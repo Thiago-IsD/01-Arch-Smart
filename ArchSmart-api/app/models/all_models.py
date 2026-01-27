@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -22,6 +22,8 @@ class User(Base):
     projects = relationship("Project", back_populates="user")
     library_items = relationship("LibraryItem", back_populates="user")
     ai_logs = relationship("AIUsageLog", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
+    meetings = relationship("Meeting", back_populates="user")
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
@@ -45,12 +47,14 @@ class Project(Base):
     client_name = Column(String)
     status = Column(String, default="PLANNING")
     total_area_m2 = Column(Float)
+    tags = Column(ARRAY(String)) # Categorization
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="projects")
     environments = relationship("Environment", back_populates="project", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="project", cascade="all, delete-orphan")
+    meetings = relationship("Meeting", back_populates="project")
 
 class Environment(Base):
     __tablename__ = "environments"
@@ -69,7 +73,7 @@ class LibraryItem(Base):
     __tablename__ = "library_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id")) # Nullable if system items exist, but spec says user_idFK(users)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id")) # Nullable if system items exist
     title = Column(String, nullable=False)
     category = Column(String)
     provider = Column(String)
@@ -95,6 +99,7 @@ class ProjectItem(Base):
     # Relationships
     environment = relationship("Environment", back_populates="items")
     library_item = relationship("LibraryItem", back_populates="project_items")
+    comments = relationship("Comment", back_populates="project_item", cascade="all, delete-orphan")
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -124,3 +129,72 @@ class AIUsageLog(Base):
 
     # Relationships
     user = relationship("User", back_populates="ai_logs")
+
+# --- Critical Modules Additions ---
+
+class VerificationToken(Base):
+    __tablename__ = "verification_tokens"
+    
+    token = Column(String, primary_key=True)
+    email = Column(String, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String)
+    email = Column(String)
+    phone = Column(String)
+    status = Column(String, default='NEW') # NEW, CONTACTED, CONVERTED
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_item_id = Column(UUID(as_uuid=True), ForeignKey("project_items.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    is_resolved = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    project_item = relationship("ProjectItem", back_populates="comments")
+    user = relationship("User", back_populates="comments")
+
+class Meeting(Base):
+    __tablename__ = "meetings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
+    title = Column(String)
+    description = Column(Text)
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    google_event_id = Column(String)
+    meeting_link = Column(String)
+
+    # Relationships
+    user = relationship("User", back_populates="meetings")
+    project = relationship("Project", back_populates="meetings")
+
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code = Column(String, unique=True, index=True, nullable=False)
+    discount_percent = Column(Float, nullable=False)
+    max_uses = Column(Integer)
+    used_count = Column(Integer, default=0)
+    expires_at = Column(DateTime)
+    is_active = Column(Boolean, default=True)
+
+class FeatureFlag(Base):
+    __tablename__ = "feature_flags"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, unique=True, nullable=False)
+    is_active = Column(Boolean, default=False)
+    description = Column(String)
