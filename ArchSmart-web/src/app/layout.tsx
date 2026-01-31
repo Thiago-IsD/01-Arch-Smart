@@ -8,9 +8,14 @@ const manrope = Manrope({
   display: "swap",
 });
 
+import { BRAND_ASSETS } from "@/config/brand";
+
 export const metadata: Metadata = {
   title: "Arch Smart",
   description: "AI-Powered Architecture Platform",
+  icons: {
+    icon: BRAND_ASSETS.icon,
+  },
 };
 
 export default function RootLayout({

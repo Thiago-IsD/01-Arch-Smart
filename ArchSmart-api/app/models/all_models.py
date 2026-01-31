@@ -349,6 +349,15 @@ class AdminLog(Base):
     action = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-    # Relationships
-    account = relationship("Account", back_populates="admin_logs")
     user = relationship("User", back_populates="admin_logs")
+
+# RAG / Knowledge Base
+from pgvector.sqlalchemy import Vector
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True) # Using Integer/BigSerial as per SQL definition
+    content = Column(Text)
+    metadata_ = Column("metadata", JSON) # 'metadata' is reserved in SQLAlchemy Base, using alias or explicit name
+    embedding = Column(Vector(1536))

@@ -6,5 +6,6 @@ from app.models.all_models import (
     Budget, BudgetItem, ItemOption, ApplicationRule,
     Presentation, PresentationEnvironment, PresentationAcceptance,
     FinancialEntry, Event, AdminLog,
-    SubscriptionStatus, ProductOriginType, ProductStateStatus
+    SubscriptionStatus, ProductOriginType, ProductStateStatus,
+    Document
 )
