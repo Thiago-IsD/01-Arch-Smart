@@ -14,6 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.api import leads, auth
+app.include_router(leads.router, prefix="/api", tags=["leads"])
+app.include_router(auth.router, prefix="/api", tags=["auth"])
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Arch Smart API"}

@@ -54,12 +54,17 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String)
     role = Column(String, default="ARCHITECT")
-    hashed_password = Column(String)
+    full_name = Column(String)
+    role = Column(String, default="ARCHITECT")
+    # hashed_password removed (managed by Supabase Auth)
+    cpf = Column(String, unique=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     account = relationship("Account", back_populates="users")
     admin_logs = relationship("AdminLog", back_populates="user")
+
+# VerificationToken removed
 
 class Lead(Base):
     __tablename__ = "leads"
@@ -69,6 +74,8 @@ class Lead(Base):
     name = Column(String)
     email = Column(String)
     phone = Column(String)
+    origin = Column(String, default="SITE")
+    active_projects = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -350,6 +357,7 @@ class AdminLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="admin_logs")
+    account = relationship("Account", back_populates="admin_logs")
 
 # RAG / Knowledge Base
 from pgvector.sqlalchemy import Vector

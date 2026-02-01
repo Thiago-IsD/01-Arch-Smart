@@ -9,3 +9,4 @@ httpx
 pgvector
 openai
 pypdf
+email-validator
