@@ -1,10 +1,36 @@
 "use client";
 
-import { Construction } from "lucide-react";
+import { Construction, LogOut } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
+    const router = useRouter();
+    const { toast } = useToast();
+
+    const handleLogout = async () => {
+        try {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+
+            toast({
+                title: "Logout realizado",
+                description: "Até logo!",
+            });
+
+            router.push("/");
+        } catch (error) {
+            toast({
+                title: "Erro ao sair",
+                description: "Tente novamente.",
+                variant: "destructive",
+            });
+        }
+    };
+
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 text-center">
             <div className="rounded-2xl bg-white p-8 shadow-xl md:p-12">
@@ -22,8 +48,9 @@ export default function DashboardPage() {
                     <Button asChild className="bg-[#008080] hover:bg-[#008080]/90">
                         <Link href="/">Voltar para Home</Link>
                     </Button>
-                    <Button variant="outline" onClick={() => window.location.reload()}>
-                        Recarregar
+                    <Button variant="outline" onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sair
                     </Button>
                 </div>
             </div>

@@ -12,6 +12,8 @@ import { Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
+import { BRAND_ASSETS } from "@/config/brand";
+import Image from "next/image";
 
 // Schema for Email Only
 const formSchema = z.object({
@@ -41,8 +43,8 @@ export default function RegisterRequestPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     email: data.email,
-                    // Redirect to our verify page where we handle the fragment
-                    redirect_url: `${window.location.origin}/auth/verify`
+                    // Redirect to callback page which will forward to verify with the token
+                    redirect_url: `${window.location.origin}/auth/callback`
                 }),
             });
 
@@ -100,6 +102,19 @@ export default function RegisterRequestPage() {
             <Navbar />
             <main className="flex-1 py-12 lg:py-24 flex items-center justify-center">
                 <div className="container px-4 md:px-6 max-w-md mx-auto">
+                    {/* Logo */}
+                    <div className="flex justify-center mb-8">
+                        <div className="relative w-32 h-32">
+                            <Image
+                                src={BRAND_ASSETS.vertical}
+                                alt="Arch Smart Logo"
+                                fill
+                                className="object-contain"
+                                priority
+                            />
+                        </div>
+                    </div>
+
                     <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold tracking-tight mb-2">Cadastre-se</h1>
                         <p className="text-muted-foreground">

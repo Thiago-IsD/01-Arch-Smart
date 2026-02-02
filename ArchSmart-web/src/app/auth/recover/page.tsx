@@ -12,6 +12,8 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
+import { BRAND_ASSETS } from "@/config/brand";
+import Image from "next/image";
 
 const formSchema = z.object({
     email: z.string().email("E-mail inválido"),
@@ -62,6 +64,19 @@ export default function RecoverPage() {
             <Navbar />
             <main className="flex-1 py-12 lg:py-24 flex items-center justify-center">
                 <div className="container px-4 md:px-6 max-w-md mx-auto">
+                    {/* Logo */}
+                    <div className="flex justify-center mb-8">
+                        <div className="relative w-32 h-32">
+                            <Image
+                                src={BRAND_ASSETS.vertical}
+                                alt="Arch Smart Logo"
+                                fill
+                                className="object-contain"
+                                priority
+                            />
+                        </div>
+                    </div>
+
                     <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold tracking-tight mb-2">Recuperar Senha</h1>
                         <p className="text-muted-foreground">

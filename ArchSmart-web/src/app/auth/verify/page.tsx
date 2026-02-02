@@ -16,6 +16,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import { BRAND_ASSETS } from "@/config/brand";
 import Image from "next/image";
+import { createClient } from "@/utils/supabase/client";
 
 // Enhanced Password Validation
 const passwordSchema = z.string()
@@ -58,21 +59,37 @@ export default function VerifyPage() {
     const passwordValue = watch("password", "");
 
     useEffect(() => {
+        // For Email Confirmation flow, token comes as query parameter
+        const searchParams = new URLSearchParams(window.location.search);
+        const tokenFromQuery = searchParams.get("token");
+        const typeFromQuery = searchParams.get("type");
+
+        // Also check hash fragment for backward compatibility with magic link
         const hash = window.location.hash;
-        const params = new URLSearchParams(hash.substring(1));
-        const token = params.get("access_token");
-        const type = params.get("type");
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const tokenFromHash = hashParams.get("access_token");
+        const typeFromHash = hashParams.get("type");
+
+        const token = tokenFromQuery || tokenFromHash;
+        const type = typeFromQuery || typeFromHash;
 
         if (token) {
             setAccessToken(token);
-            setStatus("VALID");
+
+            // Clean URL without reloading
             window.history.replaceState(null, "", window.location.pathname);
 
             if (type === "recovery") {
+                // Keep status as LOADING to avoid flashing the form
+                console.log("➡️ Recovery flow detected, redirecting to reset-password");
                 router.push(`/auth/reset-password#access_token=${token}`);
                 return;
             }
+
+            setStatus("VALID");
+            console.log("✅ Token set, ready for registration");
         } else {
+            console.warn("❌ No token found - showing invalid link message");
             setStatus("INVALID");
         }
     }, [router]);
@@ -101,11 +118,53 @@ export default function VerifyPage() {
 
             toast({
                 title: "Sucesso!",
-                description: "Conta criada. Redirecionando...",
+                description: "Cadastro concluído! Fazendo login...",
             });
 
-            localStorage.setItem("sb-access-token", accessToken);
-            router.push("/dashboard");
+            // Auto-login after registration
+            try {
+                const loginResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: resData.user.email,
+                        password: data.password,
+                    }),
+                });
+
+                if (loginResponse.ok) {
+                    const loginData = await loginResponse.json();
+
+                    // Create Supabase session
+                    const supabase = createClient();
+                    const { error: sessionError } = await supabase.auth.setSession({
+                        access_token: loginData.access_token,
+                        refresh_token: loginData.refresh_token,
+                    });
+
+                    if (sessionError) {
+                        console.error("Session creation error:", sessionError);
+                        throw new Error("Erro ao criar sessão");
+                    }
+
+                    console.log("✅ Auto-login successful, redirecting to dashboard");
+
+                    // Small delay to ensure session is set
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    router.push("/dashboard");
+                } else {
+                    throw new Error("Falha no login automático");
+                }
+            } catch (loginError: any) {
+                console.error("Auto-login failed:", loginError);
+                // Fallback: redirect to login page
+                toast({
+                    title: "Cadastro concluído!",
+                    description: "Faça login para acessar.",
+                });
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                router.push("/auth/login");
+            }
 
         } catch (error: any) {
             toast({
@@ -152,9 +211,9 @@ export default function VerifyPage() {
 
                     {/* Branding */}
                     <div className="flex justify-center mb-8">
-                        <div className="relative w-48 h-12">
+                        <div className="relative w-32 h-32">
                             <Image
-                                src={BRAND_ASSETS.horizontal}
+                                src={BRAND_ASSETS.vertical}
                                 alt="Arch Smart Logo"
                                 fill
                                 className="object-contain"

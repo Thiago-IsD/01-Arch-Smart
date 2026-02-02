@@ -13,6 +13,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
+import { BRAND_ASSETS } from "@/config/brand";
+import Image from "next/image";
 
 const formSchema = z.object({
     email: z.string().email("E-mail inválido"),
@@ -52,14 +54,27 @@ export default function LoginPage() {
 
             // Check for Supabase Access Token
             if (resData.access_token) {
-                toast({
-                    title: "Bem-vindo de volta! 👋",
-                    description: "Autenticado via Supabase.",
+                // Create Supabase session
+                const { createClient } = await import("@/utils/supabase/client");
+                const supabase = createClient();
+
+                const { error: sessionError } = await supabase.auth.setSession({
+                    access_token: resData.access_token,
+                    refresh_token: resData.refresh_token,
                 });
 
-                // Save Token (MVP)
-                localStorage.setItem("sb-access-token", resData.access_token);
+                if (sessionError) {
+                    console.error("Session creation error:", sessionError);
+                    throw new Error("Erro ao criar sessão");
+                }
 
+                toast({
+                    title: "Bem-vindo de volta! 👋",
+                    description: "Login realizado com sucesso.",
+                });
+
+                // Small delay to ensure session is set
+                await new Promise(resolve => setTimeout(resolve, 500));
                 router.push("/dashboard");
             } else {
                 throw new Error("Resposta inválida do servidor.");
@@ -81,10 +96,23 @@ export default function LoginPage() {
             <Navbar />
             <main className="flex-1 py-12 lg:py-24 flex items-center justify-center">
                 <div className="container px-4 md:px-6 max-w-md mx-auto">
+                    {/* Logo */}
+                    <div className="flex justify-center mb-8">
+                        <div className="relative w-32 h-32">
+                            <Image
+                                src={BRAND_ASSETS.vertical}
+                                alt="Arch Smart Logo"
+                                fill
+                                className="object-contain"
+                                priority
+                            />
+                        </div>
+                    </div>
+
                     <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold tracking-tight mb-2">Login</h1>
                         <p className="text-muted-foreground">
-                            Acesse sua conta Arch Smart (Supabase).
+                            Acesse sua conta Arch Smart.
                         </p>
                     </div>
 

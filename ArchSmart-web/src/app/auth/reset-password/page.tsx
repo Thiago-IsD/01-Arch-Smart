@@ -103,9 +103,18 @@ export default function ResetPasswordPage() {
             router.push("/auth/login");
 
         } catch (error: any) {
+            let errorMessage = error.message;
+
+            // Translate specific Supabase errors
+            if (errorMessage.includes("New password should be different") || errorMessage.includes("same as the old password")) {
+                errorMessage = "A nova senha não pode ser igual à senha atual.";
+            } else if (errorMessage.includes("Password should be")) {
+                errorMessage = "A senha não atende aos requisitos de segurança.";
+            }
+
             toast({
-                title: "Erro",
-                description: error.message,
+                title: "Erro ao alterar senha",
+                description: errorMessage,
                 variant: "destructive",
             });
         } finally {
@@ -138,9 +147,9 @@ export default function ResetPasswordPage() {
 
                     {/* Branding */}
                     <div className="flex justify-center mb-8">
-                        <div className="relative w-48 h-12">
+                        <div className="relative w-32 h-32">
                             <Image
-                                src={BRAND_ASSETS.horizontal}
+                                src={BRAND_ASSETS.vertical}
                                 alt="Arch Smart Logo"
                                 fill
                                 className="object-contain"

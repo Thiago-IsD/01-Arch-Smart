@@ -42,14 +42,14 @@ async def request_registration(req: RegisterRequest, db: Session = Depends(get_d
         # Optional: return success silently to avoid enumeration
         raise HTTPException(status_code=400, detail="E-mail já possui cadastro.")
     
-    # Tenta criar o usuário (Magic Link flow)
+    # Create user with email confirmation flow
     email_str = str(req.email)
     
     print(f"\n🚀 DEBUG SIGNUP: Email={email_str}, Redirect={req.redirect_url}")
 
     try:
-        # Calls the lightweight service
-        await auth_service.sign_in_with_otp(
+        # Use email confirmation flow (not magic link)
+        await auth_service.sign_up_with_email_confirmation(
             email=email_str, 
             redirect_to=req.redirect_url
         )
@@ -61,6 +61,11 @@ async def request_registration(req: RegisterRequest, db: Session = Depends(get_d
 
 @router.post("/auth/complete-register")
 async def complete_registration(req: CompleteRegisterRequest, db: Session = Depends(get_db)):
+    print(f"\n📝 DEBUG COMPLETE REGISTER:")
+    print(f"Full name: {req.full_name}")
+    print(f"CPF: {req.cpf}")
+    print(f"Token: {req.access_token[:20]}...")
+    
     # 1. Validate CPF Uniqueness locally IF provided
     if req.cpf:
         if db.query(User).filter(User.cpf == req.cpf).first():
@@ -77,17 +82,22 @@ async def complete_registration(req: CompleteRegisterRequest, db: Session = Depe
         if req.cpf:
             attributes["data"]["cpf"] = req.cpf
 
+        print(f"🔄 Updating Supabase user...")
         # Calls service using User's Token
         await auth_service.update_user(req.access_token, attributes)
+        print(f"✅ Supabase user updated successfully")
         
         # 3. Get user details from token to ensure identity
+        print(f"🔍 Getting user data...")
         user_data = await auth_service.get_user(req.access_token)
         sb_user_id = user_data.get("id")
         sb_email = user_data.get("email")
+        print(f"User ID: {sb_user_id}, Email: {sb_email}")
         
         # 4. Create Sync Record in Local DB
         local_user = db.query(User).filter(User.email == sb_email).first()
         if not local_user:
+            print(f"📦 Creating local user record...")
             account = Account(name=f"Conta de {req.full_name}")
             db.add(account)
             db.commit()
@@ -103,10 +113,16 @@ async def complete_registration(req: CompleteRegisterRequest, db: Session = Depe
             )
             db.add(new_user)
             db.commit()
+            print(f"✅ Local user created successfully")
+        else:
+            print(f"ℹ️ User already exists locally")
             
-        return {"message": "Cadastro concluído!", "user": {"id": sb_user_id}}
+        return {"message": "Cadastro concluído!", "user": {"id": sb_user_id, "email": sb_email}}
 
     except Exception as e:
+        print(f"❌ ERROR in complete_registration: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Erro ao finalizar cadastro: {str(e)}")
 
 @router.post("/auth/reset-password")
@@ -119,11 +135,14 @@ async def reset_password(req: ResetPasswordRequest):
 
 @router.post("/auth/login")
 async def login(req: LoginRequest):
+    print(f"\n🔐 DEBUG LOGIN: Email={req.email}")
     try:
         res = await auth_service.sign_in_with_password(req.email, req.password)
+        print(f"✅ LOGIN SUCCESS: {res}")
         return res
     except Exception as e:
-         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
+        print(f"❌ LOGIN FAILED: {str(e)}")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
 @router.post("/auth/recover-request")
 async def recover_request(req: RecoverRequest):

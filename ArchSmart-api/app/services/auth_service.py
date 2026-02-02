@@ -93,20 +93,51 @@ class SupabaseAuthService:
 
     # --- Public Methods ---
 
+    async def sign_up_with_email_confirmation(self, email: str, redirect_to: str = None):
+        """
+        Creates a new user with email confirmation.
+        Endpoint: POST /signup
+        The user will receive a confirmation email based on Supabase dashboard settings.
+        """
+        # Generate a temporary password (will be changed after email confirmation)
+        import secrets
+        temp_password = secrets.token_urlsafe(32)
+        
+        payload = {
+            "email": email,
+            "password": temp_password,
+            "data": {
+                "temp_signup": True  # Mark as temporary signup
+            },
+            "options": {}
+        }
+        
+        if redirect_to:
+            payload["options"]["email_redirect_to"] = redirect_to
+        
+        print(f"📧 SIGNUP PAYLOAD: {payload}")
+        
+        return await self._post("/signup", payload)
+
     async def sign_in_with_otp(self, email: str, redirect_to: str = None):
         """
-        Sends Magic Link.
+        Sends Magic Link with PKCE flow.
         Endpoint: POST /otp
-        Payload: { email, create_user: true, options: { email_redirect_to: ... } }
+        Payload: { email, should_create_user: true, options: { email_redirect_to: ..., data: {} } }
         Type: "magiclink"
         """
         payload = {
             "email": email,
             "type": "magiclink",
-            "create_user": True
+            "should_create_user": True,  # Changed from create_user
+            "options": {}
         }
+        
         if redirect_to:
-            payload["options"] = {"email_redirect_to": redirect_to}
+            payload["options"]["email_redirect_to"] = redirect_to
+        
+        # Add empty data object to ensure proper PKCE flow
+        payload["options"]["data"] = {}
         
         # Usually needs Service Key or Anon Key. headers has it.
         return await self._post("/otp", payload)

@@ -43,6 +43,11 @@ export async function middleware(request: NextRequest) {
         "/produto",
         "/precos",
         "/web-clipper",
+        "/sobre",
+        "/termos",
+        "/privacidade",
+        "/legal",
+        "/beta",
         "/beta/register",
         "/auth/login",
         "/auth/register",
@@ -52,9 +57,12 @@ export async function middleware(request: NextRequest) {
         "/auth/callback", // Supabase Auth Callback
     ];
 
-    const isPublicRoute = publicRoutes.some((route) =>
-        request.nextUrl.pathname.startsWith(route) || request.nextUrl.pathname === "/"
-    );
+    const isPublicRoute = publicRoutes.some((route) => {
+        if (route === "/") {
+            return request.nextUrl.pathname === "/";
+        }
+        return request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route + "/");
+    });
 
     // Allow static assets and API routes to pass through
     if (
@@ -63,6 +71,13 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.pathname.startsWith("/static") ||
         request.nextUrl.pathname.includes(".") // Files like favicon.ico, etc.
     ) {
+        return response;
+    }
+
+    // CRITICAL: Allow auth callback routes to process tokens from URL fragments
+    // These routes handle magic links and password resets with tokens in the hash
+    const authCallbackRoutes = ["/auth/verify", "/auth/callback", "/auth/reset-password"];
+    if (authCallbackRoutes.some(route => request.nextUrl.pathname === route)) {
         return response;
     }
 
