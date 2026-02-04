@@ -26,6 +26,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { apiUrl } from "@/lib/api-url"
 
 interface BillingData {
     plan_name: string | null
@@ -67,7 +68,7 @@ export default function BillingPage() {
                 throw new Error("Sessão expirada")
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/users/me`, {
+            const response = await fetch(apiUrl("/api/users/me"), {
                 headers: {
                     "Authorization": `Bearer ${session.access_token}`
                 }

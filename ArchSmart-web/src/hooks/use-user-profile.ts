@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api-url";
 
 interface UserProfile {
     id: string;
@@ -39,7 +40,7 @@ export function useUserProfile(): UseUserProfileReturn {
                     throw new Error("No active session");
                 }
 
-                const response = await fetch("http://localhost:8000/api/users/me", {
+                const response = await fetch(apiUrl("/api/users/me"), {
                     headers: {
                         "Authorization": `Bearer ${session.access_token}`,
                     },

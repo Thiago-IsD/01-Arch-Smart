@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea"; // Keeping it just in case, but unused for lead capture
 import { useToast } from "@/hooks/use-toast";
+import { apiUrl } from "@/lib/api-url";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -50,7 +51,7 @@ const LeadCapture = ({
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch("http://localhost:8000/api/leads", {
+      const response = await fetch(apiUrl("/api/leads"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

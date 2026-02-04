@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
+import { apiUrl } from "@/lib/api-url";
 
 const formSchema = z.object({
     name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -41,7 +42,7 @@ export default function BetaRegisterPage() {
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         try {
-            const response = await fetch("http://localhost:8000/api/leads", {
+            const response = await fetch(apiUrl("/api/leads"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -16,6 +16,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import { BRAND_ASSETS } from "@/config/brand";
 import Image from "next/image";
+import { apiUrl } from "@/lib/api-url";
 import { createClient } from "@/utils/supabase/client";
 
 // Enhanced Password Validation
@@ -99,7 +100,7 @@ export default function VerifyPage() {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch("http://localhost:8000/api/auth/complete-register", {
+            const response = await fetch(apiUrl("/api/auth/complete-register"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

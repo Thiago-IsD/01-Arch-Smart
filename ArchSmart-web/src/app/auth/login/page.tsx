@@ -16,6 +16,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import { BRAND_ASSETS } from "@/config/brand";
 import Image from "next/image";
+import { apiUrl } from "@/lib/api-url";
 
 const formSchema = z.object({
     email: z.string().email("E-mail inválido"),
@@ -52,7 +53,7 @@ export default function LoginPage() {
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         try {
-            const response = await fetch("http://localhost:8000/api/auth/login", {
+            const response = await fetch(apiUrl("/api/auth/login"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),

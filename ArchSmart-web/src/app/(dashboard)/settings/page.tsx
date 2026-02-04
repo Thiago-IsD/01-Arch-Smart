@@ -23,6 +23,13 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { apiUrl } from "@/lib/api-url"
 import { Input } from "@/components/ui/input"
 import {
     AlertDialog,
@@ -87,7 +94,7 @@ export default function SettingsPage() {
                 throw new Error("Sessão expirada. Faça login novamente.")
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/change-password`, {
+            const response = await fetch(apiUrl("/api/auth/change-password"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -139,7 +146,7 @@ export default function SettingsPage() {
                 throw new Error("Sessão expirada. Faça login novamente.")
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/account`, {
+            const response = await fetch(apiUrl("/api/account"), {
                 method: "DELETE",
                 headers: {
                     "Authorization": `Bearer ${session.access_token}`

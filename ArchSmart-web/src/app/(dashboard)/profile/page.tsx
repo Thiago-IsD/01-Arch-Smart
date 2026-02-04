@@ -70,10 +70,10 @@ export default function ProfilePage() {
                 }
 
                 // Load profile data
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                console.log("Fetching profile from:", `${apiUrl}/api/users/me`);
+                const { apiUrl } = await import("@/lib/api-url");
+                console.log("Fetching profile from:", apiUrl("/api/users/me"));
 
-                const profileResponse = await fetch(`${apiUrl}/api/users/me`, {
+                const profileResponse = await fetch(apiUrl("/api/users/me"), {
                     headers: {
                         "Authorization": `Bearer ${session.access_token}`,
                     },

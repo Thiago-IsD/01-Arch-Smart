@@ -14,6 +14,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import { BRAND_ASSETS } from "@/config/brand";
 import Image from "next/image";
+import { apiUrl } from "@/lib/api-url";
 
 // Enhanced Password Validation (Same as VerifyPage)
 const passwordSchema = z.string()
@@ -75,7 +76,7 @@ export default function ResetPasswordPage() {
         try {
             // Reuse the update user logic logic via backend or could even call supabase directly if we had SDK
             // But we stick to our API facade
-            const response = await fetch("http://localhost:8000/api/auth/complete-register", {
+            const response = await fetch(apiUrl("/api/auth/complete-register"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

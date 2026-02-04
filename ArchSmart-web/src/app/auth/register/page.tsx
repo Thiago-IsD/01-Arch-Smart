@@ -14,6 +14,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 import { BRAND_ASSETS } from "@/config/brand";
 import Image from "next/image";
+import { apiUrl } from "@/lib/api-url";
 
 // Schema for Email Only
 const formSchema = z.object({
@@ -38,7 +39,7 @@ export default function RegisterRequestPage() {
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         try {
-            const response = await fetch("http://localhost:8000/api/auth/register-request", {
+            const response = await fetch(apiUrl("/api/auth/register-request"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
