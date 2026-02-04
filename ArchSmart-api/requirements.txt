@@ -10,3 +10,4 @@ pgvector
 openai
 pypdf
 email-validator
+python-multipart
