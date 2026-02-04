@@ -14,10 +14,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import leads, auth, users
+from app.api import leads, auth, users, account
 app.include_router(leads.router, prefix="/api", tags=["leads"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(account.router, prefix="/api/account", tags=["account"])
 
 @app.get("/")
 def read_root():

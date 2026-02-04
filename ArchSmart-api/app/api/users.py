@@ -4,17 +4,22 @@ from typing import Optional
 
 from app.db.session import get_db
 from app.models.all_models import User, Account, Subscription, Plan
-from app.schemas.user import UserProfileResponse, AccountInfo
+from app.schemas.user import UserProfileResponse, AccountInfo, UserProfileUpdate
 from app.services.auth_service import auth_service
 
 
 router = APIRouter()
 
 
-async def get_current_user_id(authorization: str = Header(...)) -> str:
+
+async def get_current_user(
+    authorization: str = Header(...),
+    db: Session = Depends(get_db)
+) -> User:
     """
-    Dependency to extract and validate user ID from JWT token.
-    Expects header: Authorization: Bearer <token>
+    Dependency to extract and validate user from JWT token.
+    Handles legacy users by matching email if supabase_id is missing.
+    Returns the User model instance.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
@@ -24,28 +29,48 @@ async def get_current_user_id(authorization: str = Header(...)) -> str:
     try:
         # Verify token with Supabase and get user data
         user_data = await auth_service.get_user(token)
-        return user_data["id"]
+        supabase_id = user_data["id"]
+        email = user_data.get("email")
+        
+        # 1. Try to find by supabase_id
+        user = db.query(User).filter(User.supabase_id == supabase_id).first()
+        
+        if user:
+            return user
+            
+        # 2. If not found and we have email, try to find by email (Legacy/Migration)
+        if email:
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                # Auto-link: Update supabase_id for this user
+                user.supabase_id = supabase_id
+                db.commit()
+                db.refresh(user)
+                return user
+        
+        # 3. If still not found
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 
+from app.utils.supabase_client import get_storage_client
+
+
 @router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_profile(
-    user_id: str = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get current authenticated user's profile.
     Returns user data with account and subscription information.
     """
-    # Fetch user with related account and subscription
-    user = db.query(User).filter(User.supabase_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
     # Get account with subscription
-    account = db.query(Account).filter(Account.id == user.account_id).first()
+    account = db.query(Account).filter(Account.id == current_user.account_id).first()
     
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -62,19 +87,92 @@ async def get_current_user_profile(
             if plan:
                 plan_name = plan.name
     
+    # Generate Signed URL for logo if it's a private path
+    logo_response_url = account.logo_url
+    if account.logo_url and not account.logo_url.startswith("http"):
+        try:
+            storage_client = get_storage_client()
+            logo_response_url = await storage_client.create_signed_url(
+                bucket="secure-files", 
+                path=account.logo_url
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to sign logo URL: {e}")
+
     # Build response
     account_info = AccountInfo(
         id=account.id,
         name=account.name,
         subscription_status=subscription_status,
-        plan_name=plan_name
+        plan_name=plan_name,
+        company_name=account.company_name,
+        logo_url=logo_response_url
     )
     
     return UserProfileResponse(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
+        id=current_user.id,
+        full_name=current_user.full_name,
+        email=current_user.email,
         avatar_url=None,  # TODO: Implement avatar storage
         role="admin" if account.is_active else "user",  # Simplified role logic
         account=account_info
     )
+
+
+@router.put("/profile", response_model=UserProfileResponse)
+async def update_user_profile(
+    profile_data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user's profile (full_name).
+    """
+    # Update full_name
+    current_user.full_name = profile_data.full_name
+    db.commit()
+    db.refresh(current_user)
+    
+    # Get account info for response
+    account = db.query(Account).filter(Account.id == current_user.account_id).first()
+    subscription = db.query(Subscription).filter(Subscription.account_id == account.id).first()
+    plan_name = None
+    subscription_status = "BETA"
+    
+    if subscription:
+        subscription_status = subscription.status
+        if subscription.plan_id:
+            plan = db.query(Plan).filter(Plan.id == subscription.plan_id).first()
+            if plan:
+                plan_name = plan.name
+    
+    # Generate Signed URL for logo if it's a private path
+    logo_response_url = account.logo_url
+    if account.logo_url and not account.logo_url.startswith("http"):
+        try:
+            storage_client = get_storage_client()
+            logo_response_url = await storage_client.create_signed_url(
+                bucket="secure-files", 
+                path=account.logo_url
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to sign logo URL: {e}")
+
+    account_info = AccountInfo(
+        id=account.id,
+        name=account.name,
+        subscription_status=subscription_status,
+        plan_name=plan_name,
+        company_name=account.company_name,
+        logo_url=logo_response_url
+    )
+    
+    return UserProfileResponse(
+        id=current_user.id,
+        full_name=current_user.full_name,
+        email=current_user.email,
+        avatar_url=None,
+        role="admin" if account.is_active else "user",
+        account=account_info
+    )
+

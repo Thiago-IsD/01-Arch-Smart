@@ -30,6 +30,8 @@ class Account(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
+    company_name = Column(String, nullable=True)  # Branding: Nome do escritório
+    logo_url = Column(String, nullable=True)  # Branding: Caminho da logo
     is_active = Column(Boolean, default=True) # Soft delete
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -52,8 +54,7 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    full_name = Column(String)
-    role = Column(String, default="ARCHITECT")
+    supabase_id = Column(String, unique=True, index=True, nullable=True)  # Link to Supabase Auth
     full_name = Column(String)
     role = Column(String, default="ARCHITECT")
     # hashed_password removed (managed by Supabase Auth)

@@ -9,6 +9,8 @@ class AccountInfo(BaseModel):
     name: str
     subscription_status: str  # BETA, ACTIVE, CANCELED, READ_ONLY
     plan_name: Optional[str] = None
+    company_name: Optional[str] = None  # Branding
+    logo_url: Optional[str] = None  # Branding
 
 
 class UserProfileResponse(BaseModel):
@@ -22,3 +24,8 @@ class UserProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for updating user profile"""
+    full_name: str
