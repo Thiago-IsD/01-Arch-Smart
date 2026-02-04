@@ -102,3 +102,22 @@ async def update_account_branding(
         company_name=account.company_name,
         logo_url=logo_response_url
     )
+
+
+@router.delete("", status_code=204)
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Soft delete account.
+    Marks account as inactive.
+    """
+    account = db.query(Account).filter(Account.id == current_user.account_id).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+        
+    account.is_active = False
+    db.commit()
+    return None

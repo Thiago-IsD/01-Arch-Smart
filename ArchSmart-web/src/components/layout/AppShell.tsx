@@ -270,6 +270,9 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
             presentations: "Apresentações",
             finance: "Financeiro",
             calendar: "Agenda",
+            profile: "Perfil",
+            billing: "Planos e Pagamentos",
+            settings: "Configurações",
         };
 
         return segments.map((segment) => breadcrumbMap[segment] || segment);

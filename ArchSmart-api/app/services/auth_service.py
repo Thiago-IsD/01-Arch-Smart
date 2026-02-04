@@ -10,6 +10,7 @@ class SupabaseAuthService:
     def __init__(self):
         self.base_url = os.getenv("SUPABASE_URL")
         self.api_key = os.getenv("SUPABASE_KEY")
+        self.service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         
         # Guard Clause
         if not self.base_url or not self.api_key:
@@ -20,12 +21,42 @@ class SupabaseAuthService:
             self.auth_url = f"{self.base_url.rstrip('/')}/auth/v1"
         else:
             self.auth_url = self.base_url
-
+            
+        # Standard Headers (Anon)
         self.headers = {
             "apikey": self.api_key,
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+
+    # --- Admin Methods ---
+    async def admin_update_user(self, user_id: str, attributes: dict):
+        """
+        Update User as Admin (Bypasses RLS/Scopes).
+        Endpoint: PUT /admin/users/{id}
+        """
+        if not self.service_role_key:
+            raise Exception("Service Role Key not configured")
+            
+        url = f"{self.auth_url}/admin/users/{user_id}"
+        
+        headers = {
+            "apikey": self.service_role_key,
+            "Authorization": f"Bearer {self.service_role_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # DEBUG PRINTS
+        print(f"\n🚀 DEBUG ADMIN UPDATE:")
+        print(f"URL: {url}")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.put(url, json=attributes, headers=headers)
+            
+            print(f"⬅️ ADMIN RESPONSE: {response.status_code}")
+            if response.status_code not in [200, 201]:
+                 raise Exception(f"Admin Update Error: {response.text}")
+            return response.json()
 
     async def _post(self, endpoint: str, json_data: dict, headers: dict = None):
         """Helper for POST requests"""
@@ -52,13 +83,31 @@ class SupabaseAuthService:
     async def _put(self, endpoint: str, json_data: dict, headers: dict = None):
         """Helper for PUT requests"""
         url = f"{self.auth_url}{endpoint}"
+        
+        # Start with default headers
         merged_headers = self.headers.copy()
+        
+        # If custom headers have Authorization, it should overwrite the default one (Service Key/Anon Key)
+        # Because we need the USER Token to update the user.
         if headers:
             merged_headers.update(headers)
             
+        # DEBUG PRINTS
+        print(f"\n🚀 DEBUG PUT REQUEST:")
+        print(f"URL: {url}")
+        print(f"Headers: {merged_headers}")
+        print(f"Payload: {json_data}")
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(url, json=json_data, headers=merged_headers)
+                
+                print(f"⬅️ DEBUG RESPONSE: {response.status_code}")
+                try:
+                    print(f"Body: {response.json()}")
+                except:
+                    print(f"Text: {response.text}")
+                    
                 if response.status_code not in [200, 201]:
                     try:
                         error_data = response.json()

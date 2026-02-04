@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -28,14 +29,25 @@ export default function LoginPage() {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
 
     const {
         register,
         handleSubmit,
         formState: { errors },
+        setValue,
     } = useForm<FormData>({
         resolver: zodResolver(formSchema),
     });
+
+    // Load saved email on mount
+    useEffect(() => {
+        const savedEmail = localStorage.getItem("rememberedEmail");
+        if (savedEmail) {
+            setValue("email", savedEmail);
+            setRememberMe(true);
+        }
+    }, [setValue]);
 
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
@@ -54,6 +66,13 @@ export default function LoginPage() {
 
             // Check for Supabase Access Token
             if (resData.access_token) {
+                // Handle remember me
+                if (rememberMe) {
+                    localStorage.setItem("rememberedEmail", data.email);
+                } else {
+                    localStorage.removeItem("rememberedEmail");
+                }
+
                 // Create Supabase session
                 const { createClient } = await import("@/utils/supabase/client");
                 const supabase = createClient();
@@ -156,6 +175,21 @@ export default function LoginPage() {
                                     </button>
                                 </div>
                                 {errors.password && <span className="text-xs text-red-500">{errors.password.message}</span>}
+                            </div>
+
+                            {/* Remember Me Checkbox */}
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="remember"
+                                    checked={rememberMe}
+                                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                                />
+                                <label
+                                    htmlFor="remember"
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                >
+                                    Lembrar-me
+                                </label>
                             </div>
 
                             <Button type="submit" className="w-full h-12 text-base font-bold bg-[#008080] hover:bg-[#008080]/90 text-white" disabled={isSubmitting}>

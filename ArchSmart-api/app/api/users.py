@@ -21,14 +21,22 @@ async def get_current_user(
     Handles legacy users by matching email if supabase_id is missing.
     Returns the User model instance.
     """
+    print(f"\n🔐 DEBUG get_current_user called")
+    print(f"Authorization header: {authorization[:50]}...")
+    
     if not authorization.startswith("Bearer "):
+        print("❌ Invalid authorization header format")
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     
     token = authorization.replace("Bearer ", "")
+    print(f"Token extracted: {token[:20]}...")
     
     try:
         # Verify token with Supabase and get user data
+        print("🔍 Calling auth_service.get_user...")
         user_data = await auth_service.get_user(token)
+        print(f"✅ User data received: {user_data.get('id')}, {user_data.get('email')}")
+        
         supabase_id = user_data["id"]
         email = user_data.get("email")
         
@@ -36,6 +44,7 @@ async def get_current_user(
         user = db.query(User).filter(User.supabase_id == supabase_id).first()
         
         if user:
+            print(f"✅ User found by supabase_id: {user.id}")
             return user
             
         # 2. If not found and we have email, try to find by email (Legacy/Migration)
@@ -43,6 +52,7 @@ async def get_current_user(
             user = db.query(User).filter(User.email == email).first()
             if user:
                 # Auto-link: Update supabase_id for this user
+                print(f"⚠️ User found by email, linking supabase_id")
                 user.supabase_id = supabase_id
                 db.commit()
                 db.refresh(user)

@@ -29,3 +29,38 @@ class UserProfileResponse(BaseModel):
 class UserProfileUpdate(BaseModel):
     """Schema for updating user profile"""
     full_name: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """Schema for changing password"""
+    current_password: str
+    new_password: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserSignup(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    cpf: Optional[str] = None
+
+
+class MagicLinkRequest(BaseModel):
+    email: str
+    redirect_to: Optional[str] = None
+    redirect_url: Optional[str] = None  # Alias for frontend compatibility
+
+
+class RecoverRequest(BaseModel):
+    email: str
+
+
+class CompleteRegisterRequest(BaseModel):
+    full_name: str
+    password: str
+    access_token: str
+    cpf: Optional[str] = None
