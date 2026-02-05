@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str = Field(default="dev-secret-key-change-in-production", description="Secret key for JWT and encryption")
+    FRONTEND_URL: str = Field(default="http://localhost:3000", description="URL do frontend para redirecionamentos")
     
     @field_validator('SUPABASE_URL', 'DATABASE_URL')
     @classmethod

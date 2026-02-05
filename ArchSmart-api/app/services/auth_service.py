@@ -2,6 +2,7 @@ import os
 import httpx
 from fastapi import HTTPException
 from dotenv import load_dotenv
+from app.core.config import settings
 
 # Force load .env
 load_dotenv()
@@ -207,7 +208,7 @@ class SupabaseAuthService:
             payload["data"]["cpf"] = cpf
             
         # Redirect option for confirmation email
-        payload["options"] = {"email_redirect_to": "http://localhost:3000/auth/verify"}
+        payload["options"] = {"email_redirect_to": f"{settings.FRONTEND_URL}/auth/verify"}
 
         return await self._post("/signup", payload)
 
@@ -247,7 +248,7 @@ class SupabaseAuthService:
         """
         payload = {
             "email": email,
-            "email_redirect_to": "http://localhost:3000/auth/reset-password"
+            "email_redirect_to": f"{settings.FRONTEND_URL}/auth/reset-password"
         }
         return await self._post("/recover", payload)
 
