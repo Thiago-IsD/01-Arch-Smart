@@ -41,7 +41,7 @@ const AbstractHeroIllustration = () => (
     {/* 1. Project */}
     <div className="absolute top-0 right-10 w-32 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-700 duration-[3000ms]">
       <div className="flex items-center gap-2 mb-2">
-        <HardHat className="w-4 h-4 text-orange-500" />
+        <HardHat className="w-4 h-4 text-secondary" />
         <div className="h-2 w-12 bg-muted rounded-full" />
       </div>
       <div className="h-1.5 w-full bg-muted/30 rounded-full mb-1" />
@@ -51,17 +51,17 @@ const AbstractHeroIllustration = () => (
     {/* 2. Budget */}
     <div className="absolute bottom-10 left-0 w-36 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-500 duration-[4000ms]">
       <div className="flex items-center gap-2 mb-2">
-        <Wallet className="w-4 h-4 text-green-500" />
+        <Wallet className="w-4 h-4 text-primary" />
         <div className="h-2 w-16 bg-muted rounded-full" />
       </div>
-      <div className="h-6 w-full bg-green-500/10 rounded border border-green-500/20 flex items-center px-2">
-        <span className="text-[10px] font-bold text-green-700">R$ 14.500</span>
+      <div className="h-6 w-full bg-primary/10 rounded border border-primary/20 flex items-center px-2">
+        <span className="text-[10px] font-bold text-primary">R$ 14.500</span>
       </div>
     </div>
 
     {/* 3. Library */}
     <div className="absolute top-10 left-10 w-28 p-3 bg-card rounded-lg border shadow-lg z-0 opacity-80 animate-pulse duration-[5000ms]">
-      <BookOpen className="w-4 h-4 text-blue-500 mb-2" />
+      <BookOpen className="w-4 h-4 text-primary mb-2" />
       <div className="flex gap-1">
         <div className="h-8 w-8 bg-muted rounded" />
         <div className="h-8 w-8 bg-muted rounded" />
@@ -137,9 +137,9 @@ const AbstractBrowserWindow = () => (
     {/* Browser Toolbar */}
     <div className="h-8 bg-muted/50 border-b flex items-center px-3 gap-2">
       <div className="flex gap-1.5">
-        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-        <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+        <div className="w-2.5 h-2.5 rounded-full bg-primary" />
       </div>
       <div className="flex-1 max-w-[200px] mx-auto h-5 bg-background rounded border flex items-center px-2 text-[10px] text-muted-foreground">
         loja-moveis.com.br/cadeira-design
@@ -147,7 +147,7 @@ const AbstractBrowserWindow = () => (
     </div>
 
     {/* Content */}
-    <div className="flex-1 bg-slate-50 relative p-4 grid grid-cols-2 gap-4">
+    <div className="flex-1 bg-muted/10 relative p-4 grid grid-cols-2 gap-4">
       <div className="space-y-2">
         <div className="h-32 w-full bg-muted rounded-lg" />
         <div className="h-4 w-3/4 bg-muted rounded" />
@@ -156,7 +156,7 @@ const AbstractBrowserWindow = () => (
       <div className="space-y-4 pt-8">
         <div className="h-2 w-full bg-muted rounded" />
         <div className="h-2 w-full bg-muted rounded" />
-        <div className="h-8 w-24 bg-green-600/20 rounded" />
+        <div className="h-8 w-24 bg-primary/20 rounded" />
       </div>
 
       {/* Extension Popup */}
@@ -248,7 +248,7 @@ export default function Home() {
                     "Portal do Cliente Integrado"
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-foreground/80 font-medium">
-                      <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <Check size={14} strokeWidth={3} />
                       </div>
                       {item}

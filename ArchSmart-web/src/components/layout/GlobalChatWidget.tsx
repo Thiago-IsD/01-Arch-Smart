@@ -39,7 +39,6 @@ export function GlobalChatWidget() {
     const handleSend = () => {
         if (inputValue.trim()) {
             // TODO: Implement send logic
-            console.log("Sending message:", inputValue);
             setInputValue("");
         }
     };

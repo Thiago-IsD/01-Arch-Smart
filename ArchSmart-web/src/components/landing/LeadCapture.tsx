@@ -73,7 +73,7 @@ const LeadCapture = ({
         title: "Cadastro realizado! 🚀",
         description: "Agradecemos o interesse. Em breve entraremos em contato.",
         variant: "default",
-        className: "bg-green-600 text-white border-none",
+        className: "bg-primary text-primary-foreground border-none",
       });
 
       reset();
@@ -122,26 +122,26 @@ const LeadCapture = ({
           <div className="w-full lg:w-[450px] bg-background rounded-2xl border shadow-lg p-6 md:p-8">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nome Completo <span className="text-red-500">*</span></Label>
+                <Label htmlFor="name">Nome Completo <span className="text-destructive">*</span></Label>
                 <Input
                   id="name"
                   placeholder="Seu nome"
                   {...register("name")}
-                  className={errors.name ? "border-red-500" : ""}
+                  className={errors.name ? "border-destructive" : ""}
                 />
-                {errors.name && <span className="text-xs text-red-500">{errors.name.message}</span>}
+                {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">E-mail Profissional <span className="text-red-500">*</span></Label>
+                <Label htmlFor="email">E-mail Profissional <span className="text-destructive">*</span></Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="seu@escritorio.com"
                   {...register("email")}
-                  className={errors.email ? "border-red-500" : ""}
+                  className={errors.email ? "border-destructive" : ""}
                 />
-                {errors.email && <span className="text-xs text-red-500">{errors.email.message}</span>}
+                {errors.email && <span className="text-xs text-destructive">{errors.email.message}</span>}
               </div>
 
               <div className="space-y-2">

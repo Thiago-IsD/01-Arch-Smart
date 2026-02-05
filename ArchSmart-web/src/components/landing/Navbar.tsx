@@ -8,13 +8,7 @@ import { cn } from '@/lib/utils'
 import { BRAND_ASSETS } from '@/config/brand'
 import { ModeToggle } from '@/components/theme-toggle'
 
-const menuItems = [
-    { name: 'Produto', href: '/produto' },
-    { name: 'Web Clipper', href: '/web-clipper' },
-    { name: 'Preços', href: '/precos' },
-    { name: 'Beta', href: '/beta' },
-    { name: 'Sobre', href: '/sobre' },
-]
+import { LANDING_MENU_ITEMS } from '@/config/navigation'
 
 export const Navbar = () => {
     const [menuState, setMenuState] = React.useState(false)
@@ -61,7 +55,7 @@ export const Navbar = () => {
 
                         <div className="hidden lg:block">
                             <ul className="flex gap-8 text-sm font-medium">
-                                {menuItems.map((item, index) => (
+                                {LANDING_MENU_ITEMS.map((item, index) => (
                                     <li key={index}>
                                         <Link
                                             href={item.href}
@@ -73,10 +67,10 @@ export const Navbar = () => {
                             </ul>
                         </div>
 
-                        <div className="bg-background group-data-[state=active]:block lg:group-data-[state=active]:flex mb-6 hidden w-full flex-wrap items-center justify-end space-y-8 rounded-3xl border p-6 shadow-2xl shadow-zinc-300/20 md:flex-nowrap lg:m-0 lg:flex lg:w-fit lg:gap-4 lg:space-y-0 lg:border-transparent lg:bg-transparent lg:p-0 lg:shadow-none dark:shadow-none dark:lg:bg-transparent">
+                        <div className="bg-background group-data-[state=active]:block lg:group-data-[state=active]:flex mb-6 hidden w-full flex-wrap items-center justify-end space-y-8 rounded-3xl border p-6 shadow-2xl shadow-primary/5 md:flex-nowrap lg:m-0 lg:flex lg:w-fit lg:gap-4 lg:space-y-0 lg:border-transparent lg:bg-transparent lg:p-0 lg:shadow-none dark:shadow-none dark:lg:bg-transparent">
                             <div className="lg:hidden">
                                 <ul className="space-y-6 text-base">
-                                    {menuItems.map((item, index) => (
+                                    {LANDING_MENU_ITEMS.map((item, index) => (
                                         <li key={index}>
                                             <Link
                                                 href={item.href}

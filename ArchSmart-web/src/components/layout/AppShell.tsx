@@ -43,15 +43,7 @@ interface AppShellProps {
     children: React.ReactNode;
 }
 
-// Navigation items with Dashboard as first item
-const NAV_ITEMS = [
-    { icon: LayoutDashboard, title: "Dashboard", href: "/dashboard" },
-    { icon: Book, title: "Biblioteca", href: "/library" },
-    { icon: Folder, title: "Projetos", href: "/projects" },
-    { icon: Monitor, title: "Apresentações", href: "/presentations" },
-    { icon: DollarSign, title: "Financeiro", href: "/finance" },
-    { icon: Calendar, title: "Agenda", href: "/calendar" },
-];
+import { NAV_ITEMS, PROFILE_MENU_ITEMS } from "@/config/navigation";
 
 export function AppShell({ children }: AppShellProps) {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -365,24 +357,14 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                                <Link href="/profile" className="cursor-pointer">
-                                    <User className="mr-2 h-4 w-4" />
-                                    Perfil
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href="/settings" className="cursor-pointer">
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    Configurações
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href="/billing" className="cursor-pointer">
-                                    <CreditCard className="mr-2 h-4 w-4" />
-                                    Plano & Billing
-                                </Link>
-                            </DropdownMenuItem>
+                            {PROFILE_MENU_ITEMS.map((item) => (
+                                <DropdownMenuItem key={item.href} asChild>
+                                    <Link href={item.href} className="cursor-pointer">
+                                        <item.icon className="mr-2 h-4 w-4" />
+                                        {item.title}
+                                    </Link>
+                                </DropdownMenuItem>
+                            ))}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
                                 <LogOut className="mr-2 h-4 w-4" />

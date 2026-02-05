@@ -14,13 +14,6 @@ export default function AuthCallbackPage() {
         const searchParams = new URLSearchParams(search);
         const flow = searchParams.get("flow");
 
-        const fullUrl = window.location.href;
-
-        console.log("🔍 DEBUG CALLBACK:");
-        console.log("Full URL:", fullUrl);
-        console.log("Hash:", hash);
-        console.log("Flow (Query):", flow);
-
         if (hash) {
             // Parse the hash to get the token and type
             const params = new URLSearchParams(hash.substring(1));
@@ -28,10 +21,6 @@ export default function AuthCallbackPage() {
             const type = params.get("type");
             const error = params.get("error");
             const errorDescription = params.get("error_description");
-
-            console.log("Access Token:", accessToken ? "✅ Found" : "❌ Not found");
-            console.log("Type (Hash):", type);
-            console.log("Error:", error);
 
             // Handle errors
             if (error) {
@@ -45,21 +34,17 @@ export default function AuthCallbackPage() {
                 // Check explicit flow param OR hash type
                 if (flow === "recovery" || type === "recovery") {
                     // Password recovery flow
-                    console.log("➡️ Redirecting to /auth/reset-password");
                     router.push(`/auth/reset-password${hash}`);
                 } else {
                     // Magic link signup/login flow
-                    console.log("➡️ Redirecting to /auth/verify");
                     router.push(`/auth/verify${hash}`);
                 }
             } else {
                 // No token found, redirect to home
-                console.warn("⚠️ No access token found in callback - redirecting to home");
                 router.push("/");
             }
         } else {
             // No hash fragment, redirect to home
-            console.warn("⚠️ No hash fragment found in callback - redirecting to home");
             router.push("/");
         }
     }, [router]);

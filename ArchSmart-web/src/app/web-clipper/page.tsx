@@ -22,9 +22,9 @@ const AbstractBrowser = ({ className, children }: { className?: string, children
         {/* Browser Header */}
         <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-3">
             <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-red-400" />
-                <div className="h-3 w-3 rounded-full bg-amber-400" />
-                <div className="h-3 w-3 rounded-full bg-green-400" />
+                <div className="h-3 w-3 rounded-full bg-destructive" />
+                <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                <div className="h-3 w-3 rounded-full bg-green-500" />
             </div>
             <div className="flex-1 px-4">
                 <div className="mx-auto h-6 w-3/4 max-w-[400px] rounded-md bg-background border flex items-center px-3 text-[10px] text-muted-foreground">
@@ -40,7 +40,7 @@ const AbstractBrowser = ({ className, children }: { className?: string, children
         </div>
 
         {/* Browser Body */}
-        <div className="relative bg-white dark:bg-zinc-950 p-0 h-[400px] overflow-hidden">
+        <div className="relative bg-muted/10 p-0 h-[400px] overflow-hidden">
             {/* Simulated Webpage Content */}
             <div className="p-8 space-y-8 opacity-60 pointer-events-none select-none filter blur-[1px]">
                 <div className="flex gap-8">
@@ -69,7 +69,7 @@ const ExtensionPopup = () => (
             <div className="flex items-center gap-2 text-primary font-bold text-sm">
                 <Scissors className="h-4 w-4" /> Arch Smart
             </div>
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
         </div>
         <div className="p-4 space-y-4">
             <div className="space-y-2">
@@ -80,7 +80,7 @@ const ExtensionPopup = () => (
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                     <label className="text-[10px] font-medium text-muted-foreground uppercase">Preço</label>
-                    <div className="flex items-center gap-1 text-sm font-bold text-green-600">
+                    <div className="flex items-center gap-1 text-sm font-bold text-primary">
                         R$ 129,90
                     </div>
                 </div>
@@ -169,28 +169,28 @@ export default function WebClipperPage() {
 
                         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                             {/* The Old Way (Chaos) */}
-                            <div className="rounded-2xl border border-red-200 bg-red-50/50 dark:bg-red-950/10 p-8 space-y-6 relative overflow-hidden">
+                            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 space-y-6 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-4 opacity-10">
-                                    <XCircle size={100} className="text-red-500" />
+                                    <XCircle size={100} className="text-destructive" />
                                 </div>
-                                <h3 className="text-xl font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                                <h3 className="text-xl font-bold text-destructive flex items-center gap-2">
                                     <XCircle size={20} /> O Caos Atual
                                 </h3>
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-3 text-red-900/70 dark:text-red-200/70">
-                                        <div className="h-10 w-10 rounded bg-white/50 flex items-center justify-center shrink-0">
+                                    <div className="flex items-center gap-3 text-destructive/80">
+                                        <div className="h-10 w-10 rounded bg-background/50 flex items-center justify-center shrink-0">
                                             <span className="text-2xl">📱</span>
                                         </div>
                                         <span className="font-medium">Print perdido no WhatsApp</span>
                                     </div>
-                                    <div className="flex items-center gap-3 text-red-900/70 dark:text-red-200/70">
-                                        <div className="h-10 w-10 rounded bg-white/50 flex items-center justify-center shrink-0">
+                                    <div className="flex items-center gap-3 text-destructive/80">
+                                        <div className="h-10 w-10 rounded bg-background/50 flex items-center justify-center shrink-0">
                                             <span className="text-2xl">📉</span>
                                         </div>
                                         <span className="font-medium">Planilha desatualizada</span>
                                     </div>
-                                    <div className="flex items-center gap-3 text-red-900/70 dark:text-red-200/70">
-                                        <div className="h-10 w-10 rounded bg-white/50 flex items-center justify-center shrink-0">
+                                    <div className="flex items-center gap-3 text-destructive/80">
+                                        <div className="h-10 w-10 rounded bg-background/50 flex items-center justify-center shrink-0">
                                             <span className="text-2xl">🔗</span>
                                         </div>
                                         <span className="font-medium"> Links quebrados (404)</span>
@@ -218,7 +218,7 @@ export default function WebClipperPage() {
                                     </div>
                                     <div className="flex gap-2">
                                         <Badge variant="secondary" className="text-[10px]">Piso</Badge>
-                                        <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">R$ 129,90</Badge>
+                                        <Badge variant="outline" className="text-[10px] border-primary text-primary">R$ 129,90</Badge>
                                     </div>
                                 </div>
                                 <p className="text-sm font-medium text-primary/80">

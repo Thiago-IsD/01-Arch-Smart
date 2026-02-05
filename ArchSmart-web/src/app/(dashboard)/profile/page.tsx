@@ -59,7 +59,6 @@ export default function ProfilePage() {
                 const { data: { session } } = await supabase.auth.getSession();
 
                 if (!session) {
-                    console.log("No session found");
                     return;
                 }
 
@@ -70,10 +69,10 @@ export default function ProfilePage() {
                 }
 
                 // Load profile data
-                const { apiUrl } = await import("@/lib/api-url");
-                console.log("Fetching profile from:", apiUrl("/api/users/me"));
+                const apiUrlModule = await import("@/lib/api-url");
+                const apiUrlFn = apiUrlModule.apiUrl;
 
-                const profileResponse = await fetch(apiUrl("/api/users/me"), {
+                const profileResponse = await fetch(apiUrlFn("/api/users/me"), {
                     headers: {
                         "Authorization": `Bearer ${session.access_token}`,
                     },
@@ -86,7 +85,6 @@ export default function ProfilePage() {
                 }
 
                 const profileData = await profileResponse.json();
-                console.log("Profile data loaded:", profileData);
 
                 // Update profile form
                 if (profileData.full_name) {

@@ -82,15 +82,12 @@ export default function VerifyPage() {
 
             if (type === "recovery") {
                 // Keep status as LOADING to avoid flashing the form
-                console.log("➡️ Recovery flow detected, redirecting to reset-password");
                 router.push(`/auth/reset-password#access_token=${token}`);
                 return;
             }
 
             setStatus("VALID");
-            console.log("✅ Token set, ready for registration");
         } else {
-            console.warn("❌ No token found - showing invalid link message");
             setStatus("INVALID");
         }
     }, [router]);
@@ -124,11 +121,11 @@ export default function VerifyPage() {
 
             // Auto-login after registration
             try {
-                const loginResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+                const loginResponse = await fetch(apiUrl("/api/auth/login"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        email: resData.user.email,
+                        email: resData.email,
                         password: data.password,
                     }),
                 });
@@ -147,8 +144,6 @@ export default function VerifyPage() {
                         console.error("Session creation error:", sessionError);
                         throw new Error("Erro ao criar sessão");
                     }
-
-                    console.log("✅ Auto-login successful, redirecting to dashboard");
 
                     // Small delay to ensure session is set
                     await new Promise(resolve => setTimeout(resolve, 500));

@@ -24,9 +24,9 @@ import Link from "next/link"
 const AbstractWindow = ({ children, className }: { children: React.ReactNode, className?: string }) => (
     <div className={cn("overflow-hidden rounded-xl border bg-background shadow-2xl", className)}>
         <div className="flex items-center gap-1.5 border-b bg-muted/40 px-4 py-3">
-            <div className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
-            <div className="h-2.5 w-2.5 rounded-full bg-yellow-400/80" />
-            <div className="h-2.5 w-2.5 rounded-full bg-green-400/80" />
+            <div className="h-2.5 w-2.5 rounded-full bg-destructive" />
+            <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+            <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
         </div>
         <div className="p-4 md:p-6">{children}</div>
     </div>
@@ -116,7 +116,7 @@ export default function ProductPage() {
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                                 <div className="relative">
                                     <MousePointer2 size={24} />
-                                    <div className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                    <div className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
                                 </div>
                             </div>
                             <span className="text-xs font-medium text-muted-foreground">Portal</span>
@@ -169,7 +169,7 @@ export default function ProductPage() {
                                                     <div className="h-2 w-full rounded bg-primary/20" />
                                                     <div className="h-2 w-3/4 rounded bg-primary/10" />
                                                     <div className="flex gap-2 pt-1">
-                                                        <div className="h-5 w-12 rounded bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800" />
+                                                        <div className="h-5 w-12 rounded bg-primary/20 border border-primary/30" />
                                                         <div className="h-5 w-5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-200" />
                                                     </div>
                                                 </div>
@@ -182,7 +182,7 @@ export default function ProductPage() {
                                                 <div className="h-px bg-border" />
                                                 <div className="flex justify-between text-xs items-center">
                                                     <span className="text-muted-foreground">Normalização IA:</span>
-                                                    <Badge variant="outline" className="text-[10px] border-green-500 text-green-500 gap-1 pl-1">
+                                                    <Badge variant="outline" className="text-[10px] border-primary text-primary gap-1 pl-1">
                                                         <CheckCircle2 size={8} /> Completo
                                                     </Badge>
                                                 </div>
@@ -301,7 +301,7 @@ export default function ProductPage() {
                                                     <div className="text-[10px] text-muted-foreground">Porcelanato 90x90</div>
                                                 </div>
                                                 <div className="col-span-4 text-right">
-                                                    <div className="font-bold text-green-600">R$ 3.800</div>
+                                                    <div className="font-bold text-primary">R$ 3.800</div>
                                                     <div className="text-[10px] text-muted-foreground">Vinílico SPC</div>
                                                 </div>
                                             </div>
@@ -403,7 +403,7 @@ export default function ProductPage() {
 
                                         {/* Floating Actions */}
                                         <div className="p-4 bg-background border-t space-y-3 relative z-20">
-                                            <Button className="w-full h-11 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/10">
+                                            <Button className="w-full h-11 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/10">
                                                 Aprovar Orçamento
                                             </Button>
                                             <Button variant="outline" className="w-full h-11 border-dashed">
@@ -416,7 +416,7 @@ export default function ProductPage() {
                                 {/* Floating Notification Abstract */}
                                 <div className="absolute top-12 -right-4 lg:-right-12 bg-background border rounded-lg p-3 shadow-xl animate-bounce duration-[2000ms]">
                                     <div className="flex items-center gap-2 text-xs font-semibold">
-                                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                                        <div className="h-2 w-2 rounded-full bg-primary" />
                                         Cliente visualizando agora
                                     </div>
                                 </div>
