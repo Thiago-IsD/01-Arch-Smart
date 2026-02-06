@@ -190,7 +190,7 @@ async def change_password(
         # We already verified the user knows the old password above.
         
         await auth_service.admin_update_user(
-            user_id=str(current_user.id),
+            user_id=str(current_user.supabase_id),
             attributes={"password": password_data.new_password}
         )
         
