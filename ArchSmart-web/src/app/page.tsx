@@ -39,7 +39,7 @@ const AbstractHeroIllustration = () => (
 
     {/* Floating Satellite Cards */}
     {/* 1. Project */}
-    <div className="absolute top-0 right-10 w-32 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-700 duration-[3000ms]">
+    <div className="absolute top-0 right-10 w-32 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-700 [animation-duration:3000ms]">
       <div className="flex items-center gap-2 mb-2">
         <HardHat className="w-4 h-4 text-secondary" />
         <div className="h-2 w-12 bg-muted rounded-full" />
@@ -49,7 +49,7 @@ const AbstractHeroIllustration = () => (
     </div>
 
     {/* 2. Budget */}
-    <div className="absolute bottom-10 left-0 w-36 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-500 duration-[4000ms]">
+    <div className="absolute bottom-10 left-0 w-36 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-500 [animation-duration:4000ms]">
       <div className="flex items-center gap-2 mb-2">
         <Wallet className="w-4 h-4 text-primary" />
         <div className="h-2 w-16 bg-muted rounded-full" />
@@ -60,7 +60,7 @@ const AbstractHeroIllustration = () => (
     </div>
 
     {/* 3. Library */}
-    <div className="absolute top-10 left-10 w-28 p-3 bg-card rounded-lg border shadow-lg z-0 opacity-80 animate-pulse duration-[5000ms]">
+    <div className="absolute top-10 left-10 w-28 p-3 bg-card rounded-lg border shadow-lg z-0 opacity-80 animate-pulse [animation-duration:5000ms]">
       <BookOpen className="w-4 h-4 text-primary mb-2" />
       <div className="flex gap-1">
         <div className="h-8 w-8 bg-muted rounded" />

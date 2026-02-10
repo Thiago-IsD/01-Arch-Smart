@@ -19,6 +19,8 @@ app.include_router(leads.router, prefix="/api", tags=["leads"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
+from app.api.routers import product_router
+app.include_router(product_router.router, prefix="/api/products", tags=["products"])
 
 @app.get("/")
 def read_root():

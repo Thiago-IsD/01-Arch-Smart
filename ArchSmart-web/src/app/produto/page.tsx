@@ -414,7 +414,7 @@ export default function ProductPage() {
                                 </div>
 
                                 {/* Floating Notification Abstract */}
-                                <div className="absolute top-12 -right-4 lg:-right-12 bg-background border rounded-lg p-3 shadow-xl animate-bounce duration-[2000ms]">
+                                <div className="absolute top-12 -right-4 lg:-right-12 bg-background border rounded-lg p-3 shadow-xl animate-bounce [animation-duration:2000ms]">
                                     <div className="flex items-center gap-2 text-xs font-semibold">
                                         <div className="h-2 w-2 rounded-full bg-primary" />
                                         Cliente visualizando agora

@@ -27,10 +27,17 @@ def reset_database():
             connection.execute(text("DROP SCHEMA public CASCADE;"))
             print("Recreating schema public...")
             connection.execute(text("CREATE SCHEMA public;"))
-            # Optional: Grant permissions if needed, often default is OK or user is owner
-            # connection.execute(text("GRANT ALL ON SCHEMA public TO public;"))
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector;")) # Required for Document model
             trans.commit()
-            print("Database reset successfully.")
+            print("Schema reset successfully.")
+    
+            # Create tables
+            from app.db.base import Base
+            from app.models.all_models import Product, Account, ProductOrigin, ProductState, Document # Import all
+            print(f"Registered tables: {Base.metadata.tables.keys()}")
+            print("Creating tables...")
+            Base.metadata.create_all(bind=engine)
+            print("Tables created successfully.")
         except Exception as e:
             trans.rollback()
             print(f"Error during reset: {e}")

@@ -165,7 +165,12 @@ class Product(Base):
     state_id = Column(UUID(as_uuid=True), ForeignKey("product_states.id"), nullable=True)
     name = Column(String, nullable=False)
     description = Column(Text)
+    store = Column(String, nullable=True) # New field
+    category = Column(String, nullable=True) # New field
+    price = Column(Float, nullable=True) # New field
+    dimensions = Column(JSON, nullable=True) # New field: {width, height, depth, unit}
     image_url = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     account = relationship("Account", back_populates="products")
