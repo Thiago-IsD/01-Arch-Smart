@@ -6,9 +6,9 @@ import { PaginationControls } from "@/components/ui/pagination-controls"
 import { TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import { ProductFormSheet } from "@/components/library/ProductFormSheet"
+import Link from "next/link"
 
-// Function to fetch products
-// Function to fetch products
 // Function to fetch products
 async function getProducts(searchParams: {
     q?: string;
@@ -32,9 +32,6 @@ async function getProducts(searchParams: {
         searchParams.origins.forEach(o => params.append("origins", o))
     }
 
-    // In a real app, use absolute URL or internal API call helper
-    // For Server Components, we often need absolute URL if fetching from own API
-    // Use 127.0.0.1 to avoid IPv6 issues with localhost in Node.js
     try {
         const res = await fetch(`http://127.0.0.1:8000/api/products?${params.toString()}`, {
             cache: "no-store",
@@ -48,8 +45,20 @@ async function getProducts(searchParams: {
         return res.json()
     } catch (error) {
         console.error("Connection error:", error)
-        // Return empty structure on error to prevent crashes
         return { items: [], total: 0, page: 1, size: 15, pages: 0 }
+    }
+}
+
+async function getProduct(id: string) {
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/api/products/${id}`, {
+            cache: "no-store",
+        })
+        if (!res.ok) return null
+        return res.json()
+    } catch (error) {
+        console.error("Error fetching product:", error)
+        return null
     }
 }
 
@@ -64,6 +73,10 @@ export default async function LibraryPage(props: {
     const page = typeof searchParams.page === "string" ? parseInt(searchParams.page) : 1
     const size = typeof searchParams.size === "string" ? parseInt(searchParams.size) : 15
 
+    // Form Actions
+    const action = typeof searchParams.action === "string" ? searchParams.action : undefined
+    const editId = typeof searchParams.id === "string" ? searchParams.id : undefined
+
     // Helper to get array from param
     const getArrayParam = (param: string | string[] | undefined): string[] => {
         if (!param) return []
@@ -75,13 +88,17 @@ export default async function LibraryPage(props: {
 
     // Fetch data if on library tab
     let data = { items: [], total: 0, page: 1, size: 15, pages: 0 }
+    let productToEdit = null
 
     if (tab === "library") {
         try {
             data = await getProducts({ q, categories, origins, sort_by, page, size })
+
+            if (action === "edit" && editId) {
+                productToEdit = await getProduct(editId)
+            }
         } catch (error) {
             console.error(error)
-            // Handle error state gracefully
         }
     }
 
@@ -97,17 +114,18 @@ export default async function LibraryPage(props: {
                     </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Button>
-                        <Plus className="mr-2 h-4 w-4" /> Adicionar Produto
+                    <Button asChild>
+                        <Link href={{
+                            pathname: "/library",
+                            query: { ...searchParams, action: "new" }
+                        }}>
+                            <Plus className="mr-2 h-4 w-4" /> Adicionar Produto
+                        </Link>
                     </Button>
                 </div>
             </div>
 
-            {/* Client Component handles Search, Filters, and Tabs state sync */}
             <LibraryToolbar />
-
-            {/* Content for Tabs - Controlled by URL state in LibraryToolbar,
-                but we need to render content based on current tab param */}
 
             <div className="flex-1 flex flex-col space-y-4 mt-4">
                 {tab === "inbox" && (
@@ -123,13 +141,13 @@ export default async function LibraryPage(props: {
                                 products.map((product: any) => (
                                     <ProductCard
                                         key={product.id}
+                                        id={product.id}
                                         name={product.name}
-                                        store={product.store} // Now supported by API
+                                        store={product.store}
                                         price={product.price}
                                         image_url={product.image_url}
-                                        state={product.state ? product.state.name : undefined} // Adjust based on API response structure
+                                        state={product.state ? product.state.name : undefined}
                                         origin={product.origin ? product.origin.name : undefined}
-                                    // created_at is available but not displayed on card according to design, but used for sorting
                                     />
                                 ))
                             ) : (
@@ -144,7 +162,6 @@ export default async function LibraryPage(props: {
                             )}
                         </div>
 
-                        {/* Pagination Controls */}
                         {products.length > 0 && (
                             <PaginationControls
                                 total={data.total}
@@ -162,6 +179,12 @@ export default async function LibraryPage(props: {
                     </div>
                 )}
             </div>
+
+            {/* Product Form Sheet */}
+            <ProductFormSheet
+                isOpen={!!action}
+                productToEdit={productToEdit}
+            />
         </div>
     )
 }

@@ -66,6 +66,13 @@ def get_products(
         "items": products
     }
 
+@router.get("/{product_id}", response_model=ProductResponse)
+def get_product(product_id: UUID, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
 @router.post("/", response_model=ProductResponse)
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     # Verify/Get State ID provided or Default to NORMALIZED
