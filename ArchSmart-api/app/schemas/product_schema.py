@@ -12,6 +12,7 @@ class ProductBase(BaseModel):
     price: Optional[float] = None
     dimensions: Optional[Dict[str, Any]] = None # {width, height, depth, unit}
     image_url: Optional[str] = None
+    source_url: Optional[str] = None
     origin_id: Optional[UUID] = None
     state_id: Optional[UUID] = None
 
@@ -26,6 +27,7 @@ class ProductUpdate(BaseModel):
     price: Optional[float] = None
     dimensions: Optional[Dict[str, Any]] = None
     image_url: Optional[str] = None
+    source_url: Optional[str] = None
     state_id: Optional[UUID] = None
 
 class ProductStateSchema(BaseModel):

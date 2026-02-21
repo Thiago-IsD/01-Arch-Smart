@@ -170,6 +170,7 @@ class Product(Base):
     price = Column(Float, nullable=True) # New field
     dimensions = Column(JSON, nullable=True) # New field: {width, height, depth, unit}
     image_url = Column(String)
+    source_url = Column(String, nullable=True) # Link to original store
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

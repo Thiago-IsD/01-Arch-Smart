@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, Sparkles, ExternalLink } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
 import {
@@ -32,7 +32,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { ImageUpload } from "@/components/ui/image-upload"
 
 const CATEGORIES = [
     "Mobiliário",
@@ -46,37 +45,31 @@ const CATEGORIES = [
 
 const formSchema = z.object({
     name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-    store: z.string().optional(),
     category: z.string().optional(),
     price: z.coerce.number().min(0, "Preço inválido").optional(),
-    image_url: z.string().url("URL inválida").optional().or(z.literal("")),
-    description: z.string().optional(),
-    // Dimensions
-    width: z.coerce.number().optional(),
-    height: z.coerce.number().optional(),
-    depth: z.coerce.number().optional(),
+    width: z.coerce.number().min(0.1, "Obrigatório").optional(),
+    height: z.coerce.number().min(0.1, "Obrigatório").optional(),
+    depth: z.coerce.number().min(0.1, "Obrigatório").optional(),
     source_url: z.string().url("URL inválida").optional().or(z.literal("")),
 })
 
-interface ProductFormSheetProps {
+interface NormalizationSheetProps {
     isOpen: boolean
-    productToEdit?: any // Typed as needed
+    productToNormalize?: any
 }
 
-export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProps) {
+export function NormalizationSheet({ isOpen, productToNormalize }: NormalizationSheetProps) {
     const router = useRouter()
     const { toast } = useToast()
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isExtracting, setIsExtracting] = useState(false)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema) as any,
         defaultValues: {
             name: "",
-            store: "",
             category: "",
             price: 0,
-            image_url: "",
-            description: "",
             width: 0,
             height: 0,
             depth: 0,
@@ -84,57 +77,43 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
         },
     })
 
-    // Update form when productToEdit changes
     useEffect(() => {
-        if (productToEdit) {
+        if (productToNormalize) {
             form.reset({
-                name: productToEdit.name,
-                store: productToEdit.store || "",
-                category: productToEdit.category || "",
-                price: productToEdit.price || 0,
-                image_url: productToEdit.image_url || "",
-                description: productToEdit.description || "",
-                width: productToEdit.dimensions?.width || 0,
-                height: productToEdit.dimensions?.height || 0,
-                depth: productToEdit.dimensions?.depth || 0,
-                source_url: productToEdit.source_url || "",
-            })
-        } else {
-            form.reset({
-                name: "",
-                store: "",
-                category: "",
-                price: 0,
-                image_url: "",
-                description: "",
-                width: 0,
-                height: 0,
-                depth: 0,
-                source_url: "",
+                name: productToNormalize.name,
+                category: productToNormalize.category || "",
+                price: productToNormalize.price || 0,
+                width: productToNormalize.dimensions?.width || 0,
+                height: productToNormalize.dimensions?.height || 0,
+                depth: productToNormalize.dimensions?.depth || 0,
+                source_url: productToNormalize.source_url || "",
             })
         }
-    }, [productToEdit, form])
+    }, [productToNormalize, form])
 
     const onClose = () => {
-        // Remove params to close sheet
         const url = new URL(window.location.href)
         url.searchParams.delete("action")
         url.searchParams.delete("id")
         router.push(url.pathname + url.search)
     }
 
+    const { watch } = form
+    const w = watch("width") || 0
+    const h = watch("height") || 0
+    const d = watch("depth") || 0
+    const hasDimensions = w > 0 && h > 0 && d > 0
+
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        if (!hasDimensions) return
+
         setIsSubmitting(true)
         try {
-            // Prepare payload
             const payload = {
                 name: values.name,
-                store: values.store,
                 category: values.category,
                 price: values.price,
-                image_url: values.image_url || null,
-                description: values.description,
-                source_url: values.source_url || null,
+                source_url: values.source_url,
                 dimensions: {
                     width: values.width,
                     height: values.height,
@@ -143,48 +122,17 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 }
             }
 
-            // Clean undefineds
-            // Create user
-            const { createClient } = await import("@/utils/supabase/client");
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-
-            if (!user) throw new Error("Usuário não autenticado");
-
-            // We need to fetch the account_id from our API or store it in session. 
-            // For now, let's assume the backend finds it via the user, OR we pass a dummy account_id since auth/user/account logic is complex here.
-            // Actually, backend requires account_id. 
-            // Let's rely on the backend finding the account via the user token IF we had that middleware set up perfectly.
-            // But currently auth.py creates user/account.
-            // Let's just pass a hardcoded/fetched account ID? No, let's fix backend to get account from user? 
-            // Better: For this MVP, we fetch the first account of the user or similar.
-            // Wait, create_product endpoint requires account_id in body? 
-            // ProductCreate schema has account_id: UUID.
-
-            // Temporary Hack: Fetch current user's account first? 
-            // Or simpler: Fetch one of the existing accounts from the seed to make it work for now?
-            // "41456060-7f1a-46d8-9769-5ada9733fe97" was created in seed.
-            // Use that for now to avoid blocking.
-            const accountId = "41456060-7f1a-46d8-9769-5ada9733fe97"
-
-            const method = productToEdit ? "PUT" : "POST"
-            const url = productToEdit
-                ? apiUrl(`/api/products/${productToEdit.id}`)
-                : apiUrl("/api/products/")
-
-            const finalPayload = { ...payload, account_id: accountId }
-
-            const res = await fetch(url, {
-                method,
+            const res = await fetch(apiUrl(`/api/products/${productToNormalize.id}/approve`), {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(finalPayload),
+                body: JSON.stringify(payload),
             })
 
-            if (!res.ok) throw new Error("Falha ao salvar produto")
+            if (!res.ok) throw new Error("Falha ao aprovar produto")
 
             toast({
-                title: productToEdit ? "Produto atualizado!" : "Produto criado!",
-                description: `${values.name} foi salvo com sucesso.`,
+                title: "Produto Aprovado!",
+                description: "O item foi movido para a biblioteca.",
             })
 
             onClose()
@@ -194,7 +142,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
             console.error(error)
             toast({
                 title: "Erro",
-                description: "Não foi possível salvar o produto.",
+                description: "Não foi possível aprovar o produto.",
                 variant: "destructive",
             })
         } finally {
@@ -202,18 +150,110 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
         }
     }
 
+    const handleExtractAi = async () => {
+        setIsExtracting(true)
+        try {
+            const currentUrl = form.getValues("source_url") || productToNormalize?.source_url || "";
+            const currentName = form.getValues("name") || productToNormalize?.name || "";
+
+            const res = await fetch(apiUrl("/api/products/normalize"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: currentName, source_url: currentUrl }),
+            })
+
+            if (!res.ok) throw new Error("Falha ao extrair dados")
+
+            const data = await res.json()
+
+            if (data) {
+                if (data.name) form.setValue("name", data.name)
+                if (data.category) form.setValue("category", data.category)
+                if (data.price !== undefined && data.price !== null) form.setValue("price", data.price)
+
+                if (data.dimensions) {
+                    form.setValue("width", data.dimensions.width)
+                    form.setValue("height", data.dimensions.height)
+                    form.setValue("depth", data.dimensions.depth)
+                }
+
+                toast({
+                    title: "Sucesso",
+                    description: "Dados extraídos com IA.",
+                })
+            }
+
+        } catch (error) {
+            console.error(error)
+            toast({
+                title: "Erro",
+                description: "Não foi possível conectar com a IA.",
+                variant: "destructive"
+            })
+        } finally {
+            setIsExtracting(false)
+        }
+    }
+
     return (
         <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <SheetContent className="overflow-y-auto w-[400px] sm:w-[540px]">
-                <SheetHeader>
-                    <SheetTitle>{productToEdit ? "Editar Produto" : "Novo Produto"}</SheetTitle>
+                <SheetHeader className="mb-6">
+                    <SheetTitle>Normalizar Produto</SheetTitle>
                     <SheetDescription>
-                        Preencha os dados abaixo para salvar o produto na sua biblioteca.
+                        Complete os dados faltantes para aprovar este produto.
                     </SheetDescription>
                 </SheetHeader>
 
+                {productToNormalize && (
+                    <div className="flex gap-4 mb-6 p-4 border rounded-lg bg-muted/50">
+                        {productToNormalize.image_url ? (
+                            <img
+                                src={productToNormalize.image_url}
+                                alt={productToNormalize.name}
+                                className="w-24 h-24 object-cover rounded-md"
+                            />
+                        ) : (
+                            <div className="w-24 h-24 bg-muted rounded-md flex items-center justify-center">
+                                Sem imagem
+                            </div>
+                        )}
+                        <div className="flex flex-col flex-1 justify-center">
+                            <h4 className="font-medium text-sm line-clamp-2">{productToNormalize.name}</h4>
+                            <p className="text-sm text-muted-foreground mt-1">{productToNormalize.store}</p>
+
+                            <Button variant="link" className="p-0 h-auto self-start mt-2" size="sm" asChild>
+                                {productToNormalize.source_url ? (
+                                    <a href={productToNormalize.source_url} target="_blank" rel="noopener noreferrer">
+                                        Ver na Loja <ExternalLink className="ml-1 h-3 w-3" />
+                                    </a>
+                                ) : (
+                                    <span className="text-muted-foreground">URL não disponível</span>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="mb-6">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={handleExtractAi}
+                        disabled={isExtracting}
+                    >
+                        {isExtracting ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Sparkles className="mr-2 h-4 w-4" />
+                        )}
+                        {isExtracting ? "Analisando..." : "Extrair dados com IA"}
+                    </Button>
+                </div>
+
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
                         <FormField
                             control={form.control}
@@ -222,7 +262,21 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                 <FormItem>
                                     <FormLabel>Nome do Produto *</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Cadeira Eames..." {...field} />
+                                        <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="source_url"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>URL do Produto</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="https://..." {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -230,21 +284,6 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                         />
 
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="store"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Marca / Loja</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Herman Miller" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-
                             <FormField
                                 control={form.control}
                                 name="category"
@@ -269,9 +308,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                     </FormItem>
                                 )}
                             />
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="price"
@@ -287,40 +324,10 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                             />
                         </div>
 
-                        <FormField
-                            control={form.control}
-                            name="source_url"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>URL do Produto</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="https://..." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="image_url"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Imagem do Produto</FormLabel>
-                                    <FormControl>
-                                        <ImageUpload
-                                            value={field.value || ""}
-                                            onChange={field.onChange}
-                                            disabled={isSubmitting}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
                         <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Dimensões (cm)</label>
+                            <label className="text-sm font-medium leading-none">
+                                Dimensões (cm) {!hasDimensions && <span className="text-destructive">*</span>}
+                            </label>
                             <div className="flex gap-2">
                                 <FormField
                                     control={form.control}
@@ -356,27 +363,16 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                     )}
                                 />
                             </div>
-                        </div>
-
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Descrição</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Detalhes opcionais..." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
+                            {!hasDimensions && (
+                                <p className="text-[0.8rem] text-destructive font-medium">As dimensões são obrigatórias para aprovação.</p>
                             )}
-                        />
+                        </div>
 
                         <div className="flex justify-end gap-2 pt-4">
                             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                            <Button type="submit" disabled={isSubmitting}>
+                            <Button type="submit" disabled={isSubmitting || !hasDimensions}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Salvar
+                                Aprovar Produto
                             </Button>
                         </div>
 

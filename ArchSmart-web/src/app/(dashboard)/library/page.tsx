@@ -7,6 +7,7 @@ import { TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ProductFormSheet } from "@/components/library/ProductFormSheet"
+import { NormalizationSheet } from "@/components/library/NormalizationSheet"
 import Link from "next/link"
 
 // Function to fetch products
@@ -17,6 +18,7 @@ async function getProducts(searchParams: {
     sort_by?: string;
     page: number;
     size: number;
+    state?: string;
 }) {
     const params = new URLSearchParams()
     params.set("page", searchParams.page.toString())
@@ -24,6 +26,7 @@ async function getProducts(searchParams: {
 
     if (searchParams.q) params.set("q", searchParams.q)
     if (searchParams.sort_by) params.set("sort_by", searchParams.sort_by)
+    if (searchParams.state) params.set("state", searchParams.state)
 
     if (searchParams.categories) {
         searchParams.categories.forEach(c => params.append("categories", c))
@@ -90,16 +93,26 @@ export default async function LibraryPage(props: {
     let data = { items: [], total: 0, page: 1, size: 15, pages: 0 }
     let productToEdit = null
 
-    if (tab === "library") {
+    if (tab === "library" || tab === "inbox") {
         try {
-            data = await getProducts({ q, categories, origins, sort_by, page, size })
+            const productState = tab === "inbox" ? "CAPTURED" : "NORMALIZED"
+            data = await getProducts({ q, categories, origins, sort_by, page, size, state: productState })
 
-            if (action === "edit" && editId) {
+            if ((action === "edit" || action === "normalize") && editId) {
                 productToEdit = await getProduct(editId)
             }
         } catch (error) {
             console.error(error)
         }
+    }
+
+    // Fetch inbox count always
+    let inboxCount = 0
+    try {
+        const countData = await getProducts({ page: 1, size: 1, state: "CAPTURED" })
+        inboxCount = countData.total || 0
+    } catch (error) {
+        console.error("Error fetching inbox count", error)
     }
 
     const products = data.items || []
@@ -125,16 +138,10 @@ export default async function LibraryPage(props: {
                 </div>
             </div>
 
-            <LibraryToolbar />
+            <LibraryToolbar inboxCount={inboxCount} />
 
             <div className="flex-1 flex flex-col space-y-4 mt-4">
-                {tab === "inbox" && (
-                    <div className="flex flex-col items-center justify-center h-[400px] border border-dashed rounded-lg">
-                        <p className="text-muted-foreground">Itens capturados aparecerão aqui para normalização.</p>
-                    </div>
-                )}
-
-                {tab === "library" && (
+                {(tab === "library" || tab === "inbox") && (
                     <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                             {products.length > 0 ? (
@@ -148,6 +155,8 @@ export default async function LibraryPage(props: {
                                         image_url={product.image_url}
                                         state={product.state ? product.state.name : undefined}
                                         origin={product.origin ? product.origin.name : undefined}
+                                        dimensions={product.dimensions}
+                                        isInbox={tab === "inbox"}
                                     />
                                 ))
                             ) : (
@@ -180,11 +189,21 @@ export default async function LibraryPage(props: {
                 )}
             </div>
 
-            {/* Product Form Sheet */}
-            <ProductFormSheet
-                isOpen={!!action}
-                productToEdit={productToEdit}
-            />
+            {/* Product Form Sheet (Create/Edit) */}
+            {action !== "normalize" && (
+                <ProductFormSheet
+                    isOpen={!!action && action !== "normalize"}
+                    productToEdit={productToEdit}
+                />
+            )}
+
+            {/* Normalization Sheet */}
+            {action === "normalize" && (
+                <NormalizationSheet
+                    isOpen={action === "normalize"}
+                    productToNormalize={productToEdit}
+                />
+            )}
         </div>
     )
 }

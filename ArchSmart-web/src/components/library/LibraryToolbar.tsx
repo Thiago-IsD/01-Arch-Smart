@@ -23,7 +23,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 
-export function LibraryToolbar() {
+interface LibraryToolbarProps {
+    inboxCount?: number;
+}
+
+export function LibraryToolbar({ inboxCount = 0 }: LibraryToolbarProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
@@ -149,9 +153,11 @@ export function LibraryToolbar() {
                     <TabsList>
                         <TabsTrigger value="inbox" className="relative">
                             Inbox
-                            <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">
-                                3
-                            </Badge>
+                            {inboxCount > 0 && (
+                                <Badge variant="destructive" className="ml-2 h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-[10px] px-1">
+                                    {inboxCount}
+                                </Badge>
+                            )}
                         </TabsTrigger>
                         <TabsTrigger value="library">Biblioteca</TabsTrigger>
                         <TabsTrigger value="shopping">Shopping Hub</TabsTrigger>

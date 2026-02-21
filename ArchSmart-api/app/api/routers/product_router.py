@@ -1,13 +1,67 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
+import time
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.session import get_db
-from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType
+from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, Account
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
 
 router = APIRouter()
+
+@router.get("/seed-captured")
+def seed_captured(db: Session = Depends(get_db)):
+    account = db.query(Account).first()
+    if not account:
+        account = Account(name="Demo Account", company_name="Arch Smart Demo")
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+
+    captured_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.CAPTURED).first()
+    if not captured_state:
+        captured_state = ProductState(name="Captured", status=ProductStateStatus.CAPTURED)
+        db.add(captured_state)
+        
+    clipper_origin = db.query(ProductOrigin).filter(ProductOrigin.type == ProductOriginType.WEB_CLIPPER).first()
+    if not clipper_origin:
+        clipper_origin = ProductOrigin(name="Web Clipper", type=ProductOriginType.WEB_CLIPPER)
+        db.add(clipper_origin)
+
+    db.commit()
+    db.refresh(captured_state)
+    db.refresh(clipper_origin)
+
+    p1 = Product(
+        account_id=account.id,
+        name="Sofa Modular Cinza (Bruto)",
+        store="Tok&Stok",
+        category=None,
+        price=3200.00,
+        image_url="https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&q=80&w=500",
+        state_id=captured_state.id,
+        origin_id=clipper_origin.id,
+        dimensions=None
+    )
+
+    p2 = Product(
+        account_id=account.id,
+        name="Luminária Pendente Industrial",
+        store="Westwing",
+        category="Iluminação",
+        price=None,
+        image_url="https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&q=80&w=500",
+        state_id=captured_state.id,
+        origin_id=clipper_origin.id,
+        dimensions=None
+    )
+
+    db.add(p1)
+    db.add(p2)
+    db.commit()
+    return {"message": "Captured products seeded successfully"}
 
 @router.get("/", response_model=PaginatedProductResponse)
 def get_products(
@@ -72,6 +126,26 @@ def get_product(product_id: UUID, db: Session = Depends(get_db)):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
+
+from app.services.ai_service import extract_product_data
+
+class NormalizeRequest(BaseModel):
+    text: str = ""
+    source_url: Optional[str] = None
+
+class NormalizeResponse(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    price: Optional[float] = None
+    dimensions: Optional[Dict[str, float]] = None
+
+@router.post("/normalize", response_model=NormalizeResponse)
+async def normalize_product(request: NormalizeRequest):
+    try:
+        extracted_data = await extract_product_data(request.text, request.source_url)
+        return extracted_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=ProductResponse)
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
@@ -142,3 +216,27 @@ def delete_product(product_id: UUID, db: Session = Depends(get_db)):
     db_product.state_id = inactive_state.id
     db.commit()
     return {"ok": True}
+
+@router.patch("/{product_id}/approve", response_model=ProductResponse)
+def approve_product(product_id: UUID, product_update: ProductUpdate, db: Session = Depends(get_db)):
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Update fields
+    update_data = product_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_product, key, value)
+        
+    # Set status to NORMALIZED
+    normalized_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.NORMALIZED).first()
+    if not normalized_state:
+        normalized_state = ProductState(name="Normalized", status=ProductStateStatus.NORMALIZED)
+        db.add(normalized_state)
+        db.commit()
+        db.refresh(normalized_state)
+        
+    db_product.state_id = normalized_state.id
+    db.commit()
+    db.refresh(db_product)
+    return db_product

@@ -38,6 +38,8 @@ interface ProductCardProps {
     image_url?: string | null
     state?: string
     origin?: string
+    dimensions?: any
+    isInbox?: boolean
     onMove?: () => void
     onDelete?: () => void
 }
@@ -50,6 +52,8 @@ export function ProductCard({
     image_url,
     state,
     origin,
+    dimensions,
+    isInbox,
 }: ProductCardProps) {
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -65,11 +69,14 @@ export function ProductCard({
         currency: 'BRL',
     });
 
+    const isMissingDimensions = isInbox && (!dimensions || !dimensions.width || !dimensions.height || !dimensions.depth);
+    const actionType = isInbox ? "normalize" : "edit";
+
     const editUrl = {
         pathname: "/library",
         query: {
             ...Object.fromEntries(searchParams.entries()),
-            action: "edit",
+            action: actionType,
             id: id
         }
     }
@@ -134,7 +141,7 @@ export function ProductCard({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem asChild>
-                                    <Link href={editUrl}>Editar</Link>
+                                    <Link href={editUrl}>{isInbox ? "Normalizar" : "Editar"}</Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={handleAddToProject}>
                                     Mover para Projeto
@@ -151,7 +158,7 @@ export function ProductCard({
                 </div>
 
                 <CardContent className="p-4">
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex flex-wrap gap-2 mb-2">
                         {state && (
                             <Badge variant={state === "NORMALIZED" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0 h-5">
                                 {state}
@@ -160,6 +167,11 @@ export function ProductCard({
                         {origin && (
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
                                 {origin}
+                            </Badge>
+                        )}
+                        {isMissingDimensions && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5">
+                                Faltam Dimensões
                             </Badge>
                         )}
                     </div>

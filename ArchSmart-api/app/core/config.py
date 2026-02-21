@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = Field(None, description="SMTP password")
     EMAILS_FROM_EMAIL: Optional[str] = Field(None, description="Default sender email address")
     
+    # AI Config
+    GEMINI_API_KEY: str = Field(..., description="Google Gemini API Key for data extraction")
+    
     # Security
     SECRET_KEY: str = Field(default="dev-secret-key-change-in-production", description="Secret key for JWT and encryption")
     FRONTEND_URL: str = Field(default="http://localhost:3000", description="URL do frontend para redirecionamentos")
