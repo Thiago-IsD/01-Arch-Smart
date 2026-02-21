@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ProductFormSheet } from "@/components/library/ProductFormSheet"
 import { NormalizationSheet } from "@/components/library/NormalizationSheet"
+import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import Link from "next/link"
 
 // Function to fetch products
@@ -186,6 +187,10 @@ export default async function LibraryPage(props: {
                     <div className="flex flex-col items-center justify-center h-[400px] border border-dashed rounded-lg">
                         <p className="text-muted-foreground">Shopping Hub integration coming soon.</p>
                     </div>
+                )}
+
+                {tab === "clipper" && (
+                    <ClipperOnboarding />
                 )}
             </div>
 

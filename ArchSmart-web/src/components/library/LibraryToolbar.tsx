@@ -161,6 +161,7 @@ export function LibraryToolbar({ inboxCount = 0 }: LibraryToolbarProps) {
                         </TabsTrigger>
                         <TabsTrigger value="library">Biblioteca</TabsTrigger>
                         <TabsTrigger value="shopping">Shopping Hub</TabsTrigger>
+                        <TabsTrigger value="clipper">Web Clipper</TabsTrigger>
                     </TabsList>
                 </Tabs>
 

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>Arch Smart Clipper</title>
+</head>
+<body>
+  <div id="app" class="container">
+    <div class="header">
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" x2="12" y1="8" y2="8"/><line x1="3.95" x2="8.54" y1="6.06" y2="14"/><line x1="10.88" x2="15.46" y1="21.94" y2="14"/></svg>
+        <span>Arch Smart Clipper</span>
+      </div>
+    </div>
+
+    <!-- State 1: Loading -->
+    <div id="loading" class="state-container">
+      <div class="loader"></div>
+      <p>Conectando ao Arch Smart...</p>
+    </div>
+
+    <!-- State 2: Not Logged In -->
+    <div id="unauthenticated" class="state-container hidden">
+      <div class="icon-wrapper error">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+      </div>
+      <h3>Faça Login</h3>
+      <p>Você precisa estar logado na plataforma web para salvar produtos.</p>
+      <button id="btn-login" class="btn btn-primary mt-4">Fazer Login</button>
+    </div>
+
+    <!-- State 3: Ready to Capture -->
+    <div id="capture-state" class="state-container hidden">
+      <div class="product-preview">
+        <div id="image-container" class="image-container">
+            <span class="no-image">Sem Imagem</span>
+        </div>
+        <div class="product-info">
+          <h4 id="product-title" class="truncate-2">Carregando...</h4>
+          <p id="product-url" class="truncate">...</p>
+        </div>
+      </div>
+      <button id="btn-capture" class="btn btn-primary mt-4 w-full">
+        Enviar para o Inbox
+      </button>
+    </div>
+
+    <!-- State 4: Success -->
+    <div id="success-state" class="state-container hidden">
+      <div class="icon-wrapper success" id="success-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <h3>Capturado!</h3>
+      <p>O item foi enviado para normalização.</p>
+      <button id="btn-close" class="btn btn-outline mt-4">Fechar</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

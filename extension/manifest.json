@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+    "name": "Arch Smart Clipper",
+    "version": "1.0",
+    "description": "Capture e salve produtos diretamente das lojas para o seu painel Arch Smart.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "cookies",
+        "storage"
+    ],
+    "host_permissions": [
+        "<all_urls>",
+        "http://localhost:3000/*",
+        "http://127.0.0.1:8000/*"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Arch Smart Clipper"
+    }
+}

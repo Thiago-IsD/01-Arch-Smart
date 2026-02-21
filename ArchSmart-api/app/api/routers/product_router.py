@@ -8,6 +8,8 @@ from sqlalchemy import func
 from app.db.session import get_db
 from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, Account
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
+from app.api.dependencies.auth import get_current_user
+from app.models.all_models import User
 
 router = APIRouter()
 
@@ -239,4 +241,50 @@ def approve_product(product_id: UUID, product_update: ProductUpdate, db: Session
     db_product.state_id = normalized_state.id
     db.commit()
     db.refresh(db_product)
+    db.refresh(db_product)
     return db_product
+
+class ClipperCaptureRequest(BaseModel):
+    name: str
+    source_url: Optional[str] = None
+    image_url: Optional[str] = None
+
+@router.post("/clipper/capture", status_code=201)
+async def clipper_capture(
+    request: ClipperCaptureRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # Get State
+        captured_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.CAPTURED).first()
+        if not captured_state:
+            captured_state = ProductState(name="Captured", status=ProductStateStatus.CAPTURED)
+            db.add(captured_state)
+            
+        # Get Origin
+        clipper_origin = db.query(ProductOrigin).filter(ProductOrigin.type == ProductOriginType.WEB_CLIPPER).first()
+        if not clipper_origin:
+            clipper_origin = ProductOrigin(name="Web Clipper", type=ProductOriginType.WEB_CLIPPER)
+            db.add(clipper_origin)
+            
+        db.commit()
+        
+        import uuid
+        new_product = Product(
+            account_id=current_user.account_id,
+            name=request.name[:255] if request.name else "Captura sem título",
+            store=None,  # Or parse from URL later
+            source_url=request.source_url,
+            image_url=request.image_url,
+            state_id=captured_state.id,
+            origin_id=clipper_origin.id,
+            codigo=str(uuid.uuid4())[:8].upper()
+        )
+        db.add(new_product)
+        db.commit()
+        db.refresh(new_product)
+        return {"status": "success", "product_id": str(new_product.id)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
