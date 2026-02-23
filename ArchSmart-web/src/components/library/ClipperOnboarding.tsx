@@ -77,9 +77,11 @@ export function ClipperOnboarding() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4">
-                        <Button className="w-full gap-2">
-                            <Download className="h-4 w-4" />
-                            Baixar Extensão (ZIP)
+                        <Button className="w-full gap-2" asChild>
+                            <a href="/arch-smart-clipper.zip" download="arch-smart-clipper.zip">
+                                <Download className="h-4 w-4" />
+                                Baixar Extensão (ZIP)
+                            </a>
                         </Button>
                         <p className="text-[10px] text-muted-foreground text-center mt-3">
                             *Versão Beta. Requer instalação manual via "Load Unpacked".

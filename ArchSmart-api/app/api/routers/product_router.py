@@ -8,7 +8,7 @@ from sqlalchemy import func
 from app.db.session import get_db
 from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, Account
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
-from app.api.dependencies.auth import get_current_user
+from app.api.users import get_current_user
 from app.models.all_models import User
 
 router = APIRouter()
@@ -270,7 +270,6 @@ async def clipper_capture(
             
         db.commit()
         
-        import uuid
         new_product = Product(
             account_id=current_user.account_id,
             name=request.name[:255] if request.name else "Captura sem título",
@@ -278,8 +277,7 @@ async def clipper_capture(
             source_url=request.source_url,
             image_url=request.image_url,
             state_id=captured_state.id,
-            origin_id=clipper_origin.id,
-            codigo=str(uuid.uuid4())[:8].upper()
+            origin_id=clipper_origin.id
         )
         db.add(new_product)
         db.commit()

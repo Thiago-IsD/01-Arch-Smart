@@ -58,10 +58,35 @@ async def get_current_user(
                 db.refresh(user)
                 return user
         
-        # 3. If still not found
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    except HTTPException:
+        # 3. If still not found, Auto-Create User AND Account to ensure sync resiliency
+        if email and supabase_id:
+            print(f"⚠️ User not found in local DB. Auto-creating for email: {email}")
+            
+            # Create a default account
+            new_account = Account(
+                name=email.split("@")[0], 
+                company_name=None
+            )
+            db.add(new_account)
+            db.commit()
+            db.refresh(new_account)
+            
+            # Create the user
+            new_user = User(
+                account_id=new_account.id,
+                email=email,
+                supabase_id=supabase_id,
+                full_name=email.split("@")[0],
+                role="ARCHITECT"
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            
+            print(f"✅ User auto-created successfully: {new_user.id}")
+            return new_user
+            
+        raise HTTPException(status_code=404, detail="User not found and could not be auto-created")
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")

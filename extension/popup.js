@@ -1,5 +1,5 @@
 const URL_WEB = "http://localhost:3000";
-const URL_API = "http://127.0.0.1:8000/api/clipper/capture";
+const URL_API = "http://127.0.0.1:8000/api/products/clipper/capture";
 
 let authToken = null;
 let currentProduct = null;

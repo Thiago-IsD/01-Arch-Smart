@@ -27,10 +27,10 @@ GEMINI_SCHEMA = {
 }
 
 class ExtractionSchema(BaseModel):
-    name: str | None = None
-    category: str | None = None
-    price: float | None = None
-    dimensions: Dict[str, float] | None = None
+    name: str | None
+    category: str | None
+    price: float | None
+    dimensions: Dict[str, float] | None
 
 SYSTEM_PROMPT = """Você é um assistente técnico de arquitetura. Sua missão é extrair dados de produtos a partir de textos brutos de lojas. Retorne APENAS um JSON válido e estruturado.
 Extraia:
@@ -80,57 +80,40 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
         return {}
         
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        # Use the correct REST URL structure for generateContent
+        import google.generativeai as genai
         
-        payload = {
-            "system_instruction": {
-                "parts": [{"text": SYSTEM_PROMPT}]
-            },
-            "contents": [{
-                "parts": [{"text": f"Texto Bruto:\n{raw_text}"}]
-            }],
-            "generationConfig": {
-                "temperature": 0.1,
-                "responseMimeType": "application/json",
-                "responseSchema": GEMINI_SCHEMA
-            }
-        }
+        genai.configure(api_key=api_key)
         
-        headers = {'Content-Type': 'application/json'}
+        # Generation config to force JSON
+        generation_config = genai.types.GenerationConfig(
+            temperature=0.1,
+            response_mime_type="application/json"
+        )
+        
+        # Using the standard SDK resolves region alias issues
+        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=SYSTEM_PROMPT)
+        
+        response = model.generate_content(
+            f"Texto Bruto:\n{raw_text}",
+            generation_config=generation_config,
+            request_options={"timeout": 15.0}
+        )
+        
+        response_text = response.text.strip()
+        
+        # Clean potential markdown wrappers
+        if response_text.startswith("```json"):
+            response_text = response_text.removeprefix("```json").removesuffix("```").strip()
+        elif response_text.startswith("```"):
+            response_text = response_text.removeprefix("```").removesuffix("```").strip()
+            
+        json_data = json.loads(response_text)
+        
+        # Validate through Pydantic
+        validated = ExtractionSchema(**json_data)
+        return validated.dict(exclude_none=True)
 
-        # Raw REST call specifying tight limits and forcing SSL bypass for windows networking
-        async with httpx.AsyncClient(verify=False, http2=False, timeout=12.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            
-            resp_data = response.json()
-            
-            # Navigate nested REST Gemini Response
-            candidates = resp_data.get("candidates", [])
-            if not candidates:
-                logger.error("No candidates returned from Gemini.")
-                return {}
-                
-            content = candidates[0].get("content", {})
-            parts = content.get("parts", [])
-            if not parts:
-                return {}
-                
-            # The model is forced to return JSON text matching the schema
-            response_text = parts[0].get("text", "{}").strip()
-            
-            json_data = json.loads(response_text)
-            
-            # Validate
-            validated = ExtractionSchema(**json_data)
-            return validated.dict(exclude_none=True)
-
-    except httpx.TimeoutException:
-        logger.error("Gemini API REST request timed out after 12 seconds.")
-        raise Exception("O seviço de IA não respondeu a tempo (Timeout). Verifique sua conexão.")
-    except httpx.HTTPError as he:
-        logger.error(f"Gemini API HTTP Error: {he}")
-        raise Exception(f"Erro de conexão com IA: {he}")
     except Exception as e:
-        logger.error(f"Failed to extract product data: {e}")
-        raise e
+        logger.error(f"Failed to extract product data using SDK: {e}")
+        raise Exception(f"Erro de conexão com IA: {e}")
