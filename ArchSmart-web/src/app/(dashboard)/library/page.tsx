@@ -183,12 +183,6 @@ export default async function LibraryPage(props: {
                     </>
                 )}
 
-                {tab === "shopping" && (
-                    <div className="flex flex-col items-center justify-center h-[400px] border border-dashed rounded-lg">
-                        <p className="text-muted-foreground">Shopping Hub integration coming soon.</p>
-                    </div>
-                )}
-
                 {tab === "clipper" && (
                     <ClipperOnboarding />
                 )}

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2, Sparkles, ExternalLink } from "lucide-react"
+import { Loader2, Sparkles, ExternalLink, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
 import {
@@ -32,6 +32,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const CATEGORIES = [
     "Mobiliário",
@@ -314,7 +320,19 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                 name="price"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Preço (R$)</FormLabel>
+                                        <div className="flex items-center gap-2">
+                                            <FormLabel>Preço (R$)</FormLabel>
+                                            <TooltipProvider delayDuration={300}>
+                                                <Tooltip>
+                                                    <TooltipTrigger type="button" tabIndex={-1} className="cursor-help">
+                                                        <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="max-w-[250px] text-center">
+                                                        <p>O sistema pode extrair preços promocionais (ex: PIX) dependendo da loja. <b>Sempre confira o valor!</b></p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </div>
                                         <FormControl>
                                             <Input type="number" step="0.01" {...field} />
                                         </FormControl>
@@ -324,18 +342,21 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                             />
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             <label className="text-sm font-medium leading-none">
-                                Dimensões (cm) {!hasDimensions && <span className="text-destructive">*</span>}
+                                Dimensões: Largura x Altura x Prof. (cm) {!hasDimensions && <span className="text-destructive">*</span>}
                             </label>
                             <div className="flex gap-2">
                                 <FormField
                                     control={form.control}
                                     name="width"
                                     render={({ field }) => (
-                                        <FormItem className="flex-1">
+                                        <FormItem className="flex-1 space-y-1">
                                             <FormControl>
-                                                <Input type="number" placeholder="L" title="Largura" {...field} />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground w-4 text-center">L</span>
+                                                    <Input type="number" step="0.1" className="pl-8" placeholder="0" title="Largura em cm" {...field} />
+                                                </div>
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -344,9 +365,12 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                     control={form.control}
                                     name="height"
                                     render={({ field }) => (
-                                        <FormItem className="flex-1">
+                                        <FormItem className="flex-1 space-y-1">
                                             <FormControl>
-                                                <Input type="number" placeholder="A" title="Altura" {...field} />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground w-4 text-center">A</span>
+                                                    <Input type="number" step="0.1" className="pl-8" placeholder="0" title="Altura em cm" {...field} />
+                                                </div>
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -355,9 +379,12 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                     control={form.control}
                                     name="depth"
                                     render={({ field }) => (
-                                        <FormItem className="flex-1">
+                                        <FormItem className="flex-1 space-y-1">
                                             <FormControl>
-                                                <Input type="number" placeholder="P" title="Profundidade" {...field} />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground w-4 text-center">P</span>
+                                                    <Input type="number" step="0.1" className="pl-8" placeholder="0" title="Profundidade em cm" {...field} />
+                                                </div>
                                             </FormControl>
                                         </FormItem>
                                     )}

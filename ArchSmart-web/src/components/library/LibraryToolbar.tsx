@@ -64,7 +64,7 @@ export function LibraryToolbar({ inboxCount = 0 }: LibraryToolbarProps) {
     ]
 
     const categoryOptions = ["Cadeiras", "Poltronas", "Sofás", "Mesas", "Luminárias", "Decoração"]
-    const originOptions = ["Manual", "Web Clipper", "Shopping Hub"] // Matching Backend Names
+    const originOptions = ["Manual", "Web Clipper"] // Matching Backend Names
 
     // Debounced search handler
     const handleSearch = useDebouncedCallback((term: string) => {
@@ -160,7 +160,6 @@ export function LibraryToolbar({ inboxCount = 0 }: LibraryToolbarProps) {
                             )}
                         </TabsTrigger>
                         <TabsTrigger value="library">Biblioteca</TabsTrigger>
-                        <TabsTrigger value="shopping">Shopping Hub</TabsTrigger>
                         <TabsTrigger value="clipper">Web Clipper</TabsTrigger>
                     </TabsList>
                 </Tabs>

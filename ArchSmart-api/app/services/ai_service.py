@@ -32,11 +32,11 @@ class ExtractionSchema(BaseModel):
     price: float | None
     dimensions: Dict[str, float] | None
 
-SYSTEM_PROMPT = """Você é um assistente técnico de arquitetura. Sua missão é extrair dados de produtos a partir de textos brutos de lojas. Retorne APENAS um JSON válido e estruturado.
+SYSTEM_PROMPT = """Você é um assistente técnico de arquitetura. Sua missão é extrair dados de produtos a partir de textos brutos e metadados JSON-LD de lojas. Retorne APENAS um JSON válido e estruturado.
 Extraia:
 - 'name'
 - 'category' (Piso, Revestimento, Iluminação, Mobiliário, Marcenaria, Paisagismo ou Outros)
-- 'price' (apenas números floats)
+- 'price' (apenas números floats. ATENÇÃO: Encontre o preço ORIGINAL cheio do produto (ListPrice/De). IGNORE preços promocionais limitados, descontos para PIX ou pagamentos à vista. Queremos o valor cheio original.)
 - 'dimensions' (width, height, depth em centimetros - converta qualquer unidade)
 
 Se você não achar algum dos dados ou ele for inconclusivo, retorne null para esse campo."""
@@ -67,10 +67,16 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
                     logger.warning(f"Store returned {resp.status_code} for URL {source_url}. Falling back to name-only AI extraction.")
                 else:
                     soup = BeautifulSoup(resp.text, 'html.parser')
+                    
+                    # Extract structured JSON-LD data which usually contains the exact price and dimensions
+                    json_lds = soup.find_all('script', type='application/ld+json')
+                    ld_texts = [ld.get_text(strip=True) for ld in json_lds]
+                    ld_content = "\n".join(ld_texts)
+                    
                     for script in soup(["script", "style"]):
                         script.decompose()
                     page_text = soup.get_text(separator=' ', strip=True)
-                    raw_text = f"{raw_text}\n\n[CONTEÚDO DA PÁGINA: {source_url}]\n{page_text[:15000]}"
+                    raw_text = f"{raw_text}\n\n[METADADOS JSON-LD DA PÁGINA]\n{ld_content}\n\n[CONTEÚDO DA PÁGINA: {source_url}]\n{page_text[:45000]}"
         except Exception as e:
             logger.warning(f"Failed to scrape URL {source_url}, proceeding with raw_text only: {e}")
         
@@ -92,7 +98,7 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
         )
         
         # Using the standard SDK resolves region alias issues
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=SYSTEM_PROMPT)
+        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=SYSTEM_PROMPT)
         
         response = model.generate_content(
             f"Texto Bruto:\n{raw_text}",
