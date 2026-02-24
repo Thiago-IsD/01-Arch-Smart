@@ -45,6 +45,7 @@ class Account(Base):
     subscription = relationship("Subscription", back_populates="account", uselist=False)
     admin_logs = relationship("AdminLog", back_populates="account")
     leads = relationship("Lead", back_populates="account")
+    clients = relationship("Client", back_populates="account")
 
 # 2. ACESSO, IDENTIDADE E ORIGEM
 
@@ -186,12 +187,17 @@ class Project(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
     name = Column(String, nullable=False)
+    status = Column(String, default="ACTIVE")
+    service_type = Column(String, nullable=True)
+    service_value = Column(Float, nullable=True)
+    payment_installments = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     account = relationship("Account", back_populates="projects")
-    client = relationship("Client", back_populates="project", uselist=False)
+    client = relationship("Client", back_populates="projects")
     environments = relationship("Environment", back_populates="project")
     budget = relationship("Budget", back_populates="project", uselist=False)
     presentations = relationship("Presentation", back_populates="project")
@@ -203,13 +209,14 @@ class Client(Base):
     __tablename__ = "clients"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     name = Column(String, nullable=False)
     email = Column(String)
     phone = Column(String)
 
     # Relationships
-    project = relationship("Project", back_populates="client")
+    account = relationship("Account", back_populates="clients")
+    projects = relationship("Project", back_populates="client")
 
 class Environment(Base):
     __tablename__ = "environments"

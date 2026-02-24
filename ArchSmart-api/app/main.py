@@ -21,6 +21,8 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 from app.api.routers import product_router
 app.include_router(product_router.router, prefix="/api/products", tags=["products"])
+from app.api.endpoints import projects
+app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 
 @app.get("/")
 def read_root():
