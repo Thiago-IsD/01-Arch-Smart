@@ -22,11 +22,11 @@ async def get_current_user(
     Handles legacy users by matching email if supabase_id is missing.
     Returns the User model instance.
     """
-    print(f"\n🔐 DEBUG get_current_user called")
+    print(f"\n[DEBUG] get_current_user called")
     print(f"Authorization header: {authorization[:50]}...")
     
     if not authorization.startswith("Bearer "):
-        print("❌ Invalid authorization header format")
+        print("[ERROR] Invalid authorization header format")
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     
     token = authorization.replace("Bearer ", "")
@@ -34,9 +34,9 @@ async def get_current_user(
     
     try:
         # Verify token with Supabase and get user data
-        print("🔍 Calling auth_service.get_user...")
+        print("[SYSTEM] Calling auth_service.get_user...")
         user_data = await auth_service.get_user(token)
-        print(f"✅ User data received: {user_data.get('id')}, {user_data.get('email')}")
+        print(f"[OK] User data received: {user_data.get('id')}, {user_data.get('email')}")
         
         supabase_id = user_data["id"]
         email = user_data.get("email")
@@ -46,7 +46,7 @@ async def get_current_user(
             # Try to find by supabase_id
             user = db.query(User).filter(User.supabase_id == supabase_id).first()
             if user:
-                print(f"✅ User found by supabase_id: {user.id}")
+                print(f"[OK] User found by supabase_id: {user.id}")
                 return user
                 
             # If not found and we have email, try to find by email (Legacy/Migration)
@@ -54,7 +54,7 @@ async def get_current_user(
                 user = db.query(User).filter(User.email == email).first()
                 if user:
                     # Auto-link: Update supabase_id for this user
-                    print(f"⚠️ User found by email, linking supabase_id")
+                    print(f"[WARN] User found by email, linking supabase_id")
                     user.supabase_id = supabase_id
                     db.commit()
                     db.refresh(user)
@@ -62,7 +62,7 @@ async def get_current_user(
             
             # If still not found, Auto-Create User AND Account to ensure sync resiliency
             if email and supabase_id:
-                print(f"⚠️ User not found in local DB. Auto-creating for email: {email}")
+                print(f"[WARN] User not found in local DB. Auto-creating for email: {email}")
                 
                 # Create a default account
                 new_account = Account(
@@ -85,7 +85,7 @@ async def get_current_user(
                 db.commit()
                 db.refresh(new_user)
                 
-                print(f"✅ User auto-created successfully: {new_user.id}")
+                print(f"[OK] User auto-created successfully: {new_user.id}")
                 return new_user
                 
             return None

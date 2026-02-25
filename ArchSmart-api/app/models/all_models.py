@@ -17,11 +17,23 @@ class ProductOriginType(str, enum.Enum):
     WEB_CLIPPER = "WEB_CLIPPER"
     SHOPPING_HUB = "SHOPPING_HUB"
     MANUAL = "MANUAL"
+    # New values from the provided snippet, assuming they are additions/replacements
+    CATALOG = "CATALOG" # Added from snippet
 
 class ProductStateStatus(str, enum.Enum):
     CAPTURED = "CAPTURED"
     NORMALIZED = "NORMALIZED"
     INACTIVE = "INACTIVE"
+    # New values from the provided snippet, assuming they are additions/replacements
+    ACTIVE = "ACTIVE" # Added from snippet
+    ARCHIVED = "ARCHIVED" # Added from snippet
+    DELETED = "DELETED" # Added from snippet
+
+class RuleType(str, enum.Enum): # Added RuleType enum
+    FLOOR = "FLOOR"
+    WALL = "WALL"
+    CEILING = "CEILING"
+    UNIT = "UNIT"
 
 # 1. CAMADA RAIZ — MULTI-TENANCY
 
@@ -205,6 +217,10 @@ class Project(Base):
     financial_entry = relationship("FinancialEntry", back_populates="project", uselist=False) # 0..1
     event = relationship("Event", back_populates="project", uselist=False) # 0..1
 
+    @property
+    def environments_count(self) -> int:
+        return len(self.environments) if self.environments else 0
+
 class Client(Base):
     __tablename__ = "clients"
 
@@ -263,38 +279,27 @@ class BudgetItem(Base):
     __tablename__ = "budget_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    budget_id = Column(UUID(as_uuid=True), ForeignKey("budgets.id"), nullable=False)
-    environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id"), nullable=True)
-    name = Column(String)
+    budget_id = Column(UUID(as_uuid=True), ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False)
+    environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=True)
+    rule_type = Column(Enum(RuleType), nullable=False)
+    manual_quantity = Column(Integer, nullable=True)
 
     # Relationships
     budget = relationship("Budget", back_populates="items")
     environment = relationship("Environment", back_populates="budget_items")
-    options = relationship("ItemOption", back_populates="budget_item")
+    options = relationship("ItemOption", back_populates="budget_item", cascade="all, delete-orphan")
 
 class ItemOption(Base):
     __tablename__ = "item_options"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id"), nullable=False)
+    budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
-    selected = Column(Boolean, default=False)
+    is_selected = Column(Boolean, default=True)
 
     # Relationships
     budget_item = relationship("BudgetItem", back_populates="options")
     product = relationship("Product", back_populates="item_options")
-    application_rules = relationship("ApplicationRule", back_populates="item_option")
-
-class ApplicationRule(Base):
-    __tablename__ = "application_rules"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_option_id = Column(UUID(as_uuid=True), ForeignKey("item_options.id"), nullable=False)
-    rule_type = Column(String) # Piso, Parede, Unitario
-    formula = Column(String)
-
-    # Relationships
-    item_option = relationship("ItemOption", back_populates="application_rules")
 
 # 7. NÚCLEO 4 — APRESENTAÇÃO
 

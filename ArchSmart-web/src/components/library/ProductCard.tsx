@@ -29,6 +29,7 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
+import { MoveToProjectModal } from "./MoveToProjectModal"
 
 interface ProductCardProps {
     id: string
@@ -59,7 +60,8 @@ export function ProductCard({
     const router = useRouter()
     const { toast } = useToast()
 
-    // State for Alert Dialog
+    // State for Dialogs
+    const [isMoveOpen, setIsMoveOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -110,13 +112,6 @@ export function ProductCard({
         }
     }
 
-    const handleAddToProject = () => {
-        toast({
-            title: "Em breve",
-            description: "Funcionalidade disponível em breve (Módulo de Projetos).",
-        })
-    }
-
     return (
         <>
             <Card className="overflow-hidden group hover:shadow-lg transition-shadow">
@@ -143,7 +138,7 @@ export function ProductCard({
                                 <DropdownMenuItem asChild>
                                     <Link href={editUrl}>{isInbox ? "Normalizar" : "Editar"}</Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleAddToProject}>
+                                <DropdownMenuItem onClick={() => setIsMoveOpen(true)}>
                                     Mover para Projeto
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -213,6 +208,12 @@ export function ProductCard({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <MoveToProjectModal
+                isOpen={isMoveOpen}
+                onOpenChange={setIsMoveOpen}
+                product={{ id, name }}
+            />
         </>
     )
 }

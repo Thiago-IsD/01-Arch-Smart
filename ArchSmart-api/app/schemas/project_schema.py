@@ -71,6 +71,7 @@ class ProjectResponse(ProjectBase):
     account_id: UUID
     client_id: UUID
     created_at: datetime
+    environments_count: int = 0
     client: Optional[ClientResponse] = None  # Embed client data for the UI Card
     
     class Config:

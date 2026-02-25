@@ -3,9 +3,9 @@ from app.models.all_models import (
     Plan, Subscription, ProjectSlot,
     ProductOrigin, ProductState, Product,
     Project, Client, Environment, EnvironmentDNA,
-    Budget, BudgetItem, ItemOption, ApplicationRule,
+    Budget, BudgetItem, ItemOption,
     Presentation, PresentationEnvironment, PresentationAcceptance,
     FinancialEntry, Event, AdminLog,
-    SubscriptionStatus, ProductOriginType, ProductStateStatus,
+    SubscriptionStatus, ProductOriginType, ProductStateStatus, RuleType,
     Document
 )

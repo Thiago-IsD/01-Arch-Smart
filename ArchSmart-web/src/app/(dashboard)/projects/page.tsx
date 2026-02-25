@@ -98,7 +98,7 @@ export default async function ProjectsPage(props: {
                                 status={project.status}
                                 serviceType={project.service_type}
                                 createdAt={project.created_at}
-                                environmentsCount={0} // To be implemented later when environments relation holds data
+                                environmentsCount={project.environments_count || 0}
                             />
                         ))}
                     </div>

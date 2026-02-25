@@ -44,50 +44,53 @@ interface AppShellProps {
 }
 
 import { NAV_ITEMS, PROFILE_MENU_ITEMS } from "@/config/navigation";
+import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
 
 export function AppShell({ children }: AppShellProps) {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     return (
-        <div className="flex min-h-screen w-full bg-background">
-            {/* Desktop Sidebar */}
-            <div className="hidden lg:block">
-                <Sidebar />
-            </div>
+        <BreadcrumbProvider>
+            <div className="flex min-h-screen w-full bg-background">
+                {/* Desktop Sidebar */}
+                <div className="hidden lg:block">
+                    <Sidebar />
+                </div>
 
-            <div className="flex-1 flex flex-col">
-                <Header
-                    notificationsOpen={notificationsOpen}
-                    setNotificationsOpen={setNotificationsOpen}
-                    mobileMenuOpen={mobileMenuOpen}
-                    setMobileMenuOpen={setMobileMenuOpen}
+                <div className="flex-1 flex flex-col">
+                    <Header
+                        notificationsOpen={notificationsOpen}
+                        setNotificationsOpen={setNotificationsOpen}
+                        mobileMenuOpen={mobileMenuOpen}
+                        setMobileMenuOpen={setMobileMenuOpen}
+                    />
+                    <main className="flex-1 p-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32 overflow-auto">{children}</main>
+                </div>
+
+                {/* Mobile Sidebar Sheet */}
+                <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                    <SheetContent side="left" className="p-0 w-64">
+                        <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
+                        <MobileSidebar onNavigate={() => setMobileMenuOpen(false)} />
+                    </SheetContent>
+                </Sheet>
+
+                {/* Notification Panel */}
+                <NotificationPanel
+                    isOpen={notificationsOpen}
+                    onClose={() => setNotificationsOpen(false)}
                 />
-                <main className="flex-1 p-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32 overflow-auto">{children}</main>
+
+                {/* Backdrop */}
+                {notificationsOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+                        onClick={() => setNotificationsOpen(false)}
+                    />
+                )}
             </div>
-
-            {/* Mobile Sidebar Sheet */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetContent side="left" className="p-0 w-64">
-                    <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
-                    <MobileSidebar onNavigate={() => setMobileMenuOpen(false)} />
-                </SheetContent>
-            </Sheet>
-
-            {/* Notification Panel */}
-            <NotificationPanel
-                isOpen={notificationsOpen}
-                onClose={() => setNotificationsOpen(false)}
-            />
-
-            {/* Backdrop */}
-            {notificationsOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 transition-opacity"
-                    onClick={() => setNotificationsOpen(false)}
-                />
-            )}
-        </div>
+        </BreadcrumbProvider>
     );
 }
 
@@ -246,6 +249,7 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
     const router = useRouter();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const { customLabels } = useBreadcrumb();
 
     // Avoid hydration mismatch
     useEffect(() => {
@@ -267,7 +271,7 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
             settings: "Configurações",
         };
 
-        return segments.map((segment) => breadcrumbMap[segment] || segment);
+        return segments.map((segment) => customLabels[segment] || breadcrumbMap[segment] || segment);
     };
 
     const breadcrumbs = generateBreadcrumb();
