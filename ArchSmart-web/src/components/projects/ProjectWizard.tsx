@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Loader2, ArrowRight, ArrowLeft, Check, Wallet, User, PenTool } from "lucide-react"
 
+import { createClient } from "@/utils/supabase/client"
 import { apiUrl } from "@/lib/api-url"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -51,9 +52,11 @@ interface ProjectWizardProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
     onSuccess?: () => void
+    mode?: "create" | "edit"
+    initialData?: any
 }
 
-export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizardProps) {
+export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create", initialData }: ProjectWizardProps) {
     const [step, setStep] = useState(1)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { toast } = useToast()
@@ -72,6 +75,32 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizard
         },
     })
 
+    useEffect(() => {
+        if (isOpen && initialData && mode === "edit") {
+            form.reset({
+                name: initialData.name || "",
+                service_type: initialData.service_type || "",
+                client_name: initialData.client?.name || initialData.client_name || "",
+                client_email: initialData.client?.email || initialData.client_email || "",
+                client_phone: initialData.client?.phone || initialData.client_phone || "",
+                service_value: initialData.service_value || 0,
+                payment_installments: initialData.payment_installments || 1
+            })
+            setStep(1)
+        } else if (isOpen && mode === "create") {
+            form.reset({
+                name: "",
+                service_type: "",
+                client_name: "",
+                client_email: "",
+                client_phone: "",
+                service_value: 0,
+                payment_installments: 1
+            })
+            setStep(1)
+        }
+    }, [isOpen, initialData, mode, form])
+
     const handleNextStep = async () => {
         let fieldsToValidate: (keyof WizardFormValues)[] = []
         if (step === 1) fieldsToValidate = ['name', 'service_type']
@@ -88,15 +117,23 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizard
     }
 
     const onSubmit = async (data: WizardFormValues) => {
+        if (step !== 3) return
+
         try {
             setIsSubmitting(true)
 
+            const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            const token = session?.access_token || ""
+
             const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const res = await fetch(`${apiBase}/api/projects`, {
-                method: 'POST',
+            const endpoint = mode === "edit" ? `${apiBase}/api/projects/${initialData.id}` : `${apiBase}/api/projects`
+
+            const res = await fetch(endpoint, {
+                method: mode === "edit" ? 'PUT' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem("supabase_session") ? JSON.parse(localStorage.getItem("supabase_session")!).access_token : ''}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(data),
             })
@@ -112,12 +149,12 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizard
                     })
                     return
                 }
-                throw new Error("Erro ao criar projeto")
+                throw new Error(`Erro ao ${mode === 'edit' ? 'editar' : 'criar'} projeto`)
             }
 
             toast({
-                title: "Projeto Criado",
-                description: `O projeto ${data.name} foi iniciado com sucesso.`,
+                title: mode === "edit" ? "Projeto Atualizado" : "Projeto Criado",
+                description: mode === "edit" ? "Os dados do projeto foram atualizados com sucesso." : `O projeto ${data.name} foi iniciado com sucesso.`,
             })
 
             form.reset()
@@ -156,9 +193,9 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizard
         }}>
             <DialogContent className="sm:max-w-[550px]">
                 <DialogHeader className="mb-4">
-                    <DialogTitle>Novo Projeto</DialogTitle>
+                    <DialogTitle>{mode === "edit" ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
                     <DialogDescription>
-                        Preencha os dados em etapas para abrir um novo projeto.
+                        {mode === "edit" ? "Atualize as informações e detalhes do seu projeto." : "Preencha os dados em etapas para abrir um novo projeto."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -188,7 +225,7 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizard
                 </div>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
 
                         {/* STEP 1: PROJETO */}
                         <div className={`space-y-4 transition-all duration-300 ${step !== 1 ? 'hidden' : 'block'}`}>
@@ -349,11 +386,12 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess }: ProjectWizard
                                     </Button>
                                 ) : (
                                     <Button
-                                        type="submit"
+                                        type="button"
+                                        onClick={form.handleSubmit(onSubmit)}
                                         disabled={isSubmitting}
                                     >
                                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Criar Projeto
+                                        {mode === "edit" ? "Salvar Alterações" : "Criar Projeto"}
                                     </Button>
                                 )}
                             </div>

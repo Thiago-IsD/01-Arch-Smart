@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import Optional
+from starlette.concurrency import run_in_threadpool
 
 from app.db.session import get_db
 from app.models.all_models import User, Account, Subscription, Plan
@@ -40,51 +41,58 @@ async def get_current_user(
         supabase_id = user_data["id"]
         email = user_data.get("email")
         
-        # 1. Try to find by supabase_id
-        user = db.query(User).filter(User.supabase_id == supabase_id).first()
-        
-        if user:
-            print(f"✅ User found by supabase_id: {user.id}")
-            return user
-            
-        # 2. If not found and we have email, try to find by email (Legacy/Migration)
-        if email:
-            user = db.query(User).filter(User.email == email).first()
+        # 1. DB Operations need to run in threadpool to avoid blocking main event loop
+        def _db_operations():
+            # Try to find by supabase_id
+            user = db.query(User).filter(User.supabase_id == supabase_id).first()
             if user:
-                # Auto-link: Update supabase_id for this user
-                print(f"⚠️ User found by email, linking supabase_id")
-                user.supabase_id = supabase_id
-                db.commit()
-                db.refresh(user)
+                print(f"✅ User found by supabase_id: {user.id}")
                 return user
-        
-        # 3. If still not found, Auto-Create User AND Account to ensure sync resiliency
-        if email and supabase_id:
-            print(f"⚠️ User not found in local DB. Auto-creating for email: {email}")
+                
+            # If not found and we have email, try to find by email (Legacy/Migration)
+            if email:
+                user = db.query(User).filter(User.email == email).first()
+                if user:
+                    # Auto-link: Update supabase_id for this user
+                    print(f"⚠️ User found by email, linking supabase_id")
+                    user.supabase_id = supabase_id
+                    db.commit()
+                    db.refresh(user)
+                    return user
             
-            # Create a default account
-            new_account = Account(
-                name=email.split("@")[0], 
-                company_name=None
-            )
-            db.add(new_account)
-            db.commit()
-            db.refresh(new_account)
+            # If still not found, Auto-Create User AND Account to ensure sync resiliency
+            if email and supabase_id:
+                print(f"⚠️ User not found in local DB. Auto-creating for email: {email}")
+                
+                # Create a default account
+                new_account = Account(
+                    name=email.split("@")[0], 
+                    company_name=None
+                )
+                db.add(new_account)
+                db.commit()
+                db.refresh(new_account)
+                
+                # Create the user
+                new_user = User(
+                    account_id=new_account.id,
+                    email=email,
+                    supabase_id=supabase_id,
+                    full_name=email.split("@")[0],
+                    role="ARCHITECT"
+                )
+                db.add(new_user)
+                db.commit()
+                db.refresh(new_user)
+                
+                print(f"✅ User auto-created successfully: {new_user.id}")
+                return new_user
+                
+            return None
             
-            # Create the user
-            new_user = User(
-                account_id=new_account.id,
-                email=email,
-                supabase_id=supabase_id,
-                full_name=email.split("@")[0],
-                role="ARCHITECT"
-            )
-            db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
-            
-            print(f"✅ User auto-created successfully: {new_user.id}")
-            return new_user
+        user = await run_in_threadpool(_db_operations)
+        if user:
+            return user
             
         raise HTTPException(status_code=404, detail="User not found and could not be auto-created")
         raise

@@ -224,10 +224,12 @@ class Environment(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
+    type = Column(String, nullable=True) # Ex: Interna/Seca
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     project = relationship("Project", back_populates="environments")
-    dna = relationship("EnvironmentDNA", back_populates="environment", uselist=False)
+    dna = relationship("EnvironmentDNA", back_populates="environment", uselist=False, cascade="all, delete-orphan")
     budget_items = relationship("BudgetItem", back_populates="environment")
     presentation_environments = relationship("PresentationEnvironment", back_populates="environment")
 
@@ -235,8 +237,11 @@ class EnvironmentDNA(Base):
     __tablename__ = "environment_dnas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id"), nullable=False)
-    details = Column(JSON) # Detailed technical data
+    environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=False, unique=True)
+    floor_area = Column(Float, default=0.0)
+    wall_area = Column(Float, default=0.0)
+    ceiling_area = Column(Float, default=0.0)
+    is_complete = Column(Boolean, default=False)
 
     # Relationships
     environment = relationship("Environment", back_populates="dna")

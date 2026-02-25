@@ -1,0 +1,36 @@
+from pydantic import BaseModel, Field
+from typing import Optional
+from uuid import UUID
+from datetime import datetime
+
+class EnvironmentDNABase(BaseModel):
+    floor_area: float = Field(0.0, ge=0.0)
+    wall_area: float = Field(0.0, ge=0.0)
+    ceiling_area: float = Field(0.0, ge=0.0)
+
+class EnvironmentDNAUpdate(EnvironmentDNABase):
+    pass
+
+class EnvironmentDNAResponse(EnvironmentDNABase):
+    id: UUID
+    environment_id: UUID
+    is_complete: bool
+
+    class Config:
+        from_attributes = True
+
+class EnvironmentBase(BaseModel):
+    name: str = Field(..., min_length=1)
+    type: Optional[str] = None
+
+class EnvironmentCreate(EnvironmentBase):
+    pass
+
+class EnvironmentResponse(EnvironmentBase):
+    id: UUID
+    project_id: UUID
+    created_at: datetime
+    dna: Optional[EnvironmentDNAResponse] = None
+
+    class Config:
+        from_attributes = True

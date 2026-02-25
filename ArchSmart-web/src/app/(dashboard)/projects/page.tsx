@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/server"
+import { UpgradeAlertModal } from "@/components/projects/UpgradeAlertModal"
 
 // Function to fetch projects
 async function getProjects(page = 1, size = 20) {
@@ -39,6 +40,7 @@ export default async function ProjectsPage(props: {
 
     const data = await getProjects()
     const projects = data.items || []
+    const activeProjectsCount = projects.filter((p: any) => p.status === 'ACTIVE').length
 
     const isWizardOpen = action === "new"
 
@@ -46,17 +48,41 @@ export default async function ProjectsPage(props: {
         <div className="h-full flex flex-col space-y-6 p-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Projetos</h2>
+                    <div className="flex items-center space-x-4 mb-1">
+                        <h2 className="text-3xl font-bold tracking-tight">Projetos</h2>
+
+                        <div className="flex items-center space-x-3 bg-muted/40 px-3 py-1.5 rounded-full border shadow-sm">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-medium text-muted-foreground hidden sm:inline-block">
+                                    Plano Solo
+                                </span>
+                            </div>
+                            <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full ${activeProjectsCount >= 2 ? 'bg-destructive' : 'bg-primary'} transition-all duration-500`}
+                                    style={{ width: `${Math.min((activeProjectsCount / 2) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <span className={`text-xs font-bold ${activeProjectsCount >= 2 ? 'text-destructive' : 'text-primary'}`}>
+                                {activeProjectsCount}/2
+                            </span>
+                        </div>
+                    </div>
+
                     <p className="text-muted-foreground">
                         Acompanhe seus projetos, ambientes e faturamento centralizados.
                     </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Button asChild>
-                        <Link href="/projects?action=new">
-                            <Plus className="mr-2 h-4 w-4" /> Novo Projeto
-                        </Link>
-                    </Button>
+                    {activeProjectsCount >= 2 ? (
+                        <UpgradeAlertModal />
+                    ) : (
+                        <Button asChild>
+                            <Link href="/projects?action=new">
+                                <Plus className="mr-2 h-4 w-4" /> Novo Projeto
+                            </Link>
+                        </Button>
+                    )}
                 </div>
             </div>
 

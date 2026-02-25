@@ -42,6 +42,18 @@ class ProjectWizardCreate(BaseModel):
     service_value: Optional[float] = None
     payment_installments: Optional[int] = None
 
+class ProjectWizardUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    status: Optional[str] = None
+    service_type: Optional[str] = None
+    
+    client_name: Optional[str] = Field(None, max_length=255)
+    client_email: Optional[str] = None
+    client_phone: Optional[str] = None
+    
+    service_value: Optional[float] = None
+    payment_installments: Optional[int] = None
+
 class ProjectCreate(ProjectBase):
     account_id: UUID
     client_id: UUID

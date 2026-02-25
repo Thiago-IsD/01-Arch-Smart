@@ -41,6 +41,28 @@ def get_projects(
         "items": items
     }
 
+@router.get("/{project_id}", response_model=ProjectResponse)
+def get_project_by_id(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Recupera os detalhes de um projeto específico.
+    """
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.account_id == current_user.account_id
+    ).first()
+    
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Projeto não encontrado."
+        )
+        
+    return project
+
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 def create_project(
     data: ProjectWizardCreate,
@@ -101,3 +123,75 @@ def create_project(
     db.refresh(project)
     
     return project
+
+from app.schemas.project_schema import ProjectWizardUpdate
+
+@router.put("/{project_id}", response_model=ProjectResponse)
+def update_project(
+    project_id: UUID,
+    data: ProjectWizardUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Atualiza um projeto existente e os dados do cliente vinculado.
+    """
+    account_id = current_user.account_id
+    
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.account_id == account_id
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+        
+    client = db.query(Client).filter(Client.id == project.client_id).first()
+    
+    # Update Client
+    if client:
+        if data.client_name is not None:
+            client.name = data.client_name
+        if data.client_email is not None:
+            client.email = data.client_email
+        if data.client_phone is not None:
+            client.phone = data.client_phone
+            
+    # Update Project
+    if data.name is not None:
+        project.name = data.name
+    if data.status is not None:
+        project.status = data.status
+    if data.service_type is not None:
+        project.service_type = data.service_type
+    if data.service_value is not None:
+        project.service_value = data.service_value
+    if data.payment_installments is not None:
+        project.payment_installments = data.payment_installments
+        
+    db.commit()
+    db.refresh(project)
+    
+    return project
+
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Remove permanentemente o projeto.
+    """
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.account_id == current_user.account_id
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+        
+    db.delete(project)
+    db.commit()
+    
+    return None

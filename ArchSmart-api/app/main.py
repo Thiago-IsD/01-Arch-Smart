@@ -23,7 +23,8 @@ from app.api.routers import product_router
 app.include_router(product_router.router, prefix="/api/products", tags=["products"])
 from app.api.endpoints import projects
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
-
+from app.api.routers import environments_router
+app.include_router(environments_router.router, prefix="/api", tags=["environments"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Arch Smart API"}
