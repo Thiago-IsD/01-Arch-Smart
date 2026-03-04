@@ -182,6 +182,7 @@ class Product(Base):
     category = Column(String, nullable=True) # New field
     price = Column(Float, nullable=True) # New field
     dimensions = Column(JSON, nullable=True) # New field: {width, height, depth, unit}
+    yield_factor = Column(Float, nullable=True) # New field: Rendimento de Cobertura (m2, ml, etc.)
     image_url = Column(String)
     source_url = Column(String, nullable=True) # Link to original store
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -283,7 +284,8 @@ class BudgetItem(Base):
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=True)
     rule_type = Column(Enum(RuleType), nullable=False)
     manual_quantity = Column(Integer, nullable=True)
-
+    loss_factor = Column(Float, default=10.0) # Perdimento padrão de 10%
+    
     # Relationships
     budget = relationship("Budget", back_populates="items")
     environment = relationship("Environment", back_populates="budget_items")

@@ -14,6 +14,7 @@ GEMINI_SCHEMA = {
         "name": {"type": "STRING", "description": "Nome do produto", "nullable": True},
         "category": {"type": "STRING", "description": "Categoria", "nullable": True},
         "price": {"type": "NUMBER", "description": "Preço numérico. Exemplo: 1500.50", "nullable": True},
+        "yield_factor": {"type": "NUMBER", "description": "Rendimento ou Cobertura do produto (em m², ml, etc por caixa/unidade). Ex: 2.5", "nullable": True},
         "dimensions": {
             "type": "OBJECT",
             "nullable": True,
@@ -30,13 +31,15 @@ class ExtractionSchema(BaseModel):
     name: str | None
     category: str | None
     price: float | None
+    yield_factor: float | None
     dimensions: Dict[str, float] | None
 
 SYSTEM_PROMPT = """Você é um assistente técnico de arquitetura. Sua missão é extrair dados de produtos a partir de textos brutos e metadados JSON-LD de lojas. Retorne APENAS um JSON válido e estruturado.
 Extraia:
 - 'name'
 - 'category' (Piso, Revestimento, Iluminação, Mobiliário, Marcenaria, Paisagismo ou Outros)
-- 'price' (apenas números floats. ATENÇÃO: Encontre o preço ORIGINAL cheio do produto (ListPrice/De). IGNORE preços promocionais limitados, descontos para PIX ou pagamentos à vista. Queremos o valor cheio original.)
+- 'price' (apenas números floats. ATENÇÃO: Encontre o preço ORIGINAL cheio do produto (ListPrice/De). IGNORE descontos PIX ou à vista.)
+- 'yield_factor' (apenas floats. Quantos metros quadrados (m²) ou lineares a caixa/unidade deste produto cobre de rendimento. Ex: Se a caixa faz 2.5m², retorne 2.5. Se não houver, retorne null)
 - 'dimensions' (width, height, depth em centimetros - converta qualquer unidade)
 
 Se você não achar algum dos dados ou ele for inconclusivo, retorne null para esse campo."""

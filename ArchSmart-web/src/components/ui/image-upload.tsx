@@ -4,7 +4,7 @@ import { useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react"
+import { Loader2, Upload, X, Image as ImageIcon, Link as LinkIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ImageUploadProps {
@@ -54,7 +54,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center gap-4">
                 {value ? (
                     <div className="relative w-40 h-40 rounded-md overflow-hidden border">
                         <img
@@ -78,12 +78,13 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
                     </div>
                 )}
 
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 w-full mt-2">
+                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
                         <Button
                             type="button"
                             variant="secondary"
                             disabled={disabled || isUploading}
+                            className="w-full sm:w-auto"
                             asChild
                         >
                             <label className="cursor-pointer">
@@ -92,7 +93,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
                                 ) : (
                                     <Upload className="h-4 w-4 mr-2" />
                                 )}
-                                Carregar Imagem
+                                Carregar Arquivo
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -102,21 +103,21 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
                                 />
                             </label>
                         </Button>
-                        {value && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                disabled={disabled || isUploading}
-                                onClick={() => {
-                                    const input = prompt("Ou cole uma URL externa:", value)
-                                    if (input !== null) onChange(input)
-                                }}
-                            >
-                                Editar URL
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={disabled || isUploading}
+                            className="w-full sm:w-auto"
+                            onClick={() => {
+                                const input = prompt("Ou cole uma URL externa da imagem:", value || "")
+                                if (input !== null) onChange(input)
+                            }}
+                        >
+                            <LinkIcon className="h-4 w-4 mr-2" />
+                            Editar URL
+                        </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground mt-1">
                         Formatos: JPG, PNG, WEBP. Máx 5MB.
                     </p>
                 </div>

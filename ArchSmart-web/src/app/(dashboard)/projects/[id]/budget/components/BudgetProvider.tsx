@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState } from "react"
+import React, { createContext, useContext, useState, useEffect } from "react"
 
 // Types
 export type Environment = {
@@ -23,6 +23,10 @@ export type BudgetItem = {
     environment_id: string | null
     rule_type: string
     manual_quantity: number | null
+    loss_factor: number
+    calculated_quantity?: number | null
+    base_area?: number | null
+    has_yield_alert?: boolean
     options: ItemOption[]
 }
 
@@ -55,8 +59,16 @@ export function BudgetProvider({
     initialBudgetTree: BudgetTree
     initialEnvironments: Environment[]
 }) {
-    const [budgetTree] = useState<BudgetTree>(initialBudgetTree)
-    const [environments] = useState<Environment[]>(initialEnvironments)
+    const [budgetTree, setBudgetTree] = useState<BudgetTree>(initialBudgetTree)
+    const [environments, setEnvironments] = useState<Environment[]>(initialEnvironments)
+
+    useEffect(() => {
+        setBudgetTree(initialBudgetTree)
+    }, [initialBudgetTree])
+
+    useEffect(() => {
+        setEnvironments(initialEnvironments)
+    }, [initialEnvironments])
     const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string | null>(
         initialEnvironments.length > 0 ? initialEnvironments[0].id : null
     )

@@ -53,9 +53,10 @@ const formSchema = z.object({
     name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
     category: z.string().optional(),
     price: z.coerce.number().min(0, "Preço inválido").optional(),
-    width: z.coerce.number().min(0.1, "Obrigatório").optional(),
-    height: z.coerce.number().min(0.1, "Obrigatório").optional(),
-    depth: z.coerce.number().min(0.1, "Obrigatório").optional(),
+    width: z.coerce.number().optional(),
+    height: z.coerce.number().optional(),
+    depth: z.coerce.number().optional(),
+    yield_factor: z.coerce.number().optional(),
     source_url: z.string().url("URL inválida").optional().or(z.literal("")),
 })
 
@@ -79,6 +80,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
             width: 0,
             height: 0,
             depth: 0,
+            yield_factor: undefined,
             source_url: "",
         },
     })
@@ -92,6 +94,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                 width: productToNormalize.dimensions?.width || 0,
                 height: productToNormalize.dimensions?.height || 0,
                 depth: productToNormalize.dimensions?.depth || 0,
+                yield_factor: productToNormalize.yield_factor || undefined,
                 source_url: productToNormalize.source_url || "",
             })
         }
@@ -125,7 +128,8 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                     height: values.height,
                     depth: values.depth,
                     unit: "cm"
-                }
+                },
+                yield_factor: values.yield_factor || null
             }
 
             const res = await fetch(apiUrl(`/api/products/${productToNormalize.id}/approve`), {
@@ -181,6 +185,10 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                     form.setValue("width", data.dimensions.width)
                     form.setValue("height", data.dimensions.height)
                     form.setValue("depth", data.dimensions.depth)
+                }
+
+                if (data.yield_factor !== undefined && data.yield_factor !== null) {
+                    form.setValue("yield_factor", data.yield_factor)
                 }
 
                 toast({
@@ -395,7 +403,33 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                             )}
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-4">
+                        <FormField
+                            control={form.control}
+                            name="yield_factor"
+                            render={({ field }) => (
+                                <FormItem className="pt-2">
+                                    <div className="flex items-center gap-2">
+                                        <FormLabel>Rendimento (Caixa / Unidade)</FormLabel>
+                                        <TooltipProvider delayDuration={300}>
+                                            <Tooltip>
+                                                <TooltipTrigger type="button" tabIndex={-1} className="cursor-help">
+                                                    <Info className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="max-w-[250px] text-center">
+                                                    <p>Apenas números (Ex: 2.5). Usado para calcular a quantidade necessária no Orçamento de áreas.</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+                                    <FormControl>
+                                        <Input type="number" step="0.01" placeholder="Ex: 2 m²" {...field} value={field.value ?? ""} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <div className="flex justify-end gap-2 pt-6 border-t mt-4">
                             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
                             <Button type="submit" disabled={isSubmitting || !hasDimensions}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

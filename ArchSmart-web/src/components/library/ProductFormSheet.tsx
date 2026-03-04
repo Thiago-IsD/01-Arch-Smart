@@ -55,6 +55,7 @@ const formSchema = z.object({
     width: z.coerce.number().optional(),
     height: z.coerce.number().optional(),
     depth: z.coerce.number().optional(),
+    yield_factor: z.coerce.number().optional(),
     source_url: z.string().url("URL inválida").optional().or(z.literal("")),
 })
 
@@ -80,6 +81,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
             width: 0,
             height: 0,
             depth: 0,
+            yield_factor: undefined,
             source_url: "",
         },
     })
@@ -97,6 +99,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 width: productToEdit.dimensions?.width || 0,
                 height: productToEdit.dimensions?.height || 0,
                 depth: productToEdit.dimensions?.depth || 0,
+                yield_factor: productToEdit.yield_factor || undefined,
                 source_url: productToEdit.source_url || "",
             })
         } else {
@@ -110,6 +113,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 width: 0,
                 height: 0,
                 depth: 0,
+                yield_factor: undefined,
                 source_url: "",
             })
         }
@@ -140,7 +144,8 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                     height: values.height,
                     depth: values.depth,
                     unit: "cm"
-                }
+                },
+                yield_factor: values.yield_factor || null
             }
 
             // Clean undefineds
@@ -357,6 +362,20 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                 />
                             </div>
                         </div>
+
+                        <FormField
+                            control={form.control}
+                            name="yield_factor"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Rendimento da Caixa / Unidade (ex: m², ml)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" step="0.01" placeholder="Ex: 2.5" {...field} value={field.value ?? ""} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
                         <FormField
                             control={form.control}

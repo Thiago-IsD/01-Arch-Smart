@@ -11,6 +11,7 @@ class ProductBase(BaseModel):
     category: Optional[str] = None
     price: Optional[float] = None
     dimensions: Optional[Dict[str, Any]] = None # {width, height, depth, unit}
+    yield_factor: Optional[float] = None # Rendimento para motores de orçamento
     image_url: Optional[str] = None
     source_url: Optional[str] = None
     origin_id: Optional[UUID] = None
@@ -26,6 +27,7 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     price: Optional[float] = None
     dimensions: Optional[Dict[str, Any]] = None
+    yield_factor: Optional[float] = None
     image_url: Optional[str] = None
     source_url: Optional[str] = None
     state_id: Optional[UUID] = None

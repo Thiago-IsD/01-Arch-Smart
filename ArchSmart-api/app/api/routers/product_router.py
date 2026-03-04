@@ -140,6 +140,7 @@ class NormalizeResponse(BaseModel):
     category: Optional[str] = None
     price: Optional[float] = None
     dimensions: Optional[Dict[str, float]] = None
+    yield_factor: Optional[float] = None
 
 @router.post("/normalize", response_model=NormalizeResponse)
 async def normalize_product(request: NormalizeRequest):
@@ -248,6 +249,8 @@ class ClipperCaptureRequest(BaseModel):
     name: str
     source_url: Optional[str] = None
     image_url: Optional[str] = None
+    dimensions: Optional[Dict[str, float]] = None
+    yield_factor: Optional[float] = None
 
 @router.post("/clipper/capture", status_code=201)
 async def clipper_capture(
@@ -275,6 +278,8 @@ async def clipper_capture(
             name=request.name[:255] if request.name else "Captura sem título",
             store=None,  # Or parse from URL later
             source_url=request.source_url,
+            dimensions=request.dimensions,
+            yield_factor=request.yield_factor,
             image_url=request.image_url,
             state_id=captured_state.id,
             origin_id=clipper_origin.id

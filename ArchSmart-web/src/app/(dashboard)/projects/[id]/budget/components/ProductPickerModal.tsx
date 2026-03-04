@@ -26,13 +26,13 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 
-export function ProductPickerModal({
-    isOpen,
-    onOpenChange
-}: {
+interface ProductPickerModalProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
-}) {
+    targetItemId?: string // Se presente, funciona no modo "Adicionar Opção B" para um item existente
+}
+
+export function ProductPickerModal({ isOpen, onOpenChange, targetItemId }: ProductPickerModalProps) {
     const { projectId, selectedEnvironmentId } = useBudget()
     const { toast } = useToast()
     const router = useRouter()
@@ -43,7 +43,7 @@ export function ProductPickerModal({
 
     // Item Addition State
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
-    const [ruleType, setRuleType] = useState<string>("UNIT")
+    const [ruleType, setRuleType] = useState<string>(targetItemId ? "UNIT" : "FLOOR")
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     // Fetch Library Products
@@ -98,14 +98,24 @@ export function ProductPickerModal({
             const token = session?.access_token || ""
             const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
 
-            const payload = {
-                project_id: projectId,
-                environment_id: selectedEnvironmentId,
-                product_id: selectedProduct.id,
-                rule_type: ruleType
+            const isOptionMode = !!targetItemId;
+            let endpoint = ""
+            let payload: any = {}
+
+            if (isOptionMode) {
+                endpoint = `${apiBase}/api/budgets/items/${targetItemId}/options`
+                payload = { product_id: selectedProduct.id }
+            } else {
+                endpoint = `${apiBase}/api/budgets/items`
+                payload = {
+                    project_id: projectId,
+                    environment_id: selectedEnvironmentId,
+                    product_id: selectedProduct.id,
+                    rule_type: ruleType
+                }
             }
 
-            const res = await fetch(`${apiBase}/api/budgets/items`, {
+            const res = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -117,12 +127,17 @@ export function ProductPickerModal({
             if (!res.ok) throw new Error("Failed to add to budget")
 
             toast({
-                title: "Produto Adicionado!",
-                description: `${selectedProduct.name} foi vinculado ao ambiente.`,
+                title: "Produto Vinculado!",
+                description: `${selectedProduct.name} foi adicionado como ${isOptionMode ? "uma nova opção" : "um novo item"}.`,
             })
 
             onOpenChange(false)
             router.refresh() // Refresh Server Component to fetch new Budget Tree
+
+            // Wait for React to process refresh, then fire recalculation
+            setTimeout(() => {
+                window.dispatchEvent(new Event('archsmart:budget_updated'))
+            }, 500)
 
         } catch (error) {
             toast({
@@ -140,9 +155,12 @@ export function ProductPickerModal({
             <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
                 <div className="p-6 pb-4 border-b">
                     <DialogHeader>
-                        <DialogTitle>Biblioteca de Produtos</DialogTitle>
+                        <DialogTitle>{targetItemId ? "Selecionar Opção Alternativa" : "Biblioteca de Produtos"}</DialogTitle>
                         <DialogDescription>
-                            Selecione um produto da sua biblioteca global para inserir neste ambiente.
+                            {targetItemId
+                                ? "Escolha uma variação ou alternativa de material para este item do orçamento."
+                                : "Selecione um produto da sua biblioteca global para inserir neste ambiente."
+                            }
                         </DialogDescription>
                     </DialogHeader>
                 </div>

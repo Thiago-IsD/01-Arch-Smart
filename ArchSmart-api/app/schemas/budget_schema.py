@@ -27,6 +27,13 @@ class BudgetItemResponse(BaseModel):
     environment_id: Optional[UUID] = None
     rule_type: RuleType
     manual_quantity: Optional[int] = None
+    loss_factor: Optional[float] = 10.0
+    
+    # Calculated Fields (Injected by the Service)
+    calculated_quantity: Optional[int] = None
+    base_area: Optional[float] = None
+    has_yield_alert: Optional[bool] = False
+    
     environment: Optional[EnvironmentBaseForBudget] = None
     options: List[ItemOptionResponse] = []
     
@@ -46,3 +53,7 @@ class BudgetItemCreate(BaseModel):
     environment_id: UUID
     product_id: UUID
     rule_type: RuleType
+
+class BudgetItemUpdate(BaseModel):
+    manual_quantity: Optional[int] = None
+    loss_factor: Optional[float] = None
