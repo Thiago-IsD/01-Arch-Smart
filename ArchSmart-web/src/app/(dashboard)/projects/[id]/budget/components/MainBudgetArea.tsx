@@ -116,6 +116,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
     const [isDeleting, setIsDeleting] = useState(false)
     const [isOptionSwitching, setIsOptionSwitching] = useState(false)
     const [optimisticActiveOptionId, setOptimisticActiveOptionId] = useState<string | null>(null)
+    const [optimisticDeletedOptionId, setOptimisticDeletedOptionId] = useState<string | null>(null)
 
     const [isPickerOpen, setIsPickerOpen] = useState(false) // For Option B
 
@@ -219,10 +220,14 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
 
             if (res.ok) {
                 onUpdate()
+            } else {
+                // Only revert if failed so the UI doesn't drop the skeleton prematurely
+                setOptimisticActiveOptionId(null)
+                setIsOptionSwitching(false)
             }
         } catch (e) {
             console.error("Failed to switch option", e)
-        } finally {
+            setOptimisticActiveOptionId(null)
             setIsOptionSwitching(false)
         }
     }
@@ -246,10 +251,13 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
                 // If this is the active option and we delete it, handleUpdate will refresh 
                 // and the backend will have auto-selected another or removed the row completely.
                 onUpdate()
+            } else {
+                setOptimisticDeletedOptionId(null)
+                setIsOptionSwitching(false)
             }
         } catch (e) {
             console.error("Failed to delete option", e)
-        } finally {
+            setOptimisticDeletedOptionId(null)
             setIsOptionSwitching(false)
         }
     }
@@ -261,7 +269,14 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
             setOptimisticActiveOptionId(null)
             setIsOptionSwitching(false)
         }
-    }, [item, optimisticActiveOptionId])
+
+        // If the deleted option is actually gone from the server payload
+        const stillExists = item.options.find((o: any) => o.id === optimisticDeletedOptionId)
+        if (!stillExists && optimisticDeletedOptionId) {
+            setOptimisticDeletedOptionId(null)
+            setIsOptionSwitching(false)
+        }
+    }, [item, optimisticActiveOptionId, optimisticDeletedOptionId])
 
     const price = product?.price || 0
     const qty = item.rule_type === "UNIT" ? (item.manual_quantity || 1) : (item.calculated_quantity || 0)
@@ -273,39 +288,49 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
             <td className="p-4 align-middle">
 
                 {/* A/B Option Toggles */}
-                {item.options.length > 1 && (
-                    <div className="flex items-center gap-1 mb-3">
-                        {item.options.map((opt: any, index: number) => {
-                            const isSelected = optimisticActiveOptionId ? opt.id === optimisticActiveOptionId : opt.is_selected
-                            return (
-                                <div key={opt.id} className="relative group/opt inline-flex h-full">
-                                    <button
-                                        onClick={() => handleOptionSelect(opt.id)}
-                                        className={`text-xs pl-3 pr-6 py-1 rounded-full border transition-colors ${isSelected
-                                            ? 'bg-primary text-primary-foreground border-primary font-medium shadow-sm'
-                                            : 'bg-background hover:bg-muted text-muted-foreground border-border'
-                                            }`}
-                                    >
-                                        Opção {String.fromCharCode(65 + index)}
-                                    </button>
+                {item.options.length > 1 && (() => {
+                    // Stable sort to prevent Postgres MVCC reordering on updates from swapping A and B
+                    const sortedOptions = [...item.options]
+                        .filter((opt: any) => opt.id !== optimisticDeletedOptionId)
+                        .sort((a: any, b: any) => (a.created_at || a.id).localeCompare(b.created_at || b.id))
 
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteOption(opt.id);
-                                        }}
-                                        className={`absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center transition-opacity hover:bg-destructive hover:text-destructive-foreground
+                    if (sortedOptions.length <= 1) return null;
+
+                    return (
+                        <div className="flex items-center gap-1 mb-3">
+                            {sortedOptions.map((opt: any, index: number) => {
+                                const isSelected = optimisticActiveOptionId ? opt.id === optimisticActiveOptionId : opt.is_selected
+                                return (
+                                    <div key={opt.id} className="relative group/opt inline-flex h-full">
+                                        <button
+                                            onClick={() => handleOptionSelect(opt.id)}
+                                            className={`text-xs pl-3 pr-6 py-1 rounded-full border transition-colors ${isSelected
+                                                ? 'bg-primary text-primary-foreground border-primary font-medium shadow-sm'
+                                                : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                                                }`}
+                                        >
+                                            Opção {String.fromCharCode(65 + index)}
+                                        </button>
+
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOptimisticDeletedOptionId(opt.id);
+                                                handleDeleteOption(opt.id);
+                                            }}
+                                            className={`absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center transition-opacity hover:bg-destructive hover:text-destructive-foreground
                                             ${isSelected ? 'text-primary-foreground/70 hover:opacity-100' : 'text-muted-foreground/70 opacity-0 group-hover/opt:opacity-100'}
                                         `}
-                                        title="Remover Opção"
-                                    >
-                                        <X className="w-2.5 h-2.5" />
-                                    </button>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
+                                            title="Remover Opção"
+                                        >
+                                            <X className="w-2.5 h-2.5" />
+                                        </button>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )
+                })()}
 
                 <div className="flex items-center justify-between group/prod">
                     <div className="flex items-center gap-3">

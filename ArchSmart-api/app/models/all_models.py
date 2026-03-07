@@ -298,6 +298,7 @@ class ItemOption(Base):
     budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     is_selected = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     budget_item = relationship("BudgetItem", back_populates="options")
