@@ -33,13 +33,34 @@ async def get_current_user(
     print(f"Token extracted: {token[:20]}...")
     
     try:
-        # Verify token with Supabase and get user data
-        print("[SYSTEM] Calling auth_service.get_user...")
-        user_data = await auth_service.get_user(token)
-        print(f"[OK] User data received: {user_data.get('id')}, {user_data.get('email')}")
+        import os
+        from jose import jwt
         
-        supabase_id = user_data["id"]
-        email = user_data.get("email")
+        secret = os.getenv("SUPABASE_JWT_SECRET")
+        if secret:
+            secret = secret.strip()
+            try:
+                import base64
+                # Supabase secrets are base64 encoded. We must decode them to bytes to verify HS256 signatures correctly.
+                # Pad the base64 string if necessary
+                padded_secret = secret + '=' * (-len(secret) % 4)
+                secret_bytes = base64.b64decode(padded_secret)
+                
+                # Decode locally (no network delay)
+                payload = jwt.decode(token, secret_bytes, algorithms=["HS256"], options={"verify_aud": False})
+                supabase_id = payload.get("sub")
+                email = payload.get("email")
+            except Exception as jwt_err:
+                print(f"[WARN] Local JWT validation failed ({jwt_err}). Falling back to remote validation.")
+                user_data = await auth_service.get_user(token)
+                supabase_id = user_data["id"]
+                email = user_data.get("email")
+        else:
+            # Fallback to remote service if secret not present (fallback)
+            print("[WARN] SUPABASE_JWT_SECRET missing, using slow remote validation")
+            user_data = await auth_service.get_user(token)
+            supabase_id = user_data["id"]
+            email = user_data.get("email")
         
         # 1. DB Operations need to run in threadpool to avoid blocking main event loop
         def _db_operations():
@@ -97,6 +118,7 @@ async def get_current_user(
         raise HTTPException(status_code=404, detail="User not found and could not be auto-created")
         raise
     except Exception as e:
+        print(f"[ERROR] JWT Validation failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 

@@ -35,6 +35,12 @@ class RuleType(str, enum.Enum): # Added RuleType enum
     CEILING = "CEILING"
     UNIT = "UNIT"
 
+class PresentationStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    ACCEPTED = "ACCEPTED"
+    REVISION_REQUESTED = "REVISION_REQUESTED"
+
 # 1. CAMADA RAIZ — MULTI-TENANCY
 
 class Account(Base):
@@ -58,6 +64,7 @@ class Account(Base):
     admin_logs = relationship("AdminLog", back_populates="account")
     leads = relationship("Lead", back_populates="account")
     clients = relationship("Client", back_populates="account")
+    notifications = relationship("Notification", back_populates="account")
 
 # 2. ACESSO, IDENTIDADE E ORIGEM
 
@@ -311,13 +318,17 @@ class Presentation(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
-    title = Column(String)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(Enum(PresentationStatus), default=PresentationStatus.DRAFT, nullable=False)
+    branding_snapshot = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     project = relationship("Project", back_populates="presentations")
-    environments = relationship("PresentationEnvironment", back_populates="presentation")
-    acceptance = relationship("PresentationAcceptance", back_populates="presentation", uselist=False)
+    environments = relationship("PresentationEnvironment", back_populates="presentation", cascade="all, delete-orphan")
+    acceptance = relationship("PresentationAcceptance", back_populates="presentation", uselist=False, cascade="all, delete-orphan")
+    comments = relationship("PresentationComment", back_populates="presentation", cascade="all, delete-orphan")
 
 class PresentationEnvironment(Base):
     __tablename__ = "presentation_environments"
@@ -326,6 +337,11 @@ class PresentationEnvironment(Base):
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id"), nullable=False)
     is_visible = Column(Boolean, default=True)
+    # Campos de detalhamento (Feature 6.1.C)
+    title = Column(String, nullable=True)
+    subtitle = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    image_urls = Column(JSON, default=list)
 
     # Relationships
     presentation = relationship("Presentation", back_populates="environments")
@@ -337,11 +353,25 @@ class PresentationAcceptance(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     accepted = Column(Boolean, default=False)
-    accepted_at = Column(DateTime)
-    feedback = Column(Text)
+    feedback = Column(Text, nullable=True)
+    client_ip = Column(String, nullable=True)
+    accepted_at = Column(DateTime, default=datetime.utcnow)
+    selected_options_snapshot = Column(JSON, nullable=True)
 
     # Relationships
     presentation = relationship("Presentation", back_populates="acceptance")
+
+class PresentationComment(Base):
+    __tablename__ = "presentation_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
+    author_type = Column(String, nullable=False) # 'CLIENT' | 'ARCHITECT'
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    presentation = relationship("Presentation", back_populates="comments")
 
 # 8. SUPORTE (FINANCEIRO, AGENDA, ADMIN)
 
@@ -385,6 +415,19 @@ class AdminLog(Base):
 
     user = relationship("User", back_populates="admin_logs")
     account = relationship("Account", back_populates="admin_logs")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    account = relationship("Account", back_populates="notifications")
 
 # RAG / Knowledge Base
 from pgvector.sqlalchemy import Vector

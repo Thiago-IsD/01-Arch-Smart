@@ -56,7 +56,11 @@ export function ProjectHeader({ project, activeTab = "ambientes" }: ProjectHeade
                                 Orçamento
                             </TabsTrigger>
                         </Link>
-                        <TabsTrigger value="apresentacao" disabled>Apresentação</TabsTrigger>
+                        <Link href={`/projects/${project.id}/presentation`}>
+                            <TabsTrigger value="apresentacao" data-state={activeTab === "apresentacao" ? "active" : "inactive"}>
+                                Apresentação
+                            </TabsTrigger>
+                        </Link>
                     </TabsList>
                 </Tabs>
             </div>

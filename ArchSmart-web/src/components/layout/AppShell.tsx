@@ -45,10 +45,74 @@ interface AppShellProps {
 
 import { NAV_ITEMS, PROFILE_MENU_ITEMS } from "@/config/navigation";
 import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
+import { apiUrl } from "@/lib/api-url";
+
+export interface NotificationItem {
+    id: string;
+    title: string;
+    message: string;
+    is_read: boolean;
+    created_at: string;
+}
+
+import { createClient } from "@/utils/supabase/client";
 
 export function AppShell({ children }: AppShellProps) {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const supabase = createClient();
+                const { data: sessionData } = await supabase.auth.getSession();
+                const token = sessionData?.session?.access_token;
+
+                const headers: HeadersInit = {};
+                if (token) {
+                    headers["Authorization"] = `Bearer ${token}`;
+                }
+
+                const res = await fetch(apiUrl("/api/notifications"), {
+                    headers
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    setNotifications(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch notifications", error);
+            }
+        };
+        fetchNotifications();
+    }, []);
+
+    const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+    const handleMarkAsRead = async (id: string) => {
+        try {
+            const supabase = createClient();
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+
+            const headers: HeadersInit = {};
+            if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
+            }
+
+            const res = await fetch(apiUrl(`/api/notifications/${id}/read`), {
+                method: "PATCH",
+                headers
+            });
+            if (res.ok) {
+                setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     return (
         <BreadcrumbProvider>
@@ -64,6 +128,7 @@ export function AppShell({ children }: AppShellProps) {
                         setNotificationsOpen={setNotificationsOpen}
                         mobileMenuOpen={mobileMenuOpen}
                         setMobileMenuOpen={setMobileMenuOpen}
+                        unreadCount={unreadCount}
                     />
                     <main className="flex-1 p-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32 overflow-auto">{children}</main>
                 </div>
@@ -80,12 +145,14 @@ export function AppShell({ children }: AppShellProps) {
                 <NotificationPanel
                     isOpen={notificationsOpen}
                     onClose={() => setNotificationsOpen(false)}
+                    notifications={notifications}
+                    onMarkAsRead={handleMarkAsRead}
                 />
 
                 {/* Backdrop */}
                 {notificationsOpen && (
                     <div
-                        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+                        className="fixed inset-0 bg-black/50 z-[115] transition-opacity"
                         onClick={() => setNotificationsOpen(false)}
                     />
                 )}
@@ -242,39 +309,19 @@ interface HeaderProps {
     setNotificationsOpen: (open: boolean) => void;
     mobileMenuOpen: boolean;
     setMobileMenuOpen: (open: boolean) => void;
+    unreadCount: number;
 }
 
-function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMobileMenuOpen }: HeaderProps) {
-    const pathname = usePathname();
+function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMobileMenuOpen, unreadCount }: HeaderProps) {
     const router = useRouter();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
-    const { customLabels } = useBreadcrumb();
 
-    // Avoid hydration mismatch
+    // Avoid hydration mismatch for date rendering
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Generate breadcrumb from pathname
-    const generateBreadcrumb = () => {
-        const segments = pathname.split("/").filter(Boolean);
-        const breadcrumbMap: Record<string, string> = {
-            dashboard: "Dashboard",
-            library: "Biblioteca",
-            projects: "Projetos",
-            presentations: "Apresentações",
-            finance: "Financeiro",
-            calendar: "Agenda",
-            profile: "Perfil",
-            billing: "Planos e Pagamentos",
-            settings: "Configurações",
-        };
-
-        return segments.map((segment) => customLabels[segment] || breadcrumbMap[segment] || segment);
-    };
-
-    const breadcrumbs = generateBreadcrumb();
 
     const handleLogout = async () => {
         const { createClient } = await import("@/utils/supabase/client");
@@ -284,7 +331,7 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
     };
 
     return (
-        <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-[110] border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-16 items-center justify-between px-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32">
                 {/* Left Side: Mobile Menu + Breadcrumb */}
                 <div className="flex items-center gap-4">
@@ -297,26 +344,21 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
                         <Menu className="h-5 w-5 text-foreground" />
                     </button>
 
-                    {/* Breadcrumb */}
-                    <div className="flex items-center gap-2 text-sm">
-                        {breadcrumbs.length > 0 ? (
-                            breadcrumbs.map((crumb, index) => (
-                                <React.Fragment key={index}>
-                                    {index > 0 && <span className="text-muted-foreground">/</span>}
-                                    <span
-                                        className={
-                                            index === breadcrumbs.length - 1
-                                                ? "font-medium text-foreground"
-                                                : "text-muted-foreground"
-                                        }
-                                    >
-                                        {crumb}
-                                    </span>
-                                </React.Fragment>
-                            ))
-                        ) : (
-                            <span className="font-medium text-foreground">Dashboard</span>
-                        )}
+                    {/* Title + Date */}
+                    <div className="flex flex-col">
+                        <span className="font-semibold text-foreground text-sm leading-tight">
+                            Bem-vindo à Arch Smart
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-0.5">
+                            {mounted
+                                ? new Date().toLocaleDateString("pt-BR", {
+                                    weekday: "long",
+                                    day: "2-digit",
+                                    month: "long",
+                                    year: "numeric",
+                                })
+                                : "..."}
+                        </span>
                     </div>
                 </div>
 
@@ -345,7 +387,9 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
                     >
                         <Bell className="h-4 w-4 text-muted-foreground" />
                         {/* Notification badge */}
-                        <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
+                        {unreadCount > 0 && (
+                            <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
+                        )}
                     </button>
 
                     {/* User Avatar Dropdown */}
@@ -385,74 +429,66 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
 interface NotificationPanelProps {
     isOpen: boolean;
     onClose: () => void;
+    notifications: NotificationItem[];
+    onMarkAsRead: (id: string) => void;
 }
 
-function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
-    // Mock notifications
-    const notifications = [
-        {
-            id: 1,
-            title: "Bem-vindo ao Arch Smart!",
-            message: "Explore todas as funcionalidades da plataforma.",
-            time: "Agora",
-            unread: true,
-        },
-        {
-            id: 2,
-            title: "Novo projeto criado",
-            message: "O projeto 'Casa Moderna' foi criado com sucesso.",
-            time: "2h atrás",
-            unread: true,
-        },
-        {
-            id: 3,
-            title: "Atualização de sistema",
-            message: "Nova versão disponível com melhorias de performance.",
-            time: "1 dia atrás",
-            unread: false,
-        },
-    ];
-
+function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead }: NotificationPanelProps) {
     return (
         <div
-            className={`fixed top-0 right-0 h-full w-96 bg-card border-l border-border shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "translate-x-full"
+            className={`fixed top-0 right-0 h-full w-96 bg-card border-l border-border shadow-2xl z-[120] transform transition-transform duration-300 ease-in-out flex flex-col ${isOpen ? "translate-x-0" : "translate-x-full"
                 }`}
         >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
                 <h2 className="text-lg font-semibold text-foreground">Notificações</h2>
-                <button
-                    onClick={onClose}
-                    className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent transition-colors"
-                >
-                    <X className="h-4 w-4 text-muted-foreground" />
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Optional: mark all as read button here */}
+                    <button
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent transition-colors"
+                    >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                </div>
             </div>
 
             {/* Notifications List */}
-            <div className="overflow-y-auto h-[calc(100%-4rem)]">
-                {notifications.map((notification) => (
-                    <div
-                        key={notification.id}
-                        className={`p-4 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer ${notification.unread ? "bg-primary/5" : ""
-                            }`}
-                    >
-                        <div className="flex items-start gap-3">
-                            <div className={`mt-1 h-2 w-2 rounded-full ${notification.unread ? "bg-primary" : "bg-transparent"}`} />
-                            <div className="flex-1">
-                                <h3 className="text-sm font-medium text-foreground mb-1">
-                                    {notification.title}
-                                </h3>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                    {notification.message}
-                                </p>
-                                <span className="text-xs text-muted-foreground">
-                                    {notification.time}
-                                </span>
+            <div className="overflow-y-auto flex-1">
+                {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4">
+                        <Bell className="w-8 h-8 opacity-20" />
+                        <p className="text-sm">Nenhuma notificação por enquanto.</p>
+                    </div>
+                ) : (
+                    notifications.map((notification) => (
+                        <div
+                            key={notification.id}
+                            onClick={() => {
+                                if (!notification.is_read) onMarkAsRead(notification.id);
+                            }}
+                            className={`p-4 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer ${!notification.is_read ? "bg-primary/5" : ""
+                                }`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className={`mt-1.5 shrink-0 h-2 w-2 rounded-full ${!notification.is_read ? "bg-primary" : "bg-transparent"}`} />
+                                <div className="flex-1">
+                                    <h3 className="text-sm font-semibold text-foreground mb-1 leading-tight">
+                                        {notification.title}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mb-2 leading-snug">
+                                        {notification.message}
+                                    </p>
+                                    <span className="text-[11px] font-medium text-muted-foreground/80">
+                                        {new Date(notification.created_at).toLocaleString("pt-BR", {
+                                            day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+                                        })}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
         </div>
     );

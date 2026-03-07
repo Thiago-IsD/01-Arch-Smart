@@ -21,12 +21,18 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 from app.api.routers import product_router
 app.include_router(product_router.router, prefix="/api/products", tags=["products"])
-from app.api.endpoints import projects
+from app.api.endpoints import projects, presentations
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+app.include_router(presentations.router, prefix="/api", tags=["presentations"])
 from app.api.routers import environments_router
 app.include_router(environments_router.router, prefix="/api", tags=["environments"])
 from app.api.routers import budgets_router
 app.include_router(budgets_router.router, prefix="/api", tags=["budgets"])
+from app.api.endpoints import public as public_endpoint
+app.include_router(public_endpoint.router, prefix="/public", tags=["public"])
+
+from app.api.endpoints import notifications
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Arch Smart API"}
