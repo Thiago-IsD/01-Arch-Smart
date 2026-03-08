@@ -44,7 +44,7 @@ const wizardSchema = z.object({
     client_phone: z.string().optional().or(z.literal('')),
     service_value: z.number().min(0),
     payment_installments: z.number().min(1),
-    payment_method: z.string().default("STANDARD"),
+    payment_method: z.string(),
     custom_installments: z.array(z.object({
         amount: z.number().min(0),
         due_date: z.string().min(10, "Data inválida"),
