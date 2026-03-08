@@ -328,6 +328,7 @@ async def accept_public_presentation(
         notification = Notification(
             account_id=project.account_id,
             title=title,
+            message=msg,
         )
         db.add(notification)
 

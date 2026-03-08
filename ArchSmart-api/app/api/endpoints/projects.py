@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.api.users import get_current_user
 from app.models.all_models import User, Project, Client, Account, Subscription
 from app.schemas.project_schema import ProjectResponse, PaginatedProjectResponse, ProjectWizardCreate
+from app.services.financial_service import sync_project_financials
 
 router = APIRouter()
 
@@ -60,6 +61,17 @@ def get_project_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Projeto não encontrado."
         )
+        
+    from app.models.all_models import FinancialEntry
+    if getattr(project, "payment_method", "STANDARD") == "CUSTOM":
+        entries = db.query(FinancialEntry).filter(
+            FinancialEntry.project_id == project.id,
+            FinancialEntry.type == "INCOME",
+            FinancialEntry.status == "PREDICTED"
+        ).order_by(FinancialEntry.due_date.asc()).all()
+        
+        custom_insts = [{"amount": e.amount, "due_date": e.due_date, "description": e.description} for e in entries]
+        setattr(project, "custom_installments", custom_insts)
         
     return project
 
@@ -115,12 +127,16 @@ def create_project(
         service_type=data.service_type,
         service_value=data.service_value,
         payment_installments=data.payment_installments,
+        payment_method=data.payment_method,
         status="ACTIVE"
     )
     
     db.add(project)
     db.commit()
     db.refresh(project)
+    
+    # Financial Automation Hook
+    sync_project_financials(project, db, data.custom_installments)
     
     return project
 
@@ -168,9 +184,14 @@ def update_project(
         project.service_value = data.service_value
     if data.payment_installments is not None:
         project.payment_installments = data.payment_installments
+    if data.payment_method is not None:
+        project.payment_method = data.payment_method
         
     db.commit()
     db.refresh(project)
+    
+    # Financial Automation: re-sync if values changed
+    sync_project_financials(project, db, data.custom_installments)
     
     return project
 

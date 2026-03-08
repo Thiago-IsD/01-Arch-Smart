@@ -331,7 +331,7 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
     };
 
     return (
-        <header className="sticky top-0 z-[110] border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-16 items-center justify-between px-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32">
                 {/* Left Side: Mobile Menu + Breadcrumb */}
                 <div className="flex items-center gap-4">

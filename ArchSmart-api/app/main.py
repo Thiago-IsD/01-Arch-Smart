@@ -33,6 +33,8 @@ app.include_router(public_endpoint.router, prefix="/public", tags=["public"])
 
 from app.api.endpoints import notifications
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+from app.api.endpoints import financial
+app.include_router(financial.router, prefix="/api/financial", tags=["financial"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Arch Smart API"}

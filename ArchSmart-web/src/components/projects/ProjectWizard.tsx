@@ -44,6 +44,23 @@ const wizardSchema = z.object({
     client_phone: z.string().optional().or(z.literal('')),
     service_value: z.number().min(0),
     payment_installments: z.number().min(1),
+    payment_method: z.string().default("STANDARD"),
+    custom_installments: z.array(z.object({
+        amount: z.number().min(0),
+        due_date: z.string().min(10, "Data inválida"),
+        description: z.string()
+    })).optional()
+}).superRefine((val, ctx) => {
+    if (val.payment_method === "CUSTOM" && val.custom_installments) {
+        const sum = val.custom_installments.reduce((acc, curr) => acc + (curr.amount || 0), 0)
+        if (Math.abs(sum - val.service_value) > 0.01) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "A soma das parcelas deve ser igual ao Valor Fechado do Serviço.",
+                path: ["custom_installments"]
+            });
+        }
+    }
 })
 
 type WizardFormValues = z.infer<typeof wizardSchema>
@@ -71,7 +88,9 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
             client_email: "",
             client_phone: "",
             service_value: 0,
-            payment_installments: 1
+            payment_installments: 1,
+            payment_method: "STANDARD",
+            custom_installments: []
         },
     })
 
@@ -84,7 +103,9 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
                 client_email: initialData.client?.email || initialData.client_email || "",
                 client_phone: initialData.client?.phone || initialData.client_phone || "",
                 service_value: initialData.service_value || 0,
-                payment_installments: initialData.payment_installments || 1
+                payment_installments: initialData.payment_installments || 1,
+                payment_method: initialData.payment_method || "STANDARD",
+                custom_installments: initialData.custom_installments || []
             })
             setStep(1)
         } else if (isOpen && mode === "create") {
@@ -95,11 +116,32 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
                 client_email: "",
                 client_phone: "",
                 service_value: 0,
-                payment_installments: 1
+                payment_installments: 1,
+                payment_method: "STANDARD",
+                custom_installments: []
             })
             setStep(1)
         }
     }, [isOpen, initialData, mode, form])
+
+    const paymentMethod = form.watch("payment_method")
+    const paymentInstallments = form.watch("payment_installments") || 1
+    const serviceValue = form.watch("service_value") || 0
+    const customInstallments = form.watch("custom_installments") || []
+
+    useEffect(() => {
+        if (paymentMethod === "CUSTOM" && paymentInstallments > 0) {
+            const currentInstallments = form.getValues("custom_installments") || []
+            if (currentInstallments.length !== paymentInstallments) {
+                const draft = Array.from({ length: paymentInstallments }).map((_, i) => ({
+                    description: currentInstallments[i]?.description || `Parcela ${i + 1}`,
+                    amount: currentInstallments[i]?.amount || parseFloat((serviceValue / paymentInstallments).toFixed(2)),
+                    due_date: currentInstallments[i]?.due_date || ""
+                }))
+                form.setValue("custom_installments", draft, { shouldValidate: true })
+            }
+        }
+    }, [paymentInstallments, paymentMethod, form])
 
     const handleNextStep = async () => {
         let fieldsToValidate: (keyof WizardFormValues)[] = []
@@ -350,6 +392,83 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
                                     </FormItem>
                                 )}
                             />
+                            <FormField
+                                control={form.control}
+                                name="payment_method"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Tipo de Recebimento</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Selecione..." />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="STANDARD">Padrão Mensal (A cada 30 dias)</SelectItem>
+                                                <SelectItem value="CUSTOM">Personalizado (Datas/Valores Manuais)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            {paymentMethod === "CUSTOM" && (
+                                <div className="space-y-3 mt-4 border-t pt-4">
+                                    <h4 className="text-sm font-semibold tracking-tight">Cronograma Personalizado</h4>
+
+                                    <div className="max-h-[220px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                                        {Array.from({ length: paymentInstallments }).map((_, index) => (
+                                            <div key={index} className="grid grid-cols-12 gap-2 items-center text-sm bg-muted/30 p-2 rounded-md border">
+                                                <div className="col-span-12 font-medium text-xs mb-1">
+                                                    Parcela {index + 1}
+                                                </div>
+                                                <div className="col-span-12 sm:col-span-4">
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`custom_installments.${index}.due_date`}
+                                                        render={({ field }) => (
+                                                            <Input type="date" className="h-8 text-xs" {...field} />
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="col-span-12 sm:col-span-8">
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`custom_installments.${index}.amount`}
+                                                        render={({ field }) => (
+                                                            <div className="relative">
+                                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">R$</span>
+                                                                <Input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="h-8 text-xs pl-7"
+                                                                    {...field}
+                                                                    onChange={e => {
+                                                                        field.onChange(Number(e.target.value))
+                                                                        form.trigger("custom_installments") // trigger validation
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="bg-muted p-3 rounded-lg flex items-center justify-between text-sm mt-4">
+                                        <span className="font-semibold text-muted-foreground">Soma das Parcelas:</span>
+                                        <span className={`font-bold ${Math.abs(customInstallments.reduce((acc, curr) => acc + (curr.amount || 0), 0) - serviceValue) > 0.01 ? "text-red-500" : "text-emerald-500"}`}>
+                                            R$ {customInstallments.reduce((acc, curr) => acc + (curr.amount || 0), 0).toFixed(2)} / R$ {serviceValue?.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    {form.formState.errors.custom_installments && (
+                                        <p className="text-xs text-red-500 mt-1 font-medium">{form.formState.errors.custom_installments.message}</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <DialogFooter className="mt-8 pt-4 border-t flex items-center justify-between sm:justify-between w-full">

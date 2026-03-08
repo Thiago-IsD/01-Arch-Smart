@@ -213,6 +213,7 @@ class Project(Base):
     service_type = Column(String, nullable=True)
     service_value = Column(Float, nullable=True)
     payment_installments = Column(Integer, nullable=True)
+    payment_method = Column(String, default="STANDARD")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -382,9 +383,15 @@ class FinancialEntry(Base):
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     description = Column(String)
+    category = Column(String)
     amount = Column(Float)
     type = Column(String) # INCOME, EXPENSE
-    date = Column(Date)
+    status = Column(String, default="PREDICTED") # PREDICTED, REALIZED
+    due_date = Column(Date)
+    group_id = Column(String, index=True, nullable=True) # ID to group recurring/installment entries
+    installment_number = Column(Integer, nullable=True) # Indicates which installment this is
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     account = relationship("Account", back_populates="financial_entries")

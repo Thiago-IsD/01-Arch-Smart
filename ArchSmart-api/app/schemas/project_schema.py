@@ -1,7 +1,12 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
+
+class CustomInstallment(BaseModel):
+    amount: float
+    due_date: date
+    description: str
 
 # Client schemas
 class ClientBase(BaseModel):
@@ -26,6 +31,7 @@ class ProjectBase(BaseModel):
     service_type: Optional[str] = None
     service_value: Optional[float] = None
     payment_installments: Optional[int] = None
+    payment_method: Optional[str] = "STANDARD"
 
 # Payload from the frontend Wizard
 class ProjectWizardCreate(BaseModel):
@@ -41,6 +47,8 @@ class ProjectWizardCreate(BaseModel):
     # Step 3: Financial Details
     service_value: Optional[float] = None
     payment_installments: Optional[int] = None
+    payment_method: Optional[str] = "STANDARD"
+    custom_installments: Optional[List[CustomInstallment]] = None
 
 class ProjectWizardUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=255)
@@ -53,6 +61,8 @@ class ProjectWizardUpdate(BaseModel):
     
     service_value: Optional[float] = None
     payment_installments: Optional[int] = None
+    payment_method: Optional[str] = None
+    custom_installments: Optional[List[CustomInstallment]] = None
 
 class ProjectCreate(ProjectBase):
     account_id: UUID
@@ -64,6 +74,7 @@ class ProjectUpdate(BaseModel):
     service_type: Optional[str] = None
     service_value: Optional[float] = None
     payment_installments: Optional[int] = None
+    payment_method: Optional[str] = None
     client_id: Optional[UUID] = None
 
 class ProjectResponse(ProjectBase):
