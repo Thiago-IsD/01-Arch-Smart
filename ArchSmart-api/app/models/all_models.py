@@ -224,7 +224,7 @@ class Project(Base):
     presentations = relationship("Presentation", back_populates="project")
     slot = relationship("ProjectSlot", back_populates="project", uselist=False)
     financial_entry = relationship("FinancialEntry", back_populates="project", uselist=False) # 0..1
-    event = relationship("Event", back_populates="project", uselist=False) # 0..1
+    events = relationship("Event", back_populates="project") # 0..N
 
     @property
     def environments_count(self) -> int:
@@ -403,13 +403,17 @@ class Event(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
-    title = Column(String)
-    start_time = Column(DateTime)
-    end_time = Column(DateTime)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    meet_link = Column(String, nullable=True)
+    google_event_id = Column(String, nullable=True)  # Preparação para Google Calendar OAuth
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     account = relationship("Account", back_populates="events")
-    project = relationship("Project", back_populates="event")
+    project = relationship("Project", back_populates="events")
 
 class AdminLog(Base):
     __tablename__ = "admin_logs"
@@ -437,7 +441,12 @@ class Notification(Base):
     account = relationship("Account", back_populates="notifications")
 
 # RAG / Knowledge Base
-from pgvector.sqlalchemy import Vector
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    # pgvector não está disponível no ambiente local (ex: ao rodar alembic migrations).
+    # O servidor de produção/desenvolvimento tem o pacote instalado.
+    from sqlalchemy import Text as Vector  # type: ignore[assignment]
 
 class Document(Base):
     __tablename__ = "documents"

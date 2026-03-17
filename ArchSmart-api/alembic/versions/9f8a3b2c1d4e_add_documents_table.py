@@ -8,7 +8,15 @@ Create Date: 2024-01-31 16:15:00.000000
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from pgvector.sqlalchemy import Vector
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    # Fallback in case pgvector is not installed locally (e.g. running alembic upgrade in venv)
+    class Vector(sa.types.TypeDecorator):
+        impl = sa.Text
+        cache_ok = True
+        def __init__(self, dim, *args, **kwargs):
+            super(Vector, self).__init__(*args, **kwargs)
 
 # revision identifiers, used by Alembic.
 revision = '9f8a3b2c1d4e'

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Loader2, Trash2, ShieldAlert, Check, Eye, EyeOff } from "lucide-react"
+import { Loader2, Trash2, ShieldAlert, Check, Eye, EyeOff, Calendar, Plug } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -346,7 +346,53 @@ export default function SettingsPage() {
                 </CardContent>
             </Card>
 
-            {/* Seção 2: Termos de Uso */}
+            {/* Seção 2: Integrações */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Plug className="h-5 w-5" />
+                        Integrações
+                    </CardTitle>
+                    <CardDescription>
+                        Conecte serviços externos para ampliar as funcionalidades da plataforma.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                                <Calendar className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div>
+                                <p className="font-medium">Google Calendar</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Sincronize seus eventos com o Google Calendar
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-muted-foreground/30 bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+                                Desconectado
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    toast({
+                                        title: "Em breve!",
+                                        description: "Integração com Google Calendar disponível em breve.",
+                                    })
+                                }
+                            >
+                                Conectar
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Seção 3: Termos de Uso */}
             <Card>
                 <CardHeader>
                     <CardTitle>Termos e Privacidade</CardTitle>
