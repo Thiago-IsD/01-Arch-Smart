@@ -37,6 +37,8 @@ from app.api.endpoints import financial
 app.include_router(financial.router, prefix="/api/financial", tags=["financial"])
 from app.api.endpoints import events
 app.include_router(events.router, prefix="/api/events", tags=["events"])
+from app.api.endpoints import dashboard
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Arch Smart API"}

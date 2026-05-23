@@ -1,59 +1,21 @@
 "use client";
 
-import { Construction, LogOut } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { createClient } from "@/utils/supabase/client";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
-export default function DashboardPage() {
+export default function HomePage() {
     const router = useRouter();
-    const { toast } = useToast();
 
-    const handleLogout = async () => {
-        try {
-            const supabase = createClient();
-            await supabase.auth.signOut();
-
-            toast({
-                title: "Logout realizado",
-                description: "Até logo!",
-            });
-
-            router.push("/");
-        } catch (error) {
-            toast({
-                title: "Erro ao sair",
-                description: "Tente novamente.",
-                variant: "destructive",
-            });
-        }
-    };
+    useEffect(() => {
+        // Redireciona a raiz do App para a nova dashboard criada
+        router.replace("/dashboard");
+    }, [router]);
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 text-center">
-            <div className="rounded-2xl bg-white p-8 shadow-xl md:p-12">
-                <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
-                    <Construction className="h-10 w-10 text-blue-600" />
-                </div>
-                <h1 className="mb-4 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
-                    Dashboard em Construção
-                </h1>
-                <p className="mb-8 text-lg text-gray-600">
-                    Estamos preparando algo incrível para você. <br />
-                    Em breve, você terá acesso completo ao painel.
-                </p>
-                <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-                    <Button asChild className="bg-[#008080] hover:bg-[#008080]/90">
-                        <Link href="/">Voltar para Home</Link>
-                    </Button>
-                    <Button variant="outline" onClick={handleLogout}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sair
-                    </Button>
-                </div>
-            </div>
+        <div className="flex min-h-screen flex-col items-center justify-center p-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Redirecionando...</p>
         </div>
     );
 }
