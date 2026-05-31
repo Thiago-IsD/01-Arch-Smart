@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_urls(cls, v: str, info: ValidationInfo) -> str:
         """Ensure URLs are properly formatted"""
+        if info.field_name == 'DATABASE_URL' and v and v.startswith('postgres://'):
+            v = v.replace('postgres://', 'postgresql://', 1)
         if not v or not v.startswith(('http://', 'https://', 'postgresql://')):
             raise ValueError(f'{info.field_name} must be a valid URL')
         return v

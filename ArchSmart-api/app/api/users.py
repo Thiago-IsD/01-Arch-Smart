@@ -116,7 +116,6 @@ async def get_current_user(
             return user
             
         raise HTTPException(status_code=404, detail="User not found and could not be auto-created")
-        raise
     except Exception as e:
         print(f"[ERROR] JWT Validation failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
