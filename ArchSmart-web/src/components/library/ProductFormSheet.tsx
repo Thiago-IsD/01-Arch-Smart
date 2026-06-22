@@ -49,6 +49,8 @@ const formSchema = z.object({
     store: z.string().optional(),
     category: z.string().optional(),
     price: z.coerce.number().min(0, "Preço inválido").optional(),
+    cost_price: z.coerce.number().min(0, "Preço inválido").optional(),
+    markup: z.coerce.number().optional(),
     image_url: z.string().url("URL inválida").optional().or(z.literal("")),
     description: z.string().optional(),
     // Dimensions
@@ -76,6 +78,8 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
             store: "",
             category: "",
             price: 0,
+            cost_price: 0,
+            markup: 0,
             image_url: "",
             description: "",
             width: 0,
@@ -94,6 +98,8 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 store: productToEdit.store || "",
                 category: productToEdit.category || "",
                 price: productToEdit.price || 0,
+                cost_price: productToEdit.cost_price || 0,
+                markup: productToEdit.markup || 0,
                 image_url: productToEdit.image_url || "",
                 description: productToEdit.description || "",
                 width: productToEdit.dimensions?.width || 0,
@@ -108,6 +114,8 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 store: "",
                 category: "",
                 price: 0,
+                cost_price: 0,
+                markup: 0,
                 image_url: "",
                 description: "",
                 width: 0,
@@ -136,6 +144,8 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 store: values.store,
                 category: values.category,
                 price: values.price,
+                cost_price: values.cost_price,
+                markup: values.markup,
                 image_url: values.image_url || null,
                 description: values.description,
                 source_url: values.source_url || null,
@@ -148,41 +158,25 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 yield_factor: values.yield_factor || null
             }
 
-            // Clean undefineds
-            // Create user
+            // Get Supabase session to extract token
             const { createClient } = await import("@/utils/supabase/client");
             const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
 
-            if (!user) throw new Error("Usuário não autenticado");
-
-            // We need to fetch the account_id from our API or store it in session. 
-            // For now, let's assume the backend finds it via the user, OR we pass a dummy account_id since auth/user/account logic is complex here.
-            // Actually, backend requires account_id. 
-            // Let's rely on the backend finding the account via the user token IF we had that middleware set up perfectly.
-            // But currently auth.py creates user/account.
-            // Let's just pass a hardcoded/fetched account ID? No, let's fix backend to get account from user? 
-            // Better: For this MVP, we fetch the first account of the user or similar.
-            // Wait, create_product endpoint requires account_id in body? 
-            // ProductCreate schema has account_id: UUID.
-
-            // Temporary Hack: Fetch current user's account first? 
-            // Or simpler: Fetch one of the existing accounts from the seed to make it work for now?
-            // "41456060-7f1a-46d8-9769-5ada9733fe97" was created in seed.
-            // Use that for now to avoid blocking.
-            const accountId = "41456060-7f1a-46d8-9769-5ada9733fe97"
+            if (!session) throw new Error("Usuário não autenticado");
 
             const method = productToEdit ? "PUT" : "POST"
             const url = productToEdit
                 ? apiUrl(`/api/products/${productToEdit.id}`)
                 : apiUrl("/api/products/")
 
-            const finalPayload = { ...payload, account_id: accountId }
-
             const res = await fetch(url, {
                 method,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(finalPayload),
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify(payload),
             })
 
             if (!res.ok) throw new Error("Falha ao salvar produto")
@@ -276,15 +270,78 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="cost_price"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Custo (R$)</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                step="0.01" 
+                                                {...field} 
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value) || 0;
+                                                    field.onChange(val);
+                                                    const currentMarkup = form.getValues("markup") || 0;
+                                                    const sellingPrice = val * (1 + currentMarkup / 100);
+                                                    form.setValue("price", parseFloat(sellingPrice.toFixed(2)));
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="markup"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Markup (%)</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                step="0.1" 
+                                                {...field} 
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value) || 0;
+                                                    field.onChange(val);
+                                                    const cost = form.getValues("cost_price") || 0;
+                                                    const sellingPrice = cost * (1 + val / 100);
+                                                    form.setValue("price", parseFloat(sellingPrice.toFixed(2)));
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
                             <FormField
                                 control={form.control}
                                 name="price"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Preço (R$)</FormLabel>
+                                        <FormLabel>Venda (R$)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.01" {...field} />
+                                            <Input 
+                                                type="number" 
+                                                step="0.01" 
+                                                {...field} 
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value) || 0;
+                                                    field.onChange(val);
+                                                    const cost = form.getValues("cost_price") || 0;
+                                                    if (cost > 0) {
+                                                        const calculatedMarkup = ((val / cost) - 1) * 100;
+                                                        form.setValue("markup", parseFloat(calculatedMarkup.toFixed(2)));
+                                                    }
+                                                }}
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -332,9 +389,12 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                     name="width"
                                     render={({ field }) => (
                                         <FormItem className="flex-1">
-                                            <FormControl>
-                                                <Input type="number" placeholder="L" title="Largura" {...field} />
-                                            </FormControl>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Largura</span>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="L" title="Largura" {...field} />
+                                                </FormControl>
+                                            </div>
                                         </FormItem>
                                     )}
                                 />
@@ -343,9 +403,12 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                     name="height"
                                     render={({ field }) => (
                                         <FormItem className="flex-1">
-                                            <FormControl>
-                                                <Input type="number" placeholder="A" title="Altura" {...field} />
-                                            </FormControl>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Altura</span>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="A" title="Altura" {...field} />
+                                                </FormControl>
+                                            </div>
                                         </FormItem>
                                     )}
                                 />
@@ -354,9 +417,12 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                                     name="depth"
                                     render={({ field }) => (
                                         <FormItem className="flex-1">
-                                            <FormControl>
-                                                <Input type="number" placeholder="P" title="Profundidade" {...field} />
-                                            </FormControl>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Profundidade</span>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="P" title="Profundidade" {...field} />
+                                                </FormControl>
+                                            </div>
                                         </FormItem>
                                     )}
                                 />

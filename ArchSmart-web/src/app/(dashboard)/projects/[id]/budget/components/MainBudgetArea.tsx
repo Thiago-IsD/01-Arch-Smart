@@ -21,17 +21,20 @@ import {
 export function MainBudgetArea({
     projectId,
     budgetTree,
-    environments
+    environments,
+    projectName
 }: {
     projectId: string
     budgetTree: BudgetTree
     environments: Environment[]
+    projectName?: string
 }) {
     return (
         <BudgetProvider
             projectId={projectId}
             initialBudgetTree={budgetTree}
             initialEnvironments={environments}
+            projectName={projectName}
         >
             <div className="flex flex-col md:flex-row h-full w-full">
                 {/* Sidebar com Lista de Ambientes e Provider Context Injetado */}
@@ -57,11 +60,59 @@ export function MainBudgetArea({
 import { ProductPickerModal } from "./ProductPickerModal"
 import { useState, useEffect } from "react"
 
+const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={props.className}
+        style={{ width: '1em', height: '1em' }}
+        {...props}
+    >
+        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.413 9.863-9.83.001-2.624-1.023-5.092-2.884-6.956C16.53 1.96 14.07 .938 11.474.938c-5.437 0-9.865 4.414-9.867 9.832-.001 1.959.514 3.87 1.492 5.562l-1.01 3.693 3.79-.994c1.57.857 3.125 1.309 4.178 1.123zm11.758-6.938c-.305-.153-1.802-.888-2.08-.988-.277-.1-.48-.153-.68.153-.2.305-.777.988-.952 1.188-.176.2-.352.224-.658.072-.305-.153-1.288-.475-2.454-1.516-.906-.809-1.517-1.808-1.695-2.113-.177-.305-.019-.47.133-.62.137-.137.305-.353.458-.53.153-.176.203-.305.305-.51.102-.2.05-.382-.025-.535-.076-.153-.68-1.637-.93-2.239-.244-.588-.492-.51-.68-.52-.176-.01-.377-.01-.58-.01-.202 0-.53.077-.807.382-.277.305-1.058 1.037-1.058 2.532 0 1.496 1.087 2.94 1.238 3.144.152.204 2.14 3.266 5.185 4.578.724.312 1.29.499 1.732.64.727.231 1.39.198 1.912.12.583-.087 1.802-.738 2.054-1.452.252-.713.252-1.325.176-1.452-.076-.127-.277-.203-.583-.356z" />
+    </svg>
+)
+
 function ActiveBudgetWorkspace() {
-    const { budgetTree, environments, selectedEnvironmentId } = useBudget()
+    const { budgetTree, environments, selectedEnvironmentId, projectName } = useBudget()
     const [isPickerOpen, setIsPickerOpen] = useState(false)
 
     const activeEnv = environments.find(e => e.id === selectedEnvironmentId)
+
+    const handleExportWhatsApp = () => {
+        let text = `*Orçamento${projectName ? ` - ${projectName}` : ''}*\n\n`
+
+        environments.forEach((env) => {
+            const envItems = (budgetTree.items || []).filter(item => item.environment_id === env.id)
+            if (envItems.length === 0) return
+
+            text += `*${env.name}*\n`
+            envItems.forEach(item => {
+                const activeOption = item.options.find((o: any) => o.is_selected) || item.options[0]
+                if (!activeOption || !activeOption.product) return
+
+                const product = activeOption.product
+                const qty = item.rule_type === "UNIT" ? (item.manual_quantity || 1) : (item.calculated_quantity || 0)
+                const price = product.price || 0
+                const total = qty * price
+
+                text += `- ${product.name}: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`
+            })
+            text += '\n'
+        })
+
+        const totalProject = (budgetTree.items || []).reduce((sum, item) => {
+            const activeOption = item.options.find((o: any) => o.is_selected) || item.options[0]
+            if (!activeOption || !activeOption.product) return sum
+            const qty = item.rule_type === "UNIT" ? (item.manual_quantity || 1) : (item.calculated_quantity || 0)
+            const price = activeOption.product.price || 0
+            return sum + (qty * price)
+        }, 0)
+
+        text += `*Total Geral: R$ ${totalProject.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`
+
+        const encodedText = encodeURIComponent(text)
+        window.open(`https://wa.me/?text=${encodedText}`, '_blank')
+    }
 
     if (!activeEnv) {
         return (
@@ -87,6 +138,13 @@ function ActiveBudgetWorkspace() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Button 
+                        onClick={handleExportWhatsApp} 
+                        className="bg-[#25D366] hover:bg-[#20BA56] text-white font-bold transition-all shadow-sm flex items-center"
+                    >
+                        <WhatsAppIcon className="w-4 h-4 mr-2" />
+                        Exportar WhatsApp
+                    </Button>
                     <Button onClick={() => setIsPickerOpen(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Adicionar Produto

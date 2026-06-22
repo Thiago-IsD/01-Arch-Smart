@@ -18,6 +18,7 @@ interface PublicOptionInfo {
     id: string;
     is_selected: boolean;
     product: PublicProductInfo | null;
+    approval_status?: string;
 }
 
 interface PublicBudgetItemInfo {
@@ -66,10 +67,10 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
 
     const isLocked = status === "ACCEPTED" || status === "REVISION_REQUESTED";
 
-    const handleSelectOption = (itemId: string, optionId: string) => {
-        if (isLocked) return; // Cannot edit if already accepted
+    const handleSelectOption = async (itemId: string, optionId: string) => {
+        if (isLocked) return;
 
-        // Update local state without hitting the API
+        // Update local state
         setItems(prev => prev.map(item => {
             if (item.id !== itemId) return item;
             return {
@@ -80,6 +81,72 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
                 }))
             };
         }));
+
+        try {
+            await fetch(
+                apiUrl(`/public/presentations/${presentationId}/options/${optionId}/select`),
+                { method: "POST" }
+            );
+        } catch (e) {
+            console.error("Failed to save selection on server", e);
+        }
+    };
+
+    const handleApproveOption = async (itemId: string, optionId: string) => {
+        if (isLocked) return;
+
+        // Optimistically update UI
+        setItems(prev => prev.map(item => {
+            if (item.id !== itemId) return item;
+            return {
+                ...item,
+                options: item.options.map(opt => ({
+                    ...opt,
+                    is_selected: opt.id === optionId,
+                    approval_status: opt.id === optionId ? "APPROVED" : "PENDING"
+                }))
+            };
+        }));
+
+        try {
+            const res = await fetch(
+                apiUrl(`/public/presentations/${presentationId}/options/${optionId}/approve`),
+                { method: "POST" }
+            );
+            if (!res.ok) throw new Error("Erro ao aprovar item");
+            toast({ title: "Item Aprovado", description: "O status foi atualizado com sucesso." });
+        } catch (err) {
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível salvar a aprovação." });
+            setItems(initialItems);
+        }
+    };
+
+    const handleRejectOption = async (itemId: string, optionId: string) => {
+        if (isLocked) return;
+
+        // Optimistically update UI
+        setItems(prev => prev.map(item => {
+            if (item.id !== itemId) return item;
+            return {
+                ...item,
+                options: item.options.map(opt => {
+                    if (opt.id !== optionId) return opt;
+                    return { ...opt, approval_status: "REJECTED" };
+                })
+            };
+        }));
+
+        try {
+            const res = await fetch(
+                apiUrl(`/public/presentations/${presentationId}/options/${optionId}/reject`),
+                { method: "POST" }
+            );
+            if (!res.ok) throw new Error("Erro ao recusar item");
+            toast({ title: "Item Recusado", description: "O orçamento foi recalculado." });
+        } catch (err) {
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível salvar a recusa." });
+            setItems(initialItems);
+        }
     };
 
     const handleSubmitAcceptance = async () => {
@@ -122,6 +189,9 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
 
     const calculateItemTotal = (item: PublicBudgetItemInfo) => {
         const active = item.options.find(o => o.is_selected) || item.options[0];
+        if (active?.approval_status === "REJECTED") {
+            return 0;
+        }
         const price = active?.product?.price || 0;
         const qty = item.rule_type === "UNIT" ? (item.manual_quantity || 1) : (item.calculated_quantity || 0);
         return price * qty;
@@ -226,6 +296,40 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
                                                         </a>
                                                     )}
                                                 </div>
+                                            </div>
+
+                                            {/* Approve / Reject Controls */}
+                                            <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+                                                <span className="text-xs text-slate-400">
+                                                    Status: {activeOption?.approval_status === "APPROVED" ? (
+                                                        <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded">Aprovado ✓</span>
+                                                    ) : activeOption?.approval_status === "REJECTED" ? (
+                                                        <span className="text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded">Recusado ✗</span>
+                                                    ) : (
+                                                        <span className="text-slate-500 font-medium">Aguardando Avaliação</span>
+                                                    )}
+                                                </span>
+                                                
+                                                {!isLocked && (
+                                                    <div className="flex gap-2">
+                                                        {activeOption?.approval_status !== "APPROVED" && (
+                                                            <button
+                                                                onClick={() => handleApproveOption(item.id, activeOption.id)}
+                                                                className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors"
+                                                            >
+                                                                Aprovar
+                                                            </button>
+                                                        )}
+                                                        {activeOption?.approval_status !== "REJECTED" && (
+                                                            <button
+                                                                onClick={() => handleRejectOption(item.id, activeOption.id)}
+                                                                className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-colors"
+                                                            >
+                                                                Recusar
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );

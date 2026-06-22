@@ -181,7 +181,6 @@ export default function ResetPasswordPage() {
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                                        tabIndex={-1}
                                     >
                                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </button>
@@ -227,8 +226,9 @@ export default function ResetPasswordPage() {
                                 {errors.confirmPassword && <span className="text-xs text-red-500">{errors.confirmPassword.message}</span>}
                             </div>
 
-                            <Button type="submit" className="w-full h-12 text-base font-bold bg-[#008080] hover:bg-[#008080]/90 text-white" disabled={isSubmitting}>
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Salvar Nova Senha"}
+                            <Button type="submit" className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4 inline" /> : null}
+                                Salvar Nova Senha
                             </Button>
                         </form>
                     </div>

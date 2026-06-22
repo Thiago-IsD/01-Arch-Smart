@@ -92,7 +92,7 @@ export default async function BudgetWorkspacePage(
                     <div className="flex-1 mt-6">
                         <TabsContent value="orcamento" className="m-0 flex-1 flex flex-col h-[70vh] w-full border rounded-lg overflow-hidden bg-background">
                             {/* The Main Area wrapper will split to Sidebar / Center and hold Context */}
-                            <MainBudgetArea projectId={projectId} budgetTree={budgetTree} environments={environments} />
+                            <MainBudgetArea projectId={projectId} budgetTree={budgetTree} environments={environments} projectName={project?.name} />
                         </TabsContent>
                     </div>
                 </Tabs>

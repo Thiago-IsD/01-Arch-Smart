@@ -44,6 +44,7 @@ type BudgetContextType = {
     environments: Environment[]
     selectedEnvironmentId: string | null
     setSelectedEnvironmentId: (id: string | null) => void
+    projectName?: string
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined)
@@ -52,12 +53,14 @@ export function BudgetProvider({
     children,
     projectId,
     initialBudgetTree,
-    initialEnvironments
+    initialEnvironments,
+    projectName
 }: {
     children: React.ReactNode
     projectId: string
     initialBudgetTree: BudgetTree
     initialEnvironments: Environment[]
+    projectName?: string
 }) {
     const [budgetTree, setBudgetTree] = useState<BudgetTree>(initialBudgetTree)
     const [environments, setEnvironments] = useState<Environment[]>(initialEnvironments)
@@ -79,7 +82,8 @@ export function BudgetProvider({
             budgetTree,
             environments,
             selectedEnvironmentId,
-            setSelectedEnvironmentId
+            setSelectedEnvironmentId,
+            projectName
         }}>
             {children}
         </BudgetContext.Provider>

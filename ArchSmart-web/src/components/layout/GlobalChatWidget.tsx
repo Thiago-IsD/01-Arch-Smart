@@ -20,7 +20,7 @@ const MOCK_MESSAGES: Message[] = [
     {
         id: 1,
         sender: "bot",
-        text: "Olá! Sou o Assistente Ecowe. Como posso ajudar você hoje?",
+        text: "Olá! Sou o Assistente Arch Smart. Como posso ajudar você hoje?",
         timestamp: "10:30",
     },
     {
@@ -65,7 +65,7 @@ export function GlobalChatWidget() {
                         </Avatar>
                         <div>
                             <h3 className="font-semibold text-sm text-foreground">
-                                Assistente Ecowe
+                                Assistente Arch Smart
                             </h3>
                             <p className="text-xs text-muted-foreground">Online</p>
                         </div>

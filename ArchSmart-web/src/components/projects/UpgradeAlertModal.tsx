@@ -13,12 +13,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Lock } from "lucide-react"
+import Link from "next/link"
 
 export function UpgradeAlertModal() {
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700">
+                <Button variant="outline" className="text-amber-800 border-amber-300 bg-amber-100/50 hover:bg-amber-100 hover:text-amber-900">
                     <Lock className="mr-2 h-4 w-4" /> Slot Indisponível
                 </Button>
             </AlertDialogTrigger>
@@ -35,7 +36,7 @@ export function UpgradeAlertModal() {
                 <AlertDialogFooter>
                     <AlertDialogCancel>Continuar no Solo</AlertDialogCancel>
                     <AlertDialogAction asChild>
-                        <a href="/billing">Fazer Upgrade</a>
+                        <Link href="/billing">Fazer Upgrade</Link>
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

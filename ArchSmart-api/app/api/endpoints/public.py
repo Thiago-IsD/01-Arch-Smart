@@ -40,6 +40,7 @@ class PublicProductInfo(BaseModel):
 class PublicOptionInfo(BaseModel):
     id: Optional[str] = None
     is_selected: bool = False
+    approval_status: Optional[str] = "PENDING"
     product: Optional[PublicProductInfo] = None
 
     model_config = {"from_attributes": True}
@@ -213,6 +214,7 @@ async def get_public_presentation(
                     options_out.append(PublicOptionInfo(
                         id=str(opt.id),
                         is_selected=opt.is_selected,
+                        approval_status=getattr(opt, "approval_status", "PENDING"),
                         product=product_out,
                     ))
 
@@ -274,6 +276,80 @@ def select_public_option(
     db.commit()
 
     return {"status": "success", "message": "Opção selecionada com sucesso"}
+
+@router.post("/presentations/{presentation_uuid}/options/{option_id}/approve")
+def approve_public_option(
+    presentation_uuid: str,
+    option_id: uuid_module.UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Permite que o cliente aprove uma opção (A/B) no portal público.
+    """
+    # 1. Validar apresentação
+    presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
+    if not presentation:
+        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
+
+    # 2. Buscar a opção e garantir que ela pertence ao projeto da apresentação
+    option = (
+        db.query(ItemOption)
+        .join(BudgetItem)
+        .join(Budget)
+        .filter(
+            ItemOption.id == option_id,
+            Budget.project_id == presentation.project_id
+        )
+        .first()
+    )
+
+    if not option:
+        raise HTTPException(status_code=404, detail="Opção não encontrada neste projeto")
+
+    # 3. Desmarcar outras opções do mesmo item e marcar esta como aprovada e selecionada
+    db.query(ItemOption).filter(
+        ItemOption.budget_item_id == option.budget_item_id
+    ).update({"is_selected": False})
+
+    option.is_selected = True
+    option.approval_status = "APPROVED"
+    db.commit()
+
+    return {"status": "success", "message": "Opção aprovada com sucesso", "approval_status": "APPROVED"}
+
+@router.post("/presentations/{presentation_uuid}/options/{option_id}/reject")
+def reject_public_option(
+    presentation_uuid: str,
+    option_id: uuid_module.UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Permite que o cliente rejeite uma opção (A/B) no portal público.
+    """
+    # 1. Validar apresentação
+    presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
+    if not presentation:
+        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
+
+    # 2. Buscar a opção
+    option = (
+        db.query(ItemOption)
+        .join(BudgetItem)
+        .join(Budget)
+        .filter(
+            ItemOption.id == option_id,
+            Budget.project_id == presentation.project_id
+        )
+        .first()
+    )
+
+    if not option:
+        raise HTTPException(status_code=404, detail="Opção não encontrada neste projeto")
+
+    option.approval_status = "REJECTED"
+    db.commit()
+
+    return {"status": "success", "message": "Opção rejeitada com sucesso", "approval_status": "REJECTED"}
 
 @router.post("/presentations/{presentation_uuid}/accept")
 async def accept_public_presentation(

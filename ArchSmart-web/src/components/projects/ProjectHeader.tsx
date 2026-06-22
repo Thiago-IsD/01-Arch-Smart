@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EditProjectButton } from "@/components/projects/EditProjectButton"
@@ -36,6 +36,12 @@ export function ProjectHeader({ project, activeTab = "ambientes" }: ProjectHeade
                 </div>
                 <div className="flex items-center space-x-2">
                     <ProjectStatusSelect projectId={project.id} currentStatus={project.status} />
+                    <span className="w-px h-6 bg-border mx-2 hidden md:block"></span>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={`/projects/${project.id}/print`} target="_blank">
+                            <Printer className="w-4 h-4 mr-2" /> Caderno de Obras
+                        </Link>
+                    </Button>
                     <span className="w-px h-6 bg-border mx-2 hidden md:block"></span>
                     <EditProjectButton projectData={project} />
                     <DeleteProjectAlert projectId={project.id} projectName={project.name} />

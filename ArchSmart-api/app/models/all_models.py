@@ -188,6 +188,8 @@ class Product(Base):
     store = Column(String, nullable=True) # New field
     category = Column(String, nullable=True) # New field
     price = Column(Float, nullable=True) # New field
+    cost_price = Column(Float, nullable=True)
+    markup = Column(Float, nullable=True)
     dimensions = Column(JSON, nullable=True) # New field: {width, height, depth, unit}
     yield_factor = Column(Float, nullable=True) # New field: Rendimento de Cobertura (m2, ml, etc.)
     image_url = Column(String)
@@ -306,6 +308,7 @@ class ItemOption(Base):
     budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     is_selected = Column(Boolean, default=True)
+    approval_status = Column(String, default="PENDING", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

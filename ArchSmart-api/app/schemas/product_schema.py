@@ -10,6 +10,8 @@ class ProductBase(BaseModel):
     store: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = None
+    cost_price: Optional[float] = None
+    markup: Optional[float] = None
     dimensions: Optional[Dict[str, Any]] = None # {width, height, depth, unit}
     yield_factor: Optional[float] = None # Rendimento para motores de orçamento
     image_url: Optional[str] = None
@@ -18,7 +20,7 @@ class ProductBase(BaseModel):
     state_id: Optional[UUID] = None
 
 class ProductCreate(ProductBase):
-    account_id: UUID
+    account_id: Optional[UUID] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -26,6 +28,8 @@ class ProductUpdate(BaseModel):
     store: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = None
+    cost_price: Optional[float] = None
+    markup: Optional[float] = None
     dimensions: Optional[Dict[str, Any]] = None
     yield_factor: Optional[float] = None
     image_url: Optional[str] = None

@@ -75,8 +75,12 @@ def get_products(
     origins: Optional[List[str]] = Query(None, description="Filter by origins"),
     sort_by: Optional[str] = Query("created_at_desc", description="Sort products"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Product).join(ProductState).filter(ProductState.status == state)
+    query = db.query(Product).join(ProductState).filter(
+        ProductState.status == state,
+        Product.account_id == current_user.account_id
+    )
 
     if q:
         search = f"%{q}%"
@@ -123,8 +127,15 @@ def get_products(
     }
 
 @router.get("/{product_id}", response_model=ProductResponse)
-def get_product(product_id: UUID, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
+def get_product(
+    product_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.account_id == current_user.account_id
+    ).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
@@ -151,7 +162,11 @@ async def normalize_product(request: NormalizeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=ProductResponse)
-def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+def create_product(
+    product: ProductCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     # Verify/Get State ID provided or Default to NORMALIZED
     state_id = product.state_id
     if not state_id:
@@ -175,11 +190,11 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
              db.refresh(manual_origin)
         origin_id = manual_origin.id
 
-    product_data = product.dict(exclude={'state_id', 'origin_id'})
-    # Ensure account_id is set if not in product_data but in product object (it is in ProductCreate)
+    product_data = product.dict(exclude={'state_id', 'origin_id', 'account_id'})
     
     db_product = Product(
         **product_data,
+        account_id=current_user.account_id,
         state_id=state_id,
         origin_id=origin_id
     )
@@ -189,8 +204,16 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     return db_product
 
 @router.put("/{product_id}", response_model=ProductResponse)
-def update_product(product_id: UUID, product_update: ProductUpdate, db: Session = Depends(get_db)):
-    db_product = db.query(Product).filter(Product.id == product_id).first()
+def update_product(
+    product_id: UUID, 
+    product_update: ProductUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.account_id == current_user.account_id
+    ).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
@@ -203,8 +226,15 @@ def update_product(product_id: UUID, product_update: ProductUpdate, db: Session 
     return db_product
 
 @router.delete("/{product_id}")
-def delete_product(product_id: UUID, db: Session = Depends(get_db)):
-    db_product = db.query(Product).filter(Product.id == product_id).first()
+def delete_product(
+    product_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.account_id == current_user.account_id
+    ).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -221,8 +251,16 @@ def delete_product(product_id: UUID, db: Session = Depends(get_db)):
     return {"ok": True}
 
 @router.patch("/{product_id}/approve", response_model=ProductResponse)
-def approve_product(product_id: UUID, product_update: ProductUpdate, db: Session = Depends(get_db)):
-    db_product = db.query(Product).filter(Product.id == product_id).first()
+def approve_product(
+    product_id: UUID, 
+    product_update: ProductUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.account_id == current_user.account_id
+    ).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
@@ -241,7 +279,6 @@ def approve_product(product_id: UUID, product_update: ProductUpdate, db: Session
         
     db_product.state_id = normalized_state.id
     db.commit()
-    db.refresh(db_product)
     db.refresh(db_product)
     return db_product
 

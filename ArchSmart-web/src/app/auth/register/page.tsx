@@ -138,7 +138,7 @@ export default function RegisterRequestPage() {
                                 {errors.email && <span className="text-xs text-red-500">{errors.email.message}</span>}
                             </div>
 
-                            <Button type="submit" className="w-full h-12 text-base font-bold bg-[#008080] hover:bg-[#008080]/90 text-white" disabled={isSubmitting}>
+                            <Button type="submit" className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
                                 {isSubmitting ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -151,7 +151,7 @@ export default function RegisterRequestPage() {
                         </form>
                         <div className="mt-6 text-center text-sm">
                             Já tem conta?{" "}
-                            <Link href="/auth/login" className="font-semibold text-[#008080] hover:underline">
+                            <Link href="/auth/login" className="font-semibold text-primary hover:underline">
                                 Fazer login
                             </Link>
                         </div>
