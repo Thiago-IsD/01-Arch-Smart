@@ -40,3 +40,5 @@ class DashboardLeanResponse(BaseModel):
     financial_income: float
     financial_expense: float
     upcoming_events: List[UpcomingEvent]
+    project_limit: int = 2
+

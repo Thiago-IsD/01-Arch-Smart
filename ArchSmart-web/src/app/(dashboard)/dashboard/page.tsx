@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
+import { Skeleton } from "@/components/ui/skeleton"
 import { 
     Plus, 
     FolderIcon, 
@@ -65,6 +67,7 @@ interface DashboardLeanResponse {
     financial_income: number
     financial_expense: number
     upcoming_events: UpcomingEvent[]
+    project_limit?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -152,16 +155,118 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[70vh] text-muted-foreground">
-                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-                <p className="text-lg animate-pulse">Carregando seu espaço de trabalho...</p>
+            <div className="flex flex-col gap-8 p-4 md:p-8 w-full max-w-7xl mx-auto">
+                {/* Header / Saudação Premium Skeleton */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl border bg-card">
+                    <div className="space-y-2 flex-1">
+                        <Skeleton className="h-9 w-64 md:w-80" />
+                        <Skeleton className="h-5 w-80 md:w-96" />
+                    </div>
+                    <Skeleton className="h-9 w-40 rounded-full" />
+                </div>
+
+                {/* Grid de Métricas Principais (Linha 1) Skeleton */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map((i) => (
+                        <Card key={i} className="bg-card shadow-sm pt-2">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-8 w-8 rounded-lg" />
+                            </CardHeader>
+                            <CardContent className="pt-2 space-y-2">
+                                <Skeleton className="h-8 w-32" />
+                                <Skeleton className="h-3 w-40" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Quick Actions Skeleton */}
+                <div>
+                    <Skeleton className="h-6 w-32 mb-4" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="h-16 rounded-xl border bg-card p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Skeleton className="h-9 w-9 rounded-lg" />
+                                    <Skeleton className="h-5 w-28" />
+                                </div>
+                                <Skeleton className="h-4 w-4" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Grid de Conteúdo Secundário Skeleton */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Coluna 1: Projetos Recentes */}
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <Skeleton className="h-6 w-44" />
+                            <Skeleton className="h-4 w-16" />
+                        </div>
+                        {[1, 2, 3].map((i) => (
+                            <Card key={i}>
+                                <CardContent className="p-4 flex items-center justify-between">
+                                    <div className="space-y-1.5 flex-1 mr-4">
+                                        <Skeleton className="h-5 w-full max-w-[180px]" />
+                                        <Skeleton className="h-3.5 w-full max-w-[120px]" />
+                                    </div>
+                                    <Skeleton className="h-4 w-4" />
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* Coluna 2: Compromissos */}
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <Skeleton className="h-6 w-48" />
+                            <Skeleton className="h-4 w-28" />
+                        </div>
+                        {[1, 2, 3].map((i) => (
+                            <Card key={i}>
+                                <CardContent className="p-4 flex flex-col gap-2">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="space-y-1.5 flex-1">
+                                            <Skeleton className="h-5 w-full max-w-[160px]" />
+                                            <Skeleton className="h-3.5 w-full max-w-[100px]" />
+                                        </div>
+                                        <Skeleton className="h-7 w-16 rounded-full shrink-0" />
+                                    </div>
+                                    <Skeleton className="h-5 w-24 rounded shrink-0" />
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* Coluna 3: Biblioteca */}
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <Skeleton className="h-6 w-44" />
+                            <Skeleton className="h-4 w-24" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="flex flex-col rounded-xl border bg-card overflow-hidden h-full">
+                                    <Skeleton className="aspect-[4/3] w-full" />
+                                    <div className="p-2.5 space-y-1.5 flex-1">
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-3 w-16" />
+                                        <Skeleton className="h-4 w-20" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
         )
     }
 
     const userName = data?.user_first_name || "Usuário"
     const activeProjectsCount = data?.active_projects_count || 0
-    const planLimit = 2
+    const planLimit = data?.project_limit || 2
     const projectPercentage = Math.min((activeProjectsCount / planLimit) * 100, 100)
 
     return (
@@ -455,16 +560,18 @@ export default function DashboardPage() {
                             <p className="text-sm font-medium">Nenhum produto salv recentemente.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {data.recent_products.map((prod) => (
                                 <Link key={prod.id} href={`/library?product=${prod.id}`} className="group">
                                     <div className="flex flex-col rounded-xl border bg-card overflow-hidden hover:border-indigo-300 transition-all duration-300 h-full">
                                         <div className="relative aspect-[4/3] w-full bg-muted border-b overflow-hidden">
                                             {prod.image_url ? (
-                                                <img 
+                                                <Image 
                                                     src={prod.image_url} 
                                                     alt={prod.name}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    fill
+                                                    sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+                                                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                                                 />
                                             ) : (
                                                 <div className="flex w-full h-full items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 text-xs">

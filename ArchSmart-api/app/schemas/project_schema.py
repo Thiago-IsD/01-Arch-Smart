@@ -94,3 +94,5 @@ class PaginatedProjectResponse(BaseModel):
     size: int
     pages: int
     items: List[ProjectResponse]
+    project_limit: int = 2
+

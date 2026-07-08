@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.db.session import get_db
 from app.api.users import get_current_user
-from app.models.all_models import User, Project, Product, Client, Event, FinancialEntry
+from app.models.all_models import User, Project, Product, Client, Event, FinancialEntry, Subscription, Plan
 from app.schemas.dashboard_schema import DashboardLeanResponse
 
 router = APIRouter()
@@ -126,6 +126,17 @@ def get_dashboard_lean(
             "project_name": pj_name
         })
 
+    # 5. Buscar limite do plano (Subscription -> Plan -> limits['projects'])
+    project_limit = 2
+    subscription = db.query(Subscription).filter(Subscription.account_id == account_id).first()
+    if subscription and subscription.plan_id:
+        plan = db.query(Plan).filter(Plan.id == subscription.plan_id).first()
+        if plan:
+            if plan.limits and "projects" in plan.limits:
+                project_limit = plan.limits["projects"]
+            elif plan.name == "Professional":
+                project_limit = 999999
+
     return {
         "user_first_name": current_user.full_name or "Usuário",
         "recent_projects": recent_projects,
@@ -134,5 +145,6 @@ def get_dashboard_lean(
         "financial_balance": financial_balance,
         "financial_income": financial_income,
         "financial_expense": financial_expense,
-        "upcoming_events": upcoming_events
+        "upcoming_events": upcoming_events,
+        "project_limit": project_limit
     }
