@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 from typing import Optional
 
@@ -22,8 +22,7 @@ class UserProfileResponse(BaseModel):
     role: str  # "admin" or "user" - can be expanded later
     account: AccountInfo
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserProfileUpdate(BaseModel):

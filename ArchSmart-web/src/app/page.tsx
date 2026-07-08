@@ -24,7 +24,7 @@ const AbstractHeroIllustration = () => (
     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-48 bg-card rounded-xl border shadow-2xl flex flex-col p-4 z-20">
       <div className="flex items-center gap-2 mb-4 border-b pb-2">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <LayoutDashboard className="w-5 h-5 text-primary" />
+          <LayoutDashboard className="w-5 h-5 text-primary" aria-hidden="true" focusable="false" />
         </div>
         <div className="h-2 w-24 bg-muted rounded-full" />
       </div>
@@ -41,7 +41,7 @@ const AbstractHeroIllustration = () => (
     {/* 1. Project */}
     <div className="absolute top-0 right-10 w-32 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-700 [animation-duration:3000ms]">
       <div className="flex items-center gap-2 mb-2">
-        <HardHat className="w-4 h-4 text-secondary" />
+        <HardHat className="w-4 h-4 text-secondary" aria-hidden="true" focusable="false" />
         <div className="h-2 w-12 bg-muted rounded-full" />
       </div>
       <div className="h-1.5 w-full bg-muted/30 rounded-full mb-1" />
@@ -51,7 +51,7 @@ const AbstractHeroIllustration = () => (
     {/* 2. Budget */}
     <div className="absolute bottom-10 left-0 w-36 p-3 bg-card rounded-lg border shadow-lg z-10 animate-bounce delay-500 [animation-duration:4000ms]">
       <div className="flex items-center gap-2 mb-2">
-        <Wallet className="w-4 h-4 text-primary" />
+        <Wallet className="w-4 h-4 text-primary" aria-hidden="true" focusable="false" />
         <div className="h-2 w-16 bg-muted rounded-full" />
       </div>
       <div className="h-6 w-full bg-primary/10 rounded border border-primary/20 flex items-center px-2">
@@ -61,7 +61,7 @@ const AbstractHeroIllustration = () => (
 
     {/* 3. Library */}
     <div className="absolute top-10 left-10 w-28 p-3 bg-card rounded-lg border shadow-lg z-0 opacity-80 animate-pulse [animation-duration:5000ms]">
-      <BookOpen className="w-4 h-4 text-primary mb-2" />
+      <BookOpen className="w-4 h-4 text-primary mb-2" aria-hidden="true" focusable="false" />
       <div className="flex gap-1">
         <div className="h-8 w-8 bg-muted rounded" />
         <div className="h-8 w-8 bg-muted rounded" />
@@ -162,7 +162,7 @@ const AbstractBrowserWindow = () => (
       {/* Extension Popup */}
       <div className="absolute top-4 right-4 w-48 bg-card rounded-lg border shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 duration-700">
         <div className="flex items-center gap-2 mb-3">
-          <Chrome className="w-4 h-4 text-primary" />
+          <Chrome className="w-4 h-4 text-primary" aria-hidden="true" focusable="false" />
           <span className="text-xs font-bold">Arch Smart Clipper</span>
         </div>
         <div className="space-y-2">
@@ -188,27 +188,27 @@ export default function Home() {
 
       <main className="flex-1">
         {/* 1. Hero Section */}
-        <section className="py-20 lg:py-28 overflow-hidden">
+        <section className="py-20 lg:py-28 overflow-hidden" aria-labelledby="hero-title">
           <div className="container px-4 md:px-6">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="flex flex-col items-center lg:items-start text-center lg:text-left space-y-8">
                 <Badge variant="outline" className="py-1.5 px-4 bg-primary/5 border-primary/20 text-primary">
                   Otimizado para Escritórios
                 </Badge>
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+                <h1 id="hero-title" className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
                   Transforme a Gestão do seu <span className="text-primary">Escritório</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-lg leading-relaxed">
                   A plataforma tudo-em-um para gestão de projetos, controle financeiro e colaboração com clientes, feita sob medida para arquitetos e designers.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                  <Button size="lg" className="h-12 px-8 text-base gap-2" asChild>
+                  <Button size="lg" className="h-12 px-8 text-base gap-2 hover:scale-105 active:scale-95 transition-transform" asChild>
                     <Link href="/beta/register">
                       Entrar no Beta
-                      <ArrowRight className="w-4 h-4" />
+                      <ArrowRight className="w-4 h-4" aria-hidden="true" focusable="false" />
                     </Link>
                   </Button>
-                  <Button size="lg" variant="outline" className="h-12 px-8 text-base" asChild>
+                  <Button size="lg" variant="outline" className="h-12 px-8 text-base hover:scale-105 active:scale-95 transition-transform" asChild>
                     <Link href="/produto">
                       Conhecer o Produto
                     </Link>
@@ -227,7 +227,7 @@ export default function Home() {
         <div className="container px-4"><div className="h-px bg-border" /></div>
 
         {/* 2. Dashboard Teaser */}
-        <section className="py-24 bg-muted/10">
+        <section className="py-24 bg-muted/10" aria-labelledby="dashboard-teaser-title">
           <div className="container px-4 md:px-6">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div className="order-2 lg:order-1 relative h-[400px]">
@@ -237,7 +237,7 @@ export default function Home() {
               </div>
 
               <div className="order-1 lg:order-2 space-y-6">
-                <h2 className="text-3xl font-bold tracking-tight">Tudo o que você precisa em um só lugar</h2>
+                <h2 id="dashboard-teaser-title" className="text-3xl font-bold tracking-tight">Tudo o que você precisa em um só lugar</h2>
                 <p className="text-lg text-muted-foreground">
                   Abandone as planilhas desconexas. O Arch Smart centraliza seus projetos, orçamentos, cronogramas e comunicação com clientes em uma interface intuitiva e poderosa.
                 </p>
@@ -249,16 +249,16 @@ export default function Home() {
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-foreground/80 font-medium">
                       <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <Check size={14} strokeWidth={3} />
+                        <Check size={14} strokeWidth={3} aria-hidden="true" focusable="false" />
                       </div>
                       {item}
                     </li>
                   ))}
                 </ul>
-                <Button variant="link" className="px-0 text-primary h-auto font-bold group" asChild>
+                <Button variant="link" className="px-0 text-primary h-auto font-bold group hover:scale-105 active:scale-95 transition-transform" asChild>
                   <Link href="/produto">
                     Ver todas as funcionalidades
-                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" aria-hidden="true" focusable="false" />
                   </Link>
                 </Button>
               </div>
@@ -267,18 +267,18 @@ export default function Home() {
         </section>
 
         {/* 3. Web Clipper Teaser */}
-        <section className="py-24">
+        <section className="py-24" aria-labelledby="web-clipper-title">
           <div className="container px-4 md:px-6">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div className="space-y-6">
-                <h2 className="text-3xl font-bold tracking-tight">Capture inspirações instantaneamente</h2>
+                <h2 id="web-clipper-title" className="text-3xl font-bold tracking-tight">Capture inspirações instantaneamente</h2>
                 <p className="text-lg text-muted-foreground">
                   Viu um produto incrível em um site de fornecedor? Use nossa extensão Web Clipper para salvar especificações, imagens e preços diretamente na sua biblioteca de projetos com um clique.
                 </p>
                 <div className="pt-4">
-                  <Button className="h-12 px-8 text-base bg-primary text-primary-foreground hover:bg-primary/90" asChild>
+                  <Button className="h-12 px-8 text-base bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 active:scale-95 transition-transform" asChild>
                     <Link href="/web-clipper">
-                      <Chrome className="w-4 h-4 mr-2" />
+                      <Chrome className="w-4 h-4 mr-2" aria-hidden="true" focusable="false" />
                       Baixar Web Clipper
                     </Link>
                   </Button>
@@ -295,10 +295,10 @@ export default function Home() {
         </section>
 
         {/* 4. Pricing Teaser */}
-        <section className="py-24 bg-muted/10 border-t">
+        <section className="py-24 bg-muted/10 border-t" aria-labelledby="pricing-title">
           <div className="container px-4 md:px-6">
             <div className="text-center mb-16 max-w-3xl mx-auto space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight">Planos que crescem com você</h2>
+              <h2 id="pricing-title" className="text-3xl font-bold tracking-tight">Planos que crescem com você</h2>
               <p className="text-lg text-muted-foreground">
                 De freelancers a grandes escritórios, temos a solução ideal. Sem contratos de fidelidade.
               </p>
@@ -351,11 +351,11 @@ export default function Home() {
 
 // Simple icons for the pricing section
 const UserIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
 )
 const BuildingIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg>
 )
 const Building2Icon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /><path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" /></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /><path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" /></svg>
 )

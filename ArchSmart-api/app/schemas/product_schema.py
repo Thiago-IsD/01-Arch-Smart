@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.all_models import ProductStateStatus, ProductOriginType
 
 class ProductBase(BaseModel):
@@ -41,16 +41,14 @@ class ProductStateSchema(BaseModel):
     name: str
     status: ProductStateStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ProductOriginSchema(BaseModel):
     id: UUID
     name: str
     type: ProductOriginType
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ProductResponse(ProductBase):
     id: UUID
@@ -59,8 +57,7 @@ class ProductResponse(ProductBase):
     state: Optional[ProductStateSchema] = None
     origin: Optional[ProductOriginSchema] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PaginatedProductResponse(BaseModel):
     total: int

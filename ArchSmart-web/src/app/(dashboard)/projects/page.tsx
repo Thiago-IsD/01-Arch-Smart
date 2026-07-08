@@ -5,7 +5,6 @@ import { Plus } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/server"
 import { UpgradeAlertModal } from "@/components/projects/UpgradeAlertModal"
-import { apiUrl } from "@/lib/api-url"
 
 // Function to fetch projects
 async function getProjects(page = 1, size = 20) {
@@ -14,7 +13,7 @@ async function getProjects(page = 1, size = 20) {
     const token = session?.access_token
 
     try {
-        const res = await fetch(apiUrl(`/api/projects?page=${page}&size=${size}`), {
+        const res = await fetch(`http://127.0.0.1:8000/api/projects?page=${page}&size=${size}`, {
             cache: "no-store",
             headers: token ? {
                 "Authorization": `Bearer ${token}`
@@ -41,7 +40,6 @@ export default async function ProjectsPage(props: {
 
     const data = await getProjects()
     const projects = data.items || []
-    const projectLimit = data.project_limit || 2
     const activeProjectsCount = projects.filter((p: any) => p.status === 'ACTIVE').length
 
     const isWizardOpen = action === "new"
@@ -61,12 +59,12 @@ export default async function ProjectsPage(props: {
                             </div>
                             <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                                 <div
-                                    className={`h-full ${activeProjectsCount >= projectLimit ? 'bg-destructive' : 'bg-primary'} transition-all duration-500`}
-                                    style={{ width: `${Math.min((activeProjectsCount / projectLimit) * 100, 100)}%` }}
+                                    className={`h-full ${activeProjectsCount >= 2 ? 'bg-destructive' : 'bg-primary'} transition-all duration-500`}
+                                    style={{ width: `${Math.min((activeProjectsCount / 2) * 100, 100)}%` }}
                                 />
                             </div>
-                            <span className={`text-xs font-bold ${activeProjectsCount >= projectLimit ? 'text-destructive' : 'text-primary'}`}>
-                                {activeProjectsCount}/{projectLimit}
+                            <span className={`text-xs font-bold ${activeProjectsCount >= 2 ? 'text-destructive' : 'text-primary'}`}>
+                                {activeProjectsCount}/2
                             </span>
                         </div>
                     </div>
@@ -76,7 +74,7 @@ export default async function ProjectsPage(props: {
                     </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                    {activeProjectsCount >= projectLimit ? (
+                    {activeProjectsCount >= 2 ? (
                         <UpgradeAlertModal />
                     ) : (
                         <Button asChild>

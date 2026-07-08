@@ -79,6 +79,9 @@ def calculate_budget_item_quantity(db: Session, budget_item: BudgetItem) -> Dict
     # Qtd Final = Qtd Base / Product.rendimento
     qtd_final_float = qtd_base / yield_factor
     
+    # Mitigate float precision issues before ceiling
+    qtd_final_float = round(qtd_final_float, 4)
+    
     # Rounding up for physical packaging
     calculated_quantity = math.ceil(qtd_final_float)
     

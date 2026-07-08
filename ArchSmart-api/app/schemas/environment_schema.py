@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -16,8 +16,7 @@ class EnvironmentDNAResponse(EnvironmentDNABase):
     environment_id: UUID
     is_complete: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class EnvironmentBase(BaseModel):
     name: str = Field(..., min_length=1)
@@ -32,5 +31,4 @@ class EnvironmentResponse(EnvironmentBase):
     created_at: datetime
     dna: Optional[EnvironmentDNAResponse] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

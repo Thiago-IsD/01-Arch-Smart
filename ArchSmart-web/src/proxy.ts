@@ -33,9 +33,20 @@ export async function proxy(request: NextRequest) {
         }
     );
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    let user = null;
+    if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "dummy_anon_key") {
+        const mockCookie = request.cookies.get("sb-access-token");
+        console.log("Mock check in middleware. Cookie:", mockCookie);
+        if (mockCookie && mockCookie.value) {
+            user = { id: "00000000-0000-0000-0000-000000000000", email: "email@email.com" };
+        }
+        console.log("Mock user assigned:", user);
+    } else {
+        const { data } = await supabase.auth.getUser();
+        user = data.user;
+    }
+
+    console.log(`Middleware path: ${request.nextUrl.pathname}, User:`, user ? "Logged in" : "Not logged in");
 
     // Public Routes (Allow access without login)
     const publicRoutes = [

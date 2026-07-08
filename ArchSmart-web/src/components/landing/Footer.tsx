@@ -23,12 +23,12 @@ export default function Footer() {
                 </div>
 
                 {/* Navigation Links */}
-                <div className="flex flex-wrap justify-center gap-6 md:gap-8 text-sm text-muted-foreground">
-                    <Link href="/produto" className="hover:text-primary transition-colors">Produto</Link>
-                    <Link href="/web-clipper" className="hover:text-primary transition-colors">Web Clipper</Link>
-                    <Link href="/precos" className="hover:text-primary transition-colors">Preços</Link>
-                    <Link href="/sobre" className="hover:text-primary transition-colors">Sobre</Link>
-                    <Link href="/beta" className="hover:text-primary transition-colors font-semibold text-foreground">Beta</Link>
+                <div className="flex flex-wrap justify-center gap-6 md:gap-8 text-sm text-foreground/80 font-medium">
+                    <Link href="/produto" className="hover:text-primary hover:underline underline-offset-4 transition-all">Produto</Link>
+                    <Link href="/web-clipper" className="hover:text-primary hover:underline underline-offset-4 transition-all">Web Clipper</Link>
+                    <Link href="/precos" className="hover:text-primary hover:underline underline-offset-4 transition-all">Preços</Link>
+                    <Link href="/sobre" className="hover:text-primary hover:underline underline-offset-4 transition-all">Sobre</Link>
+                    <Link href="/beta" className="hover:text-primary hover:underline underline-offset-4 transition-all font-bold text-foreground">Beta</Link>
                 </div>
             </div>
 

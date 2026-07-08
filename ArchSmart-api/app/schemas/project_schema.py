@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, date
 from uuid import UUID
 
@@ -21,8 +21,7 @@ class ClientResponse(ClientBase):
     id: UUID
     account_id: UUID
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Project schemas
 class ProjectBase(BaseModel):
@@ -85,8 +84,7 @@ class ProjectResponse(ProjectBase):
     environments_count: int = 0
     client: Optional[ClientResponse] = None  # Embed client data for the UI Card
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PaginatedProjectResponse(BaseModel):
     total: int
@@ -94,5 +92,3 @@ class PaginatedProjectResponse(BaseModel):
     size: int
     pages: int
     items: List[ProjectResponse]
-    project_limit: int = 2
-

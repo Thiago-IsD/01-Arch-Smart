@@ -10,7 +10,6 @@ import { ProductFormSheet } from "@/components/library/ProductFormSheet"
 import { NormalizationSheet } from "@/components/library/NormalizationSheet"
 import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import Link from "next/link"
-import { apiUrl } from "@/lib/api-url"
 
 // Function to fetch products
 async function getProducts(searchParams: {
@@ -21,7 +20,7 @@ async function getProducts(searchParams: {
     page: number;
     size: number;
     state?: string;
-}) {
+}, token?: string) {
     const params = new URLSearchParams()
     params.set("page", searchParams.page.toString())
     params.set("size", searchParams.size.toString())
@@ -38,8 +37,14 @@ async function getProducts(searchParams: {
     }
 
     try {
-        const res = await fetch(apiUrl(`/api/products?${params.toString()}`), {
+        const headers: Record<string, string> = {}
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`
+        }
+
+        const res = await fetch(`http://127.0.0.1:8000/api/products?${params.toString()}`, {
             cache: "no-store",
+            headers,
         })
 
         if (!res.ok) {
@@ -54,10 +59,16 @@ async function getProducts(searchParams: {
     }
 }
 
-async function getProduct(id: string) {
+async function getProduct(id: string, token?: string) {
     try {
-        const res = await fetch(apiUrl(`/api/products/${id}`), {
+        const headers: Record<string, string> = {}
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`
+        }
+        
+        const res = await fetch(`http://127.0.0.1:8000/api/products/${id}`, {
             cache: "no-store",
+            headers,
         })
         if (!res.ok) return null
         return res.json()
@@ -67,9 +78,14 @@ async function getProduct(id: string) {
     }
 }
 
+import { cookies } from "next/headers"
+
 export default async function LibraryPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+    const cookieStore = await cookies()
+    const token = cookieStore.get("sb-access-token")?.value
+
     const searchParams = await props.searchParams
 
     const q = typeof searchParams.q === "string" ? searchParams.q : undefined
@@ -98,10 +114,10 @@ export default async function LibraryPage(props: {
     if (tab === "library" || tab === "inbox") {
         try {
             const productState = tab === "inbox" ? "CAPTURED" : "NORMALIZED"
-            data = await getProducts({ q, categories, origins, sort_by, page, size, state: productState })
+            data = await getProducts({ q, categories, origins, sort_by, page, size, state: productState }, token)
 
             if ((action === "edit" || action === "normalize") && editId) {
-                productToEdit = await getProduct(editId)
+                productToEdit = await getProduct(editId, token)
             }
         } catch (error) {
             console.error(error)
@@ -111,7 +127,7 @@ export default async function LibraryPage(props: {
     // Fetch inbox count always
     let inboxCount = 0
     try {
-        const countData = await getProducts({ page: 1, size: 1, state: "CAPTURED" })
+        const countData = await getProducts({ page: 1, size: 1, state: "CAPTURED" }, token)
         inboxCount = countData.total || 0
     } catch (error) {
         console.error("Error fetching inbox count", error)

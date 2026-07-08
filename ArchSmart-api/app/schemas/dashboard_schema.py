@@ -1,4 +1,4 @@
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, ConfigDict, UUID4
 from typing import List, Optional
 from datetime import datetime
 
@@ -7,8 +7,7 @@ class RecentProject(BaseModel):
     name: str
     client_name: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class RecentProduct(BaseModel):
     id: UUID4
@@ -17,8 +16,7 @@ class RecentProduct(BaseModel):
     price: Optional[float] = None
     store: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UpcomingEvent(BaseModel):
     id: UUID4
@@ -28,8 +26,7 @@ class UpcomingEvent(BaseModel):
     meet_link: Optional[str] = None
     project_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DashboardLeanResponse(BaseModel):
     user_first_name: str
@@ -40,5 +37,3 @@ class DashboardLeanResponse(BaseModel):
     financial_income: float
     financial_expense: float
     upcoming_events: List[UpcomingEvent]
-    project_limit: int = 2
-

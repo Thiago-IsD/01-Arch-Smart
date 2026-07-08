@@ -46,14 +46,16 @@ export const Navbar = () => {
 
                             <button
                                 onClick={() => setMenuState(!menuState)}
-                                aria-label={menuState == true ? 'Close Menu' : 'Open Menu'}
+                                aria-label={menuState ? 'Fechar menu' : 'Abrir menu'}
+                                aria-expanded={menuState}
+                                aria-controls="mobile-menu"
                                 className="relative z-20 -m-2.5 -mr-4 block cursor-pointer p-2.5 lg:hidden">
-                                <Equal className="group-data-[state=active]:rotate-180 group-data-[state=active]:scale-0 group-data-[state=active]:opacity-0 m-auto size-6 duration-200" />
-                                <X className="group-data-[state=active]:rotate-0 group-data-[state=active]:scale-100 group-data-[state=active]:opacity-100 absolute inset-0 m-auto size-6 -rotate-180 scale-0 opacity-0 duration-200" />
+                                <Equal className="group-data-[state=active]:rotate-180 group-data-[state=active]:scale-0 group-data-[state=active]:opacity-0 m-auto size-6 duration-200" aria-hidden="true" />
+                                <X className="group-data-[state=active]:rotate-0 group-data-[state=active]:scale-100 group-data-[state=active]:opacity-100 absolute inset-0 m-auto size-6 -rotate-180 scale-0 opacity-0 duration-200" aria-hidden="true" />
                             </button>
                         </div>
 
-                        <div className="hidden lg:block">
+                        <div id="mobile-menu" className="hidden lg:block">
                             <ul className="flex gap-8 text-sm font-medium">
                                 {LANDING_MENU_ITEMS.map((item, index) => (
                                     <li key={index}>
