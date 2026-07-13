@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, ValidationInfo
 
 class Settings(BaseSettings):
@@ -36,13 +36,10 @@ class Settings(BaseSettings):
         """Ensure URLs are properly formatted"""
         if info.field_name == 'DATABASE_URL' and v and v.startswith('postgres://'):
             v = v.replace('postgres://', 'postgresql://', 1)
-        if not v or not v.startswith(('http://', 'https://', 'postgresql://')):
+        if not v or not v.startswith(('http://', 'https://', 'postgresql://', 'sqlite://')):
             raise ValueError(f'{info.field_name} must be a valid URL')
         return v
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=True)
 
 settings = Settings()

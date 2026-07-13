@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid as UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -444,12 +444,16 @@ class Notification(Base):
     account = relationship("Account", back_populates="notifications")
 
 # RAG / Knowledge Base
-try:
-    from pgvector.sqlalchemy import Vector
-except ImportError:
-    # pgvector não está disponível no ambiente local (ex: ao rodar alembic migrations).
-    # O servidor de produção/desenvolvimento tem o pacote instalado.
-    from sqlalchemy import Text as Vector  # type: ignore[assignment]
+import os
+if os.getenv("DATABASE_URL", "").startswith("sqlite"):
+    from sqlalchemy import Text as Vector
+else:
+    try:
+        from pgvector.sqlalchemy import Vector
+    except ImportError:
+        # pgvector não está disponível no ambiente local (ex: ao rodar alembic migrations).
+        # O servidor de produção/desenvolvimento tem o pacote instalado.
+        from sqlalchemy import Text as Vector  # type: ignore[assignment]
 
 class Document(Base):
     __tablename__ = "documents"

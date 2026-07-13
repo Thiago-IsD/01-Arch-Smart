@@ -41,10 +41,7 @@ const wizardSchema = z.object({
     service_type: z.string().min(1, "Selecione o tipo de serviço"),
     client_name: z.string().min(3, "Nome do cliente deve ter pelo menos 3 caracteres"),
     client_email: z.string().email("E-mail inválido").optional().or(z.literal('')),
-    client_phone: z.string().optional().or(z.literal('')).refine((val) => {
-        if (!val) return true;
-        return val.length === 14 || val.length === 15;
-    }, "Telefone inválido. Use o formato (99) 99999-9999 ou (99) 9999-9999"),
+    client_phone: z.string().optional().or(z.literal('')),
     service_value: z.number().min(0),
     payment_installments: z.number().min(1),
     payment_method: z.string(),
@@ -75,23 +72,6 @@ interface ProjectWizardProps {
     mode?: "create" | "edit"
     initialData?: any
 }
-
-const formatPhone = (value: string) => {
-    const cleanValue = value.replace(/\D/g, "");
-    const limitedValue = cleanValue.slice(0, 11);
-    
-    if (limitedValue.length === 0) return "";
-    if (limitedValue.length <= 2) {
-        return `(${limitedValue}`;
-    }
-    if (limitedValue.length <= 6) {
-        return `(${limitedValue.slice(0, 2)}) ${limitedValue.slice(2)}`;
-    }
-    if (limitedValue.length <= 10) {
-        return `(${limitedValue.slice(0, 2)}) ${limitedValue.slice(2, 6)}-${limitedValue.slice(6)}`;
-    }
-    return `(${limitedValue.slice(0, 2)}) ${limitedValue.slice(2, 7)}-${limitedValue.slice(7)}`;
-};
 
 export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create", initialData }: ProjectWizardProps) {
     const [step, setStep] = useState(1)
@@ -188,7 +168,8 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const endpoint = mode === "edit" ? apiUrl(`/api/projects/${initialData.id}`) : apiUrl("/api/projects")
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
+            const endpoint = mode === "edit" ? `${apiBase}/api/projects/${initialData.id}` : `${apiBase}/api/projects`
 
             const res = await fetch(endpoint, {
                 method: mode === "edit" ? 'PUT' : 'POST',
@@ -356,21 +337,14 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
                                     </FormItem>
                                 )}
                             />
-                             <FormField
+                            <FormField
                                 control={form.control}
                                 name="client_phone"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Telefone / WhatsApp (Opcional)</FormLabel>
                                         <FormControl>
-                                            <Input 
-                                                placeholder="(11) 99999-9999" 
-                                                {...field} 
-                                                onChange={(e) => {
-                                                    const masked = formatPhone(e.target.value);
-                                                    field.onChange(masked);
-                                                }}
-                                            />
+                                            <Input placeholder="(11) 99999-9999" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

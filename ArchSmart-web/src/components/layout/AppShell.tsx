@@ -130,7 +130,7 @@ export function AppShell({ children }: AppShellProps) {
                         setMobileMenuOpen={setMobileMenuOpen}
                         unreadCount={unreadCount}
                     />
-                    <main className="flex-1 p-6 md:p-8 lg:p-10 overflow-auto">{children}</main>
+                    <main className="flex-1 p-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32 overflow-auto">{children}</main>
                 </div>
 
                 {/* Mobile Sidebar Sheet */}
@@ -304,60 +304,6 @@ function MobileSidebar({ onNavigate }: { onNavigate: () => void }) {
     );
 }
 
-function Breadcrumbs() {
-    const pathname = usePathname();
-    const { customLabels } = useBreadcrumb();
-
-    const friendlyNames: Record<string, string> = {
-        dashboard: "Dashboard",
-        projects: "Projetos",
-        library: "Biblioteca",
-        finance: "Financeiro",
-        calendar: "Agenda",
-        settings: "Configurações",
-        profile: "Perfil",
-        billing: "Faturamento",
-        budget: "Orçamento",
-        presentations: "Apresentações",
-        builder: "Editor",
-        print: "Impressão",
-    };
-
-    const segments = pathname.split("/").filter(Boolean);
-    
-    if (segments.length === 0) {
-        return <span className="font-semibold text-foreground text-sm">Dashboard</span>;
-    }
-
-    return (
-        <nav className="flex items-center space-x-1.5 text-sm font-semibold text-muted-foreground" aria-label="Breadcrumb">
-            {segments.map((segment, index) => {
-                const isLast = index === segments.length - 1;
-                const label = customLabels[segment] || friendlyNames[segment] || segment;
-                const href = "/" + segments.slice(0, index + 1).join("/");
-
-                return (
-                    <React.Fragment key={href}>
-                        {index > 0 && <span className="text-muted-foreground/50">/</span>}
-                        {isLast ? (
-                            <span className="text-foreground font-semibold truncate max-w-[150px] sm:max-w-[200px]">
-                                {label}
-                            </span>
-                        ) : (
-                            <Link
-                                href={href}
-                                className="hover:text-foreground hover:underline transition-colors truncate max-w-[120px] sm:max-w-[150px]"
-                            >
-                                {label}
-                            </Link>
-                        )}
-                    </React.Fragment>
-                );
-            })}
-        </nav>
-    );
-}
-
 interface HeaderProps {
     notificationsOpen: boolean;
     setNotificationsOpen: (open: boolean) => void;
@@ -386,7 +332,7 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
 
     return (
         <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-16 items-center justify-between px-6 md:px-8 lg:px-10">
+            <div className="flex h-16 items-center justify-between px-6 pr-8 md:pr-16 lg:pr-24 xl:pr-32">
                 {/* Left Side: Mobile Menu + Breadcrumb */}
                 <div className="flex items-center gap-4">
                     {/* Mobile Menu Button */}
@@ -400,7 +346,9 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
 
                     {/* Title + Date */}
                     <div className="flex flex-col">
-                        <Breadcrumbs />
+                        <span className="font-semibold text-foreground text-sm leading-tight">
+                            Bem-vindo à Arch Smart
+                        </span>
                         <span className="text-xs text-muted-foreground mt-0.5">
                             {mounted
                                 ? new Date().toLocaleDateString("pt-BR", {
@@ -447,7 +395,7 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
                     {/* User Avatar Dropdown */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 rounded-lg p-2 hover:bg-accent transition-colors">
+                            <button suppressHydrationWarning className="flex items-center gap-2 rounded-lg p-2 hover:bg-accent transition-colors">
                                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                                     <User className="h-4 w-4 text-primary" />
                                 </div>

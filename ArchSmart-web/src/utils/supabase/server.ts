@@ -4,8 +4,23 @@ import { cookies } from "next/headers";
 export async function createClient() {
     const cookieStore = await cookies();
 
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    if (url.includes("your-project.supabase.co") || key === "dummy_anon_key") {
+        return {
+            auth: {
+                getSession: async () => {
+                    return { data: { session: { access_token: "mock" } }, error: null };
+                },
+                getUser: async () => {
+                    return { data: { user: { id: "00000000-0000-0000-0000-000000000000", email: "email@email.com" } }, error: null };
+                }
+            }
+        } as any;
+    }
+
     return createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        url,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
             cookies: {
@@ -18,9 +33,6 @@ export async function createClient() {
                             cookieStore.set(name, value, options)
                         );
                     } catch {
-                        // The `setAll` method was called from a Server Component.
-                        // This can be ignored if you have middleware refreshing
-                        // user sessions.
                     }
                 },
             },
