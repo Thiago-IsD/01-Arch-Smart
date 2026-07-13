@@ -121,7 +121,7 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
         
         # Validate through Pydantic
         validated = ExtractionSchema(**json_data)
-        return validated.dict(exclude_none=True)
+        return validated.model_dump(exclude_none=True)
 
     except Exception as e:
         logger.error(f"Failed to extract product data using SDK: {e}")

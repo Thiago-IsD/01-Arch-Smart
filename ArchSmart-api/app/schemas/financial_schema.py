@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 import uuid
 from datetime import date, datetime
@@ -34,8 +34,7 @@ class FinancialEntryResponse(FinancialEntryBase):
     updated_at: datetime
     project_name: Optional[str] = None # Will be populated if joined with Project
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class FinancialSummaryResponse(BaseModel):
     balance: float

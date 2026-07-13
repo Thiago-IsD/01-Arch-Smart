@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List, Any
 from uuid import UUID
 from datetime import datetime
@@ -34,8 +34,7 @@ class PresentationEnvironmentResponse(PresentationEnvironmentBase):
             return []
         return v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PresentationEnvironmentDetailUpdate(BaseModel):
     title: Optional[str] = None
@@ -80,5 +79,4 @@ class PresentationResponse(PresentationBase):
     # Includings project data for global list
     project: Optional[ProjectResponse] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

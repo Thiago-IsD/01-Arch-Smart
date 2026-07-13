@@ -95,7 +95,10 @@ export default function LoginPage() {
 
                 // Small delay to ensure session is set
                 await new Promise(resolve => setTimeout(resolve, 500));
-                router.push("/dashboard");
+                
+                // Force navigation
+                console.log("Navigating to dashboard...");
+                window.location.assign("/dashboard");
             } else {
                 throw new Error("Resposta inválida do servidor.");
             }

@@ -176,6 +176,11 @@ class SupabaseAuthService:
         Payload: { email, should_create_user: true, options: { email_redirect_to: ..., data: {} } }
         Type: "magiclink"
         """
+        if settings.DATABASE_URL.startswith("sqlite"):
+            print("[MOCK] OTP ACTIVATED")
+            # Fake successful OTP request
+            return {"message": "Mock OTP sent successfully"}
+
         payload = {
             "email": email,
             "type": "magiclink",
@@ -197,6 +202,18 @@ class SupabaseAuthService:
         Standard Signup (Password).
         Endpoint: POST /signup
         """
+        if settings.DATABASE_URL.startswith("sqlite"):
+            print("[MOCK] SIGN_UP ACTIVATED")
+            return {
+                "user": {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "email": email
+                },
+                "session": {
+                    "access_token": "dummy_mock_token"
+                }
+            }
+
         payload = {
             "email": email,
             "password": password,
@@ -217,6 +234,29 @@ class SupabaseAuthService:
         Login.
         Endpoint: POST /token?grant_type=password
         """
+        if settings.DATABASE_URL.startswith("sqlite"):
+            print("[MOCK] LOGIN ACTIVATED")
+            import base64
+            import json
+            
+            header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode('utf-8').rstrip('=')
+            payload = base64.urlsafe_b64encode(json.dumps({
+                "sub": "00000000-0000-0000-0000-000000000000",
+                "email": email,
+                "exp": 1999999999,
+                "role": "authenticated"
+            }).encode('utf-8')).decode('utf-8').rstrip('=')
+            
+            fake_jwt = f"{header}.{payload}.fakesignature"
+            
+            return {
+                "access_token": fake_jwt,
+                "refresh_token": fake_jwt,
+                "user": {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "email": email
+                }
+            }
         payload = {
             "email": email,
             "password": password
@@ -238,6 +278,11 @@ class SupabaseAuthService:
         Endpoint: GET /user
         Headers: Authorization: Bearer <access_token>
         """
+        if settings.DATABASE_URL.startswith("sqlite"):
+            return {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "email": "email@email.com"
+            }
         headers = {"Authorization": f"Bearer {access_token}"}
         return await self._get("/user", headers=headers)
 

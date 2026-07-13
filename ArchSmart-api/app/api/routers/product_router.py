@@ -190,7 +190,8 @@ def create_product(
              db.refresh(manual_origin)
         origin_id = manual_origin.id
 
-    product_data = product.dict(exclude={'state_id', 'origin_id', 'account_id'})
+    # Ensure we use the latest Pydantic V2 method
+    product_data = product.model_dump(exclude={'state_id', 'origin_id', 'account_id'})
     
     db_product = Product(
         **product_data,
@@ -217,7 +218,7 @@ def update_product(
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    update_data = product_update.dict(exclude_unset=True)
+    update_data = product_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_product, key, value)
 
@@ -265,7 +266,7 @@ def approve_product(
         raise HTTPException(status_code=404, detail="Product not found")
     
     # Update fields
-    update_data = product_update.dict(exclude_unset=True)
+    update_data = product_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_product, key, value)
         

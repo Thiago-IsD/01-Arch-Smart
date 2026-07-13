@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.api.users import get_current_user
-from app.models.all_models import User, Project, Client, Account, Subscription, Plan
+from app.models.all_models import User, Project, Client, Account, Subscription
 from app.schemas.project_schema import ProjectResponse, PaginatedProjectResponse, ProjectWizardCreate
 from app.services.financial_service import sync_project_financials
 
@@ -34,23 +34,12 @@ def get_projects(
     pages = (total + size - 1) // size
     items = query.offset((page - 1) * size).limit(size).all()
     
-    project_limit = 2
-    subscription = db.query(Subscription).filter(Subscription.account_id == current_user.account_id).first()
-    if subscription and subscription.plan_id:
-        plan = db.query(Plan).filter(Plan.id == subscription.plan_id).first()
-        if plan:
-            if plan.limits and "projects" in plan.limits:
-                project_limit = plan.limits["projects"]
-            elif plan.name == "Professional":
-                project_limit = 999999
-
     return {
         "total": total,
         "page": page,
         "size": size,
         "pages": pages,
-        "items": items,
-        "project_limit": project_limit
+        "items": items
     }
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -100,25 +89,15 @@ def create_project(
     account_id = current_user.account_id
     
     # Validação do Limite MVP (Plano Solo = máx 2 projetos ATIVOS)
-    project_limit = 2
-    subscription = db.query(Subscription).filter(Subscription.account_id == account_id).first()
-    if subscription and subscription.plan_id:
-        plan = db.query(Plan).filter(Plan.id == subscription.plan_id).first()
-        if plan:
-            if plan.limits and "projects" in plan.limits:
-                project_limit = plan.limits["projects"]
-            elif plan.name == "Professional":
-                project_limit = 999999
-
     active_projects_count = db.query(Project).filter(
         Project.account_id == account_id,
         Project.status == "ACTIVE"
     ).count()
     
-    if active_projects_count >= project_limit:
+    if active_projects_count >= 2:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Limite do Plano Solo atingido. Você pode ter apenas {project_limit} projetos ativos simultaneamente."
+            detail="Limite do Plano Solo atingido. Você pode ter apenas 2 projetos ativos simultaneamente."
         )
         
     # Lógica de Cliente Transacional
