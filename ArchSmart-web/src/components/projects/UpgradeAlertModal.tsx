@@ -15,7 +15,11 @@ import { Button } from "@/components/ui/button"
 import { Lock } from "lucide-react"
 import Link from "next/link"
 
-export function UpgradeAlertModal() {
+interface UpgradeAlertModalProps {
+    planLimit?: number
+}
+
+export function UpgradeAlertModal({ planLimit = 2 }: UpgradeAlertModalProps) {
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -27,14 +31,14 @@ export function UpgradeAlertModal() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Limite de Projetos Atingido</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Desculpe, o plano Solo permite manter até 2 projetos ativos simultaneamente.
+                        Desculpe, o seu plano atual permite manter até <strong>{planLimit}</strong> projeto(s) ativo(s) simultaneamente.
                         Para criar um novo projeto, conclua ou arquive um projeto existente.
                         <br /><br />
                         Ou faça o upgrade para o plano <strong>Professional</strong> e desbloqueie projetos ilimitados e novos recursos avançados.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel>Continuar no Solo</AlertDialogCancel>
+                    <AlertDialogCancel>Continuar no plano atual</AlertDialogCancel>
                     <AlertDialogAction asChild>
                         <Link href="/billing">Fazer Upgrade</Link>
                     </AlertDialogAction>

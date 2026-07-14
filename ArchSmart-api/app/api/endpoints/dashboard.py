@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.api.users import get_current_user
 from app.models.all_models import User, Project, Product, Client, Event, FinancialEntry
 from app.schemas.dashboard_schema import DashboardLeanResponse
+from app.api.endpoints.projects import _get_plan_limit
 
 router = APIRouter()
 
@@ -48,6 +49,9 @@ def get_dashboard_lean(
         Project.account_id == account_id,
         Project.status == "ACTIVE"
     ).count()
+
+    # Limite de projetos do plano da assinatura (dinâmico)
+    plan_limit = _get_plan_limit(db, account_id)
 
     # 2. Produtos Recentes (Top 5 ordenados por data de criação)
     products_query = db.query(Product).filter(
@@ -131,6 +135,7 @@ def get_dashboard_lean(
         "recent_projects": recent_projects,
         "recent_products": recent_products,
         "active_projects_count": active_projects_count,
+        "plan_limit": plan_limit,
         "financial_balance": financial_balance,
         "financial_income": financial_income,
         "financial_expense": financial_expense,

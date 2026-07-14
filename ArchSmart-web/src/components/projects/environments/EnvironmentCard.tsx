@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/utils/supabase/client"
+import { apiUrl } from "@/lib/api-url"
 
 interface EnvironmentCardProps {
     environment: any
@@ -47,8 +48,7 @@ export function EnvironmentCard({ environment, onClick, onDelete }: EnvironmentC
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const res = await fetch(`${apiBase}/api/environments/${environment.id}`, {
+            const res = await fetch(apiUrl(`/api/environments/${environment.id}`), {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
             })

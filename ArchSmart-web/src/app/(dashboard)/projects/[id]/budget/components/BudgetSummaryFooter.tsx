@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useBudget } from "./BudgetProvider"
+import { apiUrl } from "@/lib/api-url"
 
 export function BudgetSummaryFooter() {
     const { projectId, selectedEnvironmentId } = useBudget()
@@ -19,29 +20,20 @@ export function BudgetSummaryFooter() {
                 const supabase = createClient()
                 const { data: { session } } = await supabase.auth.getSession()
                 const token = session?.access_token || ""
-                const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
-                // Since budget logic is tied 1:1 to project.id for simplicity/speed in our current implementation,
-                // we'll hit the project's budget summary endpoint as drafted in the backend router.
-                // Notice the backend actually wants `budget_id` but the router allows us to find budget from project
-                // Wait, examining the backend router, `GET /budgets/{budget_id}/summary` literally needs the budget.id UUID.
-                // It doesn't find it by project. We need `GET /projects/{id}/budget` first or we need to extract budgetId.
-
-                // Let's call GET /projects/{id}/budget to get the budget ID, then fetch summary.
-                const budgetRes = await fetch(`${apiBase}/api/projects/${projectId}/budget`, {
+                const res = await fetch(apiUrl(`/api/projects/${projectId}/budget`), {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
-                if (!budgetRes.ok) throw new Error("Could not find budget")
-                const budgetData = await budgetRes.json()
+                if (!res.ok) throw new Error("Could not find budget")
+                const budgetData = await res.json()
                 const budgetId = budgetData.id
 
-                const res = await fetch(`${apiBase}/api/budgets/${budgetId}/summary`, {
+                const summaryRes = await fetch(apiUrl(`/api/budgets/${budgetId}/summary`), {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
-                if (res.ok) {
-                    const data = await res.json()
+                if (summaryRes.ok) {
+                    const data = await summaryRes.json()
                     setSummary(data)
                 }
             } catch (e) {

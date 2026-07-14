@@ -4,6 +4,7 @@ import { SidebarNav } from "@/app/(dashboard)/projects/[id]/budget/components/Si
 import { MainBudgetArea } from "@/app/(dashboard)/projects/[id]/budget/components/MainBudgetArea"
 import { ProjectHeader } from "@/components/projects/ProjectHeader"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { apiUrl } from "@/lib/api-url"
 async function getProjectDetails(id: string) {
     const supabase = await createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -12,8 +13,7 @@ async function getProjectDetails(id: string) {
     if (!token) return null
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -32,9 +32,7 @@ async function getProjectBudget(id: string) {
     if (!token) return null
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        // Force endpoint to create empty budget block if none exists
-        const res = await fetch(`${apiBase}/api/projects/${id}/budget`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}/budget`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -53,8 +51,7 @@ async function getProjectEnvironments(id: string) {
     if (!token) return []
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}/environments`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}/environments`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })

@@ -23,23 +23,24 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { createClient } from "@/utils/supabase/client"
+import { apiUrl } from "@/lib/api-url"
 
 const dnaSchema = z.object({
-    floor_area: z.number().min(0, "A área não pode ser negativa"),
-    wall_area: z.number().min(0, "A área não pode ser negativa"),
-    ceiling_area: z.number().min(0, "A área não pode ser negativa"),
+    floor_area: z.coerce.number().min(0, "A área do piso deve ser um número positivo."),
+    wall_area: z.coerce.number().min(0, "A área da parede deve ser um número positivo."),
+    ceiling_area: z.coerce.number().min(0, "A área do teto deve ser um número positivo."),
 })
 
 type DNAFormValues = z.infer<typeof dnaSchema>
 
 interface DNAEditorSheetProps {
-    environment: any
     isOpen: boolean
     onOpenChange: (open: boolean) => void
+    environment: any
     onSuccess: (updatedEnv: any) => void
 }
 
-export function DNAEditorSheet({ environment, isOpen, onOpenChange, onSuccess }: DNAEditorSheetProps) {
+export function DNAEditorSheet({ isOpen, onOpenChange, environment, onSuccess }: DNAEditorSheetProps) {
     const { toast } = useToast()
     const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -48,13 +49,12 @@ export function DNAEditorSheet({ environment, isOpen, onOpenChange, onSuccess }:
         defaultValues: {
             floor_area: 0,
             wall_area: 0,
-            ceiling_area: 0
+            ceiling_area: 0,
         }
     })
 
-    // Reset form values when environment changes or sheet opens
     useEffect(() => {
-        if (environment?.dna) {
+        if (environment && environment.dna && isOpen) {
             form.reset({
                 floor_area: environment.dna.floor_area || 0,
                 wall_area: environment.dna.wall_area || 0,
@@ -72,8 +72,7 @@ export function DNAEditorSheet({ environment, isOpen, onOpenChange, onSuccess }:
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const res = await fetch(`${apiBase}/api/environments/${environment.id}/dna`, {
+            const res = await fetch(apiUrl(`/api/environments/${environment.id}/dna`), {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

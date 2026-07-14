@@ -168,8 +168,7 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const endpoint = mode === "edit" ? `${apiBase}/api/projects/${initialData.id}` : `${apiBase}/api/projects`
+            const endpoint = mode === "edit" ? apiUrl(`/api/projects/${initialData.id}`) : apiUrl("/api/projects")
 
             const res = await fetch(endpoint, {
                 method: mode === "edit" ? 'PUT' : 'POST',

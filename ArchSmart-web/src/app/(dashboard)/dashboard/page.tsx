@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { 
-    Plus, 
-    FolderIcon, 
-    Wallet, 
-    Loader2, 
-    ArrowRight, 
+    Plus,
+    FolderIcon,
+    Wallet,
+    ArrowRight,
     TrendingUp, 
     TrendingDown, 
     Calendar, 
@@ -25,6 +25,7 @@ import { ptBR } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
 import { createClient } from "@/utils/supabase/client"
@@ -61,6 +62,7 @@ interface DashboardLeanResponse {
     recent_projects: RecentProject[]
     recent_products: RecentProduct[]
     active_projects_count: number
+    plan_limit: number
     financial_balance: number
     financial_income: number
     financial_expense: number
@@ -155,16 +157,65 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[70vh] text-muted-foreground">
-                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-                <p className="text-lg animate-pulse">Carregando seu espaço de trabalho...</p>
+            <div className="flex flex-col gap-8 p-4 md:p-8 w-full max-w-7xl mx-auto" aria-busy="true" aria-label="Carregando painel">
+                {/* Banner de saudação */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/5 via-secondary/5 to-transparent p-6 rounded-2xl border border-primary/10">
+                    <div className="space-y-2">
+                        <Skeleton className="h-9 w-72" />
+                        <Skeleton className="h-5 w-96 max-w-full" />
+                    </div>
+                    <Skeleton className="h-9 w-56 rounded-full" />
+                </div>
+
+                {/* Grid de métricas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Card key={i} className="bg-card shadow-sm relative overflow-hidden">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-8 w-8 rounded-lg" />
+                            </CardHeader>
+                            <CardContent className="pt-2 space-y-2">
+                                <Skeleton className="h-7 w-28" />
+                                <Skeleton className="h-3 w-40" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Ações rápidas */}
+                <div className="space-y-4">
+                    <Skeleton className="h-6 w-32" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <Skeleton key={i} className="h-16 w-full rounded-md" />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Grid de conteúdo secundário */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {Array.from({ length: 3 }).map((_, col) => (
+                        <div key={col} className="lg:col-span-1 flex flex-col gap-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <Skeleton className="h-6 w-44" />
+                                <Skeleton className="h-4 w-16" />
+                            </div>
+                            <div className="flex flex-col gap-3">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         )
     }
 
     const userName = data?.user_first_name || "Usuário"
     const activeProjectsCount = data?.active_projects_count || 0
-    const planLimit = 2
+    const planLimit = data?.plan_limit ?? 2
     const projectPercentage = Math.min((activeProjectsCount / planLimit) * 100, 100)
 
     return (
@@ -464,10 +515,12 @@ export default function DashboardPage() {
                                     <div className="flex flex-col rounded-xl border bg-card overflow-hidden hover:border-indigo-300 transition-all duration-300 h-full">
                                         <div className="relative aspect-[4/3] w-full bg-muted border-b overflow-hidden">
                                             {prod.image_url ? (
-                                                <img 
+                                                <Image 
                                                     src={prod.image_url} 
                                                     alt={prod.name}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    fill
+                                                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    sizes="(max-width: 768px) 50vw, 25vw"
                                                 />
                                             ) : (
                                                 <div className="flex w-full h-full items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 text-xs">

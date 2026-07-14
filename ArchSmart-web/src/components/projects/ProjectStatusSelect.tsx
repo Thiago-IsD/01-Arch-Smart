@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { apiUrl } from "@/lib/api-url"
 
 import {
     Select,
@@ -31,8 +32,7 @@ export function ProjectStatusSelect({ projectId, currentStatus }: ProjectStatusS
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const res = await fetch(`${apiBase}/api/projects/${projectId}`, {
+            const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

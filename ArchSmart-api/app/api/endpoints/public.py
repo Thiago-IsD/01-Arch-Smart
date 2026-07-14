@@ -27,6 +27,10 @@ class AcceptRequest(BaseModel):
     selected_options: Dict[str, Any] = {}
 
 
+class RejectOptionRequest(BaseModel):
+    reason: Optional[str] = None
+
+
 class PublicProductInfo(BaseModel):
     id: Optional[str] = None
     name: Optional[str] = "Produto"
@@ -41,6 +45,7 @@ class PublicOptionInfo(BaseModel):
     id: Optional[str] = None
     is_selected: bool = False
     approval_status: Optional[str] = "PENDING"
+    rejection_reason: Optional[str] = None
     product: Optional[PublicProductInfo] = None
 
     model_config = {"from_attributes": True}
@@ -215,6 +220,7 @@ async def get_public_presentation(
                         id=str(opt.id),
                         is_selected=opt.is_selected,
                         approval_status=getattr(opt, "approval_status", "PENDING"),
+                        rejection_reason=getattr(opt, "rejection_reason", None),
                         product=product_out,
                     ))
 
@@ -313,6 +319,7 @@ def approve_public_option(
 
     option.is_selected = True
     option.approval_status = "APPROVED"
+    option.rejection_reason = None  # limpa eventual justificativa anterior
     db.commit()
 
     return {"status": "success", "message": "Opção aprovada com sucesso", "approval_status": "APPROVED"}
@@ -321,10 +328,12 @@ def approve_public_option(
 def reject_public_option(
     presentation_uuid: str,
     option_id: uuid_module.UUID,
+    payload: Optional[RejectOptionRequest] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Permite que o cliente rejeite uma opção (A/B) no portal público.
+    Permite que o cliente rejeite uma opção (A/B) no portal público,
+    opcionalmente registrando uma justificativa.
     """
     # 1. Validar apresentação
     presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
@@ -347,9 +356,15 @@ def reject_public_option(
         raise HTTPException(status_code=404, detail="Opção não encontrada neste projeto")
 
     option.approval_status = "REJECTED"
+    option.rejection_reason = (payload.reason.strip() if payload and payload.reason else None)
     db.commit()
 
-    return {"status": "success", "message": "Opção rejeitada com sucesso", "approval_status": "REJECTED"}
+    return {
+        "status": "success",
+        "message": "Opção rejeitada com sucesso",
+        "approval_status": "REJECTED",
+        "rejection_reason": option.rejection_reason,
+    }
 
 @router.post("/presentations/{presentation_uuid}/accept")
 async def accept_public_presentation(

@@ -4,6 +4,7 @@ import { BudgetProvider, useBudget, type BudgetTree, type Environment, type Budg
 import { SidebarNav } from "./SidebarNav"
 import { BudgetSummaryFooter } from "./BudgetSummaryFooter"
 import { Button } from "@/components/ui/button"
+import { apiUrl } from "@/lib/api-url"
 import { Search, Loader2, PackageOpen, LayoutGrid, Plus, AlertTriangle, FilePenLine, Trash2, Unlock, Lock, X } from "lucide-react"
 import {
     AlertDialog,
@@ -196,14 +197,10 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
             const supabase = createClient()
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
 
             const payload: any = {}
             if (item.rule_type !== "UNIT") {
                 payload.loss_factor = parseFloat(lossFactor) || 0;
-
-                // If unlocked and input is not empty, use string parsed as int
-                // If it was just locked back, manualQuantity is empty string, which translates to null
                 if (isQuantityUnlocked && manualQuantity !== "") {
                     payload.manual_quantity = parseInt(manualQuantity, 10);
                 } else if (!isQuantityUnlocked) {
@@ -213,7 +210,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
                 payload.manual_quantity = parseInt(manualQuantity, 10) || 1
             }
 
-            const res = await fetch(`${apiBase}/api/budgets/items/${item.id}`, {
+            const res = await fetch(apiUrl(`/api/budgets/items/${item.id}`), {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
@@ -239,9 +236,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
             const supabase = createClient()
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
-            const res = await fetch(`${apiBase}/api/budgets/items/${item.id}`, {
+            const res = await fetch(apiUrl(`/api/budgets/items/${item.id}`), {
                 method: "DELETE",
                 headers: {
                     "Authorization": `Bearer ${token}`
@@ -267,9 +262,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
             const supabase = createClient()
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
-            const res = await fetch(`${apiBase}/api/budgets/options/${optionId}/select`, {
+            const res = await fetch(apiUrl(`/api/budgets/options/${optionId}/select`), {
                 method: "PATCH",
                 headers: {
                     "Authorization": `Bearer ${token}`
@@ -296,9 +289,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
             const supabase = createClient()
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
-            const res = await fetch(`${apiBase}/api/budgets/options/${optionId}`, {
+            const res = await fetch(apiUrl(`/api/budgets/options/${optionId}`), {
                 method: "DELETE",
                 headers: {
                     "Authorization": `Bearer ${token}`

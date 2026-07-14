@@ -1,11 +1,11 @@
 import { createClient } from "@/utils/supabase/server"
 import { notFound } from "next/navigation"
 import { BuilderClient } from "./components/BuilderClient"
+import { apiUrl } from "@/lib/api-url"
 
 async function getPresentationData(presentationId: string, token: string) {
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/presentations/${presentationId}`, {
+        const res = await fetch(apiUrl(`/api/presentations/${presentationId}`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -18,8 +18,7 @@ async function getPresentationData(presentationId: string, token: string) {
 
 async function getBudgetData(projectId: string, token: string) {
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${projectId}/budget`, {
+        const res = await fetch(apiUrl(`/api/projects/${projectId}/budget`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
