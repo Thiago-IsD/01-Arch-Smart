@@ -1,0 +1,3 @@
+# Arquivo marcador para forçar um novo build de produção no Vercel.
+# Edite este número e faça commit/push para disparar um redeploy manual.
+deploy: 1
