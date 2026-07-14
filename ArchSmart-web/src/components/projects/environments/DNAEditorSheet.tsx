@@ -45,7 +45,7 @@ export function DNAEditorSheet({ isOpen, onOpenChange, environment, onSuccess }:
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const form = useForm<DNAFormValues>({
-        resolver: zodResolver(dnaSchema),
+        resolver: zodResolver(dnaSchema) as any,
         defaultValues: {
             floor_area: 0,
             wall_area: 0,
