@@ -4,11 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="Arch Smart API", version="1.0.0")
 
 # CORS Configuration
-origins = ["*"]  # Update this with specific origins in production
-
+# Usamos allow_origin_regex (em vez de allow_origins=["*"]) porque, com
+# allow_credentials=True, a spec de CORS proíbe o coringa "*" no header
+# Access-Control-Allow-Origin — nesse caso o navegador BLOQUEIA a resposta.
+# Com o regex, o Starlette ecoa a origem específica da requisição, o que é
+# válido com credenciais (necessário para o Web Clipper, que roda em uma
+# origem chrome-extension:// dinâmica).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
