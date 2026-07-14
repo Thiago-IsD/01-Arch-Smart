@@ -1,5 +1,16 @@
-const URL_WEB = "http://localhost:3000";
-const URL_API = "http://127.0.0.1:8000/api/products/clipper/capture";
+// ---------------------------------------------------------------------------
+// Configuração de ambiente
+// Para alternar entre dev e prod, mude apenas a constante ENV abaixo.
+// ---------------------------------------------------------------------------
+const ENVIRONMENTS = {
+    dev:  { web: "http://localhost:3000",         api: "http://127.0.0.1:8000" },
+    prod: { web: "https://www.archsmart.com.br",  api: "https://arch-smart-api.onrender.com" },
+};
+
+const ENV = "prod"; // <- troque para "dev" ao testar localmente
+
+const URL_WEB = ENVIRONMENTS[ENV].web;
+const URL_API = `${ENVIRONMENTS[ENV].api}/api/products/clipper/capture`;
 
 let authToken = null;
 let currentProduct = null;
