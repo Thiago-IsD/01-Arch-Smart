@@ -7,9 +7,32 @@
 > Escopo executado: Grupos A + B + C. F2 (PDF) implementado como melhoria do print atual (toggle A4/A3 + links de compra), sem `@react-pdf/renderer`.
 
 ### ⚠️ Passos de deploy pendentes (ambiente)
-- [ ] Rodar a migration do backend: `alembic upgrade head` (cria coluna `item_options.rejection_reason`, revisão `b7c9d1e2f3a4`).
+- [x] Rodar a migration do backend: `alembic upgrade head` (coluna `item_options.rejection_reason`, revisão `b7c9d1e2f3a4`) — aplicada em **dev e prod** em 2026-07-13.
+- [ ] Redeploy da **API (Render)** — traz o fix de CORS (ver seção "Correções de deploy do Web Clipper").
+- [ ] Redeploy da **web (Vercel)** — traz o `public/arch-smart-clipper.zip` atualizado (apontando para prod).
 - [ ] Rodar `tsc --noEmit` / `npm run build` no frontend (não executável neste ambiente por falta de Node).
 - [ ] Rodar `pytest` no backend em ambiente com dependências de teste instaladas.
+
+---
+
+## Correções de deploy do Web Clipper (2026-07-13)
+
+Ao publicar em produção, o clipper falhava com "Erro ao salvar o produto...". Duas causas encontradas e corrigidas:
+
+### 1. Extensão apontando para ambiente errado + pacote de download desatualizado
+- **Fonte** (`extension/popup.js`): refatorada para config por ambiente — bloco `ENVIRONMENTS { dev, prod }` + `const ENV = "prod"`. Para alternar, muda só o `ENV`.
+  - `prod.web = https://www.archsmart.com.br` · `prod.api = https://arch-smart-api.onrender.com`
+- **Manifest** (`extension/manifest.json`): `host_permissions` agora inclui os domínios de prod (mantidos os de localhost para dev).
+- **Pacote de download** (`ArchSmart-web/public/arch-smart-clipper.zip`): **precisa ser regenerado sempre** que `extension/` mudar, senão o download da página `/web-clipper` diverge da fonte (foi a causa raiz: o zip antigo ainda apontava para `127.0.0.1`).
+  - **Como regenerar:** `cd ArchSmart-web && npm run build:clipper` (script `scripts/build-clipper.ps1`, PowerShell/Windows). Ele empacota os 5 arquivos de `extension/` na raiz do zip e avisa se `ENV` não estiver em `prod`.
+  - ⚠️ Não encadeado no `next build` (Vercel roda Linux, sem PowerShell) — é passo manual antes do commit/deploy da web.
+- **Aplicar no Chrome:** mudança em `host_permissions` exige **remover + carregar sem compactação de novo** (soft-reload não pega).
+
+### 2. CORS incompatível com credenciais
+- **Arquivo:** `ArchSmart-api/app/main.py`
+- **Problema:** `allow_origins=["*"]` **com** `allow_credentials=True` é inválido pela spec de CORS — o navegador bloqueia a resposta em modo credenciado (caso da extensão, origem `chrome-extension://` dinâmica).
+- **Fix:** trocado para `allow_origin_regex=".*"` + `allow_credentials=True`. O Starlette passa a **ecoar a origem específica** no `Access-Control-Allow-Origin` (verificado: preflight e resposta real retornam a origem, não `*`).
+- **Requer:** redeploy da API. Endurecer depois para um regex de domínios específicos é uma melhoria futura opcional.
 
 ---
 
