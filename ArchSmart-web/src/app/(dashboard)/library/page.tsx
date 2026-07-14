@@ -10,6 +10,7 @@ import { ProductFormSheet } from "@/components/library/ProductFormSheet"
 import { NormalizationSheet } from "@/components/library/NormalizationSheet"
 import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import Link from "next/link"
+import { apiUrl } from "@/lib/api-url"
 
 // Function to fetch products
 async function getProducts(searchParams: {
@@ -42,7 +43,7 @@ async function getProducts(searchParams: {
             headers["Authorization"] = `Bearer ${token}`
         }
 
-        const res = await fetch(`http://127.0.0.1:8000/api/products?${params.toString()}`, {
+        const res = await fetch(apiUrl(`/api/products?${params.toString()}`), {
             cache: "no-store",
             headers,
         })
@@ -66,7 +67,7 @@ async function getProduct(id: string, token?: string) {
             headers["Authorization"] = `Bearer ${token}`
         }
         
-        const res = await fetch(`http://127.0.0.1:8000/api/products/${id}`, {
+        const res = await fetch(apiUrl(`/api/products/${id}`), {
             cache: "no-store",
             headers,
         })

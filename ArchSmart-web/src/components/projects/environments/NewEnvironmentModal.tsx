@@ -30,6 +30,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { createClient } from "@/utils/supabase/client"
+import { apiUrl } from "@/lib/api-url"
 
 const environmentSchema = z.object({
     name: z.string().min(1, "O nome do ambiente é obrigatório."),
@@ -64,8 +65,7 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const res = await fetch(`${apiBase}/api/projects/${projectId}/environments`, {
+            const res = await fetch(apiUrl(`/api/projects/${projectId}/environments`), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

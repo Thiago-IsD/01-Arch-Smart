@@ -1,8 +1,8 @@
 import { createClient } from "@/utils/supabase/server"
 import { notFound } from "next/navigation"
-import Link from "next/link"
-import { Printer, ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ExternalLink } from "lucide-react"
+import { apiUrl } from "@/lib/api-url"
+import { PrintControls } from "./PrintControls"
 
 async function getProjectDetails(id: string) {
     const supabase = await createClient()
@@ -12,8 +12,7 @@ async function getProjectDetails(id: string) {
     if (!token) return null
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -32,8 +31,7 @@ async function getProjectBudget(id: string) {
     if (!token) return null
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}/budget`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}/budget`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -52,8 +50,7 @@ async function getProjectEnvironments(id: string) {
     if (!token) return []
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}/environments`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}/environments`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -88,27 +85,8 @@ export default async function ProjectPrintPage(
 
     return (
         <div className="min-h-screen bg-slate-50 print:bg-white text-slate-900 font-sans">
-            {/* Header controls for screen only */}
-            <div className="bg-white border-b px-8 py-4 sticky top-0 z-50 flex items-center justify-between shadow-sm print:hidden">
-                <div className="flex items-center space-x-4">
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/projects/${projectId}`}>
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao Projeto
-                        </Link>
-                    </Button>
-                    <span className="text-slate-300">|</span>
-                    <h3 className="font-semibold text-sm">Visualização de Impressão (A4)</h3>
-                </div>
-                <Button 
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
-                    size="sm"
-                    onClick={() => {
-                        if (typeof window !== 'undefined') window.print()
-                    }}
-                >
-                    <Printer className="w-4 h-4 mr-2" /> Imprimir / Salvar PDF
-                </Button>
-            </div>
+            {/* Controles de impressão (client component: toggle A4/A3 + print) */}
+            <PrintControls projectId={projectId} />
 
             {/* Print Booklet Container */}
             <div className="max-w-[210mm] mx-auto bg-white p-12 my-8 shadow-md border rounded print:my-0 print:border-none print:shadow-none print:p-0">
@@ -201,6 +179,20 @@ export default async function ProjectPrintPage(
                                                     {product.description && (
                                                         <p className="text-xs text-slate-600 italic mt-1 line-clamp-2 leading-relaxed">{product.description}</p>
                                                     )}
+
+                                                    {product.source_url && (
+                                                        <p className="text-xs text-slate-500 flex items-center gap-1 pt-0.5">
+                                                            <ExternalLink className="w-3 h-3 shrink-0" />
+                                                            <a
+                                                                href={product.source_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-primary underline underline-offset-2 break-all print:text-slate-700 print:no-underline"
+                                                            >
+                                                                {product.source_url}
+                                                            </a>
+                                                        </p>
+                                                    )}
                                                 </div>
 
                                                 {/* Quantities & Values */}
@@ -233,15 +225,11 @@ export default async function ProjectPrintPage(
                 </div>
             </div>
             
-            {/* Custom print Styles */}
+            {/* Custom print Styles (o tamanho de página @page é controlado pelo PrintControls) */}
             <style dangerouslySetInnerHTML={{__html: `
                 @media print {
                     body {
                         background-color: white !important;
-                    }
-                    @page {
-                        size: A4;
-                        margin: 15mm;
                     }
                     .break-inside-avoid {
                         break-inside: avoid;

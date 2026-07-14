@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Trash2 } from "lucide-react"
+import { apiUrl } from "@/lib/api-url"
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -41,8 +42,7 @@ export function DeleteProjectAlert({ projectId, projectName }: DeleteProjectAler
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-            const res = await fetch(`${apiBase}/api/projects/${projectId}`, {
+            const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
             })

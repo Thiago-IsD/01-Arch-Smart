@@ -309,6 +309,7 @@ class ItemOption(Base):
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     is_selected = Column(Boolean, default=True)
     approval_status = Column(String, default="PENDING", nullable=False)
+    rejection_reason = Column(String, nullable=True)  # Justificativa do cliente ao recusar a opção
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

@@ -92,3 +92,4 @@ class PaginatedProjectResponse(BaseModel):
     size: int
     pages: int
     items: List[ProjectResponse]
+    plan_limit: int = 2  # Dynamic limit from subscription plan

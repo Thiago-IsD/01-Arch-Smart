@@ -12,6 +12,15 @@ from app.services.financial_service import sync_project_financials
 
 router = APIRouter()
 
+
+def _get_plan_limit(db: Session, account_id) -> int:
+    """Returns the max active projects allowed for the account's subscription plan."""
+    from app.models.all_models import Subscription, Plan
+    sub = db.query(Subscription).filter(Subscription.account_id == account_id).first()
+    if sub and sub.plan and sub.plan.limits:
+        return int(sub.plan.limits.get("max_active_projects", 2))
+    return 2  # fallback: Plano Solo
+
 @router.get("", response_model=PaginatedProjectResponse)
 def get_projects(
     db: Session = Depends(get_db),
@@ -33,13 +42,15 @@ def get_projects(
     total = query.count()
     pages = (total + size - 1) // size
     items = query.offset((page - 1) * size).limit(size).all()
+    plan_limit = _get_plan_limit(db, current_user.account_id)
     
     return {
         "total": total,
         "page": page,
         "size": size,
         "pages": pages,
-        "items": items
+        "items": items,
+        "plan_limit": plan_limit
     }
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -88,16 +99,17 @@ def create_project(
     """
     account_id = current_user.account_id
     
-    # Validação do Limite MVP (Plano Solo = máx 2 projetos ATIVOS)
+    # Validação dinâmica de Limite de Projetos via Plano da Subscription
+    plan_limit = _get_plan_limit(db, account_id)
     active_projects_count = db.query(Project).filter(
         Project.account_id == account_id,
         Project.status == "ACTIVE"
     ).count()
     
-    if active_projects_count >= 2:
+    if active_projects_count >= plan_limit:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Limite do Plano Solo atingido. Você pode ter apenas 2 projetos ativos simultaneamente."
+            detail=f"Limite do plano atingido. Você pode ter apenas {plan_limit} projeto(s) ativo(s) simultaneamente."
         )
         
     # Lógica de Cliente Transacional

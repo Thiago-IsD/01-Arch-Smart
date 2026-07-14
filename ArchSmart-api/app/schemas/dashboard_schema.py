@@ -33,6 +33,7 @@ class DashboardLeanResponse(BaseModel):
     recent_projects: List[RecentProject]
     recent_products: List[RecentProduct]
     active_projects_count: int
+    plan_limit: int
     financial_balance: float
     financial_income: float
     financial_expense: float

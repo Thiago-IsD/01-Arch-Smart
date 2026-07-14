@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client"
 import { useBudget } from "./BudgetProvider"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { apiUrl } from "@/lib/api-url"
 
 import {
     Dialog,
@@ -61,10 +62,7 @@ export function ProductPickerModal({ isOpen, onOpenChange, targetItemId }: Produ
                 const { data: { session } } = await supabase.auth.getSession()
                 const token = session?.access_token || ""
 
-                const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
-                // Fetch all active products
-                const res = await fetch(`${apiBase}/api/products`, {
+                const res = await fetch(apiUrl("/api/products"), {
                     headers: { "Authorization": `Bearer ${token}` }
                 })
 
@@ -96,17 +94,15 @@ export function ProductPickerModal({ isOpen, onOpenChange, targetItemId }: Produ
             const supabase = createClient()
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
             const isOptionMode = !!targetItemId;
             let endpoint = ""
             let payload: any = {}
 
             if (isOptionMode) {
-                endpoint = `${apiBase}/api/budgets/items/${targetItemId}/options`
+                endpoint = apiUrl(`/api/budgets/items/${targetItemId}/options`)
                 payload = { product_id: selectedProduct.id }
             } else {
-                endpoint = `${apiBase}/api/budgets/items`
+                endpoint = apiUrl("/api/budgets/items")
                 payload = {
                     project_id: projectId,
                     environment_id: selectedEnvironmentId,

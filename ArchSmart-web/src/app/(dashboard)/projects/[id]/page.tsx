@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EnvironmentsWorkspace } from "@/components/projects/environments/EnvironmentsWorkspace"
 import { ProjectHeader } from "@/components/projects/ProjectHeader"
+import { apiUrl } from "@/lib/api-url"
 
 async function getProjectDetails(id: string) {
     const supabase = await createClient()
@@ -15,8 +16,7 @@ async function getProjectDetails(id: string) {
     if (!token) return null
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })
@@ -35,8 +35,7 @@ async function getProjectEnvironments(id: string) {
     if (!token) return []
 
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-        const res = await fetch(`${apiBase}/api/projects/${id}/environments`, {
+        const res = await fetch(apiUrl(`/api/projects/${id}/environments`), {
             headers: { "Authorization": `Bearer ${token}` },
             cache: 'no-store'
         })

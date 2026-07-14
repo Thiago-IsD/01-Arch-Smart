@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import { apiUrl } from "@/lib/api-url"
 import {
     Dialog,
     DialogContent,
@@ -57,8 +58,7 @@ export function MoveToProjectModal({
                 const { data: { session } } = await supabase.auth.getSession()
                 const token = session?.access_token || ""
 
-                const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-                const res = await fetch(`${apiBase}/api/projects`, {
+                const res = await fetch(apiUrl("/api/projects"), {
                     headers: { "Authorization": `Bearer ${token}` }
                 })
 
@@ -91,8 +91,7 @@ export function MoveToProjectModal({
                 const { data: { session } } = await supabase.auth.getSession()
                 const token = session?.access_token || ""
 
-                const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-                const res = await fetch(`${apiBase}/api/projects/${selectedProjectId}/environments`, {
+                const res = await fetch(apiUrl(`/api/projects/${selectedProjectId}/environments`), {
                     headers: { "Authorization": `Bearer ${token}` }
                 })
 
@@ -120,8 +119,6 @@ export function MoveToProjectModal({
             const supabase = createClient()
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-
             const payload = {
                 project_id: selectedProjectId,
                 environment_id: selectedEnvId,
@@ -129,7 +126,7 @@ export function MoveToProjectModal({
                 rule_type: ruleType
             }
 
-            const res = await fetch(`${apiBase}/api/budgets/items`, {
+            const res = await fetch(apiUrl("/api/budgets/items"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
