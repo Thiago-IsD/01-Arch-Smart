@@ -79,13 +79,16 @@ async function getProduct(id: string, token?: string) {
     }
 }
 
-import { cookies } from "next/headers"
+import { createClient } from "@/utils/supabase/server"
 
 export default async function LibraryPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-    const cookieStore = await cookies()
-    const token = cookieStore.get("sb-access-token")?.value
+    // Autentica via sessão real do Supabase (o cookie sb-access-token só existe
+    // no modo mock/local; em produção precisamos do token da sessão SSR).
+    const supabase = await createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
 
     const searchParams = await props.searchParams
 
