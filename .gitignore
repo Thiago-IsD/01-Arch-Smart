@@ -16,3 +16,7 @@ build
 
 # Arch
 .idea
+
+# Test artifacts
+playwright-report
+test-results
