@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import {
     Dialog,
@@ -31,7 +31,14 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import {
+    NORMALIZE_CONCURRENCY,
+    NormalizedProduct,
+    apiErrorMessage,
+    getToken,
+    mapWithConcurrency,
+    normalizeProduct,
+} from "@/lib/normalize-product"
 
 const CATEGORIES = [
     "Mobiliário",
@@ -42,12 +49,6 @@ const CATEGORIES = [
     "Paisagismo",
     "Outros",
 ]
-
-async function getToken(): Promise<string | undefined> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token
-}
 
 // Campos numéricos aceitam string vazia para permitir apagar o valor no input.
 type NumField = number | ""
@@ -84,6 +85,17 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
     const [loading, setLoading] = useState(false)
     const [aiRunning, setAiRunning] = useState(false)
     const [approving, setApproving] = useState(false)
+    // Linhas em que a loja bloqueou o acesso: a IA extraiu só pelo nome e os dados
+    // precisam de conferência manual.
+    const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set())
+    const aiAbortRef = useRef<AbortController | null>(null)
+
+    // Fechar o modal (ou desmontar) precisa abortar as requisições em voo — caso
+    // contrário elas seguem consumindo quota da IA sem ninguém para receber o resultado.
+    useEffect(() => {
+        if (!isOpen) aiAbortRef.current?.abort()
+    }, [isOpen])
+    useEffect(() => () => aiAbortRef.current?.abort(), [])
 
     // Carrega o inbox (produtos CAPTURED) toda vez que o modal abre.
     useEffect(() => {
@@ -157,31 +169,32 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
         if (targets.length === 0) return
 
         setAiRunning(true)
+        const abort = new AbortController()
+        aiAbortRef.current = abort
+
         try {
             const token = await getToken()
-            const headers: Record<string, string> = { "Content-Type": "application/json" }
-            if (token) headers["Authorization"] = `Bearer ${token}`
 
-            const results = await Promise.allSettled(
-                targets.map(async (r) => {
-                    const res = await fetch(apiUrl("/api/products/normalize"), {
-                        method: "POST",
-                        headers,
-                        body: JSON.stringify({ text: r.name, source_url: r.source_url }),
-                    })
-                    if (!res.ok) throw new Error("normalize failed")
-                    return { id: r.id, data: await res.json() }
-                })
-            )
+            const results = await mapWithConcurrency(targets, NORMALIZE_CONCURRENCY, async (r) => ({
+                id: r.id,
+                data: await normalizeProduct(
+                    { text: r.name, source_url: r.source_url },
+                    { token, signal: abort.signal },
+                ),
+            }))
 
-            const okMap = new Map<string, any>()
+            const okMap = new Map<string, NormalizedProduct>()
+            const errors: string[] = []
             results.forEach((res) => {
                 if (res.status === "fulfilled") okMap.set(res.value.id, res.value.data)
+                else errors.push(res.reason instanceof Error ? res.reason.message : String(res.reason))
             })
 
+            const blocked = new Set<string>()
             setRows((prev) => prev.map((r) => {
                 const d = okMap.get(r.id)
                 if (!d) return r
+                if (d.source_blocked) blocked.add(r.id)
                 return {
                     ...r,
                     name: d.name ?? r.name,
@@ -193,11 +206,33 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                     yield_factor: d.yield_factor !== undefined && d.yield_factor !== null ? d.yield_factor : r.yield_factor,
                 }
             }))
+            setBlockedIds(blocked)
 
-            toast({ title: "IA concluída", description: `${okMap.size} de ${targets.length} linha(s) preenchidas.` })
-        } catch {
-            toast({ variant: "destructive", title: "Erro", description: "Falha ao normalizar com IA." })
+            if (errors.length > 0) {
+                // Falha precisa aparecer como falha: antes, 40 erros viravam
+                // "IA concluída — 0 de 40 linhas preenchidas" com toast de sucesso.
+                const causa = errors[0]
+                toast({
+                    variant: "destructive",
+                    title: okMap.size > 0 ? "IA concluída com falhas" : "Falha ao normalizar com IA",
+                    description: `${errors.length} de ${targets.length} linha(s) falharam. ${causa}`,
+                })
+            } else {
+                toast({
+                    title: "IA concluída",
+                    description: blocked.size > 0
+                        ? `${okMap.size} linha(s) preenchidas. ${blocked.size} com a loja bloqueando o acesso — revise os dados.`
+                        : `${okMap.size} de ${targets.length} linha(s) preenchidas.`,
+                })
+            }
+        } catch (err) {
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: err instanceof Error ? err.message : "Falha ao normalizar com IA.",
+            })
         } finally {
+            aiAbortRef.current = null
             setAiRunning(false)
         }
     }
@@ -236,7 +271,7 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                 headers,
                 body: JSON.stringify(payload),
             })
-            if (!res.ok) throw new Error("batch approve failed")
+            if (!res.ok) throw new Error(await apiErrorMessage(res, "Falha ao aprovar em lote."))
             const data = await res.json()
             const approvedCount = data.approved?.length ?? validSelected.length
 
@@ -250,8 +285,12 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                     : `${approvedCount} produto(s) movido(s) para a biblioteca.`,
             })
             onOpenChange(false)
-        } catch {
-            toast({ variant: "destructive", title: "Erro", description: "Falha ao aprovar em lote." })
+        } catch (err) {
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: err instanceof Error ? err.message : "Falha ao aprovar em lote.",
+            })
         } finally {
             setApproving(false)
         }
@@ -317,6 +356,7 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                             <TableBody>
                                 {rows.map((r) => {
                                     const missing = r.selected && !rowHasDims(r)
+                                    const blocked = blockedIds.has(r.id)
                                     return (
                                         <TableRow key={r.id} className={missing ? "bg-destructive/5" : undefined}>
                                             <TableCell>
@@ -340,7 +380,11 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                                                             onChange={(e) => update(r.id, { name: e.target.value })}
                                                             className="h-8"
                                                         />
-                                                        {r.store && (
+                                                        {blocked ? (
+                                                            <p className="text-[11px] text-amber-600 mt-0.5 truncate">
+                                                                A loja bloqueou o acesso — confira os dados
+                                                            </p>
+                                                        ) : r.store && (
                                                             <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{r.store}</p>
                                                         )}
                                                     </div>

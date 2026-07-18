@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Sparkles, ExternalLink, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { getToken, normalizeProduct } from "@/lib/normalize-product"
 import {
     Select,
     SelectContent,
@@ -34,11 +34,6 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 
-async function getToken(): Promise<string | undefined> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token
-}
 import {
     Tooltip,
     TooltipContent,
@@ -177,29 +172,20 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
             const currentUrl = form.getValues("source_url") || productToNormalize?.source_url || "";
             const currentName = form.getValues("name") || productToNormalize?.name || "";
 
-            const token = await getToken()
-            const res = await fetch(apiUrl("/api/products/normalize"), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ text: currentName, source_url: currentUrl }),
-            })
-
-            if (!res.ok) throw new Error("Falha ao extrair dados")
-
-            const data = await res.json()
+            const data = await normalizeProduct({ text: currentName, source_url: currentUrl })
 
             if (data) {
                 if (data.name) form.setValue("name", data.name)
                 if (data.category) form.setValue("category", data.category)
                 if (data.price !== undefined && data.price !== null) form.setValue("price", data.price)
 
+                // A IA pode devolver dimensões parciais (ex.: sem profundidade). Sem o
+                // fallback, setValue gravava undefined e apagava o que o usuário já digitou.
                 if (data.dimensions) {
-                    form.setValue("width", data.dimensions.width)
-                    form.setValue("height", data.dimensions.height)
-                    form.setValue("depth", data.dimensions.depth)
+                    const { width, height, depth } = data.dimensions
+                    if (width !== undefined && width !== null) form.setValue("width", width)
+                    if (height !== undefined && height !== null) form.setValue("height", height)
+                    if (depth !== undefined && depth !== null) form.setValue("depth", depth)
                 }
 
                 if (data.yield_factor !== undefined && data.yield_factor !== null) {
@@ -207,8 +193,10 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                 }
 
                 toast({
-                    title: "Sucesso",
-                    description: "Dados extraídos com IA.",
+                    title: data.source_blocked ? "Extração parcial" : "Sucesso",
+                    description: data.source_blocked
+                        ? "A loja bloqueou o acesso à página. Os dados vieram só do nome — confira antes de salvar."
+                        : "Dados extraídos com IA.",
                 })
             }
 
@@ -216,7 +204,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
             console.error(error)
             toast({
                 title: "Erro",
-                description: "Não foi possível conectar com a IA.",
+                description: error instanceof Error ? error.message : "Não foi possível extrair os dados.",
                 variant: "destructive"
             })
         } finally {
