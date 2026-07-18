@@ -12,7 +12,7 @@ import { NormalizationSheet } from "@/components/library/NormalizationSheet"
 import { BatchNormalizeModal } from "@/components/library/BatchNormalizeModal"
 import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/utils/supabase/client"
+import { getToken } from "@/lib/normalize-product"
 import { apiUrl } from "@/lib/api-url"
 
 interface ProductQuery {
@@ -34,12 +34,6 @@ interface ProductsResponse {
 }
 
 const EMPTY_RESPONSE: ProductsResponse = { items: [], total: 0, page: 1, size: 15, pages: 0 }
-
-async function getToken(): Promise<string | undefined> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token
-}
 
 async function fetchProducts(query: ProductQuery): Promise<ProductsResponse> {
     const token = await getToken()

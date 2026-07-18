@@ -140,7 +140,13 @@ def get_product(
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-from app.services.ai_service import extract_product_data
+from app.services.ai_service import (
+    AIConfigError,
+    AIQuotaError,
+    AIResponseError,
+    AITimeoutError,
+    extract_product_data,
+)
 
 class NormalizeRequest(BaseModel):
     text: str = ""
@@ -152,14 +158,27 @@ class NormalizeResponse(BaseModel):
     price: Optional[float] = None
     dimensions: Optional[Dict[str, float]] = None
     yield_factor: Optional[float] = None
+    # True quando nem nós nem o Google conseguimos ler a página: os dados vieram só do nome
+    # e precisam de revisão manual. Não é erro, é extração parcial.
+    source_blocked: bool = False
+
+# Cada falha da IA vira um status e uma mensagem própria. Antes, um except genérico
+# devolvia "Erro de conexão com IA" para tudo — inclusive erros de validação —, o que
+# fazia um bug de schema parecer problema de rede.
+AI_ERROR_RESPONSES = {
+    AIConfigError: (503, "Serviço de IA indisponível no momento. Contate o suporte."),
+    AIQuotaError: (429, "Limite de uso da IA atingido. Tente novamente em instantes."),
+    AITimeoutError: (504, "A IA demorou demais para responder. Tente novamente."),
+    AIResponseError: (502, "A IA retornou dados em formato inesperado. Tente novamente."),
+}
 
 @router.post("/normalize", response_model=NormalizeResponse)
 async def normalize_product(request: NormalizeRequest):
     try:
-        extracted_data = await extract_product_data(request.text, request.source_url)
-        return extracted_data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return await extract_product_data(request.text, request.source_url)
+    except tuple(AI_ERROR_RESPONSES) as e:
+        status_code, detail = AI_ERROR_RESPONSES[type(e)]
+        raise HTTPException(status_code=status_code, detail=detail)
 
 @router.post("/", response_model=ProductResponse)
 def create_product(

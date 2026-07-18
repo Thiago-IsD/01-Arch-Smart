@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.core.logging import setup_logging
+
+setup_logging()
+
 app = FastAPI(title="Arch Smart API", version="1.0.0")
 
 # CORS Configuration

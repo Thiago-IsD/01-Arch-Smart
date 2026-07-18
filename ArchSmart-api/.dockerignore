@@ -1,0 +1,33 @@
+# Segredos: nunca devem entrar na imagem (o Render injeta as env vars em runtime)
+.env
+.env.*
+!.env.example
+
+# Ambiente virtual e artefatos de build locais
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Controle de versão e IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+requirements-dev.txt
+
+# Bancos locais e dumps
+*.db
+*.sqlite3
+
+# Node (o backend não usa, mas o diretório é compartilhado)
+node_modules/
+
+# Certificado órfão, não referenciado por nenhum módulo
+cacert.pem
