@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Sparkles, ExternalLink, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
+import { createClient } from "@/utils/supabase/client"
 import {
     Select,
     SelectContent,
@@ -32,6 +33,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+
+async function getToken(): Promise<string | undefined> {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token
+}
 import {
     Tooltip,
     TooltipContent,
@@ -132,9 +139,13 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                 yield_factor: values.yield_factor || null
             }
 
+            const token = await getToken()
             const res = await fetch(apiUrl(`/api/products/${productToNormalize.id}/approve`), {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify(payload),
             })
 
@@ -166,9 +177,13 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
             const currentUrl = form.getValues("source_url") || productToNormalize?.source_url || "";
             const currentName = form.getValues("name") || productToNormalize?.name || "";
 
+            const token = await getToken()
             const res = await fetch(apiUrl("/api/products/normalize"), {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ text: currentName, source_url: currentUrl }),
             })
 
@@ -303,7 +318,9 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                 name="category"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Categoria</FormLabel>
+                                        <div className="flex items-center gap-2 min-h-5">
+                                            <FormLabel>Categoria</FormLabel>
+                                        </div>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
@@ -328,7 +345,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                 name="price"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 min-h-5">
                                             <FormLabel>Preço (R$)</FormLabel>
                                             <TooltipProvider delayDuration={300}>
                                                 <Tooltip>

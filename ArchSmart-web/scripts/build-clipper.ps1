@@ -1,12 +1,17 @@
 # ---------------------------------------------------------------------------
 # build-clipper.ps1
-# Regenera o pacote de download da extensao (Web Clipper) a partir da fonte.
+# Regenera os pacotes de download da extensao (Web Clipper) a partir da fonte.
 #
 # Fonte:  <repo>/extension/            (arquivos editados manualmente)
-# Saida:  <repo>/ArchSmart-web/public/arch-smart-clipper.zip
+# Saida:  <repo>/ArchSmart-web/public/arch-smart-clipper.zip      (ENV = prod)
+#         <repo>/ArchSmart-web/public/arch-smart-clipper-dev.zip  (ENV = dev)
 #
-# Rode sempre que alterar qualquer arquivo em extension/ antes de commitar,
-# senao o zip baixado pela pagina /web-clipper fica divergente da fonte.
+# Gera SEMPRE os dois zips, forcando o valor de 'const ENV' em cada um,
+# independente do que estiver no popup.js. Assim o zip de producao entregue
+# pela pagina /web-clipper nunca sai apontando para localhost por engano, e
+# voce tem o zip de dev pronto para testar localmente.
+#
+# Rode sempre que alterar qualquer arquivo em extension/ antes de commitar.
 #
 # Uso:  npm run build:clipper   (a partir de ArchSmart-web)
 #   ou: powershell -ExecutionPolicy Bypass -File scripts/build-clipper.ps1
@@ -15,40 +20,60 @@
 $ErrorActionPreference = "Stop"
 
 # Caminhos resolvidos a partir da localizacao do script (robusto ao cwd)
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$extDir   = Join-Path $repoRoot "extension"
-$outZip   = Join-Path $repoRoot "ArchSmart-web\public\arch-smart-clipper.zip"
+$repoRoot  = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$extDir    = Join-Path $repoRoot "extension"
+$publicDir = Join-Path $repoRoot "ArchSmart-web\public"
 
-$files = @("content.js", "manifest.json", "popup.css", "popup.html", "popup.js")
+# Arquivos estaticos (copiados sem alteracao) + popup.js (ENV reescrito)
+$staticFiles = @("content.js", "manifest.json", "popup.css", "popup.html")
+$popupFile   = "popup.js"
 
 if (-not (Test-Path $extDir)) {
     throw "Pasta de fonte da extensao nao encontrada: $extDir"
 }
-
-$paths = New-Object System.Collections.Generic.List[string]
-foreach ($f in $files) {
+foreach ($f in ($staticFiles + $popupFile)) {
     $p = Join-Path $extDir $f
     if (-not (Test-Path $p)) { throw "Arquivo esperado nao encontrado: $p" }
-    $paths.Add($p)
 }
 
-# Aviso caso o pacote esteja sendo gerado apontando para dev
-$popup = Get-Content (Join-Path $extDir "popup.js") -Raw
-$m = [regex]::Match($popup, 'const ENV\s*=\s*"([a-z]+)"')
-if ($m.Success) {
-    $clipperEnv = $m.Groups[1].Value
-    Write-Host "Ambiente da extensao (ENV): $clipperEnv" -ForegroundColor Cyan
-    if ($clipperEnv -ne "prod") {
-        Write-Warning "ENV nao esta em prod. Ajuste 'const ENV' em extension/popup.js antes de publicar."
+$popupRaw = Get-Content (Join-Path $extDir $popupFile) -Raw
+if ($popupRaw -notmatch 'const ENV\s*=\s*"[a-z]+"') {
+    throw "Nao foi possivel localizar a constante 'const ENV' em popup.js."
+}
+
+# Gera um zip para um ambiente especifico, reescrevendo o ENV do popup.js.
+function Build-ClipperZip {
+    param(
+        [Parameter(Mandatory)] [string] $Env,
+        [Parameter(Mandatory)] [string] $OutZip
+    )
+
+    # Pasta temporaria isolada para montar o conteudo do zip
+    $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("clipper-" + $Env + "-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
+    try {
+        # Copia os arquivos estaticos
+        foreach ($f in $staticFiles) {
+            Copy-Item (Join-Path $extDir $f) (Join-Path $stage $f) -Force
+        }
+
+        # popup.js com o ENV forcado para este ambiente
+        $patched = [regex]::Replace($popupRaw, 'const ENV\s*=\s*"[a-z]+"', ('const ENV = "' + $Env + '"'))
+        Set-Content -Path (Join-Path $stage $popupFile) -Value $patched -Encoding UTF8 -NoNewline
+
+        if (Test-Path $OutZip) { Remove-Item $OutZip -Force }
+        $items = Get-ChildItem -Path $stage -File | Select-Object -ExpandProperty FullName
+        Compress-Archive -Path $items -DestinationPath $OutZip -Force
+
+        $size = (Get-Item $OutZip).Length
+        Write-Host ("OK [{0}]: {1} - {2} bytes" -f $Env, $OutZip, $size) -ForegroundColor Green
+    }
+    finally {
+        Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
-else {
-    Write-Warning "Nao foi possivel detectar a constante ENV em popup.js."
-}
 
-# Regenera o zip (arquivos na raiz, sem subpasta)
-if (Test-Path $outZip) { Remove-Item $outZip -Force }
-Compress-Archive -Path $paths.ToArray() -DestinationPath $outZip -Force
+Build-ClipperZip -Env "prod" -OutZip (Join-Path $publicDir "arch-smart-clipper.zip")
+Build-ClipperZip -Env "dev"  -OutZip (Join-Path $publicDir "arch-smart-clipper-dev.zip")
 
-$size = (Get-Item $outZip).Length
-Write-Host "OK: zip gerado em $outZip - $size bytes" -ForegroundColor Green
+Write-Host "Ambos os pacotes foram gerados (prod + dev)." -ForegroundColor Cyan

@@ -178,17 +178,17 @@ export function BuilderClient({
     const visibleEnvironmentIds = visibleEnvironments.map(e => e.environment?.id || e.id);
 
     return (
-        <div className="flex flex-col h-screen overflow-hidden bg-white text-gray-900 absolute inset-0 z-[100]">
+        <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground absolute inset-0 z-[100]">
             {/* Header */}
-            <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm z-10 w-full">
+            <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border bg-card shadow-sm z-10 w-full">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => router.push(`/projects/${projectId}/presentation`)}
-                        className="flex items-center justify-center p-2 rounded-md hover:bg-gray-100 text-gray-600 transition-colors"
+                        className="flex items-center justify-center p-2 rounded-md hover:bg-muted text-muted-foreground transition-colors"
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block" />
+                    <div className="h-8 w-px bg-border mx-1 hidden sm:block" />
 
                     <div className="flex items-center gap-3">
                         {data.branding_snapshot?.logo_url ? (
@@ -203,13 +203,13 @@ export function BuilderClient({
                             </div>
                         )}
                         <div className="hidden sm:block">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">
                                 {data.branding_snapshot?.office_name || "Escritório"}
                             </p>
-                            <h1 className="text-sm font-bold text-gray-900 leading-none flex items-center gap-2">
+                            <h1 className="text-sm font-bold text-foreground leading-none flex items-center gap-2">
                                 {name || "Apresentação sem nome"}
-                                <span className={`px-1.5 py-0.5 text-[9px] uppercase font-black rounded-sm 
-                                    ${data.status === "DRAFT" ? "bg-gray-100 text-gray-500" : "bg-emerald-100 text-emerald-700"}`}>
+                                <span className={`px-1.5 py-0.5 text-[9px] uppercase font-black rounded-sm
+                                    ${data.status === "DRAFT" ? "bg-muted text-muted-foreground" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"}`}>
                                     {data.status === "PUBLISHED" ? "PUBL" : "RASC"}
                                 </span>
                             </h1>
@@ -222,7 +222,7 @@ export function BuilderClient({
                         <AlertDialogTrigger asChild>
                             <button
                                 disabled={isSaving}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-100"
+                                className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900/50"
                                 title="Excluir apresentação"
                             >
                                 <Trash2 className="w-5 h-5" />
@@ -250,7 +250,7 @@ export function BuilderClient({
                     </AlertDialog>
 
                     <button
-                        className="text-sm font-medium text-emerald-700 flex items-center gap-1.5 px-3 py-2 rounded-md hover:bg-emerald-50 border border-emerald-200 transition-colors"
+                        className="text-sm font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 px-3 py-2 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 transition-colors"
                         onClick={() => setIsCommentsDrawerOpen(true)}
                     >
                         <MessageSquare className="w-4 h-4" />
@@ -258,7 +258,7 @@ export function BuilderClient({
                     </button>
 
                     <button
-                        className="text-sm font-medium text-gray-600 flex items-center gap-1.5 px-3 py-2 rounded-md hover:bg-gray-50 border border-gray-200"
+                        className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 px-3 py-2 rounded-md hover:bg-muted border border-border"
                         onClick={() => {
                             const publicUrl = `${window.location.origin}/portal/${presentationId}`;
                             navigator.clipboard.writeText(publicUrl);
@@ -284,31 +284,31 @@ export function BuilderClient({
             <div className="flex flex-1 overflow-hidden w-full">
 
                 {/* Painel Esquerdo: Configurações */}
-                <aside className="w-[380px] flex-shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col overflow-y-auto">
+                <aside className="w-[380px] flex-shrink-0 border-r border-border bg-muted/30 flex flex-col overflow-y-auto">
                     <div className="p-6 space-y-8">
 
                         {/* Informações Básicas */}
                         <section>
-                            <h2 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Informações Básicas</h2>
+                            <h2 className="text-xs font-bold tracking-wider text-muted-foreground uppercase mb-4">Informações Básicas</h2>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Apresentação</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Nome da Apresentação</label>
                                     <input
                                         type="text"
                                         value={name}
                                         onChange={e => setName(e.target.value)}
                                         onBlur={() => saveConfig({ name })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                                        className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Descrição</label>
                                     <textarea
                                         value={description}
                                         onChange={e => setDescription(e.target.value)}
                                         onBlur={() => saveConfig({ description })}
                                         rows={3}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm resize-none"
+                                        className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm resize-none"
                                     />
                                 </div>
                             </div>
@@ -316,15 +316,15 @@ export function BuilderClient({
 
                         {/* Imagem de Capa */}
                         <section>
-                            <h2 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Aparência da Capa</h2>
+                            <h2 className="text-xs font-bold tracking-wider text-muted-foreground uppercase mb-4">Aparência da Capa</h2>
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
                             {coverUrl ? (
-                                <div className="relative group rounded-lg overflow-hidden border border-gray-200">
+                                <div className="relative group rounded-lg overflow-hidden border border-border">
                                     <img src={coverUrl} alt="Capa" className="w-full h-32 object-cover" />
                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="bg-white text-gray-900 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm"
+                                            className="bg-background text-foreground px-3 py-1.5 rounded-md text-xs font-medium shadow-sm"
                                         >
                                             Trocar Imagem
                                         </button>
@@ -334,7 +334,7 @@ export function BuilderClient({
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={isUploading}
-                                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:bg-gray-100 hover:border-gray-400 transition-all text-gray-500 disabled:opacity-50"
+                                    className="w-full h-32 border-2 border-dashed border-input rounded-lg flex flex-col items-center justify-center hover:bg-muted hover:border-muted-foreground/50 transition-all text-muted-foreground disabled:opacity-50"
                                 >
                                     {isUploading ? <Loader2 className="w-6 h-6 animate-spin mb-2" /> : <Upload className="w-6 h-6 mb-2" />}
                                     <span className="text-sm font-medium">{isUploading ? "Enviando..." : "Fazer upload da Capa"}</span>
@@ -345,8 +345,8 @@ export function BuilderClient({
                         {/* Ambientes com Accordion */}
                         <section>
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xs font-bold tracking-wider text-gray-500 uppercase">Ambientes</h2>
-                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                                <h2 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">Ambientes</h2>
+                                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
                                     {visibleEnvironments.length}/{environments.length} visíveis
                                 </span>
                             </div>
@@ -361,7 +361,9 @@ export function BuilderClient({
                 </aside>
 
                 {/* Painel Direito: Live Preview */}
-                <main className="flex-1 bg-gray-200/50 p-8 overflow-y-auto relative hidden md:block">
+                <main className="flex-1 bg-muted p-8 overflow-y-auto relative hidden md:block">
+                    {/* O preview abaixo é o documento branco que o cliente vê no portal —
+                        mantido claro de propósito (WYSIWYG), independente do tema. */}
                     <div className="max-w-4xl mx-auto">
 
                         {/* Header do Preview */}

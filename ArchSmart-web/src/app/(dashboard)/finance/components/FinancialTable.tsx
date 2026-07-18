@@ -87,17 +87,17 @@ export function FinancialTable({ entries, onStatusToggled, onEdit, onDelete }: F
 
     if (entries.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-12 text-slate-500 border rounded-xl bg-slate-50/50 border-dashed">
-                <FolderOutput className="w-10 h-10 mb-4 text-slate-300" />
+            <div className="flex flex-col items-center justify-center p-12 text-muted-foreground border rounded-xl bg-muted/30 border-dashed">
+                <FolderOutput className="w-10 h-10 mb-4 text-muted-foreground/60" />
                 <p>Nenhuma movimentação encontrada para o período.</p>
             </div>
         );
     }
 
     return (
-        <div className="rounded-xl border bg-white shadow-sm overflow-hidden text-sm">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden text-sm">
             <Table>
-                <TableHeader className="bg-slate-50">
+                <TableHeader className="bg-muted/50">
                     <TableRow>
                         <TableHead className="w-[120px]">Vencimento</TableHead>
                         <TableHead>Descrição</TableHead>
@@ -109,20 +109,20 @@ export function FinancialTable({ entries, onStatusToggled, onEdit, onDelete }: F
                 </TableHeader>
                 <TableBody>
                     {entries.map((entry) => (
-                        <TableRow key={entry.id} className="group hover:bg-slate-50/60 transition-colors">
-                            <TableCell className="font-medium text-slate-600">
+                        <TableRow key={entry.id} className="group hover:bg-muted/50 transition-colors">
+                            <TableCell className="font-medium text-muted-foreground">
                                 {format(new Date(entry.due_date), "dd MMM, yyyy", { locale: ptBR })}
                             </TableCell>
                             <TableCell>
                                 <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-slate-900 line-clamp-1">{entry.description}</span>
+                                        <span className="font-semibold text-foreground line-clamp-1">{entry.description}</span>
                                         {entry.group_id && (
-                                            <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 font-medium text-slate-400 border-slate-200">Em Série</Badge>
+                                            <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 font-medium text-muted-foreground border-border">Em Série</Badge>
                                         )}
                                     </div>
                                     {entry.project_name && (
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             <LinkIcon className="w-3 h-3" />
                                             {entry.project_name}
                                         </div>
@@ -131,9 +131,9 @@ export function FinancialTable({ entries, onStatusToggled, onEdit, onDelete }: F
                             </TableCell>
                             <TableCell>
                                 {entry.category ? (
-                                    <Badge variant="secondary" className="font-normal border-slate-200">{entry.category}</Badge>
+                                    <Badge variant="secondary" className="font-normal border-border">{entry.category}</Badge>
                                 ) : (
-                                    <span className="text-slate-400 italic text-xs">Sem categoria</span>
+                                    <span className="text-muted-foreground italic text-xs">Sem categoria</span>
                                 )}
                             </TableCell>
                             <TableCell className="text-right">
@@ -148,9 +148,9 @@ export function FinancialTable({ entries, onStatusToggled, onEdit, onDelete }: F
                                         checked={entry.status === "REALIZED"}
                                         disabled={togglingId === entry.id}
                                         onCheckedChange={() => handleToggleStatus(entry.id)}
-                                        className={entry.type === "INCOME" ? "data-[state=checked]:bg-emerald-600" : "data-[state=checked]:bg-slate-900"}
+                                        className={entry.type === "INCOME" ? "data-[state=checked]:bg-emerald-600" : "data-[state=checked]:bg-foreground"}
                                     />
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${entry.status === "REALIZED" ? "text-emerald-700" : "text-slate-400"}`}>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${entry.status === "REALIZED" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`}>
                                         {entry.status === "REALIZED" ? "Baixado" : "Prévia"}
                                     </span>
                                 </div>
@@ -197,20 +197,20 @@ export function FinancialTable({ entries, onStatusToggled, onEdit, onDelete }: F
                     </AlertDialogHeader>
 
                     {entryToDelete?.group_id && (
-                        <div className="py-4 border-y border-slate-100 my-2">
-                            <Label className="text-sm font-semibold text-slate-700 mb-3 block">Esta movimentação faz parte de uma série recorrente/parcelada. Como deseja prosseguir com a exclusão?</Label>
+                        <div className="py-4 border-y border-border my-2">
+                            <Label className="text-sm font-semibold text-foreground mb-3 block">Esta movimentação faz parte de uma série recorrente/parcelada. Como deseja prosseguir com a exclusão?</Label>
                             <RadioGroup value={deleteScope} onValueChange={(val: any) => setDeleteScope(val)} className="flex flex-col gap-3 mt-2">
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="SINGLE" id="del-single" />
-                                    <Label htmlFor="del-single" className="text-slate-600 font-normal">Excluir apenas esta parcela</Label>
+                                    <Label htmlFor="del-single" className="text-muted-foreground font-normal">Excluir apenas esta parcela</Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="NEXT" id="del-next" />
-                                    <Label htmlFor="del-next" className="text-slate-600 font-normal">Excluir esta e todas as parcelas futuras pendentes</Label>
+                                    <Label htmlFor="del-next" className="text-muted-foreground font-normal">Excluir esta e todas as parcelas futuras pendentes</Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="ALL" id="del-all" />
-                                    <Label htmlFor="del-all" className="text-slate-600 font-normal">Excluir todas as parcelas pendentes desta série</Label>
+                                    <Label htmlFor="del-all" className="text-muted-foreground font-normal">Excluir todas as parcelas pendentes desta série</Label>
                                 </div>
                             </RadioGroup>
                         </div>

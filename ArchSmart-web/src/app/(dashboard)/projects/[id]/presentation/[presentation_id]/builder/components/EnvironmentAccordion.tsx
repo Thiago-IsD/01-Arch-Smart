@@ -136,26 +136,26 @@ function EnvAccordionItem({
     };
 
     return (
-        <AccordionPrimitive.Item value={env.id} className="border border-gray-200 rounded-lg mb-2 overflow-hidden">
+        <AccordionPrimitive.Item value={env.id} className="border border-border rounded-lg mb-2 overflow-hidden">
             {/* 
               Custom header: Trigger and Switch are SIBLINGS, not nested.
               This prevents the invalid button>button HTML that causes hydration errors.
             */}
-            <AccordionPrimitive.Header className="flex items-center border-b border-transparent data-[state=open]:border-gray-100">
+            <AccordionPrimitive.Header className="flex items-center border-b border-transparent data-[state=open]:border-border">
                 {/* Expand/collapse trigger — takes full remaining width */}
                 <AccordionPrimitive.Trigger
-                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-gray-50 data-[state=open]:bg-gray-50 transition-colors [&[data-state=open]>svg]:rotate-180"
+                    className="flex-1 flex items-center gap-3 px-4 py-3 hover:bg-muted data-[state=open]:bg-muted transition-colors [&[data-state=open]>svg]:rotate-180"
                 >
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${env.is_visible ? "bg-primary" : "bg-gray-300"}`} />
-                    <span className={`text-sm font-medium text-left ${env.is_visible ? "text-gray-900" : "text-gray-400"}`}>
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${env.is_visible ? "bg-primary" : "bg-muted-foreground"}`} />
+                    <span className={`text-sm font-medium text-left ${env.is_visible ? "text-foreground" : "text-muted-foreground"}`}>
                         {env.environment?.name || "Ambiente"}
                     </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400 ml-auto transition-transform duration-200" />
+                    <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto transition-transform duration-200" />
                 </AccordionPrimitive.Trigger>
 
                 {/* Visibility switch — sibling of trigger, NOT inside it */}
-                <div className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 data-[state=open]:bg-gray-50 border-l border-gray-100">
-                    <span className="text-xs text-gray-400">{env.is_visible ? "Visível" : "Oculto"}</span>
+                <div className="flex items-center gap-2 px-4 py-3 hover:bg-muted data-[state=open]:bg-muted border-l border-border">
+                    <span className="text-xs text-muted-foreground">{env.is_visible ? "Visível" : "Oculto"}</span>
                     <Switch
                         checked={env.is_visible}
                         onCheckedChange={(val) => {
@@ -166,7 +166,7 @@ function EnvAccordionItem({
                 </div>
             </AccordionPrimitive.Header>
 
-            <AccordionPrimitive.Content className="px-4 pb-4 pt-2 bg-white space-y-4 overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+            <AccordionPrimitive.Content className="px-4 pb-4 pt-2 bg-card space-y-4 overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
                 {isSaving && (
                     <div className="flex items-center gap-1.5 text-xs text-primary">
                         <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
@@ -176,36 +176,36 @@ function EnvAccordionItem({
                 {/* Textos */}
                 <div className="space-y-3">
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Título da Seção</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Título da Seção</label>
                         <input
                             type="text"
                             value={localTitle}
                             onChange={(e) => setLocalTitle(e.target.value)}
                             onBlur={() => { if (localTitle !== (env.title || "")) saveDetail("title", localTitle); }}
                             placeholder="Ex: A Sala de Estar"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Subtítulo</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Subtítulo</label>
                         <input
                             type="text"
                             value={localSubtitle}
                             onChange={(e) => setLocalSubtitle(e.target.value)}
                             onBlur={() => { if (localSubtitle !== (env.subtitle || "")) saveDetail("subtitle", localSubtitle); }}
                             placeholder="Ex: Conforto e Minimalismo"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Descrição</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Descrição</label>
                         <textarea
                             value={localDescription}
                             onChange={(e) => setLocalDescription(e.target.value)}
                             onBlur={() => { if (localDescription !== (env.description || "")) saveDetail("description", localDescription); }}
                             placeholder="Descreva o conceito, materiais e inspirações deste ambiente..."
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+                            className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
                         />
                     </div>
                 </div>
@@ -213,7 +213,7 @@ function EnvAccordionItem({
                 {/* Upload de Imagens */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-medium text-gray-600">Imagens ({(env.image_urls || []).length}/4)</label>
+                        <label className="text-xs font-medium text-muted-foreground">Imagens ({(env.image_urls || []).length}/4)</label>
                         {(env.image_urls || []).length < 4 && (
                             <button
                                 onClick={() => fileInputRef.current?.click()}
@@ -237,7 +237,7 @@ function EnvAccordionItem({
                     {(env.image_urls || []).length > 0 && (
                         <div className="grid grid-cols-2 gap-2 mb-2">
                             {(env.image_urls || []).map((url, idx) => (
-                                <div key={idx} className="relative rounded-md overflow-hidden border border-gray-200 aspect-video bg-gray-100">
+                                <div key={idx} className="relative rounded-md overflow-hidden border border-border aspect-video bg-muted">
                                     <img src={url} alt="" className="w-full h-full object-cover" />
                                     {isUploading === idx && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -256,8 +256,8 @@ function EnvAccordionItem({
                             onDragLeave={() => setIsDropOver(false)}
                             onDrop={handleDrop}
                             onClick={() => fileInputRef.current?.click()}
-                            className={`w-full h-16 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer transition-all text-xs text-gray-400
-                                ${isDropOver ? "border-primary bg-primary/5 text-primary" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}
+                            className={`w-full h-16 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer transition-all text-xs text-muted-foreground
+                                ${isDropOver ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-border hover:bg-muted"}`}
                         >
                             <Upload className="w-4 h-4 mr-1.5" />
                             <span>Arraste ou clique para adicionar</span>
@@ -272,7 +272,7 @@ function EnvAccordionItem({
 export function EnvironmentAccordion({ presentationId, environments, onEnvironmentUpdate }: EnvironmentAccordionProps) {
     if (environments.length === 0) {
         return (
-            <p className="text-sm text-gray-500 text-center py-4">
+            <p className="text-sm text-muted-foreground text-center py-4">
                 Nenhum ambiente encontrado neste projeto.
             </p>
         );

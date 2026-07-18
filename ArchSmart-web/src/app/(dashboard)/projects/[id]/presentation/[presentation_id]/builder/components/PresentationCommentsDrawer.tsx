@@ -103,7 +103,7 @@ export function PresentationCommentsDrawer({ presentationId, isOpen, onOpenChang
     return (
         <Sheet open={isOpen} onOpenChange={onOpenChange}>
             <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 z-[300]">
-                <SheetHeader className="p-6 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                <SheetHeader className="p-6 border-b border-border bg-muted flex-shrink-0">
                     <SheetTitle className="flex items-center gap-2">
                         <MessageSquare className="w-5 h-5 text-emerald-600" />
                         Feedback do Cliente
@@ -113,40 +113,40 @@ export function PresentationCommentsDrawer({ presentationId, isOpen, onOpenChang
                     </SheetDescription>
                 </SheetHeader>
 
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 relative">
+                <div className="flex-1 overflow-y-auto p-6 bg-muted/30 relative">
                     {/* Linha da timeline */}
                     {comments.length > 0 && (
-                        <div className="absolute left-[40px] top-6 bottom-6 w-0.5 bg-slate-200" />
+                        <div className="absolute left-[40px] top-6 bottom-6 w-0.5 bg-border" />
                     )}
 
                     {isLoading ? (
-                        <p className="text-sm text-center text-gray-500">Carregando mensagens...</p>
+                        <p className="text-sm text-center text-muted-foreground">Carregando mensagens...</p>
                     ) : comments.length === 0 ? (
                         <div className="text-center mt-12">
-                            <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                            <p className="text-sm text-slate-500 font-medium">Nenhum feedback recebido ainda.</p>
+                            <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                            <p className="text-sm text-muted-foreground font-medium">Nenhum feedback recebido ainda.</p>
                         </div>
                     ) : (
                         <div className="space-y-6 relative">
                             {comments.map((comment) => (
                                 <div key={comment.id} className="flex gap-4">
-                                    <div className={`mt-1 shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 ${comment.author_type === "CLIENT" ? "bg-emerald-100 text-emerald-600" : "bg-slate-200 text-slate-500"
+                                    <div className={`mt-1 shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-4 border-background shadow-sm z-10 ${comment.author_type === "CLIENT" ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-muted text-muted-foreground"
                                         }`}>
                                         <User className="w-3.5 h-3.5" />
                                     </div>
                                     <div className={`flex-1 rounded-2xl p-4 shadow-sm border ${comment.author_type === "CLIENT"
-                                            ? "bg-white border-emerald-100 rounded-tl-none"
-                                            : "bg-gray-100 border-gray-200 rounded-tr-none"
+                                            ? "bg-card border-emerald-100 dark:border-emerald-900/60 rounded-tl-none"
+                                            : "bg-muted border-border rounded-tr-none"
                                         }`}>
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className="font-semibold text-xs text-gray-800 tracking-tight">
+                                            <span className="font-semibold text-xs text-foreground tracking-tight">
                                                 {comment.author_type === "CLIENT" ? "Cliente" : "Você"}
                                             </span>
-                                            <span className="text-[10px] uppercase font-bold text-gray-400">
+                                            <span className="text-[10px] uppercase font-bold text-muted-foreground">
                                                 {format(new Date(comment.created_at), "dd MMM, HH:mm", { locale: ptBR })}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                                             {comment.text}
                                         </p>
                                     </div>
@@ -156,16 +156,16 @@ export function PresentationCommentsDrawer({ presentationId, isOpen, onOpenChang
                     )}
                 </div>
 
-                <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0">
+                <div className="p-4 border-t border-border bg-card flex-shrink-0">
                     <label className="sr-only">Sua resposta</label>
                     <textarea
                         value={newText}
                         onChange={(e) => setNewText(e.target.value)}
                         placeholder="Digite sua resposta ou contra-proposta..."
-                        className="w-full resize-none rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 text-sm min-h-[80px]"
+                        className="w-full resize-none rounded-xl border-input bg-background text-foreground placeholder:text-muted-foreground shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 text-sm min-h-[80px]"
                     />
                     <div className="flex justify-between items-center mt-3">
-                        <p className="text-[11px] text-gray-400 font-medium max-w-[200px]">
+                        <p className="text-[11px] text-muted-foreground font-medium max-w-[200px]">
                             Responder alterará o status para PUBLICADO, devolvendo a tarefa ao cliente.
                         </p>
                         <button

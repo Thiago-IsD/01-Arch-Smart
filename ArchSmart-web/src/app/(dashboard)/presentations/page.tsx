@@ -90,11 +90,11 @@ export default function PresentationsPage() {
     };
 
     return (
-        <div className="p-8 h-full bg-[#FAFAFA]">
+        <div className="p-8 h-full bg-background">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Apresentações</h1>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <h1 className="text-2xl font-bold text-foreground">Apresentações</h1>
+                    <p className="text-sm text-muted-foreground mt-1">
                         Gerencie todas as apresentações dos seus projetos.
                     </p>
                 </div>
@@ -134,33 +134,33 @@ export default function PresentationsPage() {
             </AlertDialog>
 
             {loading ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-gray-200">
+                <div className="text-center py-20 bg-card rounded-xl border border-border">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-sm text-gray-500 mt-4">Carregando apresentações...</p>
+                    <p className="text-sm text-muted-foreground mt-4">Carregando apresentações...</p>
                 </div>
             ) : presentations.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                        <Plus className="w-8 h-8 text-gray-400" />
+                <div className="text-center py-20 bg-card rounded-xl border border-border shadow-sm flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                        <Plus className="w-8 h-8 text-muted-foreground" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    <h3 className="text-lg font-medium text-foreground mb-2">
                         Nenhuma apresentação
                     </h3>
-                    <p className="text-gray-500 max-w-sm mx-auto mb-6 text-sm">
+                    <p className="text-muted-foreground max-w-sm mx-auto mb-6 text-sm">
                         Você ainda não criou nenhuma apresentação. Crie uma para poder visualizar o modelo 3D e compartilhar com seus clientes.
                     </p>
                     <button
-                        className="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg transition-colors font-medium text-sm shadow-sm"
+                        className="flex items-center gap-2 bg-card border border-border hover:bg-muted text-foreground px-4 py-2 rounded-lg transition-colors font-medium text-sm shadow-sm"
                         onClick={() => setIsDialogOpen(true)}
                     >
                         Começar
                     </button>
                 </div>
             ) : (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <tr className="bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                 <th className="py-4 px-6">Nome da Apresentação</th>
                                 <th className="py-4 px-6">Projeto</th>
                                 <th className="py-4 px-6">Status</th>
@@ -168,33 +168,33 @@ export default function PresentationsPage() {
                                 <th className="py-4 px-6 text-right">Ação</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-border">
                             {presentations.map((presentation) => (
-                                <tr key={presentation.id} className="hover:bg-gray-50/50 transition-colors">
+                                <tr key={presentation.id} className="hover:bg-muted/50 transition-colors">
                                     <td className="py-4 px-6">
-                                        <div className="font-medium text-gray-900">{presentation.name}</div>
+                                        <div className="font-medium text-foreground">{presentation.name}</div>
                                         {presentation.description && (
-                                            <div className="text-sm text-gray-500 mt-0.5 truncate max-w-xs">{presentation.description}</div>
+                                            <div className="text-sm text-muted-foreground mt-0.5 truncate max-w-xs">{presentation.description}</div>
                                         )}
                                     </td>
                                     <td className="py-4 px-6">
-                                        <div className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                                        <div className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground">
                                             {presentation.project?.name || "Desconhecido"}
                                         </div>
                                     </td>
                                     <td className="py-4 px-6">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium 
-                        ${presentation.status === 'DRAFT' ? 'bg-gray-100 text-gray-600' :
-                                                presentation.status === 'PUBLISHED' ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10' :
-                                                    presentation.status === 'ACCEPTED' ? 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20' :
-                                                        'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20'
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                        ${presentation.status === 'DRAFT' ? 'bg-muted text-muted-foreground' :
+                                                presentation.status === 'PUBLISHED' ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-400/20' :
+                                                    presentation.status === 'ACCEPTED' ? 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-950 dark:text-green-300 dark:ring-green-500/20' :
+                                                        'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-500/20'
                                             }`}>
                                             {presentation.status === 'DRAFT' ? 'Rascunho' :
                                                 presentation.status === 'PUBLISHED' ? 'Publicado' :
                                                     presentation.status === 'ACCEPTED' ? 'Aprovado' : 'Revisão'}
                                         </span>
                                     </td>
-                                    <td className="py-4 px-6 text-gray-500 text-sm">
+                                    <td className="py-4 px-6 text-muted-foreground text-sm">
                                         {new Date(presentation.created_at).toLocaleDateString("pt-BR")}
                                     </td>
                                     <td className="py-4 px-6 text-right">
@@ -206,7 +206,7 @@ export default function PresentationsPage() {
                                                 Abrir Builder
                                             </button>
                                             <button
-                                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                                className="p-2 text-muted-foreground hover:text-red-600 transition-colors"
                                                 onClick={() => handleDelete(presentation.id)}
                                                 title="Excluir apresentação"
                                             >

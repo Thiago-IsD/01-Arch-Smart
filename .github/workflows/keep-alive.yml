@@ -1,0 +1,25 @@
+name: Keep API warm
+
+# Mantém a instância do Render acordada pingando /health de tempos em tempos.
+# O tier free do Render dorme após ~15 min de inatividade, causando um cold
+# start de ~20s na próxima requisição. Um ping a cada 10 min evita isso.
+#
+# Observações:
+# - Cron do GitHub Actions usa UTC e pode atrasar em períodos de alta carga.
+# - Workflows agendados só rodam a partir da branch padrão (main).
+# - workflow_dispatch permite disparar manualmente pela aba Actions.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # a cada 10 minutos
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl -fsS --max-time 60 https://arch-smart-api.onrender.com/health \
+            && echo " -> API acordada" \
+            || echo "Ping falhou (possível cold start em andamento)"

@@ -47,19 +47,34 @@ const wizardSchema = z.object({
     payment_method: z.string(),
     custom_installments: z.array(z.object({
         amount: z.number().min(0),
-        due_date: z.string().min(10, "Data inválida"),
+        due_date: z.string(),
         description: z.string()
     })).optional()
 }).superRefine((val, ctx) => {
-    if (val.payment_method === "CUSTOM" && val.custom_installments) {
-        const sum = val.custom_installments.reduce((acc, curr) => acc + (curr.amount || 0), 0)
-        if (Math.abs(sum - val.service_value) > 0.01) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "A soma das parcelas deve ser igual ao Valor Fechado do Serviço.",
-                path: ["custom_installments"]
-            });
-        }
+    // Só validamos o cronograma quando o recebimento é Personalizado. No modo
+    // Padrão o array pode conter rascunhos (datas vazias) e NÃO deve bloquear
+    // o envio — por isso a checagem de datas saiu do schema base para cá.
+    if (val.payment_method !== "CUSTOM") return
+
+    const items = val.custom_installments || []
+
+    const missingDate = items.some((it) => !it.due_date || it.due_date.length < 10)
+    if (missingDate) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Preencha a data de todas as parcelas.",
+            path: ["custom_installments"]
+        })
+        return
+    }
+
+    const sum = items.reduce((acc, curr) => acc + (curr.amount || 0), 0)
+    if (Math.abs(sum - val.service_value) > 0.01) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "A soma das parcelas deve ser igual ao Valor Fechado do Serviço.",
+            path: ["custom_installments"]
+        })
     }
 })
 
@@ -397,7 +412,17 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Tipo de Recebimento</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
+                                        <Select
+                                            onValueChange={(value) => {
+                                                field.onChange(value)
+                                                // Ao voltar para Padrão, limpa o rascunho de parcelas
+                                                // para não arrastar dados que bloqueariam o envio.
+                                                if (value === "STANDARD") {
+                                                    form.setValue("custom_installments", [], { shouldValidate: false })
+                                                }
+                                            }}
+                                            value={field.value}
+                                        >
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Selecione..." />
@@ -505,7 +530,13 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
                                 ) : (
                                     <Button
                                         type="button"
-                                        onClick={form.handleSubmit(onSubmit)}
+                                        onClick={form.handleSubmit(onSubmit, () => {
+                                            toast({
+                                                variant: "destructive",
+                                                title: "Confira os campos",
+                                                description: "Há informações pendentes ou inválidas no formulário.",
+                                            })
+                                        })}
                                         disabled={isSubmitting}
                                     >
                                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

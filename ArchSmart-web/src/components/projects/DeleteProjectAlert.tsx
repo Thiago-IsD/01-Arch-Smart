@@ -63,7 +63,7 @@ export function DeleteProjectAlert({ projectId, projectName }: DeleteProjectAler
     return (
         <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
             <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="text-destructive border-destructive/20 hover:bg-destructive/10 hidden md:flex">
+                <Button variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300 hidden md:flex">
                     <Trash2 className="w-4 h-4 mr-2" /> Excluir
                 </Button>
             </AlertDialogTrigger>

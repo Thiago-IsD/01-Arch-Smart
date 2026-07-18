@@ -115,8 +115,26 @@ async def login(payload: UserLogin):
             email=payload.email,
             password=payload.password
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Traduz erros conhecidos do Supabase para mensagens amigáveis,
+        # sem vazar o texto interno (ex.: "Supabase Error (400): ...").
+        msg = str(e).lower()
+        if "invalid login credentials" in msg or "invalid_grant" in msg:
+            raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+        if "email not confirmed" in msg:
+            raise HTTPException(
+                status_code=403,
+                detail="Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.",
+            )
+        if "connection error" in msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Não foi possível conectar ao servidor de autenticação. Tente novamente em instantes.",
+            )
+        # Fallback genérico para erros inesperados.
+        raise HTTPException(status_code=400, detail="Não foi possível fazer login. Tente novamente.")
 
 @router.post("/signup")
 async def signup(payload: UserSignup, db: Session = Depends(get_db)):

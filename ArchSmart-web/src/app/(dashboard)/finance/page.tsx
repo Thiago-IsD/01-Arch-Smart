@@ -117,13 +117,13 @@ export default function FinancialDashboard() {
         <div className="flex-1 space-y-6 max-w-7xl mx-auto w-full pt-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Financeiro</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Financeiro</h1>
                     <p className="text-muted-foreground mt-1">Gerencie suas receitas, despesas e fluxo de caixa.</p>
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <Select value={month} onValueChange={setMonth}>
-                        <SelectTrigger className="w-[140px] bg-white">
+                        <SelectTrigger className="w-[140px] bg-card">
                             <SelectValue placeholder="Mês" />
                         </SelectTrigger>
                         <SelectContent>
@@ -132,7 +132,7 @@ export default function FinancialDashboard() {
                     </Select>
 
                     <Select value={year} onValueChange={setYear}>
-                        <SelectTrigger className="w-[100px] bg-white">
+                        <SelectTrigger className="w-[100px] bg-card">
                             <SelectValue placeholder="Ano" />
                         </SelectTrigger>
                         <SelectContent>
@@ -143,17 +143,17 @@ export default function FinancialDashboard() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-                <Card className="bg-white shadow-sm border-slate-200">
+                <Card className="bg-card shadow-sm border-border">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Saldo em Caixa Realizado</CardTitle>
-                        <Wallet className="h-4 w-4 text-slate-400" />
+                        <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">R$ {summary.balance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
                         <p className="text-xs text-muted-foreground mt-1">Saldo acumulado geral</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-white shadow-sm border-emerald-100">
+                <Card className="bg-card shadow-sm border-emerald-100 dark:border-emerald-900/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
                         <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -163,7 +163,7 @@ export default function FinancialDashboard() {
                         <p className="text-xs text-muted-foreground mt-1">Previsão e Realizado</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-white shadow-sm border-red-100">
+                <Card className="bg-card shadow-sm border-red-100 dark:border-red-900/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
                         <TrendingDown className="h-4 w-4 text-red-500" />
@@ -176,13 +176,13 @@ export default function FinancialDashboard() {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-center mt-8 mb-4 gap-4">
-                <h2 className="text-lg font-bold text-slate-800">Movimentações de {months.find(m => m.value === month)?.label} {year}</h2>
+                <h2 className="text-lg font-bold text-foreground">Movimentações de {months.find(m => m.value === month)?.label} {year}</h2>
                 <div className="flex gap-2">
                     <Button onClick={() => openDialog("INCOME")} className="bg-emerald-600 hover:bg-emerald-700 h-9 px-4">
                         <Plus className="w-4 h-4 mr-2" />
                         Nova Receita
                     </Button>
-                    <Button onClick={() => openDialog("EXPENSE")} variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 h-9 px-4">
+                    <Button onClick={() => openDialog("EXPENSE")} variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300 h-9 px-4">
                         <Plus className="w-4 h-4 mr-2" />
                         Nova Despesa
                     </Button>

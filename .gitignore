@@ -20,3 +20,6 @@ build
 # Test artifacts
 playwright-report
 test-results
+
+# Extensao - pacote dev (aponta para localhost; gerado sob demanda pelo build-clipper)
+ArchSmart-web/public/arch-smart-clipper-dev.zip

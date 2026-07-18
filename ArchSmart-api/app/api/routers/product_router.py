@@ -251,6 +251,63 @@ def delete_product(
     db.commit()
     return {"ok": True}
 
+class BatchApproveItem(BaseModel):
+    id: UUID
+    name: Optional[str] = None
+    category: Optional[str] = None
+    price: Optional[float] = None
+    dimensions: Optional[Dict[str, Any]] = None
+    yield_factor: Optional[float] = None
+    source_url: Optional[str] = None
+
+class BatchApproveRequest(BaseModel):
+    items: List[BatchApproveItem]
+
+class BatchApproveResponse(BaseModel):
+    approved: List[UUID]
+    not_found: List[UUID]
+
+@router.patch("/batch-approve", response_model=BatchApproveResponse)
+def batch_approve_products(
+    payload: BatchApproveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Aprova (normaliza) varios produtos capturados de uma vez, em um unico
+    round-trip. Aplica os campos editados de cada item e move para NORMALIZED.
+    Ignora itens que nao existem/nao pertencem a conta (retornados em not_found).
+    """
+    normalized_state = db.query(ProductState).filter(
+        ProductState.status == ProductStateStatus.NORMALIZED
+    ).first()
+    if not normalized_state:
+        normalized_state = ProductState(name="Normalized", status=ProductStateStatus.NORMALIZED)
+        db.add(normalized_state)
+        db.commit()
+        db.refresh(normalized_state)
+
+    approved: List[UUID] = []
+    not_found: List[UUID] = []
+
+    for item in payload.items:
+        db_product = db.query(Product).filter(
+            Product.id == item.id,
+            Product.account_id == current_user.account_id
+        ).first()
+        if not db_product:
+            not_found.append(item.id)
+            continue
+
+        update_data = item.model_dump(exclude_unset=True, exclude={"id"})
+        for key, value in update_data.items():
+            setattr(db_product, key, value)
+        db_product.state_id = normalized_state.id
+        approved.append(item.id)
+
+    db.commit()
+    return BatchApproveResponse(approved=approved, not_found=not_found)
+
 @router.patch("/{product_id}/approve", response_model=ProductResponse)
 def approve_product(
     product_id: UUID, 

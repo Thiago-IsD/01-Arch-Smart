@@ -34,7 +34,11 @@ import { apiUrl } from "@/lib/api-url"
 
 const environmentSchema = z.object({
     name: z.string().min(1, "O nome do ambiente é obrigatório."),
-    type: z.string().optional()
+    type: z.string().optional(),
+    // DNA técnico opcional — pode ser preenchido já na criação.
+    floor_area: z.coerce.number().min(0).optional(),
+    wall_area: z.coerce.number().min(0).optional(),
+    ceiling_area: z.coerce.number().min(0).optional(),
 })
 
 type EnvironmentFormValues = z.infer<typeof environmentSchema>
@@ -51,10 +55,13 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const form = useForm<EnvironmentFormValues>({
-        resolver: zodResolver(environmentSchema),
+        resolver: zodResolver(environmentSchema) as any,
         defaultValues: {
             name: "",
-            type: "Interna/Seca"
+            type: "Interna/Seca",
+            floor_area: 0,
+            wall_area: 0,
+            ceiling_area: 0,
         }
     })
 
@@ -65,13 +72,23 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
             const { data: { session } } = await supabase.auth.getSession()
             const token = session?.access_token || ""
 
+            const body = {
+                name: data.name,
+                type: data.type,
+                dna: {
+                    floor_area: data.floor_area || 0,
+                    wall_area: data.wall_area || 0,
+                    ceiling_area: data.ceiling_area || 0,
+                },
+            }
+
             const res = await fetch(apiUrl(`/api/projects/${projectId}/environments`), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(body)
             })
 
             if (!res.ok) throw new Error("Falha ao criar ambiente")
@@ -91,11 +108,11 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
                     <DialogTitle>Novo Ambiente</DialogTitle>
                     <DialogDescription>
-                        Crie um cômodo ou área para este projeto. O DNA técnico será iniciado vazio.
+                        Crie um cômodo ou área para este projeto. Você já pode preencher o DNA técnico agora (opcional).
                     </DialogDescription>
                 </DialogHeader>
 
@@ -137,6 +154,69 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
                                 </FormItem>
                             )}
                         />
+
+                        {/* DNA Técnico opcional */}
+                        <div className="pt-4 border-t">
+                            <div className="mb-3">
+                                <h4 className="text-sm font-medium">DNA Técnico <span className="text-muted-foreground font-normal">(opcional)</span></h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Áreas de revestimento em m². Preencha agora para já liberar os blocos de orçamento, ou deixe em branco e edite depois.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <FormField
+                                    control={form.control}
+                                    name="floor_area"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">Piso (m²)</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number" step="0.01" min="0" placeholder="0"
+                                                    {...field}
+                                                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="wall_area"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">Parede (m²)</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number" step="0.01" min="0" placeholder="0"
+                                                    {...field}
+                                                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="ceiling_area"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">Teto (m²)</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number" step="0.01" min="0" placeholder="0"
+                                                    {...field}
+                                                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        </div>
 
                         <DialogFooter className="pt-4">
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>

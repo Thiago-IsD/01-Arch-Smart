@@ -60,6 +60,7 @@ export async function proxy(request: NextRequest) {
         "/legal",
         "/beta",
         "/beta/register",
+        "/portal", // View pública da apresentação (cliente, sem login)
         "/auth/login",
         "/auth/register",
         "/auth/verify", // <--- CRITICAL: Magic Link lands here
