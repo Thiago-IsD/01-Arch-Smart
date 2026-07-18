@@ -1,0 +1,24 @@
+name: Keep database warm
+
+# Mantém o projeto Supabase (Postgres) ativo pingando /health/db, que executa
+# um SELECT 1 no banco. O tier free do Supabase pausa o projeto após ~7 dias
+# de inatividade; um toque diário no banco evita a pausa.
+#
+# Roda 2x ao dia por redundância (agendamentos do GitHub podem atrasar/pular).
+# Diferente do keep-alive da API (/health), este endpoint TOCA o banco.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 06:00 UTC
+    - cron: "0 18 * * *" # 18:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping-db:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping database health endpoint
+        run: |
+          curl -fsS --max-time 90 https://arch-smart-api.onrender.com/health/db \
+            && echo " -> banco ativo" \
+            || echo "Ping ao banco falhou (possível cold start ou banco pausado)"

@@ -23,7 +23,9 @@ class EnvironmentBase(BaseModel):
     type: Optional[str] = None
 
 class EnvironmentCreate(EnvironmentBase):
-    pass
+    # DNA opcional já no cadastro — permite preencher as áreas na primeira
+    # iteração, sem precisar entrar no ambiente depois. Se omitido, inicia zerado.
+    dna: Optional[EnvironmentDNABase] = None
 
 class EnvironmentResponse(EnvironmentBase):
     id: UUID

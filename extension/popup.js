@@ -7,7 +7,7 @@ const ENVIRONMENTS = {
     prod: { web: "https://www.archsmart.com.br",  api: "https://arch-smart-api.onrender.com" },
 };
 
-const ENV = "prod"; // <- troque para "dev" ao testar localmente
+const ENV = "dev"; // <- troque para "prod" antes de publicar
 
 const URL_WEB = ENVIRONMENTS[ENV].web;
 const URL_API = `${ENVIRONMENTS[ENV].api}/api/products/clipper/capture`;

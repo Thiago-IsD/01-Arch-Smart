@@ -98,11 +98,11 @@ export function EnvironmentCard({ environment, onClick, onDelete }: EnvironmentC
                 <CardContent className="px-4 pb-4 mt-2">
                     <div className="flex items-center space-x-2">
                         {isComplete ? (
-                            <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200">
+                            <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800/50">
                                 DNA Completo
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="text-amber-800 border-amber-300 bg-amber-100/50">
+                            <Badge variant="outline" className="text-amber-800 border-amber-300 bg-amber-100/50 dark:text-amber-300 dark:border-amber-800/60 dark:bg-amber-950/40">
                                 <Info className="w-3 h-3 mr-1" />
                                 DNA Pendente
                             </Badge>

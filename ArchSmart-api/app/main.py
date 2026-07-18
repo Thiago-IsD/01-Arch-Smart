@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 app = FastAPI(title="Arch Smart API", version="1.0.0")
 
@@ -50,3 +51,20 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.get("/health/db")
+def health_check_db():
+    """
+    Toca o banco (SELECT 1) para contar como atividade.
+    Usado por um cron diário para evitar que o projeto Supabase (free tier)
+    seja pausado após ~7 dias de inatividade.
+    """
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "db": "up"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"DB unreachable: {str(e)}")
+    finally:
+        db.close()

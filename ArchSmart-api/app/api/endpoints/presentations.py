@@ -10,6 +10,7 @@ from app.utils.supabase_client import get_storage_client
 from app.models.all_models import Presentation, PresentationEnvironment, Project, Environment, User, Account, PresentationComment
 from app.api.users import get_current_user
 from app.schemas.presentation_schema import PresentationResponse, PresentationCreate, PresentationConfigUpdate, PresentationEnvironmentDetailUpdate
+from app.core.portal_security import hash_password
 from pydantic import BaseModel
 
 class PresentationCommentCreate(BaseModel):
@@ -191,6 +192,39 @@ def update_presentation_config(
     )
     
     return updated_presentation
+
+class AccessPasswordUpdate(BaseModel):
+    # Envie uma senha para proteger; string vazia/None remove a proteção.
+    password: str | None = None
+
+@router.put("/presentations/{presentation_id}/access-password")
+def set_presentation_access_password(
+    presentation_id: uuid.UUID,
+    payload: AccessPasswordUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Define (ou remove) a senha que o cliente usa para acessar o portal público.
+    Apenas o dono (mesma conta) pode alterar.
+    """
+    presentation = (
+        db.query(Presentation)
+        .join(Project, Presentation.project_id == Project.id)
+        .filter(Presentation.id == presentation_id, Project.account_id == current_user.account_id)
+        .first()
+    )
+    if not presentation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Presentation not found")
+
+    pw = (payload.password or "").strip()
+    if pw:
+        presentation.access_password_hash = hash_password(pw)
+    else:
+        presentation.access_password_hash = None
+
+    db.commit()
+    return {"has_access_password": presentation.access_password_hash is not None}
 
 @router.post("/presentations/{presentation_id}/assets", response_model=PresentationResponse)
 async def upload_presentation_cover(

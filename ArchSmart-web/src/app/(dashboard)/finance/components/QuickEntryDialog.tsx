@@ -301,20 +301,20 @@ export function QuickEntryDialog({ isOpen, onClose, type, onSuccess, initialData
                                 control={form.control}
                                 name="editScope"
                                 render={({ field }) => (
-                                    <FormItem className="pt-2 border-t border-slate-100 mt-2">
-                                        <Label className="text-sm font-semibold text-slate-700 mb-1 block">Aplicar alterações em:</Label>
+                                    <FormItem className="pt-2 border-t border-border mt-2">
+                                        <Label className="text-sm font-semibold text-foreground mb-1 block">Aplicar alterações em:</Label>
                                         <RadioGroup value={field.value} onValueChange={field.onChange} className="flex flex-col gap-2 mt-2">
                                             <div className="flex items-center space-x-2">
                                                 <RadioGroupItem value="SINGLE" id="edit-single" />
-                                                <Label htmlFor="edit-single" className="text-slate-600 font-normal">Somente nesta parcela</Label>
+                                                <Label htmlFor="edit-single" className="text-muted-foreground font-normal">Somente nesta parcela</Label>
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 <RadioGroupItem value="NEXT" id="edit-next" />
-                                                <Label htmlFor="edit-next" className="text-slate-600 font-normal">Nesta e nas parcelas futuras pendentes</Label>
+                                                <Label htmlFor="edit-next" className="text-muted-foreground font-normal">Nesta e nas parcelas futuras pendentes</Label>
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 <RadioGroupItem value="ALL" id="edit-all" />
-                                                <Label htmlFor="edit-all" className="text-slate-600 font-normal">Em todas as parcelas pendentes da série</Label>
+                                                <Label htmlFor="edit-all" className="text-muted-foreground font-normal">Em todas as parcelas pendentes da série</Label>
                                             </div>
                                         </RadioGroup>
                                     </FormItem>

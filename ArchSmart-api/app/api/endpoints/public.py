@@ -4,11 +4,12 @@ GET /public/presentations/{uuid}
 """
 import uuid as uuid_module
 from typing import List, Optional, Any, Dict
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 
 from app.db.session import get_db
+from app.core.portal_security import verify_password, verify_portal_token, create_portal_token
 from app.models.all_models import (
     Presentation, PresentationEnvironment, Environment,
     Project, Budget, BudgetItem, ItemOption, Product,
@@ -86,8 +87,17 @@ class PublicPresentationResponse(BaseModel):
     branding: PublicBrandingInfo
     environments: List[PublicEnvironmentInfo] = []
     budget_items: List[PublicBudgetItemInfo] = []
-    
+    # Estado de acesso: quando locked=True, o conteúdo (ambientes/orçamento) NÃO
+    # é retornado — o portal mostra o portão de senha. has_password indica se o
+    # arquiteto já configurou uma senha (False = apresentação ainda indisponível).
+    locked: bool = False
+    has_password: bool = False
+
     model_config = {"from_attributes": True}
+
+
+class VerifyPasswordRequest(BaseModel):
+    password: str
 
 
 # ==================== Endpoint ====================
@@ -95,7 +105,8 @@ class PublicPresentationResponse(BaseModel):
 @router.get("/presentations/{presentation_uuid}", response_model=PublicPresentationResponse)
 async def get_public_presentation(
     presentation_uuid: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
 ):
     """
     Endpoint público (sem JWT) para o Portal do Cliente.
@@ -156,13 +167,35 @@ async def get_public_presentation(
             if signed_url:
                 logo_url = signed_url
         except Exception as e:
-            print(f"⚠️ Erro ao assinar logo no portal público: {e}")
+            # repr() escapa não-ASCII (\uXXXX) para não estourar em consoles cp1252 (Windows).
+            print("[WARN] Erro ao assinar logo no portal:", repr(str(e))[:300])
 
     branding = PublicBrandingInfo(
         office_name=office_name or "Arch Smart",
         logo_url=logo_url,
         cover_url=branding_snapshot.get("cover_url"),
     )
+
+    # 4.5. Controle de acesso: toda apresentação exige senha.
+    # - Sem senha configurada  -> locked (has_password=False): "indisponível".
+    # - Com senha + token válido -> libera o conteúdo abaixo.
+    # - Com senha + sem token    -> locked (has_password=True): mostra o portão.
+    has_password = presentation.access_password_hash is not None
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    granted = has_password and bool(token) and verify_portal_token(token, presentation.id)
+
+    if not granted:
+        return PublicPresentationResponse(
+            id=str(presentation.id),
+            name=presentation.name,
+            branding=branding,
+            environments=[],
+            budget_items=[],
+            locked=True,
+            has_password=has_password,
+        )
 
     # 5. Serializar ambientes visíveis
     env_list = []
@@ -241,7 +274,37 @@ async def get_public_presentation(
         branding=branding,
         environments=env_list,
         budget_items=budget_items_result,
+        locked=False,
+        has_password=True,
     )
+
+
+@router.post("/presentations/{presentation_uuid}/verify-password")
+def verify_presentation_password(
+    presentation_uuid: str,
+    payload: VerifyPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    O cliente envia a senha do portal. Se conferir, devolve um token JWT
+    (7 dias) que o portal guarda para acessar o conteúdo sem redigitar.
+    """
+    try:
+        uuid_obj = uuid_module.UUID(presentation_uuid)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID de apresentação inválido")
+
+    presentation = db.query(Presentation).filter(Presentation.id == uuid_obj).first()
+    if not presentation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Apresentação não encontrada")
+
+    if not presentation.access_password_hash:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Esta apresentação ainda não está disponível.")
+
+    if not verify_password(payload.password, presentation.access_password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta.")
+
+    return {"access_token": create_portal_token(str(presentation.id))}
 
 
 @router.post("/presentations/{presentation_uuid}/options/{option_id}/select")

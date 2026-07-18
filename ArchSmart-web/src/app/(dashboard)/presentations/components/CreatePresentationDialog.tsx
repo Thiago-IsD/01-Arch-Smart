@@ -117,14 +117,14 @@ export function CreatePresentationDialog({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-card rounded-xl shadow-lg w-full max-w-md overflow-hidden">
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                    <h2 className="text-xl font-semibold text-foreground">
                         Nova Apresentação
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -133,7 +133,7 @@ export function CreatePresentationDialog({
                 <form onSubmit={handleSubmit} className="p-6">
                     {!defaultProjectId && (
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Projeto *
                             </label>
                             <select
@@ -141,7 +141,7 @@ export function CreatePresentationDialog({
                                 value={projectId}
                                 onChange={(e) => setProjectId(e.target.value)}
                                 disabled={loadingProjects}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm bg-white"
+                                className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm bg-background text-foreground"
                             >
                                 <option value="" disabled>
                                     {loadingProjects ? "Carregando..." : "Selecione um projeto"}
@@ -156,7 +156,7 @@ export function CreatePresentationDialog({
                     )}
 
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                             Nome da Apresentação *
                         </label>
                         <input
@@ -165,12 +165,12 @@ export function CreatePresentationDialog({
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Ex: Apresentação Final - Apartamento 302"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm"
+                            className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm bg-background text-foreground placeholder:text-muted-foreground"
                         />
                     </div>
 
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                             Descrição (Opcional)
                         </label>
                         <textarea
@@ -178,7 +178,7 @@ export function CreatePresentationDialog({
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Uma breve descrição sobre a apresentação"
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm resize-none"
+                            className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm resize-none bg-background text-foreground placeholder:text-muted-foreground"
                         />
                     </div>
 
@@ -186,7 +186,7 @@ export function CreatePresentationDialog({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-input rounded-md hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                             Cancelar
                         </button>

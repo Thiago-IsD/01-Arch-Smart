@@ -31,13 +31,17 @@ def create_environment(
     db.add(new_env)
     db.flush() # flush to get the new_env.id before committing
 
-    # Automatically create the empty DNA record
+    # DNA: usa os valores enviados no cadastro (opcionais) ou inicia zerado.
+    floor = data.dna.floor_area if data.dna else 0.0
+    wall = data.dna.wall_area if data.dna else 0.0
+    ceiling = data.dna.ceiling_area if data.dna else 0.0
+
     new_dna = EnvironmentDNA(
         environment_id=new_env.id,
-        floor_area=0.0,
-        wall_area=0.0,
-        ceiling_area=0.0,
-        is_complete=False
+        floor_area=floor,
+        wall_area=wall,
+        ceiling_area=ceiling,
+        is_complete=(floor > 0 and wall > 0 and ceiling > 0)
     )
     db.add(new_dna)
     db.commit()
