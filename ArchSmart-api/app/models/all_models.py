@@ -327,6 +327,8 @@ class Presentation(Base):
     description = Column(Text, nullable=True)
     status = Column(Enum(PresentationStatus), default=PresentationStatus.DRAFT, nullable=False)
     branding_snapshot = Column(JSON, nullable=True)
+    # Hash (bcrypt) da senha que o cliente usa para acessar o portal público.
+    access_password_hash = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

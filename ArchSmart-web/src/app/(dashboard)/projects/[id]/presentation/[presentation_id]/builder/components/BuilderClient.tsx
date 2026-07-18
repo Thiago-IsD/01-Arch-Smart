@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Check, Link as LinkIcon, Upload, Loader2, Image as ImageIcon, Trash2, Building2, MessageSquare } from "lucide-react";
+import { ChevronLeft, Check, Link as LinkIcon, Upload, Loader2, Image as ImageIcon, Trash2, Building2, MessageSquare, Lock, AlertTriangle } from "lucide-react";
 import { apiUrl } from "@/lib/api-url";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,7 @@ interface Presentation {
     status: string;
     branding_snapshot: any;
     environments: PresentationEnvDetail[];
+    has_access_password?: boolean;
     project?: {
         id: string;
         name: string;
@@ -69,6 +70,34 @@ export function BuilderClient({
 
     const [name, setName] = useState(initialData.name || "");
     const [description, setDescription] = useState(initialData.description || "");
+
+    // ---- Acesso do cliente (senha do portal) ----
+    const [accessPassword, setAccessPassword] = useState("");
+    const [isSavingPassword, setIsSavingPassword] = useState(false);
+    const [hasPassword, setHasPassword] = useState(!!initialData.has_access_password);
+
+    const saveAccessPassword = async () => {
+        const pw = accessPassword.trim();
+        if (!pw) return;
+        setIsSavingPassword(true);
+        try {
+            const token = await getToken();
+            const res = await fetch(apiUrl(`/api/presentations/${presentationId}/access-password`), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ password: pw }),
+            });
+            if (!res.ok) throw new Error();
+            const result = await res.json();
+            setHasPassword(!!result.has_access_password);
+            setAccessPassword("");
+            toast({ title: "Senha salva", description: "Seu cliente vai precisar dela para abrir a apresentação." });
+        } catch {
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível salvar a senha." });
+        } finally {
+            setIsSavingPassword(false);
+        }
+    };
 
     // ---- Environments state (for accordion) ----
     const [environments, setEnvironments] = useState<PresentationEnvDetail[]>(
@@ -355,6 +384,42 @@ export function BuilderClient({
                                 environments={environments}
                                 onEnvironmentUpdate={handleEnvironmentUpdate}
                             />
+                        </section>
+
+                        {/* Acesso do Cliente */}
+                        <section>
+                            <h2 className="text-xs font-bold tracking-wider text-muted-foreground uppercase mb-4">Acesso do Cliente</h2>
+
+                            {hasPassword ? (
+                                <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 mb-3">
+                                    <Lock className="w-4 h-4 shrink-0" />
+                                    <span>Protegida por senha</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 mb-3">
+                                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>Sem senha — o cliente ainda não consegue abrir. Defina uma senha abaixo.</span>
+                                </div>
+                            )}
+
+                            <label className="block text-sm font-medium text-foreground mb-1">
+                                {hasPassword ? "Trocar senha" : "Definir senha"}
+                            </label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="password"
+                                    value={accessPassword}
+                                    onChange={e => setAccessPassword(e.target.value)}
+                                    placeholder="Senha para o cliente"
+                                    className="flex-1 min-w-0 px-3 py-2 border border-input bg-background text-foreground rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-sm placeholder:text-muted-foreground"
+                                />
+                                <Button onClick={saveAccessPassword} disabled={isSavingPassword || !accessPassword.trim()} size="sm">
+                                    {isSavingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Compartilhe o link e a senha com o cliente. Ele digita apenas uma vez por dispositivo.
+                            </p>
                         </section>
 
                     </div>

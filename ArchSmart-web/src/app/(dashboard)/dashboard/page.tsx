@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
-import { 
+import {
     Plus,
     FolderIcon,
     Wallet,
@@ -515,12 +514,11 @@ export default function DashboardPage() {
                                     <div className="flex flex-col rounded-xl border bg-card overflow-hidden hover:border-indigo-300 transition-all duration-300 h-full">
                                         <div className="relative aspect-[4/3] w-full bg-muted border-b overflow-hidden">
                                             {prod.image_url ? (
-                                                <Image 
-                                                    src={prod.image_url} 
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img
+                                                    src={prod.image_url}
                                                     alt={prod.name}
-                                                    fill
-                                                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                                    sizes="(max-width: 768px) 50vw, 25vw"
+                                                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                                 />
                                             ) : (
                                                 <div className="flex w-full h-full items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 text-xs">

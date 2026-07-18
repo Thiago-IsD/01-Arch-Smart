@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, computed_field
 from typing import Optional, List, Any
 from uuid import UUID
 from datetime import datetime
@@ -75,8 +75,17 @@ class PresentationResponse(PresentationBase):
     project_id: UUID
     created_at: datetime
     environments: List[PresentationEnvironmentResponse] = []
-    
+
     # Includings project data for global list
     project: Optional[ProjectResponse] = None
+
+    # Hash lido do ORM mas nunca serializado (exclude=True) — só alimenta o
+    # computed_field abaixo, para o builder saber se já existe senha configurada.
+    access_password_hash: Optional[str] = Field(default=None, exclude=True)
+
+    @computed_field
+    @property
+    def has_access_password(self) -> bool:
+        return bool(self.access_password_hash)
 
     model_config = ConfigDict(from_attributes=True)
