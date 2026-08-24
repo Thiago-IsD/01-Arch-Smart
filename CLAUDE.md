@@ -29,7 +29,7 @@ Estado em 24/08/2026: Seção 1 concluída (correções de segurança, merge `f1
 
 - **Nenhum `account_id` (ou id de usuário/tenant) literal no código.** Toda leitura e escrita é filtrada pela identidade da sessão resolvida **no servidor** (Art. 1).
 - **Nenhuma URL, chave ou host fixo no código.** Frontend usa `process.env.NEXT_PUBLIC_API_URL`; backend usa `app/core/config.py`; segredo vive em `.env`, nunca versionado (Art. 4).
-- **Nenhuma cor literal em classe utilitária** (`bg-emerald-600`, `bg-[#008080]`). Tudo referencia um token semântico do tema (Art. 7).
+- **Nenhuma cor literal em classe utilitária** (`bg-emerald-600`, `bg-[#F88379]`). Tudo referencia um token semântico do tema (Art. 7).
 - **A marca é "Arq Smart"** — duas palavras, com Q. Zero ocorrência de `ArchSmart`, `Ark Smart` ou `Ecowe` em código, copy ou comentário. `ArchSmart-api`/`ArchSmart-web` são só nome de diretório, não grafia da marca (Art. 8).
 - **Nenhuma regra de negócio ou limite de plano decidido no front.** O front renderiza o que a API devolve (`entitlements` da conta); nunca hardcoda um limite (Art. 3).
 
@@ -37,12 +37,24 @@ Lista completa das 15 regras, com o texto integral de cada artigo: [spec-kit-2/m
 
 ## Rodando os testes
 
-- Backend: `cd ArchSmart-api && docker compose -f docker-compose.test.yml up -d --wait && pytest` — suíte roda contra Postgres real, não mock.
-- Frontend: `cd ArchSmart-web && npx vitest run` — hoje falha em 2 arquivos por um defeito de configuração conhecido, ver `ArchSmart-web/CLAUDE.md`.
+Backend (suíte roda contra Postgres real, não mock):
+
+```
+cd ArchSmart-api
+docker compose -f docker-compose.test.yml up -d --wait
+pytest
+```
+
+Frontend — hoje falha em 2 arquivos por um defeito de configuração conhecido, ver `ArchSmart-web/CLAUDE.md`:
+
+```
+cd ArchSmart-web
+npx vitest run
+```
 
 ## Onde ler mais
 
 - [README.md](README.md) — visão geral do produto e como subir o ambiente.
-- [docs/dev/](docs/dev/) — arquitetura, convenções, modelo de dados, deploy.
+- [docs/dev/](docs/dev/) — arquitetura, convenções, modelo de dados, deploy (Tasks 5–8 desta seção; hoje só o índice existe).
 - [docs/dev/decisoes/](docs/dev/decisoes/) — ADRs: por que as coisas são como são.
 - Cada subdiretório da tabela acima tem seu próprio `CLAUDE.md` com regras específicas dele — leia o dele antes de mexer lá.

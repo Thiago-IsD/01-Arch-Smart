@@ -8,19 +8,27 @@ Este arquivo descreve o alvo da **Seção 5** para o frontend. Leia primeiro `..
 - `src/components/ui/` — primitivos shadcn. Não editar aqui para meter regra de negócio.
 - `src/components/` — componentes de domínio, por área (`budget/`, `library/`, `projects/`, `landing/`...).
 - `src/lib/` — utilitários e clientes soltos (`env.ts`, `api-url.ts`, `utils.ts`).
-- `src/hooks/` — hooks compartilhados.
+- `src/hooks/`, `src/types/`, `src/contexts/`, `src/config/` — hooks, tipos, contexto React e config estática (navegação, marca), cada um compartilhado entre rotas.
+
+## Onde colocar um arquivo novo
+
+Componente usado só por uma rota fica junto dela, em `<rota>/components/` (ex.: `library/components/LibraryContent.tsx`). Usado por mais de uma rota vai em `src/components/<área>/`. `src/utils/` hoje só tem o cliente Supabase (`@/utils/supabase/client`, `createClient()`) — utilitário novo vai em `src/lib/`, não em `src/utils/`.
 
 ## Onde vão morar
 
-`src/features/<dominio>/` reunindo `api.ts`, `hooks.ts` e `components/` do domínio, mais `lib/api/` (cliente HTTP único que injeta o header de auth) e `lib/query/` (TanStack Query configurado) — **Seção 5**. Nada disso existe ainda. **Não crie essas pastas agora**: uma versão feita fora da Seção 5 diverge da que ela vai entregar e é jogada fora.
+`src/features/<dominio>/` reunindo `api.ts`, `hooks.ts` e `components/` do domínio, mais `lib/api/` (cliente HTTP único que injeta o header de auth) — **Seção 5**. Essas pastas ainda não existem, **não as crie agora**. Diferente: `lib/query/` (TanStack Query) **já está instalado, configurado e montado hoje** — falta só a pasta e a convenção de `queryKeys`; ver "Busca de dados" abaixo.
 
-## Até a Seção 5 existir
+## Busca de dados
 
-Se a tela precisa chamar a API, siga exatamente o padrão do arquivo vizinho mais parecido (`const { data: { session } } = await supabase.auth.getSession()` e header `Authorization: Bearer ${session.access_token}`). **Não crie uma abstração nova** — um `apiClient`, um hook de fetch genérico, um wrapper de sessão. Repetir o padrão manual hoje é o comportamento correto; inventar um substituto parcial é o que sai caro depois, quando `lib/api/` chegar e tiver que conviver com dois padrões.
+Tela nova no dashboard busca dado com `useQuery`. O `QueryProvider` já está montado em `src/app/(dashboard)/layout.tsx` (`staleTime` 30 s, `gcTime` 5 min) — **não** use `useEffect` + `fetch`. URL base sempre de `getApiUrl()` em `src/lib/api-url.ts`; nunca escreva `http://localhost:8000` ou qualquer host na tela (Art. 4).
+
+## Autenticação da chamada — até a Seção 5 existir
+
+Siga exatamente o padrão do arquivo vizinho mais parecido: `getSession()` e header `Authorization: Bearer ${session.access_token}`. **Não crie uma abstração nova** (`apiClient`, hook de fetch genérico, wrapper de sessão): a Seção 5 migra os 70 call sites de uma vez com `lib/api/client.ts`, então repetir o padrão manual custa zero a mais — uma abstração concorrente feita agora só duplicaria trabalho e seria jogada fora nesse dia.
 
 ## O que está medido — não piore
 
-Do clique até os dados na tela, com sessão real: Projetos 3,0 s · Biblioteca 3,6 s · Financeiro 4,3 s. Nada é cacheado entre navegações. No código hoje, em 144 arquivos `.ts`/`.tsx`: 62 `createClient()`, 56 `getSession()`, 70 headers `Authorization` montados à mão, zero `next/dynamic`/`React.lazy`. Uma tela nova que soma outra chamada de rede redundante ou outro `createClient()` fora do padrão piora esse número — meça antes de assumir que não piorou.
+Do clique até os dados na tela, com sessão real: Projetos 3,0 s · Biblioteca 3,6 s · Financeiro 4,3 s. Cache é quase inexistente: só 3 dos 144 arquivos usam TanStack Query (`LibraryContent.tsx`, `PresentationsTab.tsx`, `BatchNormalizeModal.tsx`) — o resto refaz a chamada a cada navegação. No código hoje: 62 `createClient()`, 56 `getSession()`, 70 headers `Authorization` montados à mão, zero `next/dynamic`/`React.lazy`. Uma tela nova que soma outra chamada de rede redundante ou outro `createClient()` fora do padrão piora esse número — meça antes de assumir que não piorou.
 
 ## Acessibilidade (Art. 6)
 
@@ -28,7 +36,7 @@ Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível 
 
 ## Cor (Art. 7)
 
-Token semântico sempre (`text-primary`, `bg-destructive`, `border-warning`). Nenhuma cor literal em classe utilitária. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#008080]`) fora do padrão — são desvio a corrigir, não exemplo a seguir. Não acrescente o 511º.
+Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover` (cada um com seu `-foreground`), mais `--border`, `--input` e `--ring` (sem par `-foreground`). **Não existem `--success`, `--warning` nem `--info`** — a Seção 6 os cria. Se a tela precisa de um estado que nenhum token cobre (aviso, sucesso), reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um `-amber-500` literal — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
 
 ## Convenções
 
@@ -40,4 +48,4 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 
 ## Onde ler mais
 
-`docs/dev/arquitetura.md` e `docs/dev/convencoes.md` (Task 6 desta seção).
+`docs/dev/arquitetura.md` e `docs/dev/convencoes.md` (Task 6 desta seção; hoje só o índice existe).

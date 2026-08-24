@@ -28,6 +28,14 @@ Hoje cada endpoint filtra por conta manualmente — não existe ainda uma camada
 - Toda query nova filtra por `account_id` explicitamente.
 - Todo endpoint novo ganha um teste em `tests/isolation/` que autentica como conta A e prova que o dado da conta B não retorna (Art. 1).
 
+## De onde vem a identidade
+
+`Depends(get_current_user)` (definido em `app/api/users.py`) resolve `user_id`/`account_id` a partir do token da sessão — é o único jeito certo de obter a identidade num endpoint novo. **Nunca** receba `account_id` como parâmetro de rota, query ou body: o cliente pode mandar qualquer valor ali, e usá-lo é a violação exata do Art. 1.
+
+## Registrar a rota e migrar o schema
+
+Router novo não entra sozinho: precisa de um `app.include_router(...)` em `app/main.py` (hoje 14 chamadas, uma por router — sem a linha, o endpoint existe no código e nunca é alcançado). Mudança de schema precisa de uma migração em `alembic/versions/`; sem ela, o banco diverge do modelo e quebra para a próxima pessoa que rodar a suíte.
+
 ## Testes
 
 ```
