@@ -35,6 +35,9 @@
 | `ArchSmart-api/app/api/routers/product_router.py` | remoção do seed e autenticação do normalize |
 | `ArchSmart-api/app/core/rate_limit.py` | limitador compartilhado (slowapi) |
 | `ArchSmart-api/pytest.ini` | passa a enxergar `tests/` |
+| `ArchSmart-api/app/__init__.py` | torna `app` pacote regular; sem ele os dois conftest colidem |
+| `ArchSmart-api/tests/isolation/conftest.py` | reset do rate limiter entre testes (criado na Task 5) |
+| `ArchSmart-api/tests/isolation/test_financial_isolation.py` | 14o endpoint, achado na revisão final |
 
 ---
 
@@ -47,7 +50,8 @@
 - Create: `ArchSmart-api/tests/isolation/__init__.py` (vazio)
 - Create: `ArchSmart-api/tests/test_harness.py`
 - Modify: `ArchSmart-api/pytest.ini`
-- Modify: `ArchSmart-api/requirements-dev.txt`
+- Modify: `ArchSmart-api/requirements.txt`
+- Create: `ArchSmart-api/app/__init__.py` (vazio — ver Passo 4b)
 
 **Interfaces:**
 - Consumes: nada (primeira tarefa)
@@ -119,7 +123,7 @@ pythonpath = .
 testpaths = tests app/tests
 ```
 
-`app/tests` permanece na lista até a Seção 4 descartá-la.
+⚠️ Este `testpaths` vale **apenas até o Passo 5b da Task 2**, que remove `app/tests` da execução padrão. O motivo está lá.
 
 - [ ] **Passo 4b: Criar `ArchSmart-api/app/__init__.py` vazio**
 
@@ -129,6 +133,7 @@ Sem ele, `app/` não é um pacote regular (só `app/tests/` tem `__init__.py`), 
 
 Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -m pytest --collect-only -q | tail -3`
 Expected: `85 tests collected` (83 da suíte antiga + 2 do harness), sem erro de import.
+Após o Passo 5b da Task 2 este número passa a ser só o da suíte nova — não use este valor como referência depois daquele ponto.
 
 Confirme também que a aplicação continua importando:
 
@@ -324,7 +329,7 @@ Se `test_rollback_entre_testes` falhar com `count() == 1`, o rollback não está
 - [ ] **Passo 8: Commit**
 
 ```bash
-git add ArchSmart-api/docker-compose.test.yml ArchSmart-api/tests/ ArchSmart-api/pytest.ini ArchSmart-api/requirements-dev.txt
+git add ArchSmart-api/docker-compose.test.yml ArchSmart-api/tests/ ArchSmart-api/pytest.ini ArchSmart-api/requirements.txt ArchSmart-api/app/__init__.py
 git commit -m "test: harness de teste contra Postgres real em Docker
 
 O harness atual usa MagicMock como sessao de banco, que devolve o mesmo
@@ -1166,6 +1171,6 @@ Antes de declarar a seção concluída, rodar e conferir cada item:
 - [ ] `cd ArchSmart-api && pytest tests/ -v` → tudo verde
 - [ ] `grep -rn "TODO: Verify project constraints\|TODO: Auth check" ArchSmart-api/app` → sem resultado
 - [ ] `grep -rn "seed-captured" ArchSmart-api/app` → sem resultado
-- [ ] Os 13 endpoints do achado estão cobertos: 6 em `test_budgets_isolation.py`, 5 em `test_portal_access.py`, 2 em `test_public_endpoints.py`
+- [ ] Os endpoints estão cobertos — **conte os testes, não os endpoints.** A revisão final pegou uma afirmação falsa aqui: o `accept` estava corrigido mas sem teste, e este checklist dizia que estava coberto. Cobertura correta após a onda de correção: 6 em `test_budgets_isolation.py` (mais 2 discriminantes), 5 em `test_portal_access.py` (incluindo `accept`), 2 em `test_public_endpoints.py`, e `test_financial_isolation.py` para o 14o endpoint.
 
 **O que esta seção deliberadamente NÃO faz:** não cria `RequestContext`, não cria `ScopedRepository`, não move arquivo de lugar, não mexe no frontend, não registra custo de IA. Tudo isso tem seção própria. Misturar aqui é o que impede saber se a correção de segurança funcionou.
