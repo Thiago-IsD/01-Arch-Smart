@@ -417,7 +417,7 @@ fosse o presente e improvise ao nao encontrar."
 ### Task 4: `PROGRESS.md` e o script que o calcula
 
 **Files:**
-- Create: `PROGRESS.md`, `tools/progresso.py`, `tools/test_progresso.py`
+- Create: `PROGRESS.md`, `tools/progresso.py`, `tools/test_progresso.py` (sem dependência externa: `unittest` da stdlib)
 
 **Interfaces:**
 - Consumes: nada
@@ -430,12 +430,23 @@ fosse o presente e improvise ao nao encontrar."
 `tools/test_progresso.py` — testa a função pura de contagem, sem tocar disco:
 
 ```python
-"""Testes do calculador de progresso. Rode com: python -m pytest tools/test_progresso.py"""
+"""
+Testes do calculador de progresso.
+
+Rode com: cd tools; python -m unittest test_progresso -v
+
+Usa `unittest` da biblioteca padrao de proposito: o script nao tem dependencia
+externa, e o teste dele nao deve introduzir uma. Assim roda em qualquer Python,
+sem venv nem instalacao — inclusive no CI da Secao 3.
+"""
+import unittest
+
 from progresso import contar, renderizar_barra
 
 
-def test_conta_caixas_marcadas_e_totais():
-    texto = """
+class TestContagem(unittest.TestCase):
+    def test_conta_caixas_marcadas_e_totais(self):
+        texto = """
 ## Seção 1 · Segurança
 - [x] T1.1 feito
 - [x] T1.2 feito
@@ -443,30 +454,38 @@ def test_conta_caixas_marcadas_e_totais():
 - [ ] T2.1 pendente
 - [x] T2.2 feito
 """
-    assert contar(texto) == {
-        "Seção 1 · Segurança": (2, 2),
-        "Seção 2 · Estrutura": (1, 2),
-    }
+        self.assertEqual(
+            contar(texto),
+            {"Seção 1 · Segurança": (2, 2), "Seção 2 · Estrutura": (1, 2)},
+        )
+
+    def test_ignora_caixas_fora_de_secao(self):
+        texto = "- [x] solta
+## Seção 1 · A
+- [x] dentro
+"
+        self.assertEqual(contar(texto), {"Seção 1 · A": (1, 1)})
 
 
-def test_ignora_caixas_fora_de_secao():
-    texto = "- [x] solta\n## Seção 1 · A\n- [x] dentro\n"
-    assert contar(texto) == {"Seção 1 · A": (1, 1)}
+class TestBarra(unittest.TestCase):
+    def test_barra_reflete_a_proporcao(self):
+        self.assertEqual(renderizar_barra(0, 4).count("█"), 0)
+        self.assertEqual(renderizar_barra(4, 4).count("█"), 20)
+        self.assertEqual(renderizar_barra(2, 4).count("█"), 10)
+
+    def test_secao_vazia_nao_divide_por_zero(self):
+        self.assertEqual(renderizar_barra(0, 0).count("█"), 0)
 
 
-def test_barra_reflete_a_proporcao():
-    assert renderizar_barra(0, 4).count("█") == 0
-    assert renderizar_barra(4, 4).count("█") == 20
-    assert renderizar_barra(2, 4).count("█") == 10
-
-
-def test_secao_vazia_nao_divide_por_zero():
-    assert renderizar_barra(0, 0).count("█") == 0
+if __name__ == "__main__":
+    unittest.main()
 ```
+
+⚠️ **O teste usa `unittest`, não `pytest`, e isso é deliberado.** O `pytest` não está instalado no Python do sistema, e instalá-lo só para este teste criaria uma dependência que o próprio script não tem. `unittest` é biblioteca padrão: roda em qualquer Python, sem venv nem instalação, inclusive no CI da Seção 3. **Não instale nada.**
 
 - [ ] **Passo 2: Rodar e confirmar que falha**
 
-Run: `cd tools && python -m pytest test_progresso.py -q`
+Run: `cd tools; python -m unittest test_progresso -v`
 Expected: FALHA com `ModuleNotFoundError: No module named 'progresso'`.
 
 - [ ] **Passo 3: Escrever `tools/progresso.py`**
@@ -480,8 +499,8 @@ Requisitos:
 
 - [ ] **Passo 4: Rodar e confirmar que passa**
 
-Run: `cd tools && python -m pytest test_progresso.py -q`
-Expected: `4 passed`.
+Run: `cd tools; python -m unittest test_progresso -v`
+Expected: `Ran 4 tests` e `OK`.
 
 - [ ] **Passo 5: Escrever `PROGRESS.md`**
 
