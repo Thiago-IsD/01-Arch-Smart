@@ -84,11 +84,13 @@ O que ainda **não** existe e não deve ser descrito como existente:
 Run:
 ```bash
 cd ArchSmart-api && for f in add_column check_users debug_lead debug_supabase_link fix_schemas fix_storage revert_storage test_filters test_jwt test_login test_pagination trace_redirect trace_simple; do
-  n=$(grep -rn "$f" app tests Dockerfile package.json 2>/dev/null | wc -l)
+  n=$(grep -rnE "(import|from) +$f|['\"]$f\.py['\"]|[^a-zA-Z_]$f\.py" app tests Dockerfile package.json 2>/dev/null | wc -l)
   echo "$f: $n referencia(s)"
 done
 ```
 Expected: todos com `0 referencia(s)`.
+
+⚠️ O padrão acima casa **import do módulo** ou **menção ao arquivo `.py`** — não substring solta. Um `grep "$f"` cru dá falso positivo: `test_login` casa com as funções `test_login_success` e `test_login_failure` de `app/tests/test_auth.py`, que não têm relação com o script da raiz.
 
 ⚠️ Se algum tiver referência, **pare e reporte** — não apague.
 
