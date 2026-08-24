@@ -28,7 +28,7 @@ Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível 
 
 ## Cor (Art. 7)
 
-Token semântico sempre (`text-primary`, `bg-destructive`, `border-warning`). Nenhuma cor literal em classe utilitária. Hoje há 137 classes de cor nomeada (`bg-emerald-600` e afins) e 11 hex arbitrário (`bg-[#008080]`) fora do padrão — são desvio a corrigir, não exemplo a seguir. Não acrescente o 138º.
+Token semântico sempre (`text-primary`, `bg-destructive`, `border-warning`). Nenhuma cor literal em classe utilitária. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#008080]`) fora do padrão — são desvio a corrigir, não exemplo a seguir. Não acrescente o 511º.
 
 ## Convenções
 
