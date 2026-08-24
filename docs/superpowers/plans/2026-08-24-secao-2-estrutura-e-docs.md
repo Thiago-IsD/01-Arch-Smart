@@ -623,7 +623,7 @@ Este documento tem exigência própria: **o porquê de cada relação, não só 
 
 - [ ] **Passo 1: Ler o modelo inteiro**
 
-`app/models/all_models.py`, 467 linhas, 25 tabelas. Leia tudo antes de escrever qualquer coisa.
+`app/models/all_models.py`, 467 linhas, **26 tabelas**. Leia tudo antes de escrever qualquer coisa.
 
 - [ ] **Passo 2: Escrever o documento**
 
