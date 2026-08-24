@@ -66,3 +66,40 @@ def test_conta_a_altera_o_proprio_item(client_a, item_da_conta_a):
     )
     assert resposta.status_code == 200
     assert resposta.json()["manual_quantity"] == 7
+
+
+@pytest.fixture
+def opcao_da_conta_a(db, conta_a, item_da_conta_a):
+    conta, _ = conta_a
+    produto = Product(account_id=conta.id, name="Piso Vinilico", price=120.0)
+    db.add(produto)
+    db.flush()
+
+    opcao = ItemOption(
+        budget_item_id=item_da_conta_a.id,
+        product_id=produto.id,
+        is_selected=True,
+    )
+    db.add(opcao)
+    db.flush()
+    return opcao
+
+
+def test_conta_b_nao_seleciona_opcao_da_conta_a(client_b, opcao_da_conta_a):
+    resposta = client_b.patch(f"/api/budgets/options/{opcao_da_conta_a.id}/select")
+    assert resposta.status_code == 404
+
+
+def test_conta_b_nao_apaga_opcao_da_conta_a(client_b, opcao_da_conta_a):
+    resposta = client_b.delete(f"/api/budgets/options/{opcao_da_conta_a.id}")
+    assert resposta.status_code == 404
+
+
+def test_conta_b_nao_le_resumo_de_orcamento_da_conta_a(client_b, db, item_da_conta_a):
+    resposta = client_b.get(f"/api/budgets/{item_da_conta_a.budget_id}/summary")
+    assert resposta.status_code == 404
+
+
+def test_conta_a_le_o_proprio_resumo(client_a, item_da_conta_a):
+    resposta = client_a.get(f"/api/budgets/{item_da_conta_a.budget_id}/summary")
+    assert resposta.status_code == 200

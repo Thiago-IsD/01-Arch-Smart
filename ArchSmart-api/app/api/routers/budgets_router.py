@@ -34,6 +34,33 @@ def buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> Budget
         raise HTTPException(status_code=404, detail="Item de orçamento não encontrado")
     return item
 
+def buscar_opcao_da_conta(db: Session, option_id: UUID, account_id: UUID) -> ItemOption:
+    """Devolve a ItemOption apenas se ela pertencer a conta informada."""
+    opcao = (
+        db.query(ItemOption)
+        .join(BudgetItem, ItemOption.budget_item_id == BudgetItem.id)
+        .join(Budget, BudgetItem.budget_id == Budget.id)
+        .join(Project, Budget.project_id == Project.id)
+        .filter(ItemOption.id == option_id, Project.account_id == account_id)
+        .first()
+    )
+    if not opcao:
+        raise HTTPException(status_code=404, detail="Opção não encontrada")
+    return opcao
+
+
+def buscar_orcamento_da_conta(db: Session, budget_id: UUID, account_id: UUID) -> Budget:
+    """Devolve o Budget apenas se ele pertencer a conta informada."""
+    orcamento = (
+        db.query(Budget)
+        .join(Project, Budget.project_id == Project.id)
+        .filter(Budget.id == budget_id, Project.account_id == account_id)
+        .first()
+    )
+    if not orcamento:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    return orcamento
+
 @router.get("/projects/{project_id}/budget", response_model=BudgetResponse)
 def get_project_budget(
     project_id: UUID, 
@@ -229,9 +256,7 @@ def select_budget_item_option(
     """
     Selects this option and deselects all other options for the same Budget Item.
     """
-    option = db.query(ItemOption).filter(ItemOption.id == option_id).first()
-    if not option:
-        raise HTTPException(status_code=404, detail="Option not found")
+    option = buscar_opcao_da_conta(db, option_id, current_user.account_id)
 
     # Unselect others
     db.query(ItemOption).filter(
@@ -255,9 +280,7 @@ def delete_budget_item_option(
     Deletes an ItemOption (Variant A/B). If it's the only one, deletes the parent BudgetItem.
     If the deleted option was the selected one, automatically selects the next available one.
     """
-    option = db.query(ItemOption).filter(ItemOption.id == option_id).first()
-    if not option:
-        raise HTTPException(status_code=404, detail="Option not found")
+    option = buscar_opcao_da_conta(db, option_id, current_user.account_id)
 
     budget_item_id = option.budget_item_id
     was_selected = option.is_selected
@@ -291,11 +314,7 @@ def get_budget_summary(
     Returns the consolidated financial total for the budget and per-environment totals,
     based strictly on 'is_selected=True' ItemOptions.
     """
-    budget = db.query(Budget).filter(Budget.id == budget_id).first()
-    if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
-        
-    # TODO: Auth check against budget.project.account_id 
+    budget = buscar_orcamento_da_conta(db, budget_id, current_user.account_id)
 
     items = db.query(BudgetItem).filter(BudgetItem.budget_id == budget_id).all()
     
