@@ -44,6 +44,8 @@ Estas violam o Art. 1 da constitution ("violação deste artigo é P0 e bloqueia
 
 ### P0-1 · Seis endpoints de orçamento sem filtro de conta (IDOR)
 
+> ✅ **Corrigido pela Seção 1 do plano de reestruturação.** Regressão coberta em `ArchSmart-api/tests/isolation/`.
+
 `app/api/routers/budgets_router.py`
 
 | Linha | Endpoint | O que falta |
@@ -58,6 +60,8 @@ Estas violam o Art. 1 da constitution ("violação deste artigo é P0 e bloqueia
 **Impacto:** qualquer usuário autenticado que conheça um UUID altera, apaga e lê o orçamento de qualquer outro escritório. O `GET /projects/{id}/budget` (linha 19) filtra corretamente — a falha está exatamente nas operações de escrita.
 
 ### P0-2 · Cinco ações do portal público sem verificar o token de acesso
+
+> ✅ **Corrigido pela Seção 1 do plano de reestruturação.** Regressão coberta em `ArchSmart-api/tests/isolation/`.
 
 `app/api/endpoints/public.py`
 
@@ -74,6 +78,8 @@ O `GET` da apresentação (linha 105) exige senha e valida o token (`verify_port
 **Impacto:** a senha do portal protege a leitura e nada mais. Quem tiver o UUID aprova, rejeita e aceita orçamento sem senha — e aceite de apresentação tem efeito comercial. `POST /verify-password` (linha 282) também não tem rate limit: a senha é força-brutável.
 
 ### P0-3 · Dois endpoints sem autenticação alguma
+
+> ✅ **Corrigido pela Seção 1 do plano de reestruturação.** Regressão coberta em `ArchSmart-api/tests/isolation/`.
 
 | Arquivo:linha | Endpoint | Problema |
 |---|---|---|
