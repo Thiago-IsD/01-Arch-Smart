@@ -55,12 +55,12 @@ Latência de API: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/
 | Cliente de API compartilhado | **não existe** |
 | `createClient()` espalhados | 62 |
 | `getSession()` espalhados | 56 |
-| Headers `Authorization` montados à mão | 67 |
+| Headers `Authorization` montados à mão | 67 (70 após a Seção 1) |
 | Arquivos repetindo o mesmo boilerplate | 37 |
 | `CLAUDE.md` / convenções escritas | **nenhum** |
 | Estruturas de rota coexistindo no backend | 3 (`api/`, `api/endpoints/`, `api/routers/`) |
 | `next/dynamic` / `React.lazy` | **0 em 141 arquivos** |
-| Cores literais | 137 classes + 11 `bg-[#hex]` |
+| Cores literais | **510** classes de paleta Tailwind em 39 arquivos + 11 `bg-[#hex]` |
 | Testes | 83, todos contra `MagicMock` — nenhum capaz de detectar vazamento entre contas |
 | CI | **nenhum** além de dois workflows de keep-alive |
 
@@ -83,7 +83,7 @@ Alternativas consideradas e rejeitadas:
 
 1. **A regra que não é verificada por ferramenta não existe.** Toda convenção deste documento vira lint, teste ou verificação de CI. Acordo verbal não sobrevive a duas pessoas mais IA.
 2. **Cercar o caminho antigo é parte de abrir o novo.** Padrão antigo que continua possível é padrão que será copiado.
-3. **Completar antes de proibir.** As 137 cores literais existem porque faltavam tokens de `success` e `warning`. Proibir sem oferecer alternativa cria o próximo desvio.
+3. **Completar antes de proibir.** As 510 cores literais existem porque faltavam tokens de `success` e `warning`. Proibir sem oferecer alternativa cria o próximo desvio.
 4. **Uma coisa por vez, medida.** Migração e funcionalidade nova nunca no mesmo passo — misturar destrói o único teste objetivo que a migração tem.
 5. **Prova antes de afirmar.** Nenhuma tarefa é marcada como feita sem o comando ou a medição que demonstra.
 

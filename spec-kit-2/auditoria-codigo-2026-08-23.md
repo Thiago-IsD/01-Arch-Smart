@@ -160,7 +160,7 @@ Não existem `product_events` nem `ai_usage_logs`. A tabela `events` do modelo �
 | Achado | Medida |
 |---|---|
 | API sem versionamento (Art. 5) | 70 endpoints em `/api/...`; `app/api/v1/` vazio. Três padrões coexistem: `api/`, `api/endpoints/`, `api/routers/` |
-| Cores literais (Art. 7) | 137 classes tipo `bg-emerald-600` + 11 `bg-[#hex]` |
+| Cores literais (Art. 7) | **510** classes de paleta Tailwind (`bg-slate-100`, `bg-emerald-600`…) em 39 arquivos + 11 `bg-[#hex]` |
 | Marca errada (Art. 8) | 60 arquivos com `ArchSmart`; a extensão se chama "Arch Smart Clipper"; os diretórios do repo são `ArchSmart-*` |
 | Ambiente literal (Art. 4) | `extension/manifest.json` publica `http://localhost:3000/*` e `http://127.0.0.1:8000/*` em `host_permissions`, junto de `<all_urls>` |
 | Acessibilidade (Art. 6) | 5 `tabIndex={-1}` · 9 `opacity-0 group-hover` sem `focus-within` · 15 `aria-label` para 141 arquivos |
@@ -179,7 +179,7 @@ Uma auditoria que só lista defeito leva à decisão errada. Isto aqui está bom
 - **`portal_security.py`** — bcrypt correto, JWT com escopo e expiração, verificação amarrada à apresentação. Bem escrito. O problema não é este arquivo, é que 5 endpoints não o chamam.
 - **26 migrações Alembic versionadas** — o histórico de schema está preservado.
 - **`budget_calculator.py`** — serviço puro, testável, com a regra de negócio no lugar certo (Art. 5). É o modelo do que o resto deveria ser.
-- **Design tokens semânticos** — `--primary`, `--destructive`, `--muted` já existem nos dois temas com shadcn. As 137 cores literais são desvios de um sistema que existe, não ausência de sistema.
+- **Design tokens semânticos** — `--primary`, `--destructive`, `--muted` já existem nos dois temas com shadcn. As 510 cores literais são desvios de um sistema que existe, não ausência de sistema.
 - **`lang="pt-BR"`**, Zod validando env, `@supabase/ssr` corretamente separado cliente/servidor.
 
 ---

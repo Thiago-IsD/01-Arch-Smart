@@ -375,7 +375,7 @@ Conteúdo mínimo:
 - **Até a Seção 5 existir**: se você precisar chamar a API, siga o padrão do arquivo vizinho — mas **não crie uma abstração nova**, porque `lib/api/` vai substituí-la e o trabalho será jogado fora
 - **Acessibilidade**: rótulo ligado por `htmlFor`, tudo clicável focável, contraste AA nos dois temas (Art. 6)
 - **Testes**: `npx vitest run`. ⚠️ Hoje ele coleta as specs do Playwright em `e2e/` e sai com erro — defeito conhecido de configuração, a ser corrigido na Seção 3
-- **Cor**: token semântico sempre. Hoje há 137 desvios; não acrescente o 138º
+- **Cor**: token semântico sempre. Hoje há 510 desvios; não acrescente o 511º
 
 - [ ] **Passo 4: `extension/CLAUDE.md`**
 
@@ -580,7 +580,7 @@ Cubra no mínimo:
 |---|---|---|
 | `account_id` literal ou vindo do cliente | 1 | 14 endpoints vazavam dado entre contas |
 | URL, chave ou host fixo no código | 4 | o `manifest.json` da extensão publica `localhost` |
-| Cor literal em classe utilitária | 7 | 137 desvios hoje; o rebranding vira varredura manual |
+| Cor literal em classe utilitária | 7 | **510** desvios em 39 arquivos; o rebranding vira varredura manual |
 | `ArchSmart`, `Ark Smart` ou `Ecowe` em texto | 8 | 60 arquivos com a grafia errada |
 | `tabIndex={-1}` em controle interativo | 6 | 5 ocorrências tornam o controle inalcançável por teclado |
 | `opacity-0 group-hover` sem `focus-within` | 6 | 9 ocorrências escondem a ação de quem navega por teclado |
