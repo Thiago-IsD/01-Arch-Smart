@@ -148,19 +148,22 @@ rodando local, passo anterior), `NEXT_PUBLIC_SUPABASE_URL` e
 npm run dev
 ```
 
-**Sinal de sucesso:** abrir <http://localhost:3000> carrega a página inicial
-do Arq Smart.
+**Sinal de sucesso:** abrir <http://localhost:3000> carrega a página inicial.
+Confirmado também por linha de comando, sem precisar de navegador:
 
-> **Nota de execução:** este comando específico (`npm run dev`) não foi
-> verificado ponta a ponta na sessão em que este documento foi escrito, porque
-> já havia outro processo `next dev` ativo nesta mesma máquina segurando o
-> lock de `.next/dev/lock` (um lock por checkout, não por porta). Em vez
-> disso, `npm run build` foi executado com sucesso contra o mesmo
-> `.env.local` real — compila as 30 rotas da aplicação e exercita a mesma
-> validação de variáveis de ambiente (`src/lib/env.ts`) que o `next dev` usa,
-> o que dá confiança razoável de que `npm run dev` funciona igual. Se alguém
-> encontrar um caso em que `next build` passa e `next dev` não sobe, isso é
-> uma lacuna real deste documento — avise.
+```
+curl http://localhost:3000
+```
+
+Retorna `200`. E para confirmar que a proteção de rota está de pé (o
+`proxy.ts` redireciona quem não está autenticado):
+
+```
+curl -o /dev/null -w "%{http_code}" http://localhost:3000/dashboard
+```
+
+Retorna `307`, redirecionando para `/auth/login` — sinal de que a
+autenticação está funcionando, não só que o servidor responde.
 
 ## Banco de teste em Docker
 
@@ -281,6 +284,13 @@ aviso, perde a sessão de trabalho.
    preencha `SUPABASE_JWT_SECRET` no `.env` (comentário no `.env.example` diz
    onde obter) para ter o comportamento rápido e não ficar dependendo desse
    log para saber que algo está diferente do esperado.
+
+5. **`npm run dev` reclama de `.next/dev/lock`.** O lock é por checkout do
+   projeto, não por porta — trocar a porta (`npm run dev -- -p 3123`) não
+   resolve. Significa que já existe outro `next dev` rodando nesta máquina
+   (seu ou de outra pessoa, se a máquina for compartilhada). **O que fazer:**
+   encontre e encerre o processo `next dev` já ativo, ou continue usando o
+   que já está rodando em vez de subir um segundo.
 
 ## Como saber que deu certo
 
