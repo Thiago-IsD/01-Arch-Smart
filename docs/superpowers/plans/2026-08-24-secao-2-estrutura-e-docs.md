@@ -661,7 +661,7 @@ Por agregado, com o porque de cada relacao. Registra o que a Secao 4 precisa:
 ### Task 8: `docs/dev/deploy.md`, as ADRs e o processo de revisão
 
 **Files:**
-- Create: `docs/dev/deploy.md`, `docs/dev/decisoes/0001-*.md` a `0005-*.md`, `.github/pull_request_template.md`, `.github/CODEOWNERS`
+- Create: `docs/dev/deploy.md`, `docs/dev/decisoes/0001-*.md` a `0005-*.md`, `.github/pull_request_template.md`, `.github/CODEOWNERS`, `tools/checa_links.py`
 
 **Interfaces:**
 - Consumes: o template de ADR da Task 2
@@ -695,14 +695,75 @@ Checklist curto e verificável. Itens longos não são lidos. No mínimo: query 
 
 Duas pessoas apenas. Mantenha simples e comente que se torna mais granular quando o time crescer.
 
-- [ ] **Passo 5: Verificar os links de todos os documentos criados na seção**
+- [ ] **Passo 5: Criar o verificador de links e rodá-lo em tudo**
 
-Run:
-```bash
-cd "$(git rev-parse --show-toplevel)" && find . -name "*.md" -not -path "./node_modules/*" -not -path "./.git/*" -not -path "*/venv/*" -newer .git/HEAD -print0 2>/dev/null | xargs -0 grep -ohE '\]\([^)#][^)]*\)' 2>/dev/null | tr -d ']()' | sort -u | while read -r p; do [ -e "$p" ] || echo "QUEBRADO: $p"; done; echo "--- fim ---"
-```
+Crie `tools/checa_links.py`:
 
-Agora que todas as tasks rodaram, **nenhum link deveria estar quebrado**. Se algum estiver, corrija.
+```python
+"""
+Verifica links relativos em arquivos Markdown.
+
+Resolve cada link contra o diretorio do arquivo que o contem — nao contra a
+raiz do repositorio. Resolver contra a raiz produz falso positivo em todo
+link relativo escrito de dentro de uma subpasta.
+
+Uso: python tools/checa_links.py [caminho ...]      (padrao: todos os .md rastreados)
+Sai 1 se houver link quebrado.
+"""
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+PADRAO = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+
+def arquivos_md(args):
+    if args:
+        return [Path(a) for a in args]
+    saida = subprocess.run(
+        ["git", "ls-files", "*.md"], capture_output=True, text=True, check=True
+    ).stdout
+    return [Path(l) for l in saida.splitlines() if l]
+
+
+def quebrados(caminho):
+    achados = []
+    for alvo in PADRAO.findall(caminho.read_text(encoding="utf-8")):
+        alvo = alvo.split()[0]
+        if alvo.startswith(("http://", "https://", "mailto:", "#")):
+            continue
+        alvo = alvo.split("#")[0]
+        if not alvo:
+            continue
+        if not (caminho.parent / alvo).exists():
+            achados.append(alvo)
+    return achados
+
+
+def main():
+    total = 0
+    for md in arquivos_md(sys.argv[1:]):
+        if not md.exists():
+            continue
+        for alvo in quebrados(md):
+            print(f"QUEBRADO: {md} -> {alvo}")
+            total += 1
+    print(f"--- {total} link(s) quebrado(s) ---")
+    return 1 if total else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())```
+
+⚠️ O ponto do script é resolver cada link **contra o diretório do arquivo que o contém**, não contra a raiz do repositório. Uma verificação por `grep` ingênua dá falso positivo em todo link relativo escrito de dentro de uma subpasta — foi o que aconteceu na Task 2.
+
+Run: `python tools/checa_links.py`
+Expected: `--- 0 link(s) quebrado(s) ---`, saída 0.
+
+Agora que todas as tasks rodaram, nenhum link deveria estar quebrado. Se algum estiver, corrija o link ou crie o arquivo faltante.
+
+Acrescente o arquivo à lista de Files desta task.
 
 - [ ] **Passo 6: Commit**
 
