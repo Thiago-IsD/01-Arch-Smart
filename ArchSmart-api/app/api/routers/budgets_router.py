@@ -34,6 +34,7 @@ def buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> Budget
         raise HTTPException(status_code=404, detail="Item de orçamento não encontrado")
     return item
 
+
 def buscar_opcao_da_conta(db: Session, option_id: UUID, account_id: UUID) -> ItemOption:
     """Devolve a ItemOption apenas se ela pertencer a conta informada."""
     opcao = (
@@ -60,6 +61,7 @@ def buscar_orcamento_da_conta(db: Session, budget_id: UUID, account_id: UUID) ->
     if not orcamento:
         raise HTTPException(status_code=404, detail="Orçamento não encontrado")
     return orcamento
+
 
 @router.get("/projects/{project_id}/budget", response_model=BudgetResponse)
 def get_project_budget(

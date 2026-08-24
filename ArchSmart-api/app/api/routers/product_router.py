@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.session import get_db
-from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, Account
+from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
 from app.api.users import get_current_user
 from app.models.all_models import User
