@@ -17,7 +17,7 @@ from app.models.all_models import (
 )
 from app.services.budget_calculator import calculate_budget_item_quantity
 from app.utils.supabase_client import get_storage_client
-from app.core.rate_limit import limiter
+from app.core.rate_limit import limiter, chave_por_apresentacao
 
 router = APIRouter()
 
@@ -316,7 +316,7 @@ async def get_public_presentation(
 
 
 @router.post("/presentations/{presentation_uuid}/verify-password")
-@limiter.limit("10/minute")
+@limiter.limit("10/minute", key_func=chave_por_apresentacao)
 def verify_presentation_password(
     request: Request,
     presentation_uuid: str,

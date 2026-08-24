@@ -77,10 +77,30 @@ def engine():
 
 @pytest.fixture
 def db(engine) -> Generator[Session, None, None]:
-    """Sessão dentro de uma transação revertida ao fim de cada teste."""
+    """
+    Sessão dentro de uma transação revertida ao fim de cada teste.
+
+    join_transaction_mode="rollback_only" é passado explicitamente (em vez de
+    deixar o SQLAlchemy 2.0 resolver o padrão sozinho) porque duas
+    consequências dependem dele e vale documentar as duas:
+    1. O Session.commit() chamado dentro dos endpoints não vaza para fora da
+       transação externa — é o que permite o rollback() do finally desfazer
+       tudo, inclusive o que os endpoints gravaram.
+    2. Um db.rollback() chamado DENTRO de um endpoint propaga para a
+       transação externa e destrói os dados da fixture do teste (savepoint
+       encerrado). Nenhum teste atual passa pelos db.rollback() existentes
+       em product_router.py e presentations.py, mas isso é a base das
+       Seções 2 a 9 — um teste futuro que exercite esse caminho vai ver
+       fixtures desaparecerem no meio do teste se isso não estiver claro.
+    """
     connection = engine.connect()
     transaction = connection.begin()
-    session = sessionmaker(bind=connection, autocommit=False, autoflush=False)()
+    session = sessionmaker(
+        bind=connection,
+        autocommit=False,
+        autoflush=False,
+        join_transaction_mode="rollback_only",
+    )()
     try:
         yield session
     finally:
