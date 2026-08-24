@@ -2,8 +2,8 @@
 """
 Calculador de progresso da reestruturação Arq Smart.
 
-O numero do PROGRESS.md e calculado a partir das caixas marcadas, nunca
-digitado a mao. Sem dependencia externa: so biblioteca padrao.
+O número do PROGRESS.md é calculado a partir das caixas marcadas, nunca
+digitado à mão. Sem dependência externa: só biblioteca padrão.
 
 Uso:
     python tools/progresso.py --check   # sai 1 se PROGRESS.md divergir das caixas
@@ -75,6 +75,20 @@ def _totais_gerais(contagens: dict[str, tuple[int, int]]) -> tuple[int, int]:
     return feitos, total
 
 
+def secoes_sem_resumo(texto: str) -> list[str]:
+    """Títulos de seção ('## ') sem linha de resumo no formato esperado
+    ("**F/T (P%)** `barra`") imediatamente abaixo do cabeçalho.
+
+    Formato quebrado (por exemplo, uma linha em branco entre o cabeçalho e o
+    resumo, ou resumo ausente) faz a seção sumir tanto do `--write` quanto do
+    `--check` baseados em `SECTION_RE` — por isso precisa ser detectado à
+    parte e tratado como erro, nunca como ausência silenciosa.
+    """
+    todos_titulos = list(contar(texto).keys())
+    titulos_com_resumo = {m.group(2).strip() for m in SECTION_RE.finditer(texto)}
+    return [titulo for titulo in todos_titulos if titulo not in titulos_com_resumo]
+
+
 def escrever(caminho: Path) -> bool:
     """Recalcula os números a partir das caixas e grava de volta no arquivo."""
     texto = caminho.read_text(encoding="utf-8")
@@ -111,6 +125,12 @@ def conferir(caminho: Path) -> int:
     texto = caminho.read_text(encoding="utf-8")
     contagens = contar(texto)
 
+    problemas_formato: list[str] = [
+        f'formato quebrado: a seção "{titulo}" não tem linha de resumo '
+        f"logo abaixo do cabeçalho"
+        for titulo in secoes_sem_resumo(texto)
+    ]
+
     divergencias: list[str] = []
 
     overall_match = OVERALL_RE.search(texto)
@@ -141,11 +161,16 @@ def conferir(caminho: Path) -> int:
                 f"calculado {feitos}/{total} ({pct}%)"
             )
 
-    if divergencias:
+    if problemas_formato or divergencias:
         print("PROGRESS.md diverge das caixas marcadas:")
+        for p in problemas_formato:
+            print(f"  - {p}")
         for d in divergencias:
             print(f"  - {d}")
-        print("Rode: python tools/progresso.py --write")
+        if problemas_formato:
+            print("Corrija o formato manualmente antes de rodar --write.")
+        if divergencias:
+            print("Rode: python tools/progresso.py --write")
         return 1
 
     print("PROGRESS.md está consistente com as caixas marcadas.")

@@ -9,7 +9,7 @@ sem venv nem instalacao — inclusive no CI da Secao 3.
 """
 import unittest
 
-from progresso import contar, renderizar_barra
+from progresso import contar, renderizar_barra, secoes_sem_resumo
 
 
 class TestContagem(unittest.TestCase):
@@ -31,6 +31,10 @@ class TestContagem(unittest.TestCase):
         texto = "- [x] solta\n## Seção 1 · A\n- [x] dentro\n"
         self.assertEqual(contar(texto), {"Seção 1 · A": (1, 1)})
 
+    def test_conta_caixa_x_maiuscula(self):
+        texto = "## Seção 1 · A\n- [X] feito\n- [ ] pendente\n"
+        self.assertEqual(contar(texto), {"Seção 1 · A": (1, 2)})
+
 
 class TestBarra(unittest.TestCase):
     def test_barra_reflete_a_proporcao(self):
@@ -40,6 +44,28 @@ class TestBarra(unittest.TestCase):
 
     def test_secao_vazia_nao_divide_por_zero(self):
         self.assertEqual(renderizar_barra(0, 0).count("█"), 0)
+
+
+class TestFormatoDeResumo(unittest.TestCase):
+    """Um resumo ("**F/T (P%)** `barra`") fora do lugar não pode sumir em
+    silêncio da conferência — precisa aparecer como formato quebrado."""
+
+    def test_secao_com_linha_em_branco_antes_do_resumo(self):
+        texto = (
+            "## Seção 1 · A\n"
+            "\n"
+            "**1/1 (100%)** `████████████████████`\n"
+            "- [x] feito\n"
+        )
+        self.assertEqual(secoes_sem_resumo(texto), ["Seção 1 · A"])
+
+    def test_secao_sem_linha_de_resumo_nenhuma(self):
+        texto = "## Seção 1 · A\n- [x] feito\n"
+        self.assertEqual(secoes_sem_resumo(texto), ["Seção 1 · A"])
+
+    def test_secao_com_resumo_no_formato_certo_nao_acusa_nada(self):
+        texto = "## Seção 1 · A\n**1/1 (100%)** `████████████████████`\n- [x] feito\n"
+        self.assertEqual(secoes_sem_resumo(texto), [])
 
 
 if __name__ == "__main__":
