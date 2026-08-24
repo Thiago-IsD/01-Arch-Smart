@@ -162,8 +162,21 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql://arqsmart:arqsmart@localhost:55432/arqsmart_test",
 )
 
-# A aplicação lê settings na importação; garante que ela não tente o banco real.
-os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+_HOSTS_PROIBIDOS = ("supabase.co", "supabase.com", "rds.amazonaws.com")
+
+if not TEST_DATABASE_URL.endswith("_test") or any(
+    h in TEST_DATABASE_URL for h in _HOSTS_PROIBIDOS
+):
+    raise RuntimeError(
+        "TEST_DATABASE_URL precisa apontar para um banco descartavel cujo nome "
+        f"termina em '_test' e que nao seja gerenciado: {TEST_DATABASE_URL!r}. "
+        "A suite apaga e recria o schema inteiro — apontar para producao destroi dados."
+    )
+
+# Sobrescreve INCONDICIONALMENTE. Nao use setdefault: se o ambiente (um runner
+# de CI, por exemplo) ja exportar DATABASE_URL apontando para producao, o
+# setdefault vira no-op e a suite roda contra o banco real — apagando o schema.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app.db.base_class import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
