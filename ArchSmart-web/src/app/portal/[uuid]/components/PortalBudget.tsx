@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { ShoppingCart, ExternalLink, Package, Check } from "lucide-react";
 import { apiUrl } from "@/lib/api-url";
 import { useToast } from "@/hooks/use-toast";
+import { cabecalhoDoPortal, limparTokenEVoltarAoPortao } from "../portal-token";
 
 interface PublicProductInfo {
     id: string;
@@ -87,10 +88,14 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
         }));
 
         try {
-            await fetch(
+            const res = await fetch(
                 apiUrl(`/public/presentations/${presentationId}/options/${optionId}/select`),
-                { method: "POST" }
+                { method: "POST", headers: cabecalhoDoPortal(presentationId) }
             );
+            if (res.status === 401) {
+                limparTokenEVoltarAoPortao(presentationId);
+                return;
+            }
         } catch (e) {
             console.error("Failed to save selection on server", e);
         }
@@ -115,8 +120,12 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
         try {
             const res = await fetch(
                 apiUrl(`/public/presentations/${presentationId}/options/${optionId}/approve`),
-                { method: "POST" }
+                { method: "POST", headers: cabecalhoDoPortal(presentationId) }
             );
+            if (res.status === 401) {
+                limparTokenEVoltarAoPortao(presentationId);
+                return;
+            }
             if (!res.ok) throw new Error("Erro ao aprovar item");
             toast({ title: "Item Aprovado", description: "O status foi atualizado com sucesso." });
         } catch (err) {
@@ -151,10 +160,14 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
                 apiUrl(`/public/presentations/${presentationId}/options/${optionId}/reject`),
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", ...cabecalhoDoPortal(presentationId) },
                     body: JSON.stringify({ reason: trimmedReason || null }),
                 }
             );
+            if (res.status === 401) {
+                limparTokenEVoltarAoPortao(presentationId);
+                return;
+            }
             if (!res.ok) throw new Error("Erro ao recusar item");
             toast({ title: "Item Recusado", description: "O orçamento foi recalculado." });
         } catch (err) {
@@ -177,7 +190,7 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
                 apiUrl(`/public/presentations/${presentationId}/accept`),
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", ...cabecalhoDoPortal(presentationId) },
                     body: JSON.stringify({
                         accepted,
                         feedback,
@@ -185,6 +198,11 @@ export function PortalBudget({ initialItems, environments, presentationId, statu
                     })
                 }
             );
+
+            if (res.status === 401) {
+                limparTokenEVoltarAoPortao(presentationId);
+                return;
+            }
 
             if (res.ok) {
                 setIsSuccess(true);

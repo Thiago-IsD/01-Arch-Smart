@@ -17,6 +17,7 @@ from app.models.all_models import (
 )
 from app.services.budget_calculator import calculate_budget_item_quantity
 from app.utils.supabase_client import get_storage_client
+from app.core.rate_limit import limiter, chave_por_apresentacao
 
 router = APIRouter()
 
@@ -98,6 +99,41 @@ class PublicPresentationResponse(BaseModel):
 
 class VerifyPasswordRequest(BaseModel):
     password: str
+
+
+# ==================== Dependência de acesso ====================
+
+def exigir_acesso_ao_portal(
+    presentation_uuid: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> Presentation:
+    """
+    Garante que quem chama tem o token do portal desta apresentacao.
+
+    O GET da apresentacao ja fazia essa verificacao; as acoes de escrita nao
+    faziam nenhuma. Sem isto, a senha do portal protege apenas a leitura.
+    """
+    try:
+        uuid_obj = uuid_module.UUID(presentation_uuid)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="ID de apresentação inválido")
+
+    apresentacao = db.query(Presentation).filter(Presentation.id == uuid_obj).first()
+    if not apresentacao:
+        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
+
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    if not verify_portal_token(token, apresentacao.id):
+        raise HTTPException(
+            status_code=401,
+            detail="Acesso não autorizado. Informe a senha da apresentação.",
+        )
+
+    return apresentacao
 
 
 # ==================== Endpoint ====================
@@ -280,7 +316,9 @@ async def get_public_presentation(
 
 
 @router.post("/presentations/{presentation_uuid}/verify-password")
+@limiter.limit("10/minute", key_func=chave_por_apresentacao)
 def verify_presentation_password(
+    request: Request,
     presentation_uuid: str,
     payload: VerifyPasswordRequest,
     db: Session = Depends(get_db),
@@ -309,19 +347,14 @@ def verify_presentation_password(
 
 @router.post("/presentations/{presentation_uuid}/options/{option_id}/select")
 def select_public_option(
-    presentation_uuid: str,
     option_id: uuid_module.UUID,
+    presentation: Presentation = Depends(exigir_acesso_ao_portal),
     db: Session = Depends(get_db)
 ):
     """
     Permite que o cliente selecione uma opção (A/B) no portal público.
     """
-    # 1. Validar apresentação
-    presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
-    if not presentation:
-        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
-
-    # 2. Buscar a opção e garantir que ela pertence ao projeto da apresentação
+    # 1. Buscar a opção e garantir que ela pertence ao projeto da apresentação
     option = (
         db.query(ItemOption)
         .join(BudgetItem)
@@ -336,7 +369,7 @@ def select_public_option(
     if not option:
         raise HTTPException(status_code=404, detail="Opção não encontrada neste projeto")
 
-    # 3. Desmarcar outras opções do mesmo item e marcar esta
+    # 2. Desmarcar outras opções do mesmo item e marcar esta
     db.query(ItemOption).filter(
         ItemOption.budget_item_id == option.budget_item_id
     ).update({"is_selected": False})
@@ -348,19 +381,14 @@ def select_public_option(
 
 @router.post("/presentations/{presentation_uuid}/options/{option_id}/approve")
 def approve_public_option(
-    presentation_uuid: str,
     option_id: uuid_module.UUID,
+    presentation: Presentation = Depends(exigir_acesso_ao_portal),
     db: Session = Depends(get_db)
 ):
     """
     Permite que o cliente aprove uma opção (A/B) no portal público.
     """
-    # 1. Validar apresentação
-    presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
-    if not presentation:
-        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
-
-    # 2. Buscar a opção e garantir que ela pertence ao projeto da apresentação
+    # 1. Buscar a opção e garantir que ela pertence ao projeto da apresentação
     option = (
         db.query(ItemOption)
         .join(BudgetItem)
@@ -375,7 +403,7 @@ def approve_public_option(
     if not option:
         raise HTTPException(status_code=404, detail="Opção não encontrada neste projeto")
 
-    # 3. Desmarcar outras opções do mesmo item e marcar esta como aprovada e selecionada
+    # 2. Desmarcar outras opções do mesmo item e marcar esta como aprovada e selecionada
     db.query(ItemOption).filter(
         ItemOption.budget_item_id == option.budget_item_id
     ).update({"is_selected": False})
@@ -389,21 +417,16 @@ def approve_public_option(
 
 @router.post("/presentations/{presentation_uuid}/options/{option_id}/reject")
 def reject_public_option(
-    presentation_uuid: str,
     option_id: uuid_module.UUID,
     payload: Optional[RejectOptionRequest] = None,
+    presentation: Presentation = Depends(exigir_acesso_ao_portal),
     db: Session = Depends(get_db)
 ):
     """
     Permite que o cliente rejeite uma opção (A/B) no portal público,
     opcionalmente registrando uma justificativa.
     """
-    # 1. Validar apresentação
-    presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
-    if not presentation:
-        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
-
-    # 2. Buscar a opção
+    # 1. Buscar a opção
     option = (
         db.query(ItemOption)
         .join(BudgetItem)
@@ -431,19 +454,15 @@ def reject_public_option(
 
 @router.post("/presentations/{presentation_uuid}/accept")
 async def accept_public_presentation(
-    presentation_uuid: str,
     payload: AcceptRequest,
     request: Request,
+    presentation: Presentation = Depends(exigir_acesso_ao_portal),
     db: Session = Depends(get_db)
 ):
     """
     Registra o aceite ou solicitação de revisão por parte do cliente.
     Gera notificação para o arquiteto.
     """
-    presentation = db.query(Presentation).join(Project).filter(Presentation.id == presentation_uuid).first()
-    if not presentation:
-        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
-
     if presentation.status in ["ACCEPTED"]:
         raise HTTPException(status_code=400, detail="Apresentação já foi aprovada anteriormente")
 
@@ -492,19 +511,15 @@ async def accept_public_presentation(
 
 @router.get("/presentations/{presentation_uuid}/comments")
 def get_public_presentation_comments(
-    presentation_uuid: str,
+    presentation: Presentation = Depends(exigir_acesso_ao_portal),
     db: Session = Depends(get_db)
 ):
     """
     Lista a thread de conversas (Comentários) da Apresentação,
     usada pelo Portal do Cliente (Public API).
     """
-    presentation = db.query(Presentation).filter(Presentation.id == presentation_uuid).first()
-    if not presentation:
-        raise HTTPException(status_code=404, detail="Apresentação não encontrada")
-        
     comments = db.query(PresentationComment).filter(
-        PresentationComment.presentation_id == presentation_uuid
+        PresentationComment.presentation_id == presentation.id
     ).order_by(PresentationComment.created_at.asc()).all()
     
     return [

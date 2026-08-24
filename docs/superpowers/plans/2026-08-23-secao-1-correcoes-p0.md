@@ -35,10 +35,13 @@
 | `ArchSmart-api/app/api/routers/product_router.py` | remoção do seed e autenticação do normalize |
 | `ArchSmart-api/app/core/rate_limit.py` | limitador compartilhado (slowapi) |
 | `ArchSmart-api/pytest.ini` | passa a enxergar `tests/` |
+| `ArchSmart-api/app/__init__.py` | torna `app` pacote regular; sem ele os dois conftest colidem |
+| `ArchSmart-api/tests/isolation/conftest.py` | reset do rate limiter entre testes (criado na Task 5) |
+| `ArchSmart-api/tests/isolation/test_financial_isolation.py` | 14o endpoint, achado na revisão final |
 
 ---
 
-### Tarefa 1: Harness de teste contra Postgres real
+### Task 1: Harness de teste contra Postgres real
 
 **Files:**
 - Create: `ArchSmart-api/docker-compose.test.yml`
@@ -47,7 +50,8 @@
 - Create: `ArchSmart-api/tests/isolation/__init__.py` (vazio)
 - Create: `ArchSmart-api/tests/test_harness.py`
 - Modify: `ArchSmart-api/pytest.ini`
-- Modify: `ArchSmart-api/requirements-dev.txt`
+- Modify: `ArchSmart-api/requirements.txt`
+- Create: `ArchSmart-api/app/__init__.py` (vazio — ver Passo 4b)
 
 **Interfaces:**
 - Consumes: nada (primeira tarefa)
@@ -67,10 +71,12 @@
 
 `ArchSmart-api/docker-compose.test.yml`:
 
+⚠️ A imagem **precisa** ter a extensão `vector`: o model `Document.embedding` usa `pgvector.sqlalchemy.Vector(1536)`, e como `pgvector==0.4.2` está em `requirements.txt`, o fallback para `Text` do `try/except` não entra em jogo. Com `postgres:16-alpine`, o `create_all()` falha com `type "vector" does not exist`. A produção (Supabase) tem pgvector; o banco de teste precisa ter também, ou o schema de teste diverge do real.
+
 ```yaml
 services:
   postgres-test:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: arqsmart
       POSTGRES_PASSWORD: arqsmart
@@ -95,13 +101,15 @@ Expected: `postgres-test` com status `healthy`.
 
 - [ ] **Passo 3: Declarar a dependência nova**
 
-Acrescentar ao final de `ArchSmart-api/requirements-dev.txt`:
+Acrescentar ao final de `ArchSmart-api/requirements.txt` — **não** em `requirements-dev.txt`:
 
 ```
 slowapi==0.1.9
 ```
 
-Run: `pip install -r ArchSmart-api/requirements-dev.txt`
+⚠️ É dependência de **runtime**, não de teste. A Task 5 faz `app/main.py` e `app/core/rate_limit.py` importarem `slowapi` na carga do módulo, e o `Dockerfile` instala apenas `requirements.txt`. Declarar em `requirements-dev.txt` faz o contêiner de produção morrer com `ModuleNotFoundError` ao importar `app.main` — a API inteira não sobe.
+
+Run: `pip install -r ArchSmart-api/requirements.txt`
 
 - [ ] **Passo 4: Apontar o pytest para a suíte nova**
 
@@ -115,7 +123,22 @@ pythonpath = .
 testpaths = tests app/tests
 ```
 
-`app/tests` permanece na lista até a Seção 4 descartá-la.
+⚠️ Este `testpaths` vale **apenas até o Passo 5b da Task 2**, que remove `app/tests` da execução padrão. O motivo está lá.
+
+- [ ] **Passo 4b: Criar `ArchSmart-api/app/__init__.py` vazio**
+
+Sem ele, `app/` não é um pacote regular (só `app/tests/` tem `__init__.py`), então o pytest batiza `app/tests/conftest.py` como o módulo `tests.conftest` — exatamente o nome do conftest novo. Um `pytest` sem argumento aborta com `ImportPathMismatchError`, o que quebraria o CI da Seção 3.
+
+`--import-mode=importlib` **não** resolve: verificado, muda o erro para `ValueError: Plugin already registered under a different name`.
+
+Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -m pytest --collect-only -q | tail -3`
+Expected: `85 tests collected` (83 da suíte antiga + 2 do harness), sem erro de import.
+Após o Passo 5b da Task 2 este número passa a ser só o da suíte nova — não use este valor como referência depois daquele ponto.
+
+Confirme também que a aplicação continua importando:
+
+Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -c "from app.main import app; print(len(app.routes))"`
+Expected: `77`
 
 - [ ] **Passo 5: Escrever o conftest**
 
@@ -138,7 +161,7 @@ from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 TEST_DATABASE_URL = os.getenv(
@@ -146,8 +169,21 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql://arqsmart:arqsmart@localhost:55432/arqsmart_test",
 )
 
-# A aplicação lê settings na importação; garante que ela não tente o banco real.
-os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+_HOSTS_PROIBIDOS = ("supabase.co", "supabase.com", "rds.amazonaws.com")
+
+if not TEST_DATABASE_URL.endswith("_test") or any(
+    h in TEST_DATABASE_URL for h in _HOSTS_PROIBIDOS
+):
+    raise RuntimeError(
+        "TEST_DATABASE_URL precisa apontar para um banco descartavel cujo nome "
+        f"termina em '_test' e que nao seja gerenciado: {TEST_DATABASE_URL!r}. "
+        "A suite apaga e recria o schema inteiro — apontar para producao destroi dados."
+    )
+
+# Sobrescreve INCONDICIONALMENTE. Nao use setdefault: se o ambiente (um runner
+# de CI, por exemplo) ja exportar DATABASE_URL apontando para producao, o
+# setdefault vira no-op e a suite roda contra o banco real — apagando o schema.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app.db.base_class import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
@@ -175,6 +211,11 @@ def criar_projeto(db: Session, conta: Account, nome: str = "Projeto Teste") -> P
 @pytest.fixture(scope="session")
 def engine():
     eng = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    # Document.embedding e do tipo vector(1536) (pgvector). Sem a extensao, o
+    # create_all falha com 'type "vector" does not exist'. A producao (Supabase)
+    # tem pgvector habilitado; o banco de teste precisa espelhar isso.
+    with eng.begin() as conexao:
+        conexao.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.drop_all(bind=eng)
     Base.metadata.create_all(bind=eng)
     yield eng
@@ -288,7 +329,7 @@ Se `test_rollback_entre_testes` falhar com `count() == 1`, o rollback não está
 - [ ] **Passo 8: Commit**
 
 ```bash
-git add ArchSmart-api/docker-compose.test.yml ArchSmart-api/tests/ ArchSmart-api/pytest.ini ArchSmart-api/requirements-dev.txt
+git add ArchSmart-api/docker-compose.test.yml ArchSmart-api/tests/ ArchSmart-api/pytest.ini ArchSmart-api/requirements.txt ArchSmart-api/app/__init__.py
 git commit -m "test: harness de teste contra Postgres real em Docker
 
 O harness atual usa MagicMock como sessao de banco, que devolve o mesmo
@@ -299,7 +340,7 @@ o pre-requisito das correcoes P0."
 
 ---
 
-### Tarefa 2: Escopo por conta nos endpoints de item de orçamento
+### Task 2: Escopo por conta nos endpoints de item de orçamento
 
 Corrige `PATCH /api/budgets/items/{item_id}`, `DELETE /api/budgets/items/{item_id}` e `POST /api/budgets/items/{item_id}/options`.
 
@@ -308,8 +349,8 @@ Corrige `PATCH /api/budgets/items/{item_id}`, `DELETE /api/budgets/items/{item_i
 - Modify: `ArchSmart-api/app/api/routers/budgets_router.py`
 
 **Interfaces:**
-- Consumes: fixtures `db`, `conta_a`, `conta_b`, `client_a` da Tarefa 1
-- Produces: helper `buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> BudgetItem` em `budgets_router.py`, usado também pela Tarefa 3
+- Consumes: fixtures `db`, `conta_a`, `conta_b`, `client_a` da Task 1
+- Produces: helper `buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> BudgetItem` em `budgets_router.py`, usado também pela Task 3
 
 - [ ] **Passo 1: Escrever os testes que falham**
 
@@ -478,10 +519,36 @@ A checagem do produto fecha o segundo furo do mesmo endpoint: sem ela, um produt
 Run: `cd ArchSmart-api && pytest tests/isolation/test_budgets_isolation.py -v`
 Expected: 4 passed.
 
+- [ ] **Passo 5b: Tirar `app/tests` do `testpaths`**
+
+A correção do passo 4 troca a query por `join().join()`, e isso quebra `app/tests/test_budgets.py::test_update_budget_item` — um teste que afirma o **formato da cadeia de chamadas no `MagicMock`**, não o comportamento. Nenhum comportamento real regrediu; o mock é que foi programado para uma cadeia específica.
+
+Isso vai se repetir nas Tasks 3, 4 e 5, e cada repetição custa ciclos separando quebra esperada de regressão real. Pior: uma suíte vermelha que todos aprendem a ignorar treina o time a ignorar vermelho.
+
+Substituir o conteúdo de `ArchSmart-api/pytest.ini` por:
+
+```ini
+[pytest]
+asyncio_mode = auto
+asyncio_default_fixture_loop_scope = function
+pythonpath = .
+# app/tests/ nao entra aqui: aquela suite usa MagicMock como sessao de banco e
+# afirma o formato da cadeia de chamadas, nao o comportamento — entao ela quebra
+# a cada mudanca de query mesmo quando nada regride, e nao detecta vazamento
+# entre contas (ver auditoria 23/08/2026). A Secao 4 a substitui e apaga.
+# Para rodar mesmo assim: pytest app/tests
+testpaths = tests
+```
+
+Os arquivos **não** são apagados — só saem da execução padrão. A remoção é da Seção 4, que entrega a suíte substituta.
+
+Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -m pytest -q`
+Expected: só a suíte nova roda, tudo verde.
+
 - [ ] **Passo 6: Commit**
 
 ```bash
-git add ArchSmart-api/app/api/routers/budgets_router.py ArchSmart-api/tests/isolation/test_budgets_isolation.py
+git add ArchSmart-api/app/api/routers/budgets_router.py ArchSmart-api/tests/isolation/test_budgets_isolation.py ArchSmart-api/pytest.ini
 git commit -m "fix: escopo por conta nos endpoints de item de orcamento (P0-1)
 
 PATCH e DELETE /budgets/items/{id} e POST /budgets/items/{id}/options nao
@@ -494,7 +561,7 @@ Art. 1 da constitution."
 
 ---
 
-### Tarefa 3: Escopo por conta nos endpoints de opção e resumo
+### Task 3: Escopo por conta nos endpoints de opção e resumo
 
 Corrige `PATCH /api/budgets/options/{option_id}/select`, `DELETE /api/budgets/options/{option_id}` e `GET /api/budgets/{budget_id}/summary`.
 
@@ -503,7 +570,7 @@ Corrige `PATCH /api/budgets/options/{option_id}/select`, `DELETE /api/budgets/op
 - Modify: `ArchSmart-api/app/api/routers/budgets_router.py`
 
 **Interfaces:**
-- Consumes: `buscar_item_da_conta` da Tarefa 2
+- Consumes: `buscar_item_da_conta` da Task 2
 - Produces: `buscar_opcao_da_conta(db, option_id, account_id) -> ItemOption` e `buscar_orcamento_da_conta(db, budget_id, account_id) -> Budget`
 
 - [ ] **Passo 1: Acrescentar os testes que falham**
@@ -638,7 +705,7 @@ Art. 1 da constitution."
 
 ---
 
-### Tarefa 4: Token obrigatório nas ações do portal público
+### Task 4: Token obrigatório nas ações do portal público
 
 O `GET` da apresentação valida `verify_portal_token`; as cinco ações seguintes não. A senha do portal protege a leitura e nada mais.
 
@@ -647,7 +714,7 @@ O `GET` da apresentação valida `verify_portal_token`; as cinco ações seguint
 - Modify: `ArchSmart-api/app/api/endpoints/public.py`
 
 **Interfaces:**
-- Consumes: fixtures `db`, `conta_a`, `client_anon` da Tarefa 1; `verify_portal_token` e `create_portal_token` de `app/core/portal_security.py`
+- Consumes: fixtures `db`, `conta_a`, `client_anon` da Task 1; `verify_portal_token` e `create_portal_token` de `app/core/portal_security.py`
 - Produces: dependência `exigir_acesso_ao_portal(presentation_uuid: str, authorization: str | None) -> Presentation`
 
 - [ ] **Passo 1: Escrever os testes que falham**
@@ -843,7 +910,7 @@ Art. 1 da constitution."
 
 ---
 
-### Tarefa 5: Fechar os dois endpoints sem autenticação
+### Task 5: Fechar os dois endpoints sem autenticação
 
 `GET /api/products/seed-captured` escreve no banco sem autenticação. `POST /api/products/normalize` chama o Gemini sem autenticação, sem cota e sem registro de custo.
 
@@ -855,7 +922,7 @@ Art. 1 da constitution."
 - Modify: `ArchSmart-api/app/main.py`
 
 **Interfaces:**
-- Consumes: fixtures `client_anon`, `client_a` da Tarefa 1
+- Consumes: fixtures `client_anon`, `client_a` da Task 1
 - Produces: `limiter: Limiter` exportado por `app/core/rate_limit.py`
 
 **Nota:** o registro de custo de IA (Art. 9) **não** entra aqui — é a Seção 7. Esta tarefa só fecha o acesso.
@@ -867,10 +934,30 @@ Art. 1 da constitution."
 ```python
 """Regressao do achado P0-3: endpoints sem autenticacao alguma."""
 
+from app.main import app
+from app.models.all_models import Product
 
-def test_seed_captured_nao_existe_mais(client_anon):
+
+def test_seed_captured_nao_existe_mais(client_anon, db):
+    """
+    A vulnerabilidade era escrita no banco sem autenticacao — nao um codigo HTTP.
+    Por isso o teste afirma a propriedade de seguranca, e nao o status.
+
+    Detalhe de roteamento: depois de apagada, a URL passa a casar com
+    GET /{product_id}, cuja conversao para UUID falha e devolve 422, nao 404.
+    """
+    caminhos = {getattr(rota, "path", "") for rota in app.routes}
+    assert not any("seed-captured" in caminho for caminho in caminhos), (
+        "a rota seed-captured ainda esta registrada na aplicacao"
+    )
+
+    produtos_antes = db.query(Product).count()
     resposta = client_anon.get("/api/products/seed-captured")
-    assert resposta.status_code == 404
+
+    assert resposta.status_code not in (200, 201)
+    assert db.query(Product).count() == produtos_antes, (
+        "chamada anonima criou produto no banco"
+    )
 
 
 def test_normalize_exige_autenticacao(client_anon):
@@ -1021,7 +1108,7 @@ O registro de custo de IA (Art. 9) vem na Secao 7."
 
 ---
 
-### Tarefa 6: Registrar o resultado e atualizar o estado
+### Task 6: Registrar o resultado e atualizar o estado
 
 **Files:**
 - Create: `ArchSmart-api/tests/isolation/README.md`
@@ -1084,6 +1171,6 @@ Antes de declarar a seção concluída, rodar e conferir cada item:
 - [ ] `cd ArchSmart-api && pytest tests/ -v` → tudo verde
 - [ ] `grep -rn "TODO: Verify project constraints\|TODO: Auth check" ArchSmart-api/app` → sem resultado
 - [ ] `grep -rn "seed-captured" ArchSmart-api/app` → sem resultado
-- [ ] Os 13 endpoints do achado estão cobertos: 6 em `test_budgets_isolation.py`, 5 em `test_portal_access.py`, 2 em `test_public_endpoints.py`
+- [ ] Os endpoints estão cobertos — **conte os testes, não os endpoints.** A revisão final pegou uma afirmação falsa aqui: o `accept` estava corrigido mas sem teste, e este checklist dizia que estava coberto. Cobertura correta após a onda de correção: 6 em `test_budgets_isolation.py` (mais 2 discriminantes), 5 em `test_portal_access.py` (incluindo `accept`), 2 em `test_public_endpoints.py`, e `test_financial_isolation.py` para o 14o endpoint.
 
 **O que esta seção deliberadamente NÃO faz:** não cria `RequestContext`, não cria `ScopedRepository`, não move arquivo de lugar, não mexe no frontend, não registra custo de IA. Tudo isso tem seção própria. Misturar aqui é o que impede saber se a correção de segurança funcionou.
