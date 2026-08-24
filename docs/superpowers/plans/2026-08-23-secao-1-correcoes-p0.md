@@ -38,7 +38,7 @@
 
 ---
 
-### Tarefa 1: Harness de teste contra Postgres real
+### Task 1: Harness de teste contra Postgres real
 
 **Files:**
 - Create: `ArchSmart-api/docker-compose.test.yml`
@@ -67,10 +67,12 @@
 
 `ArchSmart-api/docker-compose.test.yml`:
 
+⚠️ A imagem **precisa** ter a extensão `vector`: o model `Document.embedding` usa `pgvector.sqlalchemy.Vector(1536)`, e como `pgvector==0.4.2` está em `requirements.txt`, o fallback para `Text` do `try/except` não entra em jogo. Com `postgres:16-alpine`, o `create_all()` falha com `type "vector" does not exist`. A produção (Supabase) tem pgvector; o banco de teste precisa ter também, ou o schema de teste diverge do real.
+
 ```yaml
 services:
   postgres-test:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: arqsmart
       POSTGRES_PASSWORD: arqsmart
@@ -138,7 +140,7 @@ from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 TEST_DATABASE_URL = os.getenv(
@@ -175,6 +177,11 @@ def criar_projeto(db: Session, conta: Account, nome: str = "Projeto Teste") -> P
 @pytest.fixture(scope="session")
 def engine():
     eng = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    # Document.embedding e do tipo vector(1536) (pgvector). Sem a extensao, o
+    # create_all falha com 'type "vector" does not exist'. A producao (Supabase)
+    # tem pgvector habilitado; o banco de teste precisa espelhar isso.
+    with eng.begin() as conexao:
+        conexao.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.drop_all(bind=eng)
     Base.metadata.create_all(bind=eng)
     yield eng
@@ -299,7 +306,7 @@ o pre-requisito das correcoes P0."
 
 ---
 
-### Tarefa 2: Escopo por conta nos endpoints de item de orçamento
+### Task 2: Escopo por conta nos endpoints de item de orçamento
 
 Corrige `PATCH /api/budgets/items/{item_id}`, `DELETE /api/budgets/items/{item_id}` e `POST /api/budgets/items/{item_id}/options`.
 
@@ -308,8 +315,8 @@ Corrige `PATCH /api/budgets/items/{item_id}`, `DELETE /api/budgets/items/{item_i
 - Modify: `ArchSmart-api/app/api/routers/budgets_router.py`
 
 **Interfaces:**
-- Consumes: fixtures `db`, `conta_a`, `conta_b`, `client_a` da Tarefa 1
-- Produces: helper `buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> BudgetItem` em `budgets_router.py`, usado também pela Tarefa 3
+- Consumes: fixtures `db`, `conta_a`, `conta_b`, `client_a` da Task 1
+- Produces: helper `buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> BudgetItem` em `budgets_router.py`, usado também pela Task 3
 
 - [ ] **Passo 1: Escrever os testes que falham**
 
@@ -494,7 +501,7 @@ Art. 1 da constitution."
 
 ---
 
-### Tarefa 3: Escopo por conta nos endpoints de opção e resumo
+### Task 3: Escopo por conta nos endpoints de opção e resumo
 
 Corrige `PATCH /api/budgets/options/{option_id}/select`, `DELETE /api/budgets/options/{option_id}` e `GET /api/budgets/{budget_id}/summary`.
 
@@ -503,7 +510,7 @@ Corrige `PATCH /api/budgets/options/{option_id}/select`, `DELETE /api/budgets/op
 - Modify: `ArchSmart-api/app/api/routers/budgets_router.py`
 
 **Interfaces:**
-- Consumes: `buscar_item_da_conta` da Tarefa 2
+- Consumes: `buscar_item_da_conta` da Task 2
 - Produces: `buscar_opcao_da_conta(db, option_id, account_id) -> ItemOption` e `buscar_orcamento_da_conta(db, budget_id, account_id) -> Budget`
 
 - [ ] **Passo 1: Acrescentar os testes que falham**
@@ -638,7 +645,7 @@ Art. 1 da constitution."
 
 ---
 
-### Tarefa 4: Token obrigatório nas ações do portal público
+### Task 4: Token obrigatório nas ações do portal público
 
 O `GET` da apresentação valida `verify_portal_token`; as cinco ações seguintes não. A senha do portal protege a leitura e nada mais.
 
@@ -647,7 +654,7 @@ O `GET` da apresentação valida `verify_portal_token`; as cinco ações seguint
 - Modify: `ArchSmart-api/app/api/endpoints/public.py`
 
 **Interfaces:**
-- Consumes: fixtures `db`, `conta_a`, `client_anon` da Tarefa 1; `verify_portal_token` e `create_portal_token` de `app/core/portal_security.py`
+- Consumes: fixtures `db`, `conta_a`, `client_anon` da Task 1; `verify_portal_token` e `create_portal_token` de `app/core/portal_security.py`
 - Produces: dependência `exigir_acesso_ao_portal(presentation_uuid: str, authorization: str | None) -> Presentation`
 
 - [ ] **Passo 1: Escrever os testes que falham**
@@ -843,7 +850,7 @@ Art. 1 da constitution."
 
 ---
 
-### Tarefa 5: Fechar os dois endpoints sem autenticação
+### Task 5: Fechar os dois endpoints sem autenticação
 
 `GET /api/products/seed-captured` escreve no banco sem autenticação. `POST /api/products/normalize` chama o Gemini sem autenticação, sem cota e sem registro de custo.
 
@@ -855,7 +862,7 @@ Art. 1 da constitution."
 - Modify: `ArchSmart-api/app/main.py`
 
 **Interfaces:**
-- Consumes: fixtures `client_anon`, `client_a` da Tarefa 1
+- Consumes: fixtures `client_anon`, `client_a` da Task 1
 - Produces: `limiter: Limiter` exportado por `app/core/rate_limit.py`
 
 **Nota:** o registro de custo de IA (Art. 9) **não** entra aqui — é a Seção 7. Esta tarefa só fecha o acesso.
@@ -1021,7 +1028,7 @@ O registro de custo de IA (Art. 9) vem na Secao 7."
 
 ---
 
-### Tarefa 6: Registrar o resultado e atualizar o estado
+### Task 6: Registrar o resultado e atualizar o estado
 
 **Files:**
 - Create: `ArchSmart-api/tests/isolation/README.md`
