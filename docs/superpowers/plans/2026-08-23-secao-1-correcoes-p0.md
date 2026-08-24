@@ -119,6 +119,20 @@ testpaths = tests app/tests
 
 `app/tests` permanece na lista até a Seção 4 descartá-la.
 
+- [ ] **Passo 4b: Criar `ArchSmart-api/app/__init__.py` vazio**
+
+Sem ele, `app/` não é um pacote regular (só `app/tests/` tem `__init__.py`), então o pytest batiza `app/tests/conftest.py` como o módulo `tests.conftest` — exatamente o nome do conftest novo. Um `pytest` sem argumento aborta com `ImportPathMismatchError`, o que quebraria o CI da Seção 3.
+
+`--import-mode=importlib` **não** resolve: verificado, muda o erro para `ValueError: Plugin already registered under a different name`.
+
+Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -m pytest --collect-only -q | tail -3`
+Expected: `85 tests collected` (83 da suíte antiga + 2 do harness), sem erro de import.
+
+Confirme também que a aplicação continua importando:
+
+Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -c "from app.main import app; print(len(app.routes))"`
+Expected: `77`
+
 - [ ] **Passo 5: Escrever o conftest**
 
 `ArchSmart-api/tests/conftest.py`:
