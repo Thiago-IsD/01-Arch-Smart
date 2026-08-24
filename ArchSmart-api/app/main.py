@@ -8,6 +8,14 @@ setup_logging()
 
 app = FastAPI(title="Arch Smart API", version="1.0.0")
 
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
+from app.core.rate_limit import limiter
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS Configuration
 # Usamos allow_origin_regex (em vez de allow_origins=["*"]) porque, com
 # allow_credentials=True, a spec de CORS proíbe o coringa "*" no header
