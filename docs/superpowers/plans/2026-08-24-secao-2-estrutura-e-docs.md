@@ -680,7 +680,7 @@ git add docs/dev/modelo-de-dados.md
 git commit -m "docs: modelo de dados comentado
 
 Por agregado, com o porque de cada relacao. Registra o que a Secao 4 precisa:
-13 tabelas sem account_id, created_by inexistente e apenas 4 indices."
+10 tabelas sem account_id, created_by inexistente e apenas 4 indices."
 ```
 
 ---
@@ -721,6 +721,14 @@ Checklist curto e verificável. Itens longos não são lidos. No mínimo: query 
 - [ ] **Passo 4: `.github/CODEOWNERS`**
 
 Duas pessoas apenas. Mantenha simples e comente que se torna mais granular quando o time crescer.
+
+- [ ] **Passo 4b: Varrer afirmações que envelheceram durante a seção**
+
+Documentos escritos no começo da Seção 2 fizeram afirmações sobre o que ainda não existia — e que passaram a existir enquanto a seção corria. A mais conhecida: `docs/dev/README.md` diz *"Nenhum destes documentos existe ainda além deste índice"*, falso desde a Task 5.
+
+Releia os arquivos criados nas Tasks 2 e 3 procurando afirmações de inexistência que deixaram de valer, e corrija. Liste no relatório o que encontrou e o que mudou.
+
+Isto não é capricho: a própria regra desta seção é que documento afirma só o que é verdade hoje. Um índice que diz "nada existe" ao lado de sete documentos existentes desmoraliza a regra na primeira leitura.
 
 - [ ] **Passo 5: Criar o verificador de links e rodá-lo em tudo**
 

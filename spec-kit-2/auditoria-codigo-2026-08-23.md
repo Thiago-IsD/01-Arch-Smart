@@ -188,7 +188,7 @@ Uma auditoria que só lista defeito leva à decisão errada. Isto aqui está bom
 
 | Camada | Estado | Decisão | Por quê |
 |---|---|---|---|
-| Modelo de dados | 60% pronto | **Completar** | Faltam `account_id` em 13 tabelas e `created_by` em todas. É migração, não reescrita |
+| Modelo de dados | 60% pronto | **Completar** | Faltam `account_id` em **10** tabelas que guardam dado de conta (`plans`, `product_states` e `product_origins` são catálogo global e não precisam; `documents` não tem FK nem consumidor) e `created_by` em todas. É migração, não reescrita |
 | Camada de acesso a dados | Inexistente | **Construir** | `ScopedRepository` novo — não há o que reescrever |
 | Endpoints | 70, ~10 com defeito | **Corrigir + versionar** | 60 estão corretos. Reescrever os 60 é destruir valor |
 | Serviços | 4 arquivos, bem separados | **Manter** | `budget_calculator` é referência de qualidade |

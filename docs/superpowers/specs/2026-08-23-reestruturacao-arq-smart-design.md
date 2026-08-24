@@ -209,7 +209,9 @@ Supabase local em vez de Postgres puro porque a aplicação depende de Auth (`us
 
 **`ScopedRepository`** (`app/db/repository.py`) — `query(model)` filtra por `account_id` sempre; model sem `account_id` levanta `TypeError` com mensagem citando o Art. 1. `create()` injeta `account_id` e `created_by`. Escotilha `unscoped_query()` permitida só em `app/tools/` e `alembic/`, com lint acusando em outro lugar.
 
-**`account_id` e `created_by` em toda tabela de dado.** Faltam em 13: `environments`, `environment_dnas`, `budgets`, `budget_items`, `item_options`, `presentations`, `presentation_environments`, `presentation_acceptances`, `presentation_comments`, `documents`, `project_slots`, `product_states`, `product_origins`. É desnormalização deliberada: o repositório só é universal se toda tabela responder à mesma pergunta, e o índice só funciona se a coluna existir.
+**`account_id` e `created_by` em toda tabela de dado.** Faltam em **10**: `environments`, `environment_dnas`, `budgets`, `budget_items`, `item_options`, `presentations`, `presentation_environments`, `presentation_acceptances`, `presentation_comments`, `project_slots`. É desnormalização deliberada: o repositório só é universal se toda tabela responder à mesma pergunta, e o índice só funciona se a coluna existir.
+
+⚠️ Corrigido em 24/08/2026: a versão anterior listava 13, incluindo `product_states`, `product_origins` e `documents`. Os dois primeiros são **catálogo global** — verificado que nunca são filtrados por conta em nenhum ponto do código. O `documents` (tabela de embeddings com `Vector(1536)`) não tem chave estrangeira para nada e não tem consumidor real em `app/`; decidir o escopo dele fica para quando tiver uso. `plans` também é catálogo global e nunca esteve na lista. Ver `docs/dev/modelo-de-dados.md` para a classificação tabela a tabela.
 
 **Índices**, derivados das queries reais: `(account_id)` em todas; compostos onde há filtro somado a ordenação — `(account_id, created_at)`, `(account_id, state_id)`, `(budget_id)`, `(environment_id)`, `(project_id)`.
 
