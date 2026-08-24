@@ -927,10 +927,30 @@ Art. 1 da constitution."
 ```python
 """Regressao do achado P0-3: endpoints sem autenticacao alguma."""
 
+from app.main import app
+from app.models.all_models import Product
 
-def test_seed_captured_nao_existe_mais(client_anon):
+
+def test_seed_captured_nao_existe_mais(client_anon, db):
+    """
+    A vulnerabilidade era escrita no banco sem autenticacao — nao um codigo HTTP.
+    Por isso o teste afirma a propriedade de seguranca, e nao o status.
+
+    Detalhe de roteamento: depois de apagada, a URL passa a casar com
+    GET /{product_id}, cuja conversao para UUID falha e devolve 422, nao 404.
+    """
+    caminhos = {getattr(rota, "path", "") for rota in app.routes}
+    assert not any("seed-captured" in caminho for caminho in caminhos), (
+        "a rota seed-captured ainda esta registrada na aplicacao"
+    )
+
+    produtos_antes = db.query(Product).count()
     resposta = client_anon.get("/api/products/seed-captured")
-    assert resposta.status_code == 404
+
+    assert resposta.status_code not in (200, 201)
+    assert db.query(Product).count() == produtos_antes, (
+        "chamada anonima criou produto no banco"
+    )
 
 
 def test_normalize_exige_autenticacao(client_anon):
