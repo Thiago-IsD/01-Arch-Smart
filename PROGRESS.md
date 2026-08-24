@@ -7,8 +7,8 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 10/62 (16%)**
-`███░░░░░░░░░░░░░░░░░`
+**Progresso geral: 14/62 (23%)**
+`█████░░░░░░░░░░░░░░░`
 
 _Última atualização: 2026-08-24_
 
@@ -25,16 +25,16 @@ _Última atualização: 2026-08-24_
 - [x] Documentação da Seção 1
 
 ## Seção 2 · Estrutura do repositório e documentação
-**4/8 (50%)** `██████████░░░░░░░░░░`
+**8/8 (100%)** `████████████████████`
 
 - [x] Limpeza do repositório (Task 1)
 - [x] README da raiz e esqueleto de `docs/` (Task 2)
 - [x] `CLAUDE.md` nos quatro níveis — raiz, api, web, extension (Task 3)
 - [x] `PROGRESS.md` e o script que o calcula (Task 4)
-- [ ] `docs/dev/ambiente.md` (Task 5)
-- [ ] Convenções e arquitetura — `docs/dev/convencoes.md` e `docs/dev/arquitetura.md` (Task 6)
-- [ ] Modelo de dados — `docs/dev/modelo-de-dados.md` (Task 7)
-- [ ] Deploy, ADRs em `docs/dev/decisoes/` e template de PR (Task 8)
+- [x] `docs/dev/ambiente.md` (Task 5)
+- [x] Convenções e arquitetura — `docs/dev/convencoes.md` e `docs/dev/arquitetura.md` (Task 6)
+- [x] Modelo de dados — `docs/dev/modelo-de-dados.md` (Task 7)
+- [x] Deploy, ADRs em `docs/dev/decisoes/` e template de PR (Task 8)
 
 ## Seção 3 · Esteira, ambientes e branches
 **0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`
