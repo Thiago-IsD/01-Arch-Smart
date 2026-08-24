@@ -512,10 +512,36 @@ A checagem do produto fecha o segundo furo do mesmo endpoint: sem ela, um produt
 Run: `cd ArchSmart-api && pytest tests/isolation/test_budgets_isolation.py -v`
 Expected: 4 passed.
 
+- [ ] **Passo 5b: Tirar `app/tests` do `testpaths`**
+
+A correção do passo 4 troca a query por `join().join()`, e isso quebra `app/tests/test_budgets.py::test_update_budget_item` — um teste que afirma o **formato da cadeia de chamadas no `MagicMock`**, não o comportamento. Nenhum comportamento real regrediu; o mock é que foi programado para uma cadeia específica.
+
+Isso vai se repetir nas Tasks 3, 4 e 5, e cada repetição custa ciclos separando quebra esperada de regressão real. Pior: uma suíte vermelha que todos aprendem a ignorar treina o time a ignorar vermelho.
+
+Substituir o conteúdo de `ArchSmart-api/pytest.ini` por:
+
+```ini
+[pytest]
+asyncio_mode = auto
+asyncio_default_fixture_loop_scope = function
+pythonpath = .
+# app/tests/ nao entra aqui: aquela suite usa MagicMock como sessao de banco e
+# afirma o formato da cadeia de chamadas, nao o comportamento — entao ela quebra
+# a cada mudanca de query mesmo quando nada regride, e nao detecta vazamento
+# entre contas (ver auditoria 23/08/2026). A Secao 4 a substitui e apaga.
+# Para rodar mesmo assim: pytest app/tests
+testpaths = tests
+```
+
+Os arquivos **não** são apagados — só saem da execução padrão. A remoção é da Seção 4, que entrega a suíte substituta.
+
+Run: `cd ArchSmart-api && ./venv/Scripts/python.exe -m pytest -q`
+Expected: só a suíte nova roda, tudo verde.
+
 - [ ] **Passo 6: Commit**
 
 ```bash
-git add ArchSmart-api/app/api/routers/budgets_router.py ArchSmart-api/tests/isolation/test_budgets_isolation.py
+git add ArchSmart-api/app/api/routers/budgets_router.py ArchSmart-api/tests/isolation/test_budgets_isolation.py ArchSmart-api/pytest.ini
 git commit -m "fix: escopo por conta nos endpoints de item de orcamento (P0-1)
 
 PATCH e DELETE /budgets/items/{id} e POST /budgets/items/{id}/options nao
