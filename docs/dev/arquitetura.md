@@ -178,7 +178,7 @@ sem autenticação nenhuma, e 1 em `financial.py` gravando o `project_id`
 enviado pelo cliente sem validar a conta dona. As 14 falhas foram corrigidas
 na Seção 1 (merge `f190a07`, 24/08/2026); a suíte de 29 testes contra
 Postgres real veio junto, substituindo a confiança que a suíte antiga
-(`app/tests/`, baseada em `MagicMock` como sessão de banco, 63 testes) dava
+(`app/tests/`, baseada em `MagicMock` como sessão de banco, 83 testes) dava
 sem merecer — um mock não tem "linha de outra conta" para vazar, então nunca
 teria pego essas 14 falhas.
 
