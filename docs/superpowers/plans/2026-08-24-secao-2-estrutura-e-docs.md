@@ -361,6 +361,8 @@ Conteúdo mínimo:
 - **Onde vão morar**: `app/api/v1/routes/` como pasta única de rotas — **Seção 4**. Não mova nada agora.
 - **Regra de ouro do backend**: lógica de negócio em `services/`, endpoint só orquestra
 - **Escopo por conta**: hoje cada endpoint filtra por conta manualmente; a Seção 4 entrega `ScopedRepository` que torna o erro impossível. Até lá, **toda query nova filtra por `account_id` explicitamente**, e todo endpoint novo ganha um teste em `tests/isolation/`
+- **De onde vem a identidade**: `Depends(get_current_user)`, definido em `app/api/users.py`. **Nunca** receba `account_id` do cliente. Sem dizer isso, a regra enuncia o requisito e omite o mecanismo — e um agente plausivelmente aceita `account_id` como parâmetro, que é a violação exata do Art. 1
+- **Registrar a rota e migrar o schema**: os routers são ligados à mão em `app/main.py`; tabela nova exige migração em `alembic/versions/`. Endpoint escrito sem isso é código morto
 - **Testes**: `docker compose -f docker-compose.test.yml up -d --wait` e depois `pytest`. A suíte roda contra Postgres real; `app/tests/` é a suíte antiga baseada em `MagicMock`, está fora do `testpaths` e será apagada na Seção 4 — **não escreva nada nela**
 - **Erros**: mensagem em pt-BR ao usuário, rastro no log. Nunca `detail=str(e)`
 - **Convenções**: tabelas `snake_case` plural, PK `id UUID`, schemas Pydantic com sufixo (`ProjectCreate`, `ProjectRead`)
@@ -371,7 +373,13 @@ Conteúdo mínimo:
 
 - **Onde as coisas moram hoje**: `src/app/` (App Router), `src/components/ui/` (shadcn), `src/components/`, `src/lib/`, `src/hooks/`
 - **Onde vão morar**: `src/features/<dominio>/` reunindo `api.ts`, `hooks.ts` e `components/` — **Seção 5**. Não crie agora.
-- **O que está medido e é o problema a não piorar**: 3,0 a 4,3 s do clique aos dados na tela; nada cacheado entre navegações; 62 `createClient()`, 56 `getSession()` e 67 headers `Authorization` montados à mão espalhados; zero `next/dynamic` em 141 arquivos
+- **O que está medido e é o problema a não piorar**: 3,0 a 4,3 s do clique aos dados na tela; **quase nada** cacheado — só 3 dos 144 arquivos usam TanStack Query, o resto refaz a chamada a cada navegação; 62 `createClient()`, 56 `getSession()` e 70 headers `Authorization` montados à mão; zero `next/dynamic` em 144 arquivos
+
+⚠️ **Não escreva "nada é cacheado".** É falso: o `QueryProvider` está montado em `src/app/(dashboard)/layout.tsx` com `staleTime` de 30 s, e `LibraryContent.tsx`, `PresentationsTab.tsx` e `BatchNormalizeModal.tsx` usam `useQuery`. O padrão certo **já existe** — está aplicado em 3 de 144 arquivos.
+
+- **Instrução imperativa de busca de dado**, sem hedge: tela nova no dashboard usa `useQuery`; o `QueryProvider` já está montado. **Não** use `useEffect` + `fetch`.
+- **URL base sempre de `getApiUrl()`** (`src/lib/api-url.ts`). Sem isso o agente inventa `http://localhost:8000` e viola o Art. 4.
+- **Só cite tokens que existem.** `globals.css` tem `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover`, `--border`, `--input`, `--ring`. **Não existem `--success`, `--warning` nem `--info`** — a Seção 6 os cria. Diga o que fazer enquanto não existem, em vez de oferecer um token inexistente: prescrever `border-warning` hoje faz o agente escrever a classe, não ver nada renderizar, e cair em `border-amber-500` — o 511º desvio.
 - **Até a Seção 5 existir**: se você precisar chamar a API, siga o padrão do arquivo vizinho — mas **não crie uma abstração nova**, porque `lib/api/` vai substituí-la e o trabalho será jogado fora
 - **Acessibilidade**: rótulo ligado por `htmlFor`, tudo clicável focável, contraste AA nos dois temas (Art. 6)
 - **Testes**: `npx vitest run`. ⚠️ Hoje ele coleta as specs do Playwright em `e2e/` e sai com erro — defeito conhecido de configuração, a ser corrigido na Seção 3
