@@ -85,3 +85,28 @@ def test_token_de_outra_apresentacao_nao_serve(client_anon, apresentacao_com_sen
         headers={"Authorization": f"Bearer {token_alheio}"},
     )
     assert resposta.status_code == 401
+
+
+# accept tem URL e corpo diferentes das demais acoes, entao ficou fora de
+# ACOES_SEM_CORPO e nunca ganhou teste proprio (achado CRITICAL 3 da revisao
+# final). E a acao de maior efeito comercial do portal: e ela que fecha a
+# venda. Estes dois testes sao a guarda contra alguem remover
+# exigir_acesso_ao_portal desse endpoint especificamente.
+def test_accept_sem_token_e_recusado(client_anon, apresentacao_com_senha):
+    apresentacao, _ = apresentacao_com_senha
+    resposta = client_anon.post(
+        f"/public/presentations/{apresentacao.id}/accept",
+        json={"accepted": True, "feedback": None, "selected_options": {}},
+    )
+    assert resposta.status_code == 401
+
+
+def test_accept_com_token_valido_e_aceito(client_anon, apresentacao_com_senha):
+    apresentacao, _ = apresentacao_com_senha
+    token = create_portal_token(str(apresentacao.id))
+    resposta = client_anon.post(
+        f"/public/presentations/{apresentacao.id}/accept",
+        json={"accepted": True, "feedback": None, "selected_options": {}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resposta.status_code == 200
