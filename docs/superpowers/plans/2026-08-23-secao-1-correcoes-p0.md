@@ -97,13 +97,15 @@ Expected: `postgres-test` com status `healthy`.
 
 - [ ] **Passo 3: Declarar a dependência nova**
 
-Acrescentar ao final de `ArchSmart-api/requirements-dev.txt`:
+Acrescentar ao final de `ArchSmart-api/requirements.txt` — **não** em `requirements-dev.txt`:
 
 ```
 slowapi==0.1.9
 ```
 
-Run: `pip install -r ArchSmart-api/requirements-dev.txt`
+⚠️ É dependência de **runtime**, não de teste. A Task 5 faz `app/main.py` e `app/core/rate_limit.py` importarem `slowapi` na carga do módulo, e o `Dockerfile` instala apenas `requirements.txt`. Declarar em `requirements-dev.txt` faz o contêiner de produção morrer com `ModuleNotFoundError` ao importar `app.main` — a API inteira não sobe.
+
+Run: `pip install -r ArchSmart-api/requirements.txt`
 
 - [ ] **Passo 4: Apontar o pytest para a suíte nova**
 
