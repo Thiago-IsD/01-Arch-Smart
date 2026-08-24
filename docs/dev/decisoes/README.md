@@ -37,6 +37,10 @@ O sinal observável que confirma ou refuta a decisão. Sem isso, não dá para a
 O que passa a ser mais fácil e o que passa a ser mais difícil.
 ```
 
-## O que ainda não existe
+## ADRs existentes
 
-Esta pasta está vazia além deste índice. O primeiro ADR é escrito pela Task 8 do plano da Seção 2, junto com `docs/dev/deploy.md`.
+- [0001 — Manter Vercel, Render e Supabase no beta](0001-manter-vercel-render-supabase.md)
+- [0002 — Reestruturar em vez de reescrever](0002-reestruturar-em-vez-de-reescrever.md)
+- [0003 — Descartar o banco atual e criar um novo](0003-descartar-banco-atual-criar-novo.md)
+- [0004 — Alembic como fonte única do schema](0004-alembic-fonte-unica-do-schema.md)
+- [0005 — Três branches: `develop`, `staging`, `main`](0005-tres-branches-develop-staging-main.md)

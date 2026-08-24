@@ -1,0 +1,12 @@
+# Dono de tudo, hoje: as duas pessoas do time.
+#
+# Endereço precisa ser o e-mail associado à conta do GitHub de cada um (ou o
+# @usuario do GitHub, se preferir essa forma) — confirme antes de contar com
+# revisão automática a partir deste arquivo.
+#
+# Time crescendo, isto fica mais granular por área (ex.: ArchSmart-api/ para
+# quem mexe em backend, ArchSmart-web/ para frontend) — com duas pessoas,
+# dividir por pasta não reduz revisão nenhuma, só adiciona uma regra a mais
+# para manter sincronizada.
+
+* thiagorodrigues@frwk.com.br brennoluks@gmail.com

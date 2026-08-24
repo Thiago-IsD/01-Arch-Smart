@@ -48,4 +48,4 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 
 ## Onde ler mais
 
-`docs/dev/arquitetura.md` e `docs/dev/convencoes.md` (Task 6 desta seção; hoje só o índice existe).
+`docs/dev/arquitetura.md` e `docs/dev/convencoes.md`.

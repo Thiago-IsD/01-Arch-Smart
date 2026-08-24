@@ -51,4 +51,4 @@ Mensagem em pt-BR para o usuário; detalhe técnico só no log. Nunca `detail=st
 
 ## Convenções
 
-Tabelas `snake_case` plural, PK sempre `id UUID`, schemas Pydantic com sufixo (`ProjectCreate`, `ProjectRead`) — Art. 5 da constitution. Detalhe e exemplos: `docs/dev/convencoes.md` (Task 6 desta seção).
+Tabelas `snake_case` plural, PK sempre `id UUID`, schemas Pydantic com sufixo (`ProjectCreate`, `ProjectRead`) — Art. 5 da constitution. Detalhe e exemplos: `docs/dev/convencoes.md`.

@@ -55,6 +55,6 @@ npx vitest run
 ## Onde ler mais
 
 - [README.md](README.md) — visão geral do produto e como subir o ambiente.
-- [docs/dev/](docs/dev/) — arquitetura, convenções, modelo de dados, deploy (Tasks 5–8 desta seção; hoje só o índice existe).
+- [docs/dev/](docs/dev/) — arquitetura, convenções, modelo de dados, deploy.
 - [docs/dev/decisoes/](docs/dev/decisoes/) — ADRs: por que as coisas são como são.
 - Cada subdiretório da tabela acima tem seu próprio `CLAUDE.md` com regras específicas dele — leia o dele antes de mexer lá.

@@ -1,16 +1,16 @@
 # Documentação de desenvolvimento
 
-Índice dos documentos voltados a quem desenvolve o Arq Smart. Nenhum destes documentos existe ainda além deste índice — as Tasks 5 a 8 do plano da Seção 2 os criam, na ordem abaixo.
+Índice dos documentos voltados a quem desenvolve o Arq Smart.
 
-| Documento | Para que serve | Cria |
-|---|---|---|
-| `ambiente.md` | subir o projeto do zero: dependências, variáveis de ambiente, banco local | Task 5 |
-| `convencoes.md` | o que é obrigatório e o que é proibido no código, com o artigo da constitution que sustenta cada regra | Task 6 |
-| `arquitetura.md` | como API, web e extensão se encaixam, e por onde os dados fluem | Task 6 |
-| `modelo-de-dados.md` | schema do banco comentado, com o porquê de cada relação | Task 7 |
-| `deploy.md` | ambientes, esteira de deploy e como reverter | Task 8 |
-| `decisoes/` | ADRs — por que o projeto está do jeito que está | ver [decisoes/README.md](decisoes/README.md) |
-| `modulos/` | um documento por módulo do produto | ver [modulos/README.md](modulos/README.md) |
+| Documento | Para que serve |
+|---|---|
+| [`ambiente.md`](ambiente.md) | subir o projeto do zero: dependências, variáveis de ambiente, banco local |
+| [`convencoes.md`](convencoes.md) | o que é obrigatório e o que é proibido no código, com o artigo da constitution que sustenta cada regra |
+| [`arquitetura.md`](arquitetura.md) | como API, web e extensão se encaixam, e por onde os dados fluem |
+| [`modelo-de-dados.md`](modelo-de-dados.md) | schema do banco comentado, com o porquê de cada relação |
+| [`deploy.md`](deploy.md) | ambientes, esteira de deploy e como reverter |
+| [`decisoes/`](decisoes/README.md) | ADRs — por que o projeto está do jeito que está |
+| [`modulos/`](modulos/README.md) | um documento por módulo do produto (ainda vazia — ver o índice) |
 
 ## Quando escrever aqui
 
