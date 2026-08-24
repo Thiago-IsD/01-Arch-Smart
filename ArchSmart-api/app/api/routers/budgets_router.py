@@ -16,6 +16,24 @@ from app.services.budget_calculator import calculate_budget_item_quantity
 
 router = APIRouter()
 
+def buscar_item_da_conta(db: Session, item_id: UUID, account_id: UUID) -> BudgetItem:
+    """
+    Devolve o BudgetItem apenas se ele pertencer a conta informada.
+
+    O caminho ate a conta e: BudgetItem -> Budget -> Project -> account_id.
+    Levanta 404 (nao 403) para nao revelar a existencia do recurso.
+    """
+    item = (
+        db.query(BudgetItem)
+        .join(Budget, BudgetItem.budget_id == Budget.id)
+        .join(Project, Budget.project_id == Project.id)
+        .filter(BudgetItem.id == item_id, Project.account_id == account_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Item de orçamento não encontrado")
+    return item
+
 @router.get("/projects/{project_id}/budget", response_model=BudgetResponse)
 def get_project_budget(
     project_id: UUID, 
@@ -129,11 +147,7 @@ def update_budget_item(
     """
     Updates a budget item. Typically used for overriding manual_quantity or loss_factor.
     """
-    item = db.query(BudgetItem).filter(BudgetItem.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Budget item not found")
-        
-    # TODO: Verify project constraints vs current_user
+    item = buscar_item_da_conta(db, item_id, current_user.account_id)
 
     if data.manual_quantity is not None:
         item.manual_quantity = data.manual_quantity
@@ -163,9 +177,7 @@ def delete_budget_item(
     """
     Deletes a budget item permanently (or soft delete based on design rule).
     """
-    item = db.query(BudgetItem).filter(BudgetItem.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Budget item not found")
+    item = buscar_item_da_conta(db, item_id, current_user.account_id)
 
     # Hard-delete cascade will remove ItemOption thanks to SQLAlchemy relationship setup.
     db.delete(item)
@@ -185,9 +197,15 @@ def create_budget_item_option(
     """
     Adds a new Product Option to a Budget Item (A/B Logic).
     """
-    item = db.query(BudgetItem).filter(BudgetItem.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Budget item not found")
+    item = buscar_item_da_conta(db, item_id, current_user.account_id)
+
+    produto = (
+        db.query(Product)
+        .filter(Product.id == data.product_id, Product.account_id == current_user.account_id)
+        .first()
+    )
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto não encontrado na biblioteca")
 
     # Add as unselected option by default
     new_option = ItemOption(
