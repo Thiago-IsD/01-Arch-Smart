@@ -29,8 +29,8 @@ pedaço passou de alvo para realidade (ver a regra "documento afirma só o que
 4. **Root Directory:** `ArchSmart-api`.
 5. **Runtime:** Docker — usar o `Dockerfile` que já existe em
    `ArchSmart-api/Dockerfile`, sem criar um novo. Não preencher build/start
-   command manualmente: o `CMD` do Dockerfile já sobe
-   `uvicorn app.main:app --host 0.0.0.0 --port ${PORT}`.
+   command manualmente: o `CMD` do Dockerfile (linha 11) já sobe
+   `python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`.
 6. **Variáveis de ambiente:** as mesmas chaves listadas em
    `ArchSmart-api/.env.example` (`DATABASE_URL`, `SUPABASE_URL`,
    `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`,
@@ -118,12 +118,16 @@ frontend.
    [ADR 0004](decisoes/0004-alembic-fonte-unica-do-schema.md). O passo de
    deploy do Render (seção 1, item 7) já cobre isso a cada deploy; não rode
    migração da CLI do Supabase contra este projeto em nenhuma circunstância.
-6. Em **Authentication → Providers → Email**, deixar **"Confirm email"
-   ligada** — é o mesmo estado do projeto de produção, confirmado em
-   24/08/2026 (ver a pendência de segurança em
-   [`arquitetura.md`](arquitetura.md) e a nota correspondente em
-   `../../CLAUDE.md`). Um projeto novo do Supabase nasce com essa opção
-   ligada por padrão; este passo é só confirmar que ninguém a desligou.
+6. Em **Authentication → Providers → Email** *deste projeto novo* (de
+   staging, não o de produção), confira se **"Confirm email"** está ligada
+   e ligue se não estiver — é o mesmo estado do projeto de produção,
+   confirmado por **Thiago no painel do Supabase em 24/08/2026**. `CLAUDE.md`
+   e [`arquitetura.md`](arquitetura.md) ainda descrevem essa confirmação
+   como pendente porque quem os atualiza é outra tarefa desta seção, ainda
+   não executada — não é uma contradição sobre o fato, só um texto que
+   ainda não foi ajustado. O que este passo garante não é o estado da
+   produção (já sabido), e sim que o projeto **novo** nasça igual: confira
+   no painel deste projeto, não presuma o valor.
 
 ## 4. Banco de produção novo
 
