@@ -41,7 +41,9 @@ Latência de API: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/
 
 **Quatro causas, todas confirmadas:**
 
-1. **Nada é cacheado.** Em 6 ciclos de navegação, `/api/presentations`, `/api/events` e `/api/financial` foram chamados 12× cada. `/api/products` foi chamado 4× — porque a Biblioteca é a única das 33 telas que usa TanStack Query.
+1. **Nada era cacheado.** Em 6 ciclos de navegação, `/api/presentations`, `/api/events` e `/api/financial` foram chamados 12× cada. `/api/products` foi chamado 4× — porque a Biblioteca é a única das 33 telas que usa TanStack Query.
+
+   ⚠️ Corrigido em 24/08/2026: a versão anterior afirmava, no presente, "nada é cacheado". Isso descrevia o estado medido em 23/08/2026, antes da Seção 2/3 — não é mais verdade hoje: o `QueryProvider` está montado em `src/app/(dashboard)/layout.tsx` com `staleTime` de 30 s, e 3 dos 144 arquivos já usam `useQuery`. Ver `docs/dev/arquitetura.md` e `docs/dev/convencoes.md` para o estado atual do cache.
 2. **Query lenta e piorando com o volume.** 4 `index=True` no modelo inteiro; 7 `create_index` em 26 migrações; **zero em `account_id`**. Toda listagem por conta faz varredura sequencial, contra um banco remoto (`aws-1-sa-east-1.pooler.supabase.com`). É isto que faz a plataforma ficar mais lenta quanto mais o cliente a usa: não é a sessão que degrada, é a conta.
 3. **O `proxy.ts` cobra ~83 ms de toda requisição.** `getUser()` (ida à rede ao Supabase Auth) roda **antes** do desvio para `/api`, `/_next` e estáticos. Medido: 9 ms fora do matcher, 92 ms dentro. Deslogado o custo é zero, o que explica por que não aparecia em teste rápido.
 4. **Requisição não é cancelada.** `AbortController` aparece 3× em 141 arquivos, nenhuma para navegação. Sair do Dashboard deixa o `/api/dashboard/lean` rodando 1,4–2,5 s disputando conexão com a tela que entra.
@@ -50,19 +52,29 @@ Latência de API: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/
 
 ### 2.3 Manutenibilidade — por que cada iteração custa mais
 
+Medido em 23/08/2026, antes da Seção 1. É um retrato datado — a contagem de
+arquivos do frontend mudou desde então (141 → 144, ver `docs/dev/arquitetura.md`);
+as duas linhas marcadas com nota foram revistas depois e permanecem válidas,
+as demais refletem só o momento da medição.
+
 | Medida | Valor |
 |---|---|
 | Cliente de API compartilhado | **não existe** |
 | `createClient()` espalhados | 62 |
 | `getSession()` espalhados | 56 |
-| Headers `Authorization` montados à mão | 67 (70 após a Seção 1) |
+| Headers `Authorization` montados à mão | 67 (70 após a Seção 1)¹ |
 | Arquivos repetindo o mesmo boilerplate | 37 |
 | `CLAUDE.md` / convenções escritas | **nenhum** |
 | Estruturas de rota coexistindo no backend | 3 (`api/`, `api/endpoints/`, `api/routers/`) |
 | `next/dynamic` / `React.lazy` | **0 em 141 arquivos** |
-| Cores literais | **510** classes de paleta Tailwind em 39 arquivos + 11 `bg-[#hex]` |
+| Cores literais | **510** classes de paleta Tailwind em 39 arquivos + 11 `bg-[#hex]`² |
 | Testes | 83, todos contra `MagicMock` — nenhum capaz de detectar vazamento entre contas |
 | CI | **nenhum** além de dois workflows de keep-alive |
+
+¹ Atualizado nesta revisão (24/08/2026) para incluir o efeito da Seção 1 —
+única linha desta tabela recalculada após a medição original.
+² Reconferido em 24/08/2026 (`docs/dev/convencoes.md`): o número permanece
+o mesmo hoje.
 
 Cada tela nova custa mais que a anterior porque cada tela nova copia a anterior, junto com o boilerplate.
 

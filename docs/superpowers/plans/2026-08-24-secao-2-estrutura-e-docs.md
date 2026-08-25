@@ -662,7 +662,7 @@ Para cada agregado: o que representa no negócio, as relações e por que são a
 
 Registre explicitamente, porque é o que a Seção 4 precisa:
 
-- **Quais tabelas têm `account_id` hoje** e quais não têm (13 não têm). Para as que não têm, qual é o caminho até a conta (`BudgetItem → Budget → Project → account_id`)
+- **Quais tabelas têm `account_id` hoje** e quais não têm (10 não têm). Para as que não têm, qual é o caminho até a conta (`BudgetItem → Budget → Project → account_id`)
 - **Que `created_by` não existe em nenhuma tabela**
 - **Que só há 4 índices** no modelo inteiro e nenhum em `account_id` — e que é isso que faz a plataforma ficar mais lenta conforme a conta acumula dados
 - **Que `Document.embedding` é `Vector(1536)`** e exige a extensão `vector` no Postgres

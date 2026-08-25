@@ -10,9 +10,10 @@ código (`spec-kit-2/auditoria-codigo-2026-08-23.md`) e um spike de medição em
 navegador mostraram que reescrever não resolveria as causas: elas são de
 arquitetura (sem cliente HTTP único, sem índice em `account_id`, sem cache
 padronizado) e de processo (sem `CLAUDE.md`, sem CI, sem convenção
-documentada), não de código legado irrecuperável. **57 dos 70 endpoints da
-API estão corretos hoje** — a Seção 1 já corrigiu os 13 com falha de
-autorização; a maior parte do código funciona como deveria.
+documentada), não de código legado irrecuperável. **56 dos 70 endpoints da
+API estão corretos hoje** — a Seção 1 já corrigiu os 14 com falha de
+autorização (13 encontrados na auditoria mais 1, `financial.py`, descoberto
+durante a Seção 1); a maior parte do código funciona como deveria.
 
 Tempo medido, do clique até os dados na tela, com sessão real: Projetos
 3,0 s · Biblioteca 3,6 s · Financeiro 4,3 s. Cada tela nova custa mais que a
@@ -35,7 +36,7 @@ dados e de UI que falta, e migrar as telas para cima dela uma de cada vez
 
 - **Aplicação nova em paralelo, com corte no fim.** Rejeitada: o corte é
   big-bang — tudo migra de uma vez, no fim, sem meio-termo para validar antes
-  — e 57 dos 70 endpoints já estão corretos e seriam descartados sem motivo.
+  — e 56 dos 70 endpoints já estão corretos e seriam descartados sem motivo.
   Principalmente: um projeto novo sem a camada de base que falta (cliente
   HTTP único, filtro por conta automático, tokens de cor) reproduziria
   exatamente os defeitos de processo que trouxeram a plataforma a este
