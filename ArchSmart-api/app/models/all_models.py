@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum, func
 from sqlalchemy import Uuid as UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -415,7 +415,9 @@ class Event(Base):
     end_time = Column(DateTime, nullable=False)
     meet_link = Column(String, nullable=True)
     google_event_id = Column(String, nullable=True)  # Preparação para Google Calendar OAuth
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # NOT NULL com server_default espelha a migracao f1a2b3c4d5e6: o banco
+    # garante o valor mesmo numa escrita que nao passe pelo ORM.
+    created_at = Column(DateTime, nullable=False, server_default=func.now(), default=datetime.utcnow)
 
     # Relationships
     account = relationship("Account", back_populates="events")
