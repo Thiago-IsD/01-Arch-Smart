@@ -43,7 +43,7 @@ _Última atualização: 2026-08-24_
 - [ ] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
 - [ ] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
 - [ ] Banco de produção novo, criado do zero pela receita de migrações
-- [ ] Seed com volume realista (`tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
+- [ ] Seed com volume realista (`ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
 
 ## Seção 4 · Camada de dados do backend
 **0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`

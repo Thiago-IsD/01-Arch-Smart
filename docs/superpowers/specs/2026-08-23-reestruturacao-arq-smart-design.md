@@ -44,7 +44,7 @@ Latência de API: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/
 1. **Nada era cacheado.** Em 6 ciclos de navegação, `/api/presentations`, `/api/events` e `/api/financial` foram chamados 12× cada. `/api/products` foi chamado 4× — porque a Biblioteca é a única das 33 telas que usa TanStack Query.
 
    ⚠️ Correção de 24/08/2026: o achado original dizia, no presente, "nada é cacheado", o que já era falso na data desta medição (23/08/2026). O `QueryProvider` (`staleTime` de 30 s) já estava montado em `src/app/(dashboard)/layout.tsx`, e 3 dos 144 arquivos já usavam `useQuery` — nenhuma seção desta reestruturação construiu isso, a medição original só errou. O que ela mostrou de fato é que as outras 141 telas refazem a chamada a cada navegação. Ver `docs/dev/arquitetura.md` e `docs/dev/convencoes.md` para o estado atual do cache.
-2. **Query lenta e piorando com o volume.** 4 `index=True` no modelo inteiro; 7 `create_index` em 26 migrações; **zero em `account_id`**. Toda listagem por conta faz varredura sequencial, contra um banco remoto (`aws-1-sa-east-1.pooler.supabase.com`). É isto que faz a plataforma ficar mais lenta quanto mais o cliente a usa: não é a sessão que degrada, é a conta.
+2. **Query lenta e piorando com o volume.** 4 `index=True` no modelo inteiro; 6 `create_index` em 27 migrações; **zero em `account_id`**. Toda listagem por conta faz varredura sequencial, contra um banco remoto (`aws-1-sa-east-1.pooler.supabase.com`). É isto que faz a plataforma ficar mais lenta quanto mais o cliente a usa: não é a sessão que degrada, é a conta.
 3. **O `proxy.ts` cobra ~83 ms de toda requisição.** `getUser()` (ida à rede ao Supabase Auth) roda **antes** do desvio para `/api`, `/_next` e estáticos. Medido: 9 ms fora do matcher, 92 ms dentro. Deslogado o custo é zero, o que explica por que não aparecia em teste rápido.
 4. **Requisição não é cancelada.** `AbortController` aparece 3× em 141 arquivos, nenhuma para navegação. Sair do Dashboard deixa o `/api/dashboard/lean` rodando 1,4–2,5 s disputando conexão com a tela que entra.
 
@@ -169,7 +169,7 @@ Mudanças estruturais que importam:
 2. ADR em `docs/dev/decisoes/` para toda decisão não-óbvia: o que se decidiu, o que se rejeitou, e **como saberemos se foi certo**.
 3. CI falha se módulo novo em `api/app/services/` ou `web/src/features/` não tiver arquivo correspondente em `docs/dev/modulos/`.
 
-**Descartes decididos:** `Spec-1/` (relatórios antigos). Dos 20 scripts na raiz da API: `seed_*` viram um `tools/seed.py` parametrizado; `reset_db.py` e `init_db.py` vão para `tools/`; `debug_*`, `trace_*`, `fix_*`, `check_users`, `add_column`, `test_jwt`, `test_login`, `test_filters`, `test_pagination`, `revert_storage` são apagados. Também `login.json` e `mock_database.db`, hoje rastreados no git.
+**Descartes decididos:** `Spec-1/` (relatórios antigos). Dos 20 scripts na raiz da API: `seed_*` viram um `ArchSmart-api/tools/seed.py` parametrizado; `reset_db.py` e `init_db.py` vão para `ArchSmart-api/tools/`; `debug_*`, `trace_*`, `fix_*`, `check_users`, `add_column`, `test_jwt`, `test_login`, `test_filters`, `test_pagination`, `revert_storage` são apagados. Também `login.json` e `mock_database.db`, hoje rastreados no git.
 
 ### Seção 3 — Esteira, ambientes e branches
 
@@ -188,7 +188,7 @@ feature/xyz ──PR──► develop ──► staging (ambiente online) ──
 | Front | preview automático da Vercel por PR (já disponível, não usado hoje) |
 | API de staging | segundo serviço no Render, apontando para `staging` |
 | Banco de staging | projeto Supabase separado, criado pela mesma receita de migrações |
-| Dado de staging | `tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto |
+| Dado de staging | `ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto |
 | Migração | automática no deploy de staging; produção só depois de passar lá |
 
 O volume realista é o item crítico: **é contra staging que o orçamento de performance de cada tela é medido.** Medir com três produtos na biblioteca foi o que deixou a lentidão passar despercebida.
