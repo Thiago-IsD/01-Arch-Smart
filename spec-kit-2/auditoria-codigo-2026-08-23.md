@@ -137,12 +137,14 @@ Somado ao fato de o banco estar em `aws-1-sa-east-1.pooler.supabase.com` — cad
 
 Medido em localhost, com sessão real: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/api/presentations` 868 ms · `/api/financial` 510 ms.
 
-### P1-8 · Nada era cacheado entre navegações, e nada era cancelado
+### P1-8 · Nada era cacheado entre navegações, e nada é cancelado
 
-⚠️ Nota de 24/08/2026: a Seção 2 montou o `QueryProvider` (`staleTime` de
-30 s) e a Seção 3 migrou 3 dos 144 arquivos para `useQuery` — o achado
-abaixo descreve o estado medido em 23/08/2026, na data desta auditoria, não
-o estado atual. Ver `docs/dev/arquitetura.md` e `docs/dev/convencoes.md`.
+⚠️ Correção de 24/08/2026: o título original dizia, no presente, "nada é cacheado", o que
+já era falso na data da auditoria. O `QueryProvider` (`staleTime` de 30 s) já
+estava montado em `src/app/(dashboard)/layout.tsx`, e 3 dos 144 arquivos já
+usavam `useQuery`. O que a medição mostrou é que as outras 141 telas refazem
+a chamada a cada navegação — o padrão certo existia e estava aplicado em 3
+lugares. O cancelamento, esse sim, continua sem solução: a Seção 5 o resolve.
 
 Em 6 ciclos de navegação (36 trocas de tela), `/api/presentations`, `/api/events` e `/api/financial` foram chamados 12 vezes cada; `/api/dashboard/lean`, 10 vezes. Já `/api/products` foi chamado 4 vezes — **porque a Biblioteca é a única tela que usa TanStack Query.** O padrão correto já existe no código, aplicado em 1 de 33 telas.
 
@@ -195,7 +197,7 @@ Uma auditoria que só lista defeito leva à decisão errada. Isto aqui está bom
 |---|---|---|---|
 | Modelo de dados | 60% pronto | **Completar** | Faltam `account_id` em **10** tabelas que guardam dado de conta (`plans`, `product_states` e `product_origins` são catálogo global e não precisam; `documents` não tem FK nem consumidor) e `created_by` em todas. É migração, não reescrita |
 | Camada de acesso a dados | Inexistente | **Construir** | `ScopedRepository` novo — não há o que reescrever |
-| Endpoints | 70, ~10 com defeito | **Corrigir + versionar** | 56 estão corretos. Reescrever os 56 é destruir valor |
+| Endpoints | 70, 14 com defeito | **Corrigir + versionar** | 56 estão corretos. Reescrever os 56 é destruir valor |
 | Serviços | 4 arquivos, bem separados | **Manter** | `budget_calculator` é referência de qualidade |
 | Testes | 83 inúteis | **Descartar e refazer** | Mock de banco não tem conserto incremental |
 | Front-end — telas | Client-heavy, waterfalls | **Reescrever tela a tela** | É a Onda 2, já especificada |
