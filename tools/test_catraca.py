@@ -10,7 +10,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from catraca import comparar, contar_cores, modulos_sem_doc
+from catraca import (
+    comparar,
+    contar_cores,
+    decidir_atualizacao,
+    medidas_pioradas,
+    modulos_sem_doc,
+)
 
 
 class TestContagemDeCores(unittest.TestCase):
@@ -87,6 +93,60 @@ class TestComparacao(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertIn("cobranca_service", "\n".join(linhas))
+
+
+class TestMedidasPioradas(unittest.TestCase):
+    def test_nada_piora_nao_lista_nada(self):
+        self.assertEqual(
+            medidas_pioradas({"cores_literais": 521}, {"cores_literais": 521}), []
+        )
+        self.assertEqual(
+            medidas_pioradas({"cores_literais": 521}, {"cores_literais": 500}), []
+        )
+
+    def test_numero_que_sobe_aparece(self):
+        pioras = medidas_pioradas({"cores_literais": 521}, {"cores_literais": 522})
+        self.assertEqual(pioras, ["cores_literais: 521 -> 522"])
+
+    def test_modulo_novo_sem_doc_conta_como_piora(self):
+        pioras = medidas_pioradas(
+            {"modulos_sem_doc": ["ai_service"]},
+            {"modulos_sem_doc": ["ai_service", "cobranca_service"]},
+        )
+        self.assertEqual(len(pioras), 1)
+        self.assertIn("cobranca_service", pioras[0])
+
+
+class TestDecidirAtualizacao(unittest.TestCase):
+    def test_nada_piorou_deixa_gravar_sem_avisos(self):
+        grava, avisos = decidir_atualizacao(
+            {"cores_literais": 521}, {"cores_literais": 521}, aceitar_piora=False
+        )
+        self.assertTrue(grava)
+        self.assertEqual(avisos, [])
+
+    def test_piorou_sem_flag_recusa_gravar(self):
+        grava, avisos = decidir_atualizacao(
+            {"cores_literais": 521}, {"cores_literais": 522}, aceitar_piora=False
+        )
+        self.assertFalse(grava)
+        self.assertIn("521 -> 522", "\n".join(avisos))
+
+    def test_piorou_com_flag_grava_e_avisa(self):
+        grava, avisos = decidir_atualizacao(
+            {"cores_literais": 521}, {"cores_literais": 522}, aceitar_piora=True
+        )
+        self.assertTrue(grava)
+        self.assertIn("521 -> 522", "\n".join(avisos))
+
+    def test_modulo_novo_sem_doc_conta_como_piora_e_recusa(self):
+        grava, avisos = decidir_atualizacao(
+            {"modulos_sem_doc": ["ai_service"]},
+            {"modulos_sem_doc": ["ai_service", "cobranca_service"]},
+            aceitar_piora=False,
+        )
+        self.assertFalse(grava)
+        self.assertIn("cobranca_service", "\n".join(avisos))
 
 
 if __name__ == "__main__":

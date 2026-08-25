@@ -12,10 +12,17 @@ Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
 Uso:
     python tools/catraca.py --eslint-json ArchSmart-web/eslint.json
-    python tools/catraca.py --atualizar    # regrava o baseline com o medido
+    python tools/catraca.py --atualizar                    # regrava o baseline com o medido
+    python tools/catraca.py --atualizar --aceitar-piora     # regrava mesmo com regressao, com aviso
 
 Sem --eslint-json a medida de lint e pulada, e nao falha: quem tem Node
 instalado e o job `frontend` do CI, e e la que ela roda.
+
+--atualizar so grava o baseline se nenhuma medida piorou. Se alguma piorou
+(numero subiu, ou modulo novo ficou sem doc) e --aceitar-piora nao foi
+passado, ele recusa gravar, explica o que pioraria e sai 1 -- gravar em
+silencio transformaria a regressao no novo normal. Com --aceitar-piora ele
+grava mesmo assim, mas imprime um aviso destacado com cada medida que subiu.
 """
 import argparse
 import json
@@ -113,18 +120,61 @@ def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
     return ok, linhas
 
 
+def medidas_pioradas(baseline: dict, medido: dict) -> list[str]:
+    """Descricoes ('chave: de -> para') de cada medida que piorou de `baseline` para `medido`."""
+    pioras = []
+    for chave, valor in sorted(medido.items()):
+        base = baseline.get(chave)
+        if isinstance(valor, list):
+            novos = sorted(set(valor) - set(base or []))
+            if novos:
+                pioras.append(f"{chave}: novo(s) sem doc: {', '.join(novos)}")
+        elif base is not None and valor > base:
+            pioras.append(f"{chave}: {base} -> {valor}")
+    return pioras
+
+
+def decidir_atualizacao(baseline: dict, medido: dict, aceitar_piora: bool) -> tuple[bool, list[str]]:
+    """(deve_gravar, avisos).
+
+    Sem regressao: (True, []) -- grava normal, sem aviso.
+    Com regressao e sem --aceitar-piora: (False, [...]) -- recusa gravar, explica o motivo.
+    Com regressao e com --aceitar-piora: (True, [...]) -- grava, mas avisa cada medida que piorou.
+    """
+    pioras = medidas_pioradas(baseline, medido)
+    if not pioras:
+        return True, []
+    if not aceitar_piora:
+        linhas = ["A catraca recusou --atualizar: isso pioraria o baseline:"]
+        linhas += [f"  - {p}" for p in pioras]
+        linhas.append("Gravar isso transformaria a regressao no novo normal, em silencio.")
+        linhas.append("Se e mesmo intencional, justifique no PR e rode de novo com --aceitar-piora.")
+        return False, linhas
+    linhas = ["AVISO: --aceitar-piora foi passado, o baseline vai piorar:"]
+    linhas += [f"  - {p}" for p in pioras]
+    return True, linhas
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--eslint-json", type=Path, default=None,
                         help="relatorio JSON do eslint; sem ele a medida de lint e pulada")
     parser.add_argument("--atualizar", action="store_true",
-                        help="regrava catraca.json com o valor medido")
+                        help="regrava catraca.json com o valor medido; recusa se alguma medida piorou")
+    parser.add_argument("--aceitar-piora", action="store_true",
+                        help="usado com --atualizar: grava mesmo que alguma medida tenha piorado,"
+                             " imprimindo um aviso; sozinho nao faz nada")
     args = parser.parse_args(argv)
 
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     medido = medir(args.eslint_json)
 
     if args.atualizar:
+        grava, avisos = decidir_atualizacao(baseline, medido, args.aceitar_piora)
+        if avisos:
+            print("\n".join(avisos))
+        if not grava:
+            return 1
         baseline.update(medido)
         BASELINE.write_text(json.dumps(baseline, indent=2, ensure_ascii=False) + "\n",
                             encoding="utf-8")
