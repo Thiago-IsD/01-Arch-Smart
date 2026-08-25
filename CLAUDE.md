@@ -13,6 +13,23 @@ Antes de escrever qualquer código:
 
 Estado em 24/08/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seções 3 a 9 pendentes.
 
+## Antes de começar a Seção 3
+
+Dois itens em aberto que distorcem a Seção 3 (esteira, CI e ambientes) se forem ignorados:
+
+1. **`npx vitest run` sai com erro em checkout limpo.** `ArchSmart-web/vitest.config.ts` não exclui `e2e/`, então o vitest coleta as specs do Playwright e falha em 2 arquivos — os testes de unidade reais passam. **Corrija antes de ligar o portão de CI do frontend.** Um portão que nasce vermelho é desativado na primeira semana, e aí não existe portão nenhum.
+
+2. **Falta confirmar se o Supabase exige confirmação de e-mail** — *Authentication → Providers → Email → "Confirm email"*. Só Thiago consegue verificar, no painel. Isso decide a **urgência**, não o conteúdo, do achado de segurança em `app/api/users.py`: o auto-link por e-mail entrega a conta a quem obtiver um JWT com o e-mail da vítima, e se a confirmação estiver desligada isso é explorável hoje. A correção precisa acontecer de qualquer forma — ver a advertência em [docs/dev/arquitetura.md](docs/dev/arquitetura.md), seção "pendência de segurança conhecida".
+
+## Como trabalhar aqui
+
+**Número afirmado sem medição é número errado.** Durante a Seção 2, quatro números que circulavam na auditoria e na spec estavam errados: 137 classes de cor literal (eram **510**), 63 testes na suíte antiga (eram **83**), 13 tabelas sem `account_id` (eram **10**), 27 migrações (eram **26**). Todos sobreviveram a várias revisões de texto, e todos foram pegos por alguém que **tentou usar o número** e não conseguiu reproduzi-lo.
+
+Duas consequências práticas:
+
+- **Ao receber um número — deste repositório ou de quem te instrui — meça antes de republicá-lo.** Se não bater, diga. Não ajuste sua contagem para casar com o que te falaram: já aconteceu nas duas direções aqui.
+- **Ao afirmar um número, mostre o comando.** "Verificado por grep", sem o comando colado, já se provou falso neste repositório — o `deploy.md` afirmava que as 26 migrações tinham `downgrade()` não vazio, e são 25.
+
 ## Estrutura
 
 | Diretório | O que é | Regras próprias |
