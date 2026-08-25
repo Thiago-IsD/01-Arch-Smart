@@ -17,17 +17,11 @@ class ProductOriginType(str, enum.Enum):
     WEB_CLIPPER = "WEB_CLIPPER"
     SHOPPING_HUB = "SHOPPING_HUB"
     MANUAL = "MANUAL"
-    # New values from the provided snippet, assuming they are additions/replacements
-    CATALOG = "CATALOG" # Added from snippet
 
 class ProductStateStatus(str, enum.Enum):
     CAPTURED = "CAPTURED"
     NORMALIZED = "NORMALIZED"
     INACTIVE = "INACTIVE"
-    # New values from the provided snippet, assuming they are additions/replacements
-    ACTIVE = "ACTIVE" # Added from snippet
-    ARCHIVED = "ARCHIVED" # Added from snippet
-    DELETED = "DELETED" # Added from snippet
 
 class RuleType(str, enum.Enum): # Added RuleType enum
     FLOOR = "FLOOR"

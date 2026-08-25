@@ -17,7 +17,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine, text
+from sqlalchemy import Enum as SAEnum, create_engine, text
 
 from app.core import config as app_config
 from app.db.base_class import Base
@@ -62,6 +62,52 @@ def test_receita_reproduz_os_models(banco_da_receita):
         "O banco construido pelas migracoes diverge dos models em "
         f"{len(diferencas)} ponto(s):\n"
         + "\n".join(f"  - {d!r}" for d in diferencas)
+    )
+
+
+def test_enums_do_banco_batem_com_os_models(banco_da_receita):
+    """
+    compare_metadata (Alembic) compara tabelas, colunas e tipos, mas nao o
+    conteudo de um Enum do Postgres -- um enum Python com um rotulo a mais
+    do que o tipo no banco passa pelo test_receita_reproduz_os_models sem
+    acusar nada, porque dos dois lados o tipo da coluna e "enum", so os
+    rotulos dentro dele divergem. E foi exatamente assim que quatro valores
+    (ProductOriginType.CATALOG, ProductStateStatus.ACTIVE/.ARCHIVED/.DELETED)
+    ficaram declarados no model sem nenhuma migracao para cria-los: o model
+    promete um valor que o INSERT rejeita em qualquer banco construido pela
+    receita.
+
+    Descobre os enums do lado do model varrendo Base.metadata em busca de
+    colunas Enum (o nome do tipo Postgres e `coluna.type.name`, os rotulos
+    esperados sao `coluna.type.enums`) e compara cada um com pg_type/pg_enum
+    no banco que a receita acabou de construir.
+    """
+    enums_do_model = {}
+    for tabela in Base.metadata.sorted_tables:
+        for coluna in tabela.columns:
+            if isinstance(coluna.type, SAEnum) and coluna.type.enum_class is not None:
+                enums_do_model[coluna.type.name] = set(coluna.type.enums)
+
+    with banco_da_receita.connect() as conexao:
+        linhas = conexao.execute(text(
+            "SELECT t.typname, array_agg(e.enumlabel) "
+            "FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid "
+            "GROUP BY t.typname"
+        )).all()
+    enums_do_banco = {nome: set(valores) for nome, valores in linhas}
+
+    divergencias = {}
+    for nome, valores_model in enums_do_model.items():
+        valores_banco = enums_do_banco.get(nome, set())
+        if valores_model != valores_banco:
+            divergencias[nome] = {
+                "so_no_model": sorted(valores_model - valores_banco),
+                "so_no_banco": sorted(valores_banco - valores_model),
+            }
+
+    assert divergencias == {}, (
+        f"Enums do Postgres divergem dos models em {len(divergencias)} tipo(s):\n"
+        + "\n".join(f"  - {nome}: {info}" for nome, info in divergencias.items())
     )
 
 
