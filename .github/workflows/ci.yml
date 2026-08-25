@@ -103,18 +103,25 @@ jobs:
         run: python tools/progresso.py --check
       - name: Links internos da documentacao
         run: python tools/checa_links.py
-      - name: main nao tem commit ausente em develop
+      - name: main nao tem mudanca ausente em develop
         # Hotfix aplicado em main precisa voltar para develop no mesmo dia
-        # (ADR 0005). Este passo acusa quando isso nao aconteceu.
+        # (ADR 0005). A comparacao e de CONTEUDO, nao de contagem de commits:
+        # `git rev-list --count origin/develop..origin/main` acusa tambem os
+        # merge commits que o fluxo antigo deixou em main — em 24/08/2026 sao
+        # 9 commits que nao carregam nenhuma mudanca ausente em develop, ou
+        # seja, um alarme falso permanente. O diff de tres pontos compara a
+        # base de merge com main: so acusa quando main tem conteudo que
+        # develop nao tem, que e exatamente o hotfix perdido do ADR 0005.
         run: |
           git fetch origin main develop --quiet
-          faltando=$(git rev-list --count origin/develop..origin/main)
-          if [ "$faltando" -ne 0 ]; then
-            echo "main tem $faltando commit(s) que nao estao em develop:"
+          if ! git diff --quiet origin/develop...origin/main; then
+            echo "main tem mudanca de conteudo ausente em develop:"
+            git diff --stat origin/develop...origin/main
+            echo "commits candidatos:"
             git log --oneline origin/develop..origin/main
             exit 1
           fi
-          echo "main e develop sincronizados."
+          echo "main nao tem mudanca ausente em develop."
 
 # Portoes que ainda nao existem. Nao sao stub vazio de proposito: verificacao
 # que nao mede nada da a impressao de uma cobertura que nao ha.
