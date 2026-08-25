@@ -13,7 +13,16 @@ futura está marcada como tal, nunca descrita como já existindo.
 | `ArchSmart-api` (backend) | Render, tier gratuito | URL de produção `https://arch-smart-api.onrender.com`, pingada a cada 10 min por `.github/workflows/keep-alive.yml` (o tier gratuito do Render dorme após ~15 min sem tráfego, cold start de ~20s). |
 | Banco (Postgres) | Supabase, projeto do time, região São Paulo (`aws-1-sa-east-1.pooler.supabase.com`) | Host confirmado em `spec-kit-2/auditoria-codigo-2026-08-23.md` (`ArchSmart-api/.env.example` traz só um placeholder desde a Seção 2); `.github/workflows/keep-db-alive.yml` toca o banco 2x ao dia (o tier gratuito do Supabase pausa o projeto após ~7 dias sem uso). O mesmo projeto Supabase também é o Auth — não há banco de aplicação separado do banco de autenticação hoje. |
 
-Não existe hoje um ambiente de staging: **todo `git push`/merge para `main` é o caminho direto para produção**, tanto no Vercel quanto no Render (comportamento assumido a partir da configuração de deploy contínuo de cada plataforma — não confirmado por um arquivo de config neste repositório, mesma ressalva da tabela acima).
+Não existe hoje um **ambiente** de staging: **todo `git push`/merge para
+`main` é o caminho direto para produção**, tanto no Vercel quanto no Render
+(comportamento assumido a partir da configuração de deploy contínuo de cada
+plataforma — não confirmado por um arquivo de config neste repositório,
+mesma ressalva da tabela acima). A **branch** `staging` já existe no
+GitHub, mas nenhum ambiente está ligado a ela ainda — nem serviço no Render,
+nem projeto Supabase, nem preview da Vercel. O roteiro de como ligar cada
+peça, passo a passo de painel, está em
+[`ambientes-online.md`](ambientes-online.md); nada dele foi executado até
+agora — o roteiro existe, a execução está pendente.
 
 ## A esteira hoje: nada além de dois workflows de keep-alive
 
@@ -214,6 +223,9 @@ Nada do que está descrito acima como "hoje" continua igual depois da Seção
 
 ## Onde ler mais
 
+- [`ambientes-online.md`](ambientes-online.md) — roteiro de painel para
+  ligar staging e recriar produção (Render, Vercel, Supabase, branch
+  protection); nada dele executado ainda.
 - [`ambiente.md`](ambiente.md) — como subir cada peça localmente.
 - [`arquitetura.md`](arquitetura.md) — o que roda onde e como a identidade é
   resolvida.
