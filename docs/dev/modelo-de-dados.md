@@ -30,7 +30,7 @@ fisicamente uma conta.
 Um usuário sempre pertence a exatamente uma conta (`account_id` `NOT NULL`).
 Não existe usuário multi-conta hoje — trocar de escritório significa outro
 usuário, outro login. `supabase_id` é o elo com o Supabase Auth (a senha não
-mora aqui, ver `docs/dev/arquitetura.md#como-a-identidade-é-resolvida`);
+mora aqui, ver [arquitetura.md](arquitetura.md#como-a-identidade-é-resolvida));
 `email` e `supabase_id` são as duas únicas colunas com `unique=True` que
 também têm índice — não por acaso, são as duas usadas para resolver
 identidade em toda requisição (`get_current_user`, `app/api/users.py`).

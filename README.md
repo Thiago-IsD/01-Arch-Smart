@@ -30,6 +30,7 @@ Suba o projeto seguindo **[docs/dev/ambiente.md](docs/dev/ambiente.md)**. Se alg
 | Como faço deploy e como reverto? | [docs/dev/deploy.md](docs/dev/deploy.md) |
 | O que estamos construindo e por quê? | [spec-kit-2/](spec-kit-2/) |
 | Como está a reestruturação? | [PROGRESS.md](PROGRESS.md) |
+| Quais são as regras para um agente de IA trabalhar aqui? | [CLAUDE.md](CLAUDE.md) |
 
 ## Regras que não se negociam
 

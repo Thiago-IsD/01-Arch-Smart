@@ -22,6 +22,9 @@ Estado em 24/08/2026: Seção 1 concluída (correções de segurança, merge `f1
 | `extension/` | Extensão de navegador do Web Clipper | [extension/CLAUDE.md](extension/CLAUDE.md) |
 | `spec-kit-2/` | Constitution, roadmap e specs de produto 001–020 | — |
 | `docs/` | Documentação de desenvolvimento e de usuário | [docs/README.md](docs/README.md) |
+| `tools/` | Scripts do **repositório** (checam o próprio processo: `progresso.py`, `checa_links.py`) — nunca falam com o banco da aplicação | [docs/README.md](docs/README.md) |
+
+> Existe um segundo `tools/`, dentro de `ArchSmart-api/`, com scripts que falam com o banco da aplicação (`reset_db.py`, `seed_*.py`) — ver [ArchSmart-api/tools/README.md](ArchSmart-api/tools/README.md). São dois diretórios diferentes com o mesmo nome: um script novo que fala com o banco da aplicação nunca vai no `tools/` da raiz.
 
 > `ArchSmart-api/` e `ArchSmart-web/` serão renomeados para `api/` e `web/` na **Seção 9**. Não renomeie antes disso — o path faz parte de muita coisa (imports, scripts, CI futuro) para trocar fora de uma tarefa dedicada.
 
@@ -41,6 +44,7 @@ Backend (suíte roda contra Postgres real, não mock):
 
 ```
 cd ArchSmart-api
+.\venv\Scripts\Activate.ps1
 docker compose -f docker-compose.test.yml up -d --wait
 pytest
 ```

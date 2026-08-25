@@ -11,7 +11,7 @@ futura está marcada como tal, nunca descrita como já existindo.
 |---|---|---|
 | `ArchSmart-web` (frontend) | Vercel | Decisão da constitution (Art. 14). O domínio de produção, `https://www.archsmart.com.br`, está confirmado em `extension/popup.js` (`ENVIRONMENTS.prod.web`). **Não confirmado por arquivo**: este repositório não tem `vercel.json` nem outra config que prove a hospedagem exata — ver a mesma ressalva em [`arquitetura.md`](arquitetura.md). Se precisar confirmar como o projeto está configurado na Vercel (build command, variáveis de ambiente, domínio custom), pergunte ao time em vez de assumir. |
 | `ArchSmart-api` (backend) | Render, tier gratuito | URL de produção `https://arch-smart-api.onrender.com`, pingada a cada 10 min por `.github/workflows/keep-alive.yml` (o tier gratuito do Render dorme após ~15 min sem tráfego, cold start de ~20s). |
-| Banco (Postgres) | Supabase, projeto do time, região São Paulo (`aws-1-sa-east-1.pooler.supabase.com`) | `DATABASE_URL` de `ArchSmart-api/.env.example` aponta para esse projeto; `.github/workflows/keep-db-alive.yml` toca o banco 2x ao dia (o tier gratuito do Supabase pausa o projeto após ~7 dias sem uso). O mesmo projeto Supabase também é o Auth — não há banco de aplicação separado do banco de autenticação hoje. |
+| Banco (Postgres) | Supabase, projeto do time, região São Paulo (`aws-1-sa-east-1.pooler.supabase.com`) | Host confirmado em `spec-kit-2/auditoria-codigo-2026-08-23.md` (`ArchSmart-api/.env.example` traz só um placeholder desde a Seção 2); `.github/workflows/keep-db-alive.yml` toca o banco 2x ao dia (o tier gratuito do Supabase pausa o projeto após ~7 dias sem uso). O mesmo projeto Supabase também é o Auth — não há banco de aplicação separado do banco de autenticação hoje. |
 
 Não existe hoje um ambiente de staging: **todo `git push`/merge para `main` é o caminho direto para produção**, tanto no Vercel quanto no Render (comportamento assumido a partir da configuração de deploy contínuo de cada plataforma — não confirmado por um arquivo de config neste repositório, mesma ressalva da tabela acima).
 
@@ -132,10 +132,24 @@ passou a exigir a coluna preenchida.
 
 ### 3. Smoke test pós-reversão
 
+Comandos abaixo escritos para Git Bash — é o shell em que a saída colada nesta
+seção foi obtida. No PowerShell 5.1 (shell de referência do repositório, ver
+[`ambiente.md`](ambiente.md)), `curl` é um alias de `Invoke-WebRequest` e não
+aceita `-o`/`-w` nesse formato; use `curl.exe` e `NUL` no lugar de
+`/dev/null`:
+
 ```
 curl https://arch-smart-api.onrender.com/health
 curl https://arch-smart-api.onrender.com/health/db
 curl -o /dev/null -w "%{http_code}\n" https://www.archsmart.com.br
+```
+
+No PowerShell 5.1:
+
+```
+curl.exe https://arch-smart-api.onrender.com/health
+curl.exe https://arch-smart-api.onrender.com/health/db
+curl.exe -o NUL -w "%{http_code}`n" https://www.archsmart.com.br
 ```
 
 Espera-se `{"status":"ok"}` no primeiro, confirmação de banco vivo no

@@ -149,10 +149,14 @@ npm run dev
 ```
 
 **Sinal de sucesso:** abrir <http://localhost:3000> carrega a página inicial.
-Confirmado também por linha de comando, sem precisar de navegador:
+Confirmado também por linha de comando, sem precisar de navegador. A saída
+colada abaixo foi obtida no Git Bash — no PowerShell 5.1, `curl` é um alias de
+`Invoke-WebRequest` e não aceita `-o`/`-w` nesse formato; use `curl.exe`
+(o executável real, não o alias) para o mesmo comando:
 
 ```
 curl http://localhost:3000
+# ou, no PowerShell 5.1: curl.exe http://localhost:3000
 ```
 
 Retorna `200`. E para confirmar que a proteção de rota está de pé (o
@@ -160,6 +164,7 @@ Retorna `200`. E para confirmar que a proteção de rota está de pé (o
 
 ```
 curl -o /dev/null -w "%{http_code}" http://localhost:3000/dashboard
+# no PowerShell 5.1: curl.exe -o NUL -w "%{http_code}" http://localhost:3000/dashboard
 ```
 
 Retorna `307`, redirecionando para `/auth/login` — sinal de que a
