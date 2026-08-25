@@ -90,8 +90,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # `git rev-list origin/develop..origin/main` precisa do historico
-          # completo; o checkout raso padrao traz so o ultimo commit.
+          # O diff de tres pontos (`git diff origin/develop...origin/main`)
+          # precisa do merge-base entre as duas branches; sem o historico
+          # completo o merge-base nao e calculavel e o diff de tres pontos
+          # quebra. O checkout raso padrao traz so o ultimo commit.
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -112,6 +114,8 @@ jobs:
         # seja, um alarme falso permanente. O diff de tres pontos compara a
         # base de merge com main: so acusa quando main tem conteudo que
         # develop nao tem, que e exatamente o hotfix perdido do ADR 0005.
+        # So volta ao verde com merge para develop, nunca com cherry-pick: e
+        # o merge que avanca o merge-base entre as duas branches.
         run: |
           git fetch origin main develop --quiet
           if ! git diff --quiet origin/develop...origin/main; then
@@ -119,6 +123,7 @@ jobs:
             git diff --stat origin/develop...origin/main
             echo "commits candidatos:"
             git log --oneline origin/develop..origin/main
+            echo "corrija com: git checkout develop && git merge origin/main -- cherry-pick nao zera este check, porque o merge-base nao avanca."
             exit 1
           fi
           echo "main nao tem mudanca ausente em develop."
