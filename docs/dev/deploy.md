@@ -115,8 +115,10 @@ alembic downgrade -1
 Confirme antes que `DATABASE_URL` no ambiente aponta para o banco certo
 (produção, staging ou local) — `alembic current` mostra a revisão aplicada
 agora, compare com o que você espera antes de rodar `downgrade`.
-**Verificado nesta sessão**: as 26 migrações em `alembic/versions/` têm
-`downgrade()` com corpo não vazio (checado por grep). **Não verificado**: se
+**Verificado nesta sessão**: 25 das 26 migrações em `alembic/versions/` têm
+`downgrade()` com corpo não vazio (checado por grep) — a exceção é
+`737128c96b28_remove_legacy_auth.py`, cujo `upgrade()` também é vazio
+(revisão no-op, sem risco operacional). **Não verificado**: se
 a lógica de cada `downgrade()` reverte o dado sem perda — não auditamos
 migração por migração. Se a migração revertida fez backfill de dado (passo
 2 do procedimento acima), o `downgrade` de schema não desfaz o backfill

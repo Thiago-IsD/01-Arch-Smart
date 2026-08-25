@@ -50,7 +50,7 @@ _Última atualização: 2026-08-24_
 
 - [ ] `RequestContext` em `app/core/security.py`
 - [ ] `ScopedRepository` em `app/db/repository.py`
-- [ ] `account_id` e `created_by` nas 13 tabelas que faltam
+- [ ] `account_id` e `created_by` nas 10 tabelas que faltam
 - [ ] Índices derivados das queries reais
 - [ ] Fim do N+1 no orçamento (`calculate_quantity` pura, de ~300 para 2 queries)
 - [ ] Suíte de testes contra banco real (`tests/services/`, `tests/api/`, `tests/isolation/`) substituindo `app/tests/`
