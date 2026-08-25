@@ -20,10 +20,19 @@ uma medicao de performance seja comparavel com a da semana anterior.
 
 Idempotencia: a conta "Seed — volume realista" e criada ou reaproveitada
 por nome; a cada execucao, os dados de volume dessa conta (produtos,
-clientes, projetos, ambientes, orcamentos, itens, opcoes) sao apagados e
-recriados do zero — reescrita, nao deteccao de duplicata. As tabelas de
-referencia globais (product_origins, product_states) e os usuarios do
-seed nunca sao apagados, so reaproveitados por chave natural.
+clientes, projetos, ambientes, orcamentos, itens, opcoes, e qualquer
+apresentacao/lancamento/evento/slot que alguem tenha criado em cima deles
+no staging) sao apagados e recriados do zero — reescrita, nao deteccao de
+duplicata. As tabelas de referencia globais (product_origins,
+product_states) e os usuarios do seed nunca sao apagados, so
+reaproveitados por chave natural.
+
+Guarda de producao: julga a MESMA URL que app.db.session vai usar para
+criar o engine — settings.DATABASE_URL, resolvida por
+app/core/config.py (env var OU, na ausencia dela, o arquivo .env). Nunca
+julga os.environ["DATABASE_URL"] diretamente: uma variavel nao exportada
+nao e ausencia de URL, e o pydantic cai silenciosamente para o .env nesse
+caso — que nesta maquina aponta para o pooler do Supabase de producao.
 """
 from __future__ import annotations
 
@@ -41,20 +50,45 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------------------------------------------------------------------------
 # Guarda de producao — precisa ser a PRIMEIRA coisa que main() chama, antes
-# de importar qualquer coisa de app/ (app.db.session cria o engine na
-# importacao) e antes de abrir qualquer sessao. Mesma guarda de
-# tests/conftest.py: um seed de centenas de linhas rodado por engano contra
-# o banco do time nao tem desfazer.
+# de abrir qualquer sessao ou engine (app.db.session cria o engine na
+# importacao). Mesma guarda de tests/conftest.py: um seed de centenas de
+# linhas rodado por engano contra o banco do time nao tem desfazer.
+#
+# A guarda julga a URL RESOLVIDA (resolver_url_e_origem, abaixo), nunca
+# os.environ["DATABASE_URL"] direto — ver o docstring do modulo para o
+# porque. Resolver a URL exige "from app.core.config import settings", mas
+# so importar config nao abre conexao (create_engine e lazy, e so
+# app.db.session chama create_engine) — entao isso e seguro de fazer antes
+# da guarda liberar o resto do script.
 # ---------------------------------------------------------------------------
 HOSTS_PROIBIDOS = ("supabase.co", "pooler.supabase.com", "render.com", "amazonaws.com")
 
 
-def recusar_producao(url: str, forcado: bool) -> None:
-    achados = [h for h in HOSTS_PROIBIDOS if h in url]
+def resolver_url_e_origem() -> tuple[str, str]:
+    """
+    Resolve a URL do banco exatamente como a aplicacao resolve — importando
+    app.core.config e lendo settings.DATABASE_URL, o mesmo valor que
+    app.db.session usa para criar o engine — e nao os.environ direto.
+    Devolve tambem de onde ela veio, para a mensagem de recusa deixar claro
+    se foi a variavel exportada ou o fallback do .env.
+    """
+    from app.core.config import settings
+
+    url = settings.DATABASE_URL
+    if os.environ.get("DATABASE_URL"):
+        origem = "variavel de ambiente DATABASE_URL"
+    else:
+        origem = "arquivo .env (nenhuma DATABASE_URL exportada no ambiente)"
+    return url, origem
+
+
+def recusar_producao(url: str, forcado: bool, origem: str) -> None:
+    url_normalizada = url.lower()
+    achados = [h for h in HOSTS_PROIBIDOS if h in url_normalizada]
     if achados and not forcado:
         sys.exit(
             f"Recusando rodar: DATABASE_URL contem {', '.join(achados)}, que e "
-            f"host gerenciado.\n  URL: {url!r}\n"
+            f"host gerenciado.\n  URL: {url!r}\n  Origem: {origem}\n"
             "Se e realmente o que voce quer, passe --eu-sei-o-que-estou-fazendo."
         )
 
@@ -287,12 +321,6 @@ def obter_ou_criar_usuarios(db, User, conta):
 
 
 def obter_ou_criar_origens(db, ProductOrigin, ProductOriginType):
-    # ProductOriginType.CATALOG existe no enum Python mas nao no enum do
-    # Postgres — nenhuma migracao jamais adicionou esse valor (so
-    # WEB_CLIPPER/SHOPPING_HUB/MANUAL vem de 5de7aae8c076). Divergencia real
-    # entre app/models/all_models.py e a receita, fora do escopo desta
-    # tarefa (nao mexe em app/ nem em alembic/): o seed usa so o que a
-    # receita de fato cria.
     nomes = {
         ProductOriginType.MANUAL: "Manual",
         ProductOriginType.WEB_CLIPPER: "Web Clipper",
@@ -309,10 +337,6 @@ def obter_ou_criar_origens(db, ProductOrigin, ProductOriginType):
 
 
 def obter_ou_criar_estados(db, ProductState, ProductStateStatus):
-    # Mesma divergencia do comentario em obter_ou_criar_origens: o enum
-    # Postgres so tem CAPTURED/NORMALIZED/INACTIVE (5de7aae8c076).
-    # ACTIVE/ARCHIVED/DELETED existem no enum Python e nunca foram
-    # migrados — fora do escopo desta tarefa corrigir.
     nomes = {
         ProductStateStatus.CAPTURED: "Capturado",
         ProductStateStatus.NORMALIZED: "Normalizado",
@@ -328,13 +352,54 @@ def obter_ou_criar_estados(db, ProductState, ProductStateStatus):
     return estados
 
 
-def limpar_dados_de_volume(db, conta_id, Product, Client, Project, Environment, Budget, BudgetItem, ItemOption):
+def limpar_dados_de_volume(
+    db,
+    conta_id,
+    Product,
+    Client,
+    Project,
+    Environment,
+    Budget,
+    BudgetItem,
+    ItemOption,
+    Presentation,
+    PresentationEnvironment,
+    PresentationAcceptance,
+    PresentationComment,
+    FinancialEntry,
+    Event,
+    ProjectSlot,
+):
     """
     Apaga os dados de volume desta conta antes de recriar — e assim que o
     seed fica idempotente: rodar duas vezes reescreve, nao duplica.
     Ordem inversa a de criacao, para respeitar as chaves estrangeiras.
+
+    Alem do que o proprio seed cria, sete tabelas dependem de
+    projects/environments/presentations SEM ON DELETE CASCADE no banco —
+    confirmado consultando pg_constraint.confdeltype, nao supondo a partir
+    do modelo (o cascade Python de Presentation.environments/comments/
+    acceptance so roda em session.delete() por instancia, nunca em
+    Query.delete() em lote, que e o que este script usa):
+    presentations, presentation_acceptances, presentation_comments,
+    presentation_environments, financial_entries, events, project_slots.
+    Se alguem usar o staging e criar uma apresentacao ou lancamento
+    financeiro num projeto do seed, a proxima execucao quebra com
+    ForeignKeyViolation a nao ser que essas linhas tambem sejam apagadas
+    aqui — sempre escopadas aos projects/environments desta conta, nunca
+    de outra conta.
+
+    (item_options->budget_items, budget_items->budgets,
+    budget_items->environments e environment_dnas->environments JA tem
+    ON DELETE CASCADE no banco — as queries explicitas abaixo continuam
+    corretas mesmo assim, so redundantes nesses casos.)
     """
     projeto_ids = [pid for (pid,) in db.query(Project.id).filter(Project.account_id == conta_id)]
+    ambiente_ids = (
+        [eid for (eid,) in db.query(Environment.id).filter(Environment.project_id.in_(projeto_ids))]
+        if projeto_ids
+        else []
+    )
     orcamento_ids = (
         [bid for (bid,) in db.query(Budget.id).filter(Budget.project_id.in_(projeto_ids))]
         if projeto_ids
@@ -345,6 +410,11 @@ def limpar_dados_de_volume(db, conta_id, Product, Client, Project, Environment, 
         if orcamento_ids
         else []
     )
+    apresentacao_ids = (
+        [aid for (aid,) in db.query(Presentation.id).filter(Presentation.project_id.in_(projeto_ids))]
+        if projeto_ids
+        else []
+    )
 
     if item_ids:
         db.query(ItemOption).filter(ItemOption.budget_item_id.in_(item_ids)).delete(synchronize_session=False)
@@ -352,6 +422,24 @@ def limpar_dados_de_volume(db, conta_id, Product, Client, Project, Environment, 
         db.query(BudgetItem).filter(BudgetItem.budget_id.in_(orcamento_ids)).delete(synchronize_session=False)
     if projeto_ids:
         db.query(Budget).filter(Budget.project_id.in_(projeto_ids)).delete(synchronize_session=False)
+
+    if apresentacao_ids:
+        db.query(PresentationComment).filter(
+            PresentationComment.presentation_id.in_(apresentacao_ids)
+        ).delete(synchronize_session=False)
+        db.query(PresentationAcceptance).filter(
+            PresentationAcceptance.presentation_id.in_(apresentacao_ids)
+        ).delete(synchronize_session=False)
+    if apresentacao_ids or ambiente_ids:
+        db.query(PresentationEnvironment).filter(
+            PresentationEnvironment.presentation_id.in_(apresentacao_ids)
+            | PresentationEnvironment.environment_id.in_(ambiente_ids)
+        ).delete(synchronize_session=False)
+    if projeto_ids:
+        db.query(Presentation).filter(Presentation.project_id.in_(projeto_ids)).delete(synchronize_session=False)
+        db.query(FinancialEntry).filter(FinancialEntry.project_id.in_(projeto_ids)).delete(synchronize_session=False)
+        db.query(Event).filter(Event.project_id.in_(projeto_ids)).delete(synchronize_session=False)
+        db.query(ProjectSlot).filter(ProjectSlot.project_id.in_(projeto_ids)).delete(synchronize_session=False)
         db.query(Environment).filter(Environment.project_id.in_(projeto_ids)).delete(synchronize_session=False)
     db.query(Project).filter(Project.account_id == conta_id).delete(synchronize_session=False)
     db.query(Client).filter(Client.account_id == conta_id).delete(synchronize_session=False)
@@ -557,11 +645,13 @@ def imprimir_resumo(db, tabelas) -> None:
 def main() -> None:
     args = parse_args()
 
-    url = os.environ.get("DATABASE_URL", "")
-    recusar_producao(url, args.eu_sei_o_que_estou_fazendo)
+    url, origem = resolver_url_e_origem()
+    recusar_producao(url, args.eu_sei_o_que_estou_fazendo, origem)
 
-    # Import tardio, de proposito: so depois da guarda passar e que e seguro
-    # importar algo de app/ (app.db.session cria o engine na importacao).
+    # Import tardio, de proposito: SessionLocal usa o MESMO settings.DATABASE_URL
+    # ja resolvido em resolver_url_e_origem() (settings e um singleton lido uma
+    # unica vez) — guarda e engine nunca podem divergir porque os dois leem da
+    # mesma fonte.
     from app.db.session import SessionLocal
     from app.models.all_models import (
         Account,
@@ -578,6 +668,13 @@ def main() -> None:
         BudgetItem,
         ItemOption,
         RuleType,
+        Presentation,
+        PresentationEnvironment,
+        PresentationAcceptance,
+        PresentationComment,
+        FinancialEntry,
+        Event,
+        ProjectSlot,
     )
 
     # random.seed(42) fixo (nao um random.Random() local): duas execucoes
@@ -596,7 +693,22 @@ def main() -> None:
         db.flush()
 
         limpar_dados_de_volume(
-            db, conta.id, Product, Client, Project, Environment, Budget, BudgetItem, ItemOption
+            db,
+            conta.id,
+            Product,
+            Client,
+            Project,
+            Environment,
+            Budget,
+            BudgetItem,
+            ItemOption,
+            Presentation,
+            PresentationEnvironment,
+            PresentationAcceptance,
+            PresentationComment,
+            FinancialEntry,
+            Event,
+            ProjectSlot,
         )
 
         produtos = criar_biblioteca(db, Product, conta, origens, estados, args.biblioteca, rng)

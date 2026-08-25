@@ -10,12 +10,12 @@ Scripts operacionais que não fazem parte da aplicação. **Nenhum deles é impo
 
 ## Aviso
 
-Estes scripts leem `DATABASE_URL` do ambiente. **Confira para onde ela aponta antes de rodar qualquer um** — `reset_db.py` apagado contra produção é irreversível. A suíte de testes tem uma guarda para isso (`tests/conftest.py`); `reset_db.py` e `init_db.py` **não têm**.
+Estes scripts resolvem `DATABASE_URL` do jeito que `app/core/config.py` resolve — não só do ambiente: **variável de ambiente OU, se ela não estiver exportada, o arquivo `.env`** (`SettingsConfigDict(env_file=".env")`). Rodar sem exportar nada não é "sem banco configurado" — é o `.env` local decidindo por você, silenciosamente. **Confira as duas fontes antes de rodar qualquer um** — `reset_db.py` apagado contra produção é irreversível. A suíte de testes tem uma guarda para isso (`tests/conftest.py`); `reset_db.py` e `init_db.py` **não têm**.
 
-`seed.py` tem guarda própria: recusa rodar contra qualquer `DATABASE_URL` que contenha um host gerenciado (`supabase.co`, `pooler.supabase.com`, `render.com`, `amazonaws.com`), a menos que `--eu-sei-o-que-estou-fazendo` seja passado.
+`seed.py` tem guarda própria: recusa rodar contra qualquer `DATABASE_URL` — resolvida da mesma forma, variável ou `.env` — que contenha um host gerenciado (`supabase.co`, `pooler.supabase.com`, `render.com`, `amazonaws.com`; a checagem ignora maiúsculas/minúsculas), a menos que `--eu-sei-o-que-estou-fazendo` seja passado. A mensagem de recusa diz de qual das duas fontes a URL veio.
 
 ## `seed.py`
 
-Substituiu os quatro scripts antigos (`seed_clipper.py`, `seed_mock.py`, `seed_products.py`, `seed_tokstok.py`) por um único script parametrizado. Cria (ou reaproveita, por nome) a conta `Seed — volume realista` e escreve tudo dentro dela; `--ambientes` e `--itens` são **totais**, distribuídos entre os projetos, não valores por projeto. Determinístico (`random.seed(42)`) e idempotente por conta — rodar duas vezes produz os mesmos números, lidos do banco com `SELECT count(*)` ao final, não de um contador em memória.
+Substituiu os quatro scripts antigos (`seed_clipper.py`, `seed_mock.py`, `seed_products.py`, `seed_tokstok.py`) por um único script parametrizado. Cria (ou reaproveita, por nome) a conta `Seed — volume realista` e escreve tudo dentro dela; `--ambientes` e `--itens` são **totais**, distribuídos entre os projetos, não valores por projeto. Determinístico (`random.seed(42)`) e idempotente por conta — rodar duas vezes produz os mesmos números, lidos do banco com `SELECT count(*)` ao final, não de um contador em memória. A reescrita cobre também o que **outra pessoa** cria em cima dos projetos/ambientes do seed no staging (apresentação, lançamento financeiro, evento, slot de projeto) — sem isso, rodar o seed de novo depois de alguém clicar no staging quebraria com `ForeignKeyViolation`.
 
 É contra o volume gerado aqui que o orçamento de performance de cada tela é medido nas Seções 6 e 8.
