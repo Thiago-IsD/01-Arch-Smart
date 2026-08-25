@@ -81,6 +81,7 @@ def test_schema_nao_depende_de_recurso_exclusivo_do_supabase(banco_da_receita):
             "FROM information_schema.table_constraints tc "
             "JOIN information_schema.constraint_column_usage ccu "
             "  ON tc.constraint_name = ccu.constraint_name "
+            "  AND tc.constraint_schema = ccu.constraint_schema "
             "WHERE tc.constraint_type = 'FOREIGN KEY' "
             "  AND tc.table_schema = 'public' "
             "  AND ccu.table_schema <> 'public'"

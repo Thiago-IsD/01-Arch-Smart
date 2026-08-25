@@ -117,10 +117,35 @@ Confirme antes que `DATABASE_URL` no ambiente aponta para o banco certo
 agora, compare com o que você espera antes de rodar `downgrade`.
 **Verificado em 24/08/2026** (Seção 3, Tarefa 2, após a receita de migrações
 voltar a criar o banco do zero): 26 das 27 migrações em `alembic/versions/`
-têm `downgrade()` com corpo não vazio — checado percorrendo a AST de cada
-arquivo e comparando o corpo da função `downgrade` com um `pass` isolado
-(`grep` sozinho não distingue um `pass` real de um `downgrade()` com só
-comentário e `pass`). A exceção é `737128c96b28_remove_legacy_auth.py`, cujo
+têm `downgrade()` com corpo não vazio. Comando (rodado a partir de `ArchSmart-api/`):
+
+```bash
+python - <<'EOF'
+import ast, glob, os
+vazios = []
+files = sorted(glob.glob('alembic/versions/*.py'))
+for f in files:
+    t = ast.parse(open(f, encoding='utf-8').read())
+    for n in t.body:
+        if isinstance(n, ast.FunctionDef) and n.name == 'downgrade':
+            b = n.body
+            if b and isinstance(b[0], ast.Expr) and isinstance(b[0].value, ast.Constant):
+                b = b[1:]
+            if not [x for x in b if not isinstance(x, ast.Pass)]:
+                vazios.append(os.path.basename(f))
+print(len(files) - len(vazios), "de", len(files), "| vazios:", vazios)
+EOF
+```
+
+Saída:
+
+```
+26 de 27 | vazios: ['737128c96b28_remove_legacy_auth.py']
+```
+
+É AST, não `grep`: `grep` confunde um `downgrade()` que só tem docstring + `pass`
+com um que tem corpo real — foi assim que a afirmação anterior ("checado por grep")
+ficou errada. A exceção é `737128c96b28_remove_legacy_auth.py`, cujo
 `upgrade()` também é vazio (revisão no-op, sem risco operacional).
 **Não verificado**: se
 a lógica de cada `downgrade()` reverte o dado sem perda — não auditamos
