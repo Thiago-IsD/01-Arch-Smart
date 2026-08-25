@@ -21,6 +21,7 @@ macOS) troca `;` por `&&` e `.\venv\Scripts\Activate.ps1` por
 | npm | vem com o Node | — | 11.16.0 |
 | Docker Desktop (com `docker compose`) | qualquer versão recente | sobe o Postgres usado pela suíte de testes do backend | Docker 29.6.2 / Compose v5.3.1 |
 | Git | qualquer versão recente | — | 2.54.0 |
+| CLI do Supabase | ≥ 2.x | sobe a stack Supabase local (Auth, Storage, Studio) — **opcional**, ver "Stack Supabase local" | 2.115.0 |
 
 Além disso, para **rodar a aplicação de verdade** (não só os testes) você
 precisa de credenciais de um projeto Supabase e de uma chave do Google Gemini:
@@ -29,7 +30,9 @@ precisa de credenciais de um projeto Supabase e de uma chave do Google Gemini:
   `SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_JWT_SECRET`, mais a `DATABASE_URL`
   do Postgres desse mesmo projeto (ele tem a extensão `pgvector` habilitada).
   Isso **não é autoatendimento** — peça a alguém do time. Não existe hoje um
-  projeto Supabase "de desenvolvimento local" separado do projeto real.
+  projeto Supabase **hospedado** "de desenvolvimento" separado do projeto real;
+  o que existe é a stack local em Docker, descrita em "Stack Supabase local"
+  mais abaixo, que dispensa essas credenciais para quase tudo.
 - **Chave do Google Gemini** (`GEMINI_API_KEY`): essa você mesmo gera, de
   graça, em <https://aistudio.google.com/apikey>.
 
@@ -169,6 +172,133 @@ curl -o /dev/null -w "%{http_code}" http://localhost:3000/dashboard
 
 Retorna `307`, redirecionando para `/auth/login` — sinal de que a
 autenticação está funcionando, não só que o servidor responde.
+
+## Stack Supabase local
+
+Sobe, em Docker, um Supabase inteiro na sua máquina: Postgres, **Auth**,
+**Storage** e o Studio. É **opcional** — a suíte de testes não precisa dela, e
+usa o Postgres descartável da seção seguinte.
+
+Por que não um Postgres puro: a aplicação não depende só do banco. O login vai
+no Auth e o upload vai no Storage. Um Postgres puro subiria as tabelas e
+deixaria **login e upload ainda batendo no projeto real na nuvem** — que é
+justamente o que se quer evitar ao desenvolver.
+
+### Instalar a CLI
+
+O `winget` não distribui o pacote:
+
+```
+winget search supabase
+```
+
+Saída real:
+
+```
+No package found matching input criteria.
+```
+
+No Windows o caminho é o **scoop**, que não precisa de admin e instala no seu
+perfil de usuário:
+
+```
+# so se voce ainda nao tiver o scoop
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+
+scoop install supabase
+```
+
+Saída real da última linha:
+
+```
+'supabase' (2.115.0) was installed successfully!
+```
+
+> A documentação oficial do Supabase manda adicionar um bucket
+> (`scoop bucket add supabase ...`) antes de instalar. **Não é necessário**: o
+> bucket `main`, que o scoop já traz, carrega o manifesto. Medido em
+> 25/08/2026 com só o `main` instalado — `scoop search supabase` devolve
+> `supabase 2.115.0 main`.
+
+### Subir a stack
+
+```
+cd 01-Arch-Smart
+supabase start
+```
+
+**A primeira execução baixa cerca de 8 GB de imagem** e demora — as maiores são
+`supabase/postgres`, `studio` e `edge-runtime`. As seguintes sobem em segundos.
+
+Depois, `supabase status` mostra onde tudo ficou:
+
+```
+DB_URL      postgresql://postgres:postgres@127.0.0.1:54322/postgres
+API_URL     http://127.0.0.1:54321
+STUDIO_URL  http://127.0.0.1:54323
+MAILPIT_URL http://127.0.0.1:54324
+ANON_KEY, SERVICE_ROLE_KEY, JWT_SECRET, ...
+```
+
+**Sinal de sucesso:** o `supabase status` responde com essas URLs. Ele também
+imprime `Stopped services: [supabase_imgproxy_arqsmart supabase_pooler_arqsmart]`
+— **isso é esperado**, os dois estão desligados no `config.toml` e não fazem
+falta no desenvolvimento.
+
+As chaves que ele imprime são **locais e fixas** — as mesmas em qualquer
+máquina, embutidas na CLI. Não são segredo e não vão para o `.env` de produção;
+por isso não estão coladas aqui: rode `supabase status` e leia as suas.
+
+### O schema vem do Alembic, nunca da CLI
+
+O `supabase start` sobe a **infraestrutura**. As tabelas da aplicação são
+aplicadas por cima, pelo Alembic, que é a fonte única do schema
+([ADR 0004](decisoes/0004-alembic-fonte-unica-do-schema.md)). Por isso
+`[db.migrations] enabled = false` no `supabase/config.toml`: duas ferramentas de
+migração seriam dois históricos divergentes.
+
+```
+cd ArchSmart-api
+$env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+.\venv\Scripts\python.exe -m alembic upgrade head
+```
+
+Saída real da última linha:
+
+```
+INFO  [alembic.runtime.migration] Running upgrade c9f1a2b3d4e5 -> b77a9b5656c2, reconcilia products com os models
+```
+
+**Sinal de sucesso**, conferido depois:
+
+```
+.\venv\Scripts\python.exe -m alembic current   # -> b77a9b5656c2 (head)
+docker exec supabase_db_arqsmart psql -U postgres -tAc "select count(*) from information_schema.tables where table_schema='public';"   # -> 27
+docker exec supabase_db_arqsmart psql -U postgres -tAc "select extname, extversion from pg_extension where extname='vector';"          # -> vector|0.8.2
+```
+
+As 27 migrações aplicam sem erro (`ls alembic/versions/*.py | wc -l` → 27), e a
+extensão `vector` é habilitada pela própria migração `9f8a3b2c1d4e`.
+
+### Duas diferenças que importam
+
+1. **O Postgres local é 17; o do banco de teste é 16.** Não é descuido: a CLI só
+   aceita `major_version` 14, 15 ou 17 — o Supabase nunca ofereceu 16. Medido
+   nesta máquina editando o valor e rodando `supabase status` para cada um: 16 e
+   18 saem com `Invalid db.major_version`. A versão do banco gerenciado de
+   produção **ainda não foi conferida** — é uma pendência de painel, registrada
+   em [ambientes-online.md](ambientes-online.md).
+2. **Esta stack não substitui o banco de teste.** O `docker-compose.test.yml` da
+   seção seguinte, na porta `55432`, continua separado e é ele que a suíte usa.
+
+### Parar
+
+```
+supabase stop
+```
+
+Os dados sobrevivem entre `stop` e `start`. Para descartar tudo e recomeçar do
+zero, `supabase stop --no-backup`.
 
 ## Banco de teste em Docker
 
