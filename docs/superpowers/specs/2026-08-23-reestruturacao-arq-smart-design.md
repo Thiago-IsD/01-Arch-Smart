@@ -41,7 +41,9 @@ Latência de API: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/
 
 **Quatro causas, todas confirmadas:**
 
-1. **Nada é cacheado.** Em 6 ciclos de navegação, `/api/presentations`, `/api/events` e `/api/financial` foram chamados 12× cada. `/api/products` foi chamado 4× — porque a Biblioteca é a única das 33 telas que usa TanStack Query.
+1. **Nada era cacheado.** Em 6 ciclos de navegação, `/api/presentations`, `/api/events` e `/api/financial` foram chamados 12× cada. `/api/products` foi chamado 4× — porque a Biblioteca é a única das 33 telas que usa TanStack Query.
+
+   ⚠️ Correção de 24/08/2026: o achado original dizia, no presente, "nada é cacheado", o que já era falso na data desta medição (23/08/2026). O `QueryProvider` (`staleTime` de 30 s) já estava montado em `src/app/(dashboard)/layout.tsx`, e 3 dos 144 arquivos já usavam `useQuery` — nenhuma seção desta reestruturação construiu isso, a medição original só errou. O que ela mostrou de fato é que as outras 141 telas refazem a chamada a cada navegação. Ver `docs/dev/arquitetura.md` e `docs/dev/convencoes.md` para o estado atual do cache.
 2. **Query lenta e piorando com o volume.** 4 `index=True` no modelo inteiro; 7 `create_index` em 26 migrações; **zero em `account_id`**. Toda listagem por conta faz varredura sequencial, contra um banco remoto (`aws-1-sa-east-1.pooler.supabase.com`). É isto que faz a plataforma ficar mais lenta quanto mais o cliente a usa: não é a sessão que degrada, é a conta.
 3. **O `proxy.ts` cobra ~83 ms de toda requisição.** `getUser()` (ida à rede ao Supabase Auth) roda **antes** do desvio para `/api`, `/_next` e estáticos. Medido: 9 ms fora do matcher, 92 ms dentro. Deslogado o custo é zero, o que explica por que não aparecia em teste rápido.
 4. **Requisição não é cancelada.** `AbortController` aparece 3× em 141 arquivos, nenhuma para navegação. Sair do Dashboard deixa o `/api/dashboard/lean` rodando 1,4–2,5 s disputando conexão com a tela que entra.
@@ -50,19 +52,29 @@ Latência de API: `/api/products` 1.220 ms · `/api/dashboard/lean` 881 ms · `/
 
 ### 2.3 Manutenibilidade — por que cada iteração custa mais
 
+Medido em 23/08/2026, antes da Seção 1. É um retrato datado — a contagem de
+arquivos do frontend mudou desde então (141 → 144, ver `docs/dev/arquitetura.md`);
+as duas linhas marcadas com nota foram revistas depois e permanecem válidas,
+as demais refletem só o momento da medição.
+
 | Medida | Valor |
 |---|---|
 | Cliente de API compartilhado | **não existe** |
 | `createClient()` espalhados | 62 |
 | `getSession()` espalhados | 56 |
-| Headers `Authorization` montados à mão | 67 |
+| Headers `Authorization` montados à mão | 67 (70 após a Seção 1)¹ |
 | Arquivos repetindo o mesmo boilerplate | 37 |
 | `CLAUDE.md` / convenções escritas | **nenhum** |
 | Estruturas de rota coexistindo no backend | 3 (`api/`, `api/endpoints/`, `api/routers/`) |
 | `next/dynamic` / `React.lazy` | **0 em 141 arquivos** |
-| Cores literais | 137 classes + 11 `bg-[#hex]` |
+| Cores literais | **510** classes de paleta Tailwind em 39 arquivos + 11 `bg-[#hex]`² |
 | Testes | 83, todos contra `MagicMock` — nenhum capaz de detectar vazamento entre contas |
 | CI | **nenhum** além de dois workflows de keep-alive |
+
+¹ Atualizado nesta revisão (24/08/2026) para incluir o efeito da Seção 1 —
+única linha desta tabela recalculada após a medição original.
+² Reconferido em 24/08/2026 (`docs/dev/convencoes.md`): o número permanece
+o mesmo hoje.
 
 Cada tela nova custa mais que a anterior porque cada tela nova copia a anterior, junto com o boilerplate.
 
@@ -83,7 +95,7 @@ Alternativas consideradas e rejeitadas:
 
 1. **A regra que não é verificada por ferramenta não existe.** Toda convenção deste documento vira lint, teste ou verificação de CI. Acordo verbal não sobrevive a duas pessoas mais IA.
 2. **Cercar o caminho antigo é parte de abrir o novo.** Padrão antigo que continua possível é padrão que será copiado.
-3. **Completar antes de proibir.** As 137 cores literais existem porque faltavam tokens de `success` e `warning`. Proibir sem oferecer alternativa cria o próximo desvio.
+3. **Completar antes de proibir.** As 510 cores literais existem porque faltavam tokens de `success` e `warning`. Proibir sem oferecer alternativa cria o próximo desvio.
 4. **Uma coisa por vez, medida.** Migração e funcionalidade nova nunca no mesmo passo — misturar destrói o único teste objetivo que a migração tem.
 5. **Prova antes de afirmar.** Nenhuma tarefa é marcada como feita sem o comando ou a medição que demonstra.
 
@@ -209,7 +221,9 @@ Supabase local em vez de Postgres puro porque a aplicação depende de Auth (`us
 
 **`ScopedRepository`** (`app/db/repository.py`) — `query(model)` filtra por `account_id` sempre; model sem `account_id` levanta `TypeError` com mensagem citando o Art. 1. `create()` injeta `account_id` e `created_by`. Escotilha `unscoped_query()` permitida só em `app/tools/` e `alembic/`, com lint acusando em outro lugar.
 
-**`account_id` e `created_by` em toda tabela de dado.** Faltam em 13: `environments`, `environment_dnas`, `budgets`, `budget_items`, `item_options`, `presentations`, `presentation_environments`, `presentation_acceptances`, `presentation_comments`, `documents`, `project_slots`, `product_states`, `product_origins`. É desnormalização deliberada: o repositório só é universal se toda tabela responder à mesma pergunta, e o índice só funciona se a coluna existir.
+**`account_id` e `created_by` em toda tabela de dado.** Faltam em **10**: `environments`, `environment_dnas`, `budgets`, `budget_items`, `item_options`, `presentations`, `presentation_environments`, `presentation_acceptances`, `presentation_comments`, `project_slots`. É desnormalização deliberada: o repositório só é universal se toda tabela responder à mesma pergunta, e o índice só funciona se a coluna existir.
+
+⚠️ Corrigido em 24/08/2026: a versão anterior listava 13, incluindo `product_states`, `product_origins` e `documents`. Os dois primeiros são **catálogo global** — verificado que nunca são filtrados por conta em nenhum ponto do código. O `documents` (tabela de embeddings com `Vector(1536)`) não tem chave estrangeira para nada e não tem consumidor real em `app/`; decidir o escopo dele fica para quando tiver uso. `plans` também é catálogo global e nunca esteve na lista. Ver `docs/dev/modelo-de-dados.md` para a classificação tabela a tabela.
 
 **Índices**, derivados das queries reais: `(account_id)` em todas; compostos onde há filtro somado a ordenação — `(account_id, created_at)`, `(account_id, state_id)`, `(budget_id)`, `(environment_id)`, `(project_id)`.
 
