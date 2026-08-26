@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 14/62 (23%)**
+**Progresso geral: 17/62 (27%)**
 `█████░░░░░░░░░░░░░░░`
 
-_Última atualização: 2026-08-24_
+_Última atualização: 2026-08-25_
 
 ---
 
@@ -37,13 +37,25 @@ _Última atualização: 2026-08-24_
 - [x] Deploy, ADRs em `docs/dev/decisoes/` e template de PR (Task 8)
 
 ## Seção 3 · Esteira, ambientes e branches
-**0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**3/5 (60%)** `████████████░░░░░░░░`
 
-- [ ] CI que barra merge (lint, tipos, testes contra Postgres em Docker, isolamento entre contas, literais proibidos, validador de contraste, doc de módulo, consistência do PROGRESS.md)
+- [x] CI que barra merge (lint, tipos, testes contra Postgres em Docker, literais proibidos, doc de módulo, consistência do PROGRESS.md)
 - [ ] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
-- [ ] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
+- [x] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
 - [ ] Banco de produção novo, criado do zero pela receita de migrações
-- [ ] Seed com volume realista (`ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
+- [x] Seed com volume realista (`ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
+
+> **As duas caixas desmarcadas dependem de passos em painel externo**, que só o
+> dono das contas executa — Render, Vercel e Supabase. O roteiro campo a campo
+> está em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md); o que
+> falta é a execução, não o plano. A branch `staging` em si já existe e está
+> publicada; o que não existe é o ambiente online ligado a ela.
+>
+> Dois itens do texto original saíram da primeira caixa porque são de outras
+> seções e não seriam verdade aqui: o **teste de isolamento entre contas**
+> depende do `ScopedRepository` (Seção 4) e o **validador de contraste** depende
+> dos tokens `--success`/`--warning` (Seção 6). O `ci.yml` registra os dois como
+> portões que ainda não existem, em vez de trazê-los como verificação vazia.
 
 ## Seção 4 · Camada de dados do backend
 **0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`

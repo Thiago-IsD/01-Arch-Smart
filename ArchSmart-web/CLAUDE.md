@@ -44,7 +44,15 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 
 ## Testes
 
-`npx vitest run`. Hoje ele também coleta `e2e/auth.spec.ts` e `e2e/dashboard.spec.ts` — specs do Playwright, não do Vitest — e os reporta como 2 arquivos falhos; defeito de configuração conhecido, a ser corrigido na Seção 3. As specs reais (`*.test.ts(x)`) passam; não tente "corrigir" as duas do Playwright por conta própria.
+`npm test` (que roda `vitest run`) e `npm run typecheck` (que roda
+`tsc --noEmit`). Os dois são o que o job **Frontend** do CI executa; rode-os
+antes de abrir PR.
+
+A suíte sai limpa: `Test Files 4 passed (4)` e `Tests 7 passed (7)`. **Um
+`failed` em qualquer das duas linhas é um teste realmente quebrado.** Até a
+Seção 3, o `vitest.config.ts` não excluía `e2e/` e o Vitest tentava coletar
+dois specs do Playwright, reportando `2 failed` de forma permanente — a
+orientação de então era ignorar. Não ignore mais.
 
 ## Onde ler mais
 
