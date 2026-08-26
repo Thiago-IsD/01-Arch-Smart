@@ -1,6 +1,6 @@
 # Ambientes online — roteiro de painel
 
-## Estado (24/08/2026)
+## Estado (25/08/2026)
 
 **Nenhum passo deste documento foi executado ainda.** Isto é um roteiro, não
 um registro do que já existe. Todos os passos abaixo exigem acesso
@@ -121,11 +121,7 @@ frontend.
 6. Em **Authentication → Providers → Email** *deste projeto novo* (de
    staging, não o de produção), confira se **"Confirm email"** está ligada
    e ligue se não estiver — é o mesmo estado do projeto de produção,
-   confirmado por **Thiago no painel do Supabase em 24/08/2026**. `CLAUDE.md`
-   e [`arquitetura.md`](arquitetura.md) ainda descrevem essa confirmação
-   como pendente porque quem os atualiza é outra tarefa desta seção, ainda
-   não executada — não é uma contradição sobre o fato, só um texto que
-   ainda não foi ajustado. O que este passo garante não é o estado da
+   confirmado por **Thiago no painel do Supabase em 24/08/2026**. O que este passo garante não é o estado da
    produção (já sabido), e sim que o projeto **novo** nasça igual: confira
    no painel deste projeto, não presuma o valor.
 
@@ -179,6 +175,30 @@ migrações funciona do zero antes de apostar produção nela.
 
 ## 5. Branch protection nas três branches
 
+> ⛔ **Bloqueado pelo plano do GitHub, não pela falta de executar.** Medido em
+> 25/08/2026: o repositório é **privado num plano Free**, e nessa configuração
+> branch protection e rulesets não existem.
+>
+> ```
+> gh api repos/:owner/:repo/branches/main/protection     → 404
+> gh api repos/:owner/:repo/rulesets
+>   → 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
+> gh pr view 3 --json mergeable,mergeStateStatus
+>   → mergeable: MERGEABLE   mergeStateStatus: UNSTABLE
+> ```
+>
+> `UNSTABLE` quer dizer: há check não-verde **e o merge continua permitido**.
+> Enquanto isso durar, a esteira é um conselheiro, não um portão.
+>
+> **Duas saídas, ambas decisão de quem paga a conta:**
+>
+> 1. **Tornar o repositório público.** Libera branch protection de graça. Antes
+>    de fazer, varra o histórico atrás de segredo commitado — tornar público é
+>    irreversível na prática, porque o que foi lido fica lido.
+> 2. **Assinar o GitHub Pro.** Mantém privado e libera a mesma coisa.
+>
+> Feito um dos dois, o resto desta seção passa a ser executável como escrito.
+
 Em **Settings → Branches** do repositório no GitHub, criar três regras — uma
 para `main`, uma para `staging`, uma para `develop`.
 
@@ -223,6 +243,7 @@ Adicionalmente, **só em `main` e `staging`**:
   por que o schema nunca vem da CLI do Supabase.
 - [`decisoes/0005-tres-branches-develop-staging-main.md`](decisoes/0005-tres-branches-develop-staging-main.md) —
   por que existem três branches e não duas.
-- [`../../CLAUDE.md`](../../CLAUDE.md) — a pendência de confirmar a
-  configuração de "Confirm email" no Supabase, e por que isso decide a
-  urgência (não o conteúdo) da correção de `app/api/users.py`.
+- [`arquitetura.md`](arquitetura.md), seção "pendência de segurança
+  conhecida" — por que a configuração de "Confirm email" decide a urgência
+  (não o conteúdo) da correção de `app/api/users.py`, e por que o achado
+  continua aberto mesmo com ela ligada.

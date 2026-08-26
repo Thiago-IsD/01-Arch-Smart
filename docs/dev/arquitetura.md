@@ -138,8 +138,9 @@ o caminho deixa de ser explorável por esse vetor.
 Isso muda a **urgência**, não o achado. O código continua errado: ele trata o
 e-mail como se fosse identidade verificada, e a proteção que hoje o salva mora
 num painel externo, fora do repositório e fora do controle de versão — alguém
-desligar aquela opção reabre a falha sem nenhum sinal aqui. A correção está
-marcada para a **Seção 4**, junto com o `RequestContext`.
+desligar aquela opção reabre a falha sem nenhum sinal aqui. A correção tem caixa
+própria na **Seção 4** do [`PROGRESS.md`](../../PROGRESS.md) — *"Fim do
+auto-link por e-mail em `app/api/users.py`"* —, junto com o `RequestContext`.
 
 A mesma função, um pouco abaixo, também **cria** usuário e conta novos do
 zero quando nem `supabase_id` nem e-mail batem com nada — outro caminho que

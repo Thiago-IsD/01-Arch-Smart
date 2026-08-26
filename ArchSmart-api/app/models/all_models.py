@@ -302,7 +302,12 @@ class ItemOption(Base):
     budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     is_selected = Column(Boolean, default=True)
-    approval_status = Column(String, default="PENDING", nullable=False)
+    # server_default espelha a migracao d5045c9703e1, que criou a coluna com
+    # server_default='PENDING'. O banco ja tinha o default; o model e que nao o
+    # declarava, e nada verificava a diferenca ate o teste da receita passar a
+    # comparar server_default. Nao muda comportamento: `default=` continua
+    # preenchendo pelo lado do Python, e o banco ja preenchia um INSERT cru.
+    approval_status = Column(String, server_default="PENDING", default="PENDING", nullable=False)
     rejection_reason = Column(String, nullable=True)  # Justificativa do cliente ao recusar a opção
     created_at = Column(DateTime, default=datetime.utcnow)
 

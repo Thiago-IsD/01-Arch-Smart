@@ -27,11 +27,19 @@ classes de cor literal (paleta ou arbitrária) sob `ArchSmart-web/src`;
 correspondente em `docs/dev/modulos/` (`ai_service`, `auth_service`,
 `budget_calculator`, `financial_service`).
 
-Duas outras verificações checam algo que ainda não existe no repositório: o
+Uma outra verificação checa algo que ainda não existe no repositório: o
 validador de contraste depende dos tokens `--success`/`--warning` que só a
-Seção 6 cria, e o teste de isolamento entre contas depende do
-`ScopedRepository`/`RequestContext` que só a Seção 4 cria. Não há como ligar
-essas duas verificações hoje — não existe ainda o que elas verificariam.
+Seção 6 cria. Não há como ligá-lo hoje — não existe ainda o que ele
+verificaria.
+
+O teste de isolamento entre contas é caso diferente, e a primeira versão deste
+ADR errou ao juntá-lo ao contraste. **`ArchSmart-api/tests/isolation/` já
+existe**: 27 testes vindos da Seção 1, que montam recurso na conta A, acessam
+autenticado como conta B e exigem 404. Eles rodam em todo PR, dentro do
+`pytest -q` do job `Backend` — regressão de IDOR nas rotas cobertas reprova
+hoje. O que depende do `ScopedRepository`/`RequestContext` da Seção 4 é o teste
+**genérico**, que percorre todas as rotas registradas automaticamente em vez de
+uma lista escrita à mão.
 
 ## Decisão
 
@@ -42,9 +50,11 @@ sincronia `main`↔`develop` (ADR 0005). Lint, cores literais e doc de módulo
 entram como **catraca**: um número medido, versionado em `tools/catraca.json`,
 que o job de CI só deixa piorar em uma direção — para baixo. `tools/catraca.py`
 mede as três coisas e compara com o baseline; se qualquer uma piorou, o job
-falha e imprime o que piorou e o critério usado para medir. Contraste e
-isolamento entre contas ficam como bloco comentado no `ci.yml`, nomeando a
-seção que os liga (6 e 4, respectivamente).
+falha e imprime o que piorou e o critério usado para medir. O validador de contraste e o teste
+**genérico** de isolamento ficam como bloco comentado no `ci.yml`, nomeando a
+seção que os liga (6 e 4, respectivamente) — e o comentário diz explicitamente
+que os 27 testes de isolamento da Seção 1 já rodam, para ninguém concluir que
+IDOR passa livre.
 
 O comando que sobe o baseline (`--atualizar`) não é uma regravação simples:
 ele mede de novo, compara com o baseline atual e só grava se nada piorou.

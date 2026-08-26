@@ -15,7 +15,7 @@ Estado em 25/08/2026: Seção 1 concluída (correções de segurança, merge `f1
 
 ## Portões de CI
 
-Desde a Seção 3, `.github/workflows/ci.yml` roda três jobs em todo PR, e são eles os checks obrigatórios do branch protection:
+Desde a Seção 3, `.github/workflows/ci.yml` roda três jobs em todo PR:
 
 ```
 Backend — testes contra Postgres real
@@ -23,9 +23,25 @@ Frontend — tipos, testes e catraca
 Repositorio — progresso, links e sincronia
 ```
 
+> ⚠️ **Hoje eles reprovam, mas não bloqueiam.** Branch protection não está
+> disponível: o repositório é privado num plano Free, e a API responde
+> `404` em `/branches/{main,develop,staging}/protection` e
+> `403 "Upgrade to GitHub Pro or make this repository public"` em `/rulesets`.
+> Medido em 25/08/2026. O PR #3 fica `mergeable: MERGEABLE`,
+> `mergeStateStatus: UNSTABLE` — que significa "há check não-verde **e o merge
+> continua permitido**".
+>
+> Enquanto isso não mudar, a esteira é um **conselheiro**, não um portão: ela
+> mostra o X vermelho e o botão de merge continua verde. As duas saídas (tornar
+> o repositório público, ou assinar o GitHub Pro) e os nomes exatos dos três
+> checks estão em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md),
+> seção 5.
+
 **O que bloqueia direto:** os testes do backend contra Postgres em Docker (inclui a receita de migrações e a guarda de banco), `tsc --noEmit` e `vitest run` no frontend, os testes de `tools/`, `progresso.py --check`, `checa_links.py`, e a checagem de que `main` não tem conteúdo ausente em `develop`.
 
-**O que é catraca:** `tools/catraca.py` mede o que hoje está errado — classes de cor literal, erros de eslint, módulos sem doc — e compara com o baseline versionado em `tools/catraca.json`. O número **pode descer, nunca subir**. Baixar um número é a única forma de mexer no baseline, e exige rodar `python tools/catraca.py --atualizar` **no mesmo commit** que fez o número descer; o script recusa uma atualização que piore qualquer medida.
+**O que é catraca:** `tools/catraca.py` mede o que hoje está errado — classes de cor literal, erros de eslint, módulos sem doc — e compara com o baseline versionado em `tools/catraca.json`. O caminho normal é o número **descer**: rode `python tools/catraca.py --atualizar` **no mesmo commit** que fez o número descer, e o script recusa gravar se alguma medida piorou.
+
+Subir um número é possível e deliberadamente incômodo: exige `--atualizar --aceitar-piora`, que grava imprimindo um aviso destacado com cada medida que piorou, para o aumento ficar registrado na saída do comando e justificado no PR. E o job `Repositorio` compara o `tools/catraca.json` do PR com o da branch base — editar o número à mão, sem passar pela ferramenta, reprova ali.
 
 A ideia está no [ADR 0006](docs/dev/decisoes/0006-portoes-de-ci-com-catraca.md): um portão que nasce vermelho é desligado na primeira semana, e aí não existe portão nenhum. Por isso o portão só barra o que já passa hoje, e o resto entra como catraca.
 
@@ -42,7 +58,14 @@ Duas consequências práticas:
 - **Ao receber um número — deste repositório ou de quem te instrui — meça antes de republicá-lo.** Se não bater, diga. Não ajuste sua contagem para casar com o que te falaram: já aconteceu nas duas direções aqui.
 - **Ao afirmar um número, mostre o comando.** "Verificado por grep", sem o comando colado, já se provou falso neste repositório — o `deploy.md` afirmava que as 26 migrações tinham `downgrade()` não vazio, e são 25.
 - **Enumeração fechada é uma afirmação como qualquer outra, e envelhece pior.** A Seção 3 produziu duas: "a CLI do Supabase só aceita `major_version` 14, 15 ou 17" (a varredura tinha ido de 14 a 18; 13 também passa) e "os parâmetros de query que sobrepõem o host são `host` e `hostaddr`" (faltava `dbname`, e o furo estava numa guarda de banco). Antes de escrever "são apenas estes", varra além da vizinhança — ou, melhor, troque a enumeração por uma pergunta à ferramenta que decide, que foi a correção que ficou de pé.
-- **Meça no diretório em que o CI mede.** `python tools/checa_links.py` sai 0 a partir de `tools/` e 1 a partir da raiz. O CI roda da raiz; uma verificação feita no cwd errado reportou um portão verde que estava vermelho.
+- **Meça no diretório em que o CI mede.** Durante a Seção 3, `python tools/checa_links.py` saía 0 a partir de `tools/` e **1** a partir da raiz — o CI roda da raiz, e medir no cwd errado fez reportar como verde um portão que o runner já reprovava (run 32804191634). Aquele link foi corrigido, então esse comando hoje sai 0 dos dois lados; o exemplo que **continua** reproduzindo é outro, no mesmo espírito:
+
+  ```
+  cd tools; python -m unittest discover -p "test_*.py"   # OK, 44 testes
+  cd ..;    python -m unittest discover -s tools -p "test_*.py"   # FAILED (failures=1)
+  ```
+
+  (É `test_checa_links.py::test_nao_acusa_link_existente`; o CI escapa porque o job usa `working-directory: tools`.)
 
 ## Estrutura
 

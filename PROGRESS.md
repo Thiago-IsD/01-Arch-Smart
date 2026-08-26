@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 17/62 (27%)**
+**Progresso geral: 17/63 (27%)**
 `█████░░░░░░░░░░░░░░░`
 
 _Última atualização: 2026-08-25_
@@ -51,14 +51,24 @@ _Última atualização: 2026-08-25_
 > falta é a execução, não o plano. A branch `staging` em si já existe e está
 > publicada; o que não existe é o ambiente online ligado a ela.
 >
-> Dois itens do texto original saíram da primeira caixa porque são de outras
-> seções e não seriam verdade aqui: o **teste de isolamento entre contas**
-> depende do `ScopedRepository` (Seção 4) e o **validador de contraste** depende
-> dos tokens `--success`/`--warning` (Seção 6). O `ci.yml` registra os dois como
-> portões que ainda não existem, em vez de trazê-los como verificação vazia.
+> **A primeira caixa é sobre o `ci.yml` existir e reprovar, não sobre ele
+> bloquear.** Os três jobs rodam em todo PR e ficam vermelhos quando devem, mas
+> branch protection **não está disponível** neste repositório — privado em plano
+> Free; medido em 25/08/2026: `404` em `/branches/*/protection` e `403 "Upgrade
+> to GitHub Pro or make this repository public"` em `/rulesets`. Hoje um PR com
+> os três jobs vermelhos ainda pode ser mergeado. As duas saídas estão em
+> [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
+>
+> Do texto original da caixa saiu o **validador de contraste**, que depende dos
+> tokens `--success`/`--warning` da Seção 6 — não existe ainda o que ele
+> verificaria. O **teste de isolamento entre contas** também saiu do texto, mas
+> pelo motivo oposto: ele **já existe**. São 27 testes em
+> `ArchSmart-api/tests/isolation/`, vindos da Seção 1, que rodam em todo PR. O
+> que a Seção 4 acrescenta é a versão genérica, que percorre todas as rotas
+> registradas em vez de uma lista escrita à mão.
 
 ## Seção 4 · Camada de dados do backend
-**0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
 - [ ] `RequestContext` em `app/core/security.py`
 - [ ] `ScopedRepository` em `app/db/repository.py`
@@ -68,6 +78,7 @@ _Última atualização: 2026-08-25_
 - [ ] Suíte de testes contra banco real (`tests/services/`, `tests/api/`, `tests/isolation/`) substituindo `app/tests/`
 - [ ] Tratamento de erro único (exceções de domínio; sem `detail=str(e)` nem `print()`)
 - [ ] `GET /api/v1/me` com `user`, `account` e `entitlements`
+- [ ] Fim do auto-link por e-mail em `app/api/users.py` (ver [arquitetura.md](docs/dev/arquitetura.md), "pendência de segurança conhecida")
 
 ## Seção 5 · Camada de dados do frontend
 **0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`

@@ -55,7 +55,14 @@ def banco_da_receita(monkeypatch):
 
 def test_receita_reproduz_os_models(banco_da_receita):
     with banco_da_receita.connect() as conexao:
-        contexto = MigrationContext.configure(conexao)
+        # compare_server_default=True: sem isso, um server_default novo no
+        # model sem migracao correspondente passa batido. Nao e hipotetico —
+        # all_models.py ja usa o padrao, com um comentario afirmando que ele
+        # espelha a migracao f1a2b3c4d5e6, e nada verificava esse espelhamento.
+        # Mesma classe do ponto cego de enum que a Tarefa 2b fechou.
+        contexto = MigrationContext.configure(
+            conexao, opts={"compare_server_default": True}
+        )
         diferencas = compare_metadata(contexto, Base.metadata)
 
     assert diferencas == [], (

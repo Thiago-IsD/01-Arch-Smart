@@ -108,12 +108,11 @@ tabelas de catálogo abaixo.
 
 Catálogos **globais**, não dado de conta. Cada um tem só uma dúzia de linhas
 possíveis (uma por valor do enum Python correspondente —
-`ProductOriginType`: `WEB_CLIPPER`/`SHOPPING_HUB`/`MANUAL`/`CATALOG`;
-`ProductStateStatus`: `CAPTURED`/`NORMALIZED`/`INACTIVE`/`ACTIVE`/`ARCHIVED`/
-`DELETED`) e existem como tabela — em vez de o enum morar direto em
+`ProductOriginType`: `WEB_CLIPPER`/`SHOPPING_HUB`/`MANUAL`;
+`ProductStateStatus`: `CAPTURED`/`NORMALIZED`/`INACTIVE`) e existem como tabela — em vez de o enum morar direto em
 `products.origin` — porque o modelo original queria um `name` de exibição
 independente do valor do enum. Na prática, o código nunca filtra essas
-tabelas por conta: `app/api/routers/product_router.py` e `tools/seed_products.py`
+tabelas por conta: `app/api/routers/product_router.py` e `tools/seed.py`
 sempre buscam por `type`/`status` (`db.query(ProductOrigin).filter(ProductOrigin.type == ...)`)
 e **criam a linha se não existir** — é o padrão "singleton global por valor
 de enum", não um catálogo por escritório. Não precisam de `account_id`.
@@ -315,7 +314,7 @@ Das 26 tabelas, 11 têm `account_id` direto: `admin_logs`, `clients`,
 |---|---|---|---|
 | `accounts` | É o tenant | N/A — é a própria conta | — |
 | `plans` | Catálogo global | Reaproveitado por todas as contas de um mesmo plano; consultado por `id`/nome de plano, nunca por conta (`app/api/users.py`) | N/A |
-| `product_origins` | Catálogo global | Uma linha por valor de `ProductOriginType`, criada sob demanda e buscada por `type`, nunca por conta (`product_router.py`, `seed_products.py`) | N/A |
+| `product_origins` | Catálogo global | Uma linha por valor de `ProductOriginType`, criada sob demanda e buscada por `type`, nunca por conta (`product_router.py`, `seed.py`) | N/A |
 | `product_states` | Catálogo global | Mesmo padrão de `product_origins`, por `ProductStateStatus` | N/A |
 | `documents` | Não classificável hoje | Sem FK para `projects` ou `accounts`, sem consumidor em `app/` — scaffolding de RAG não ligado ao produto | Não existe caminho hoje |
 | `project_slots` | Precisa de `account_id` | Vaga de projeto é dado da conta dona da assinatura, mesmo sem consumidor no código hoje | `ProjectSlot → Subscription → account_id` (via `subscription_id`, `NOT NULL`; **não** via `project_id`, que é nulável) |

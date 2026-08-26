@@ -22,7 +22,18 @@ A regra é uma **lista de permissão**, não de proibição. O banco só é acei
 1. o host for local (`localhost`, `127.0.0.1`, `::1` — comparados por igualdade, então `localhost.evil.com` não passa); **ou**
 2. o nome do banco terminar em `_test` ou `_seed`.
 
-Qualquer outra coisa é recusada, com saída 1 e sem escrever nada — inclusive hospedagens que uma lista de proibição não anteciparia (Neon, Railway, ou o IP cru de uma máquina de produção). Também é recusada a URL que traz `host=` ou `hostaddr=` na query string: o libpq deixa esses parâmetros **vencerem** o host da URL, então julgar o host escrito na URL seria julgar uma coisa e conectar em outra.
+Qualquer outra coisa é recusada, com saída 1 e sem escrever nada — inclusive hospedagens que uma lista de proibição não anteciparia (Neon, Railway, ou o IP cru de uma máquina de produção).
+
+**A guarda não lê a URL: ela pergunta ao driver onde a conexão vai parar.** O host e o nome do banco vêm de `PGDialect_psycopg2().create_connect_args(make_url(url))` — o mesmo caminho que o engine percorre — e é esse destino efetivo que é julgado.
+
+Isso importa porque o libpq aceita parâmetros de query que **vencem** o que está escrito na URL (`?host=`, `?dbname=`, `?hostaddr=`), e porque `urlsplit` e o parser do SQLAlchemy discordam sobre o fragmento `#`. Uma versão anterior desta guarda tentou enumerar esses parâmetros e recusar quem os trouxesse; a lista foi afirmada como completa, não incluía `dbname`, e o furo passou por uma revisão. Perguntar ao driver dispensa a lista — e é por isso que estas duas URLs recebem vereditos opostos, os dois corretos:
+
+```
+postgresql://u:s@prod.supabase.co/appdb?host=localhost      → ACEITA  (a conexão vai para localhost)
+postgresql://u:s@localhost/arqsmart_test#?host=prod.supabase.co  → recusa  (a conexão vai para o Supabase)
+```
+
+O que a guarda recusa de saída é o que ela **não consegue interpretar com segurança**: `hostaddr` (que redireciona o endereço real mantendo o host só para autenticação), URL que não seja de Postgres, e caminho composto. Fail-closed.
 
 A mensagem diz o motivo, de qual das duas fontes a URL veio, e o destino como `host:porta/banco` — **nunca a URL inteira**. Houve uma versão que imprimia a URL com a senha apagada por expressão regular; ela errava em três formas legítimas de libpq, e cada erro desses é uma credencial de produção num log de build arquivado. Montar `host:porta/banco` a partir dos campos não tem como errar.
 

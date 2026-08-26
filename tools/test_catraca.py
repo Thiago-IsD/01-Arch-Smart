@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from catraca import (
+    DiretorioMedidoSumiu,
     comparar,
     contar_cores,
     decidir_atualizacao,
@@ -63,12 +64,58 @@ class TestModulosSemDoc(unittest.TestCase):
         (base / "modulos" / "cobranca_service.md").write_text("# doc", encoding="utf-8")
         self.assertEqual(modulos_sem_doc(base / "services", None, base / "modulos"), [])
 
-    def test_diretorio_inexistente_nao_quebra(self):
+    def test_diretorio_de_services_inexistente_falha(self):
+        """
+        Fail-closed, e este teste antes consagrava o contrario.
+
+        Devolver lista vazia faz a catraca anunciar "baixou" quando o que houve
+        foi o diretorio mudar de nome. Tem data marcada: a Secao 9 renomeia
+        ArchSmart-api/ e ArchSmart-web/. No dia do rename as duas medidas
+        zerariam, o portao ficaria verde e convidaria a gravar 0 no baseline.
+        """
         base = self._base()
+        with self.assertRaises(DiretorioMedidoSumiu):
+            modulos_sem_doc(base / "nao_existe", None, base / "modulos")
+
+    def test_features_inexistente_continua_tolerado(self):
+        """
+        `src/features/` e a excecao deliberada: ele so passa a existir na Secao
+        5. Ausencia dele e o estado esperado hoje, nao um rename.
+        """
+        base = self._base()
+        (base / "services").mkdir(parents=True, exist_ok=True)
         self.assertEqual(
-            modulos_sem_doc(base / "nao_existe", base / "tambem_nao", base / "modulos"),
+            modulos_sem_doc(base / "services", base / "features_que_nao_existe", base / "modulos"),
             [],
         )
+
+    def test_diretorio_de_cores_inexistente_falha(self):
+        base = self._base()
+        with self.assertRaises(DiretorioMedidoSumiu):
+            contar_cores(base / "src_que_nao_existe")
+
+
+class TestBaselineAusente(unittest.TestCase):
+    """
+    Apagar uma chave numerica do catraca.json desligava a medida em silencio, e
+    um --atualizar seguinte gravava o numero novo sem nenhum aviso. A recusa do
+    --atualizar guarda a ferramenta; estes testes guardam o arquivo.
+    """
+
+    def test_chave_numerica_ausente_falha_a_comparacao(self):
+        ok, linhas = comparar({}, {"cores_literais": 524})
+        self.assertFalse(ok)
+        self.assertIn("SEM BASELINE", "\n".join(linhas))
+
+    def test_chave_numerica_ausente_conta_como_piora(self):
+        pioras = medidas_pioradas({}, {"cores_literais": 524})
+        self.assertEqual(len(pioras), 1)
+        self.assertIn("sem baseline", pioras[0])
+
+    def test_atualizar_recusa_quando_a_chave_sumiu(self):
+        gravar, avisos = decidir_atualizacao({}, {"cores_literais": 524}, aceitar_piora=False)
+        self.assertFalse(gravar)
+        self.assertIn("recusou", "\n".join(avisos))
 
 
 class TestComparacao(unittest.TestCase):

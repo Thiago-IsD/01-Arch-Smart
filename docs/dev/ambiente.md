@@ -259,8 +259,10 @@ Sem o `-o env`, num terminal interativo, o mesmo conteúdo sai como tabela.
 
 **Sinal de sucesso:** o `supabase status` responde com essas URLs. Ele também
 imprime `Stopped services: [supabase_imgproxy_arqsmart supabase_pooler_arqsmart]`
-— **isso é esperado**, os dois estão desligados no `config.toml` e não fazem
-falta no desenvolvimento.
+— **isso é esperado** e nenhum dos dois faz falta no desenvolvimento. O
+`pooler` está desligado no `config.toml` (`[db.pooler] enabled = false`); o
+`imgproxy` não tem entrada ativa lá — ele fica parado por padrão da CLI, já que
+a transformação de imagem é recurso de plano pago.
 
 As chaves que ele imprime são **locais e fixas** — as mesmas em qualquer
 máquina, embutidas na CLI. Não são segredo e não vão para o `.env` de produção;
@@ -353,8 +355,9 @@ Dois detalhes que economizam tempo:
    **ainda não foi conferida** — a tabela a preencher está em
    [ambientes-online.md](ambientes-online.md), seção 4.
 2. **A confirmação de e-mail vem desligada aqui, e está ligada em produção.**
-   `supabase/config.toml` traz `[auth] enable_confirmations = false`, que é o
-   padrão da CLI; no projeto real a opção *Confirm email* está **ligada**
+   `supabase/config.toml` traz `enable_confirmations = false` na seção
+   `[auth.email]`, que é o padrão da CLI (há uma segunda, independente, em
+   `[auth.sms]`); no projeto real a opção *Confirm email* está **ligada**
    (confirmado no painel em 24/08/2026 — ver
    [ambientes-online.md](ambientes-online.md)). Duas consequências: um cadastro
    testado localmente entra sem confirmar, o que **não** é o comportamento real;
@@ -414,11 +417,11 @@ Saída real:
 
 ```
 .............................................................................[100%]
-77 passed, 3 warnings in 30.74s
+78 passed, 3 warnings in 32.45s
 ```
 
 **Sinal de sucesso:** todos os testes em verde, `N passed` sem `failed` (o
-número exato cresce com o tempo; em 25/08/2026 são 77, dos quais 45 são da
+número exato cresce com o tempo; em 25/08/2026 são 78, dos quais 46 são da
 guarda de banco em `tools/guarda_banco.py`). Os 3 `warnings` vêm do Alembic e
 são esperados.
 

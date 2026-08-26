@@ -105,6 +105,22 @@ jobs:
         run: python tools/progresso.py --check
       - name: Links internos da documentacao
         run: python tools/checa_links.py
+      - name: O baseline da catraca nao afrouxou
+        # A recusa do `--atualizar` guarda a FERRAMENTA; este passo guarda o
+        # ARQUIVO. Quem tem o PR travado pela catraca pode abrir
+        # tools/catraca.json e subir o numero na mao: a catraca passa a dizer
+        # "baixou de 9999 para 521" e sai 0, sem que a pessoa precise sequer
+        # saber que --aceitar-piora existe. So a comparacao com a branch base
+        # enxerga isso, porque ela compara baseline com baseline, e nao com o
+        # medido. Descoberto por auditoria adversarial da propria Secao 3.
+        run: |
+          BASE="${{ github.base_ref || 'develop' }}"
+          git fetch origin "$BASE" --quiet
+          if git show "origin/$BASE:tools/catraca.json" > /tmp/catraca_base.json 2>/dev/null; then
+            python tools/catraca.py --comparar-baseline-com /tmp/catraca_base.json
+          else
+            echo "origin/$BASE nao tem tools/catraca.json ainda; nada a comparar."
+          fi
       - name: main nao tem mudanca ausente em develop
         # Hotfix aplicado em main precisa voltar para develop no mesmo dia
         # (ADR 0005). A comparacao e de CONTEUDO, nao de contagem de commits:
@@ -133,5 +149,9 @@ jobs:
 #
 #   validador de contraste (4.5:1 nos dois temas) — Secao 6, junto com os
 #     tokens --success/--warning que hoje faltam
-#   teste de isolamento entre contas (tests/isolation/) — Secao 4, junto com o
-#     ScopedRepository que o torna verificavel
+#   teste GENERICO de isolamento entre contas — Secao 4, junto com o
+#     ScopedRepository. Atencao: `ArchSmart-api/tests/isolation/` JA EXISTE e
+#     roda em todo PR, dentro do `pytest -q` do job backend: 27 testes que
+#     montam recurso na conta A, acessam autenticado como conta B e exigem 404.
+#     Vieram da Secao 1. O que falta e o teste que percorre TODAS as rotas
+#     registradas automaticamente, e esse depende do ScopedRepository.
