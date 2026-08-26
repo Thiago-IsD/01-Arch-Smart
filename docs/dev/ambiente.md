@@ -32,7 +32,10 @@ precisa de credenciais de um projeto Supabase e de uma chave do Google Gemini:
   Isso **não é autoatendimento** — peça a alguém do time. Não existe hoje um
   projeto Supabase **hospedado** "de desenvolvimento" separado do projeto real;
   o que existe é a stack local em Docker, descrita em "Stack Supabase local"
-  mais abaixo, que dispensa essas credenciais para quase tudo.
+  mais abaixo. Ela substitui essas credenciais para desenvolver — inclusive
+  login e upload —, e a seção "Apontar a aplicação para a stack local" diz
+  exatamente quais valores trocar. A chave do Gemini continua sendo necessária
+  para as funções de IA: essa não tem equivalente local.
 - **Chave do Google Gemini** (`GEMINI_API_KEY`): essa você mesmo gera, de
   graça, em <https://aistudio.google.com/apikey>.
 
@@ -227,18 +230,32 @@ cd 01-Arch-Smart
 supabase start
 ```
 
-**A primeira execução baixa cerca de 8 GB de imagem** e demora — as maiores são
-`supabase/postgres`, `studio` e `edge-runtime`. As seguintes sobem em segundos.
+**A primeira execução baixa cerca de 8 GB de imagem** e demora. Medido com
+`docker images` depois do primeiro `supabase start`, as maiores são `postgres`
+(1,7 GB), `studio` (1,66 GB) e `storage-api` (1,38 GB). As execuções seguintes
+sobem em segundos.
 
 Depois, `supabase status` mostra onde tudo ficou:
 
+Saída real de `supabase status -o env`, com as linhas de chave filtradas
+(`| Select-String -NotMatch "KEY|SECRET"`):
+
 ```
-DB_URL      postgresql://postgres:postgres@127.0.0.1:54322/postgres
-API_URL     http://127.0.0.1:54321
-STUDIO_URL  http://127.0.0.1:54323
-MAILPIT_URL http://127.0.0.1:54324
-ANON_KEY, SERVICE_ROLE_KEY, JWT_SECRET, ...
+Stopped services: [supabase_imgproxy_arqsmart supabase_pooler_arqsmart]
+API_URL="http://127.0.0.1:54321"
+DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+FUNCTIONS_URL="http://127.0.0.1:54321/functions/v1"
+GRAPHQL_URL="http://127.0.0.1:54321/graphql/v1"
+INBUCKET_URL="http://127.0.0.1:54324"
+MAILPIT_URL="http://127.0.0.1:54324"
+MCP_URL="http://127.0.0.1:54321/mcp"
+REST_URL="http://127.0.0.1:54321/rest/v1"
+S3_PROTOCOL_REGION="local"
+STORAGE_S3_URL="http://127.0.0.1:54321/storage/v1/s3"
+STUDIO_URL="http://127.0.0.1:54323"
 ```
+
+Sem o `-o env`, num terminal interativo, o mesmo conteúdo sai como tabela.
 
 **Sinal de sucesso:** o `supabase status` responde com essas URLs. Ele também
 imprime `Stopped services: [supabase_imgproxy_arqsmart supabase_pooler_arqsmart]`
@@ -257,6 +274,14 @@ aplicadas por cima, pelo Alembic, que é a fonte única do schema
 `[db.migrations] enabled = false` no `supabase/config.toml`: duas ferramentas de
 migração seriam dois históricos divergentes.
 
+> **Exporte a `DATABASE_URL` em todo comando de Alembic, sem exceção.**
+> `alembic/env.py` lê `settings.DATABASE_URL`, e `app/core/config.py` cai no
+> arquivo `.env` quando a variável não está exportada — e o `.env` desta
+> máquina aponta para o Supabase **de produção**. Os scripts de
+> `ArchSmart-api/tools/` têm uma guarda que recusa host gerenciado
+> ([tools/README.md](../../ArchSmart-api/tools/README.md)); **o Alembic não
+> tem**. Um `alembic upgrade head` sem a variável migra produção.
+
 ```
 cd ArchSmart-api
 $env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -272,6 +297,7 @@ INFO  [alembic.runtime.migration] Running upgrade c9f1a2b3d4e5 -> b77a9b5656c2, 
 **Sinal de sucesso**, conferido depois:
 
 ```
+$env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 .\venv\Scripts\python.exe -m alembic current   # -> b77a9b5656c2 (head)
 docker exec supabase_db_arqsmart psql -U postgres -tAc "select count(*) from information_schema.tables where table_schema='public';"   # -> 27
 docker exec supabase_db_arqsmart psql -U postgres -tAc "select extname, extversion from pg_extension where extname='vector';"          # -> vector|0.8.2
@@ -280,16 +306,64 @@ docker exec supabase_db_arqsmart psql -U postgres -tAc "select extname, extversi
 As 27 migrações aplicam sem erro (`ls alembic/versions/*.py | wc -l` → 27), e a
 extensão `vector` é habilitada pela própria migração `9f8a3b2c1d4e`.
 
-### Duas diferenças que importam
+### Apontar a aplicação para a stack local
 
-1. **O Postgres local é 17; o do banco de teste é 16.** Não é descuido: a CLI só
-   aceita `major_version` 14, 15 ou 17 — o Supabase nunca ofereceu 16. Medido
-   nesta máquina editando o valor e rodando `supabase status` para cada um: 16 e
-   18 saem com `Invalid db.major_version`. A versão do banco gerenciado de
-   produção **ainda não foi conferida** — é uma pendência de painel, registrada
-   em [ambientes-online.md](ambientes-online.md).
-2. **Esta stack não substitui o banco de teste.** O `docker-compose.test.yml` da
+Subir a stack não redireciona nada sozinho: a API e o front continuam lendo o
+que estiver no `.env`. Os valores vêm do `supabase status` (rode-o e leia os
+seus — as chaves abaixo estão nomeadas, não coladas):
+
+Em `ArchSmart-api/.env`:
+
+| Variável | Valor da stack local |
+|---|---|
+| `DATABASE_URL` | `DB_URL` |
+| `SUPABASE_URL` | `API_URL` |
+| `SUPABASE_KEY` | `ANON_KEY` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `SERVICE_ROLE_KEY` |
+| `SUPABASE_JWT_SECRET` | `JWT_SECRET` |
+
+Em `ArchSmart-web/.env.local`:
+
+| Variável | Valor da stack local |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | `API_URL` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ANON_KEY` |
+
+> **Guarde o `.env` de nuvem antes de sobrescrever.** Ele é a única cópia das
+> credenciais do projeto real nesta máquina, e não é versionado.
+
+Dois detalhes que economizam tempo:
+
+- **Os buckets do Storage não precisam ser criados à mão.**
+  `app/utils/supabase_client.py` cria o bucket sob demanda no primeiro upload.
+- **O e-mail sai no Mailpit**, em <http://127.0.0.1:54324>, não para a caixa de
+  verdade. É lá que você lê o link de confirmação e o de recuperação de senha.
+
+### Três diferenças que importam
+
+1. **O Postgres local é 17; o do banco de teste é 16.** Não é descuido: a CLI
+   **rejeita** 16. Medido nesta máquina trocando o valor e rodando
+   `supabase status` para cada um de 11 a 20 — 13, 14, 15 e 17 são aceitos; 16
+   sai com `Invalid db.major_version`. O Supabase nunca ofereceu Postgres 16, e
+   17 é a versão suportada mais próxima. A versão dos bancos gerenciados
+   **ainda não foi conferida** — a tabela a preencher está em
+   [ambientes-online.md](ambientes-online.md), seção 4.
+2. **A confirmação de e-mail vem desligada aqui, e está ligada em produção.**
+   `supabase/config.toml` traz `[auth] enable_confirmations = false`, que é o
+   padrão da CLI; no projeto real a opção *Confirm email* está **ligada**
+   (confirmado no painel em 24/08/2026 — ver
+   [ambientes-online.md](ambientes-online.md)). Duas consequências: um cadastro
+   testado localmente entra sem confirmar, o que **não** é o comportamento real;
+   e, do lado bom, esta stack passa a ser o lugar barato de reproduzir o achado
+   de segurança do auto-link por e-mail em `app/api/users.py`, que só é
+   explorável com a confirmação desligada.
+3. **Esta stack não substitui o banco de teste.** O `docker-compose.test.yml` da
    seção seguinte, na porta `55432`, continua separado e é ele que a suíte usa.
+
+> **Não use `supabase db reset`.** É o comando que a documentação oficial do
+> Supabase ensina, e ele derruba e recria o banco — apagando o schema aplicado
+> pelo Alembic junto com a tabela `alembic_version`. Para recomeçar do zero, use
+> o `supabase stop --no-backup` abaixo e refaça o `upgrade head`.
 
 ### Parar
 

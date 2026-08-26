@@ -152,7 +152,30 @@ migrações funciona do zero antes de apostar produção nela.
    descreve (divergência entre schema real e histórico de migrações).
 4. Depois do primeiro deploy bem-sucedido, rode o seed com volume realista
    (`ArchSmart-api/tools/seed.py`, entregue por outra tarefa desta seção)
-   para popular o banco novo, se for necessário dado de demonstração.
+   para popular o banco novo, **se** for necessário dado de demonstração.
+
+   > O seed **recusa** rodar contra host gerenciado: ele só aceita banco local
+   > ou com nome terminado em `_test`/`_seed`. Para um banco de produção ou de
+   > staging é preciso passar `--eu-sei-o-que-estou-fazendo`, de propósito —
+   > ver [`ArchSmart-api/tools/README.md`](../../ArchSmart-api/tools/README.md).
+   > Confira a `DATABASE_URL` antes: a flag desliga a única proteção que existe.
+
+5. **Anote qual versão de Postgres o projeto novo nasceu com** (no painel,
+   *Project Settings → Database*, ou `SHOW server_version;`) e registre-a aqui:
+
+   | Ambiente | Postgres | Como foi obtido |
+   |---|---|---|
+   | Banco de teste (`docker-compose.test.yml`) | **16** | imagem `pgvector/pgvector:pg16` |
+   | Stack Supabase local (`supabase start`) | **17** | a CLI rejeita 16; ver `supabase/config.toml` |
+   | Staging (seção 3) | *a preencher* | — |
+   | Produção nova | *a preencher* | — |
+
+   Isso não é burocracia: hoje o banco de teste e a stack local já divergem por
+   um major, porque o Supabase nunca ofereceu Postgres 16 e a CLI recusa esse
+   valor. Se os projetos novos nascerem em 17, quem diverge passa a ser o banco
+   de teste, e vale alinhar o `docker-compose.test.yml` — **numa tarefa
+   dedicada**, não de passagem, porque trocar a imagem do Postgres dos testes
+   é exatamente o tipo de mudança que precisa ser medida sozinha.
 
 ## 5. Branch protection nas três branches
 

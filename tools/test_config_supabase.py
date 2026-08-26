@@ -24,11 +24,15 @@ CONFIG = RAIZ / "supabase" / "config.toml"
 
 class TestConfigSupabase(unittest.TestCase):
     def setUp(self):
-        if not CONFIG.exists():
-            self.skipTest(
-                f"{CONFIG.relative_to(RAIZ)} nao existe — rode `supabase init` na "
-                "raiz do repositorio (ver docs/dev/ambiente.md, 'Stack Supabase local')"
-            )
+        # Falha, nao pula. O config.toml e versionado: ausencia dele e regressao,
+        # nao "ambiente sem a ferramenta". Um skipTest aqui produziria um verde
+        # falso — a suite inteira sairia OK com o arquivo apagado.
+        self.assertTrue(
+            CONFIG.exists(),
+            f"{CONFIG.relative_to(RAIZ)} nao existe. Ele e versionado; se sumiu, "
+            "foi apagado por engano. Para recria-lo do zero, `supabase init` na "
+            "raiz e reaplique as decisoes que este teste trava.",
+        )
         with CONFIG.open("rb") as arquivo:
             self.config = tomllib.load(arquivo)
 
@@ -48,6 +52,32 @@ class TestConfigSupabase(unittest.TestCase):
             "supabase/config.toml: [db.migrations] enabled precisa ser false "
             "(ADR 0004 — Alembic e a fonte unica do schema). Se voce acabou de "
             "rodar `supabase init --force`, ele reverteu esta linha.",
+        )
+
+    def test_major_version_e_um_valor_que_a_cli_aceita(self):
+        """
+        E a decisao mais surpreendente do arquivo, e a que um colega
+        bem-intencionado "corrigiria" para 16 — batendo com o banco de teste,
+        que e `pgvector/pgvector:pg16`. A CLI entao recusa subir a stack com
+        "Invalid db.major_version: 16.", uma mensagem que nao explica nada.
+
+        Os valores aceitos foram medidos nesta maquina com supabase 2.115.0,
+        trocando o valor e rodando `supabase status` para cada um de 11 a 20:
+        13, 14, 15 e 17 passam; 11, 16, 18, 19 e 20 saem com
+        "Invalid db.major_version"; 12 sai com "unsupported".
+
+        O teste aceita a lista medida, e nao so o 17, para nao quebrar se uma
+        CLI futura mudar o padrao — mas 16 continua barrado, que e o ponto.
+        """
+        aceitos = (13, 14, 15, 17)
+        self.assertIn(
+            self.config["db"]["major_version"],
+            aceitos,
+            "supabase/config.toml: [db] major_version precisa ser um dos valores "
+            f"que a CLI aceita {aceitos}. Em especial, 16 NAO e aceito — o "
+            "Supabase nunca ofereceu Postgres 16, e por isso este Postgres local "
+            "diverge do banco de teste por um major. Ver o comentario no proprio "
+            "config.toml e docs/dev/ambiente.md.",
         )
 
     def test_project_id_nao_grafa_a_marca_errado(self):

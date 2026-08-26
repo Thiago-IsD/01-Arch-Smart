@@ -42,14 +42,22 @@ shadow_port = 54320
 health_timeout = "2m"
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
-# Fica em 17 -- e nao nos 16 do banco de teste -- porque a CLI so aceita 14, 15
-# ou 17. Medido nesta maquina com supabase 2.115.0, editando este valor e
-# rodando `supabase status` para cada um: 16 e 18 saem com
-# "Invalid db.major_version". O Supabase nunca ofereceu Postgres 16, entao este
-# Postgres local diverge por um major do banco de teste
-# (`pgvector/pgvector:pg16`, em ArchSmart-api/docker-compose.test.yml). A versao
-# do banco gerenciado de producao nao foi conferida -- pendencia de painel,
-# registrada em docs/dev/ambientes-online.md.
+# Fica em 17, e nao nos 16 do banco de teste, porque a CLI REJEITA 16.
+# Medido nesta maquina com supabase 2.115.0, trocando este valor e rodando
+# `supabase status` para cada um de 11 a 20:
+#
+#   11         Invalid db.major_version
+#   12         "Postgres version 12.x is unsupported"
+#   13 14 15   aceitos
+#   16         Invalid db.major_version   <- o valor que o plano pedia
+#   17         aceito                     <- o escolhido, o mais novo aceito
+#   18 19 20   Invalid db.major_version
+#
+# Ou seja: 17 e a versao suportada mais proxima de 16, nao ha como bater com o
+# banco de teste (`pgvector/pgvector:pg16`, em
+# ArchSmart-api/docker-compose.test.yml) e este Postgres local diverge dele por
+# um major. A versao do banco gerenciado de producao nao foi conferida -- ver
+# a pendencia registrada em docs/dev/ambientes-online.md, secao 4.
 major_version = 17
 
 [db.pooler]

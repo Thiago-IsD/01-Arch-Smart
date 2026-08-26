@@ -121,7 +121,7 @@ Além do que o plano já descreve, três coisas descobertas durante a execução
 ## O que ficou pendente de Thiago, nos painéis
 
 Roteiro completo, campo a campo, em
-[`../dev/ambientes-online.md`](../dev/ambientes-online.md): serviço de staging no
+[`../../dev/ambientes-online.md`](../../dev/ambientes-online.md): serviço de staging no
 Render, preview da Vercel, projeto Supabase de staging, banco de produção novo e
 branch protection nas três branches.
 
