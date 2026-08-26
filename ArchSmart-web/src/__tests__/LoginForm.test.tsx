@@ -9,11 +9,11 @@ describe('LoginForm Component Tests', () => {
     
     // Simulate empty submit behavior
     let error = ''
-    const submit = (email, password) => {
+    const submit = (email: string, password: string) => {
         if (!email || !password) error = 'Fields are required'
         else mockLogin(email, password)
     }
-    
+
     submit('', '')
     expect(error).toBe('Fields are required')
     expect(mockLogin).not.toHaveBeenCalled()
@@ -23,11 +23,11 @@ describe('LoginForm Component Tests', () => {
     const mockLogin = vi.fn()
     
     let error = ''
-    const submit = (email, password) => {
+    const submit = (email: string, password: string) => {
         if (!email || !password) error = 'Fields are required'
         else mockLogin(email, password)
     }
-    
+
     submit('test@test.com', '123456')
     expect(error).toBe('')
     expect(mockLogin).toHaveBeenCalledWith('test@test.com', '123456')

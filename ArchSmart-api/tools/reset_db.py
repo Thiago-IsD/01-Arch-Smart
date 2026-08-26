@@ -16,10 +16,39 @@ except ImportError:
     sys.path.append(os.getcwd())
     from app.core.config import settings
 
-def reset_database():
-    print(f"Connecting to database...")
-    engine = create_engine(settings.DATABASE_URL)
-    
+from tools.guarda_banco import (
+    descrever_destino,
+    recusar_se_nao_descartavel,
+    resolver_url_e_origem,
+)
+
+
+def reset_database(forcado: bool = False):
+    # Este script faz DROP SCHEMA public CASCADE e ate a Secao 3 nao tinha
+    # guarda nenhuma, resolvendo a URL do mesmo settings que, sem
+    # DATABASE_URL exportada, cai no .env — que aponta para um projeto
+    # Supabase HOSPEDADO, nunca para um banco descartavel. A guarda vem
+    # antes de create_engine, nao depois.
+    url, origem = resolver_url_e_origem()
+    recusar_se_nao_descartavel(
+        url,
+        origem=origem,
+        forcado=forcado,
+        acao="apagar o schema public inteiro (DROP SCHEMA public CASCADE); nao ha desfazer",
+        # Modo estrito, como tests/conftest.py: o criterio do sufixo
+        # "_test"/"_seed" existe para permitir SEMEAR um staging sem flag, nao
+        # para APAGAR um. Sem isto, "staging.qualquer-host.com/arqsmart_seed"
+        # autorizaria um DROP SCHEMA remoto sem flag nenhuma.
+        exigir_host_local=True,
+    )
+
+    print(f"Connecting to database: {descrever_destino(url)}  (origem: {origem})")
+    # create_engine(url), e nao create_engine(settings.DATABASE_URL): hoje sao o
+    # mesmo valor, mas este e o script do DROP SCHEMA, e ter a URL julgada e a
+    # URL usada como duas expressoes diferentes e a distancia exata em que o
+    # defeito original nasceu. Uma expressao so nao tem como divergir.
+    engine = create_engine(url)
+
     with engine.connect() as connection:
         trans = connection.begin()
         try:
@@ -44,4 +73,4 @@ def reset_database():
             raise
 
 if __name__ == "__main__":
-    reset_database()
+    reset_database(forcado="--eu-sei-o-que-estou-fazendo" in sys.argv)

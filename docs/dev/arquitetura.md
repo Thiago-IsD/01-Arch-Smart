@@ -126,19 +126,27 @@ if email:
 
 O código busca um usuário pelo **e-mail** do token e, se encontrar, grava o
 `supabase_id` do portador do token naquela linha — entregando a conta a quem
-quer que tenha um token do Supabase com aquele e-mail no payload. A extensão
-de risco real (se um atacante consegue emitir um JWT com e-mail arbitrário,
-ou se depende de o provedor de e-mail do Supabase estar configurado para
-exigir verificação antes de aceitar login) depende de uma configuração do
-projeto Supabase que só o dono do projeto pode checar — por isso isto está
-registrado como pendência, não corrigido às pressas aqui.
+quer que tenha um token do Supabase com aquele e-mail no payload.
+
+**A extensão do risco foi medida.** Ela dependia de uma configuração do projeto
+Supabase que só o dono do projeto pode checar: *Authentication → Providers →
+Email → "Confirm email"*. Thiago verificou no painel em **24/08/2026**: a opção
+está **ligada**. Consequência: quem apenas conhece o e-mail da vítima **não**
+consegue emitir um token com aquele e-mail sem antes provar posse da caixa, e
+o caminho deixa de ser explorável por esse vetor.
+
+Isso muda a **urgência**, não o achado. O código continua errado: ele trata o
+e-mail como se fosse identidade verificada, e a proteção que hoje o salva mora
+num painel externo, fora do repositório e fora do controle de versão — alguém
+desligar aquela opção reabre a falha sem nenhum sinal aqui. A correção tem caixa
+própria na **Seção 4** do [`PROGRESS.md`](../../PROGRESS.md) — *"Fim do
+auto-link por e-mail em `app/api/users.py`"* —, junto com o `RequestContext`.
 
 A mesma função, um pouco abaixo, também **cria** usuário e conta novos do
 zero quando nem `supabase_id` nem e-mail batem com nada — outro caminho que
-depende da mesma configuração para ter o efeito esperado.
+se apoia na mesma configuração de painel para ter o efeito esperado.
 
-Isto tem tarefa própria; não está coberto por nenhuma das nove seções desta
-reestruturação. Quem for tocar em `app/api/users.py` por qualquer outro
+Quem for tocar em `app/api/users.py` por qualquer outro
 motivo precisa saber que este comportamento existe **antes** de editar o
 arquivo, para não o esconder dentro de uma mudança não relacionada nem
 assumir que o arquivo já está seguro.

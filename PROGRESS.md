@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 14/62 (23%)**
+**Progresso geral: 17/63 (27%)**
 `█████░░░░░░░░░░░░░░░`
 
-_Última atualização: 2026-08-24_
+_Última atualização: 2026-08-26_
 
 ---
 
@@ -37,16 +37,45 @@ _Última atualização: 2026-08-24_
 - [x] Deploy, ADRs em `docs/dev/decisoes/` e template de PR (Task 8)
 
 ## Seção 3 · Esteira, ambientes e branches
-**0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**3/5 (60%)** `████████████░░░░░░░░`
 
-- [ ] CI que barra merge (lint, tipos, testes contra Postgres em Docker, isolamento entre contas, literais proibidos, validador de contraste, doc de módulo, consistência do PROGRESS.md)
+- [x] CI que reprova em todo PR (lint, tipos, testes contra Postgres em Docker, cores literais, doc de módulo, consistência do PROGRESS.md, sincronia `main`↔`develop`)
 - [ ] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
-- [ ] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
+- [x] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
 - [ ] Banco de produção novo, criado do zero pela receita de migrações
-- [ ] Seed com volume realista (`tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
+- [x] Seed com volume realista (`ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
+
+> **As duas caixas desmarcadas dependem de passos em painel externo**, que só o
+> dono das contas executa — Render, Vercel e Supabase. O roteiro campo a campo
+> está em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md); o que
+> falta é a execução, não o plano. A branch `staging` em si já existe e está
+> publicada; o que não existe é o ambiente online ligado a ela.
+>
+> **A primeira caixa foi renomeada, e o motivo importa.** Ela dizia "CI que
+> barra merge". O `ci.yml` existe, roda em todo PR e reprova corretamente — mas
+> **não barra**: branch protection não está disponível num repositório privado
+> em plano Free. Medido em 25/08/2026: `404` em `/branches/*/protection`, `403
+> "Upgrade to GitHub Pro or make this repository public"` em `/rulesets`, e o
+> PR fica `mergeable: MERGEABLE / mergeStateStatus: UNSTABLE` — há check
+> não-verde **e o merge continua permitido**.
+>
+> **Decisão de Thiago, 26/08/2026: fica assim.** Sem GitHub Pro, sem tornar o
+> repositório público. A esteira é um **conselheiro**: ela mostra o X vermelho,
+> e quem mergeia decide. O custo assumido é que um PR vermelho pode entrar por
+> distração — e é por isso que a caixa não promete bloqueio. Se o plano mudar, o
+> roteiro para ligar o bloqueio está em
+> [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
+>
+> Do texto original da caixa saiu o **validador de contraste**, que depende dos
+> tokens `--success`/`--warning` da Seção 6 — não existe ainda o que ele
+> verificaria. O **teste de isolamento entre contas** também saiu do texto, mas
+> pelo motivo oposto: ele **já existe**. São 27 testes em
+> `ArchSmart-api/tests/isolation/`, vindos da Seção 1, que rodam em todo PR. O
+> que a Seção 4 acrescenta é a versão genérica, que percorre todas as rotas
+> registradas em vez de uma lista escrita à mão.
 
 ## Seção 4 · Camada de dados do backend
-**0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
 - [ ] `RequestContext` em `app/core/security.py`
 - [ ] `ScopedRepository` em `app/db/repository.py`
@@ -56,6 +85,7 @@ _Última atualização: 2026-08-24_
 - [ ] Suíte de testes contra banco real (`tests/services/`, `tests/api/`, `tests/isolation/`) substituindo `app/tests/`
 - [ ] Tratamento de erro único (exceções de domínio; sem `detail=str(e)` nem `print()`)
 - [ ] `GET /api/v1/me` com `user`, `account` e `entitlements`
+- [ ] Fim do auto-link por e-mail em `app/api/users.py` (ver [arquitetura.md](docs/dev/arquitetura.md), "pendência de segurança conhecida")
 
 ## Seção 5 · Camada de dados do frontend
 **0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`

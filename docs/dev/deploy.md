@@ -13,7 +13,16 @@ futura está marcada como tal, nunca descrita como já existindo.
 | `ArchSmart-api` (backend) | Render, tier gratuito | URL de produção `https://arch-smart-api.onrender.com`, pingada a cada 10 min por `.github/workflows/keep-alive.yml` (o tier gratuito do Render dorme após ~15 min sem tráfego, cold start de ~20s). |
 | Banco (Postgres) | Supabase, projeto do time, região São Paulo (`aws-1-sa-east-1.pooler.supabase.com`) | Host confirmado em `spec-kit-2/auditoria-codigo-2026-08-23.md` (`ArchSmart-api/.env.example` traz só um placeholder desde a Seção 2); `.github/workflows/keep-db-alive.yml` toca o banco 2x ao dia (o tier gratuito do Supabase pausa o projeto após ~7 dias sem uso). O mesmo projeto Supabase também é o Auth — não há banco de aplicação separado do banco de autenticação hoje. |
 
-Não existe hoje um ambiente de staging: **todo `git push`/merge para `main` é o caminho direto para produção**, tanto no Vercel quanto no Render (comportamento assumido a partir da configuração de deploy contínuo de cada plataforma — não confirmado por um arquivo de config neste repositório, mesma ressalva da tabela acima).
+Não existe hoje um **ambiente** de staging: **todo `git push`/merge para
+`main` é o caminho direto para produção**, tanto no Vercel quanto no Render
+(comportamento assumido a partir da configuração de deploy contínuo de cada
+plataforma — não confirmado por um arquivo de config neste repositório,
+mesma ressalva da tabela acima). A **branch** `staging` já existe no
+GitHub, mas nenhum ambiente está ligado a ela ainda — nem serviço no Render,
+nem projeto Supabase, nem preview da Vercel. O roteiro de como ligar cada
+peça, passo a passo de painel, está em
+[`ambientes-online.md`](ambientes-online.md); nada dele foi executado até
+agora — o roteiro existe, a execução está pendente.
 
 ## A esteira hoje: nada além de dois workflows de keep-alive
 
@@ -115,10 +124,39 @@ alembic downgrade -1
 Confirme antes que `DATABASE_URL` no ambiente aponta para o banco certo
 (produção, staging ou local) — `alembic current` mostra a revisão aplicada
 agora, compare com o que você espera antes de rodar `downgrade`.
-**Verificado nesta sessão**: 25 das 26 migrações em `alembic/versions/` têm
-`downgrade()` com corpo não vazio (checado por grep) — a exceção é
-`737128c96b28_remove_legacy_auth.py`, cujo `upgrade()` também é vazio
-(revisão no-op, sem risco operacional). **Não verificado**: se
+**Verificado em 24/08/2026** (Seção 3, Tarefa 2, após a receita de migrações
+voltar a criar o banco do zero): 26 das 27 migrações em `alembic/versions/`
+têm `downgrade()` com corpo não vazio. Comando (rodado a partir de `ArchSmart-api/`):
+
+```bash
+python - <<'EOF'
+import ast, glob, os
+vazios = []
+files = sorted(glob.glob('alembic/versions/*.py'))
+for f in files:
+    t = ast.parse(open(f, encoding='utf-8').read())
+    for n in t.body:
+        if isinstance(n, ast.FunctionDef) and n.name == 'downgrade':
+            b = n.body
+            if b and isinstance(b[0], ast.Expr) and isinstance(b[0].value, ast.Constant):
+                b = b[1:]
+            if not [x for x in b if not isinstance(x, ast.Pass)]:
+                vazios.append(os.path.basename(f))
+print(len(files) - len(vazios), "de", len(files), "| vazios:", vazios)
+EOF
+```
+
+Saída:
+
+```
+26 de 27 | vazios: ['737128c96b28_remove_legacy_auth.py']
+```
+
+É AST, não `grep`: `grep` confunde um `downgrade()` que só tem docstring + `pass`
+com um que tem corpo real — foi assim que a afirmação anterior ("checado por grep")
+ficou errada. A exceção é `737128c96b28_remove_legacy_auth.py`, cujo
+`upgrade()` também é vazio (revisão no-op, sem risco operacional).
+**Não verificado**: se
 a lógica de cada `downgrade()` reverte o dado sem perda — não auditamos
 migração por migração. Se a migração revertida fez backfill de dado (passo
 2 do procedimento acima), o `downgrade` de schema não desfaz o backfill
@@ -185,6 +223,9 @@ Nada do que está descrito acima como "hoje" continua igual depois da Seção
 
 ## Onde ler mais
 
+- [`ambientes-online.md`](ambientes-online.md) — roteiro de painel para
+  ligar staging e recriar produção (Render, Vercel, Supabase, branch
+  protection); nada dele executado ainda.
 - [`ambiente.md`](ambiente.md) — como subir cada peça localmente.
 - [`arquitetura.md`](arquitetura.md) — o que roda onde e como a identidade é
   resolvida.

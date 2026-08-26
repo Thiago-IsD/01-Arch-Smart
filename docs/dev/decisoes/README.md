@@ -44,3 +44,4 @@ O que passa a ser mais fácil e o que passa a ser mais difícil.
 - [0003 — Descartar o banco atual e criar um novo](0003-descartar-banco-atual-criar-novo.md)
 - [0004 — Alembic como fonte única do schema](0004-alembic-fonte-unica-do-schema.md)
 - [0005 — Três branches: `develop`, `staging`, `main`](0005-tres-branches-develop-staging-main.md)
+- [0006 — Portões de CI graduais, com catraca de baseline](0006-portoes-de-ci-com-catraca.md)

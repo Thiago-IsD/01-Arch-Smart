@@ -22,15 +22,60 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql://arqsmart:arqsmart@localhost:55432/arqsmart_test",
 )
 
-_HOSTS_PROIBIDOS = ("supabase.co", "supabase.com", "rds.amazonaws.com")
+# A regra de "isto e um banco descartavel?" vive em tools/guarda_banco.py, uma
+# so, compartilhada com seed.py, reset_db.py e init_db.py. Antes da Secao 3
+# cada um tinha a sua: a daqui exigia sufixo "_test" e proibia
+# ("supabase.co", "supabase.com", "rds.amazonaws.com"); a do seed proibia
+# ("supabase.co", "pooler.supabase.com", "render.com", "amazonaws.com") e nao
+# exigia sufixo nenhum. Nenhuma das duas era superconjunto da outra, e a
+# divergencia so foi notada numa revisao.
+#
+# A suite e MAIS estrita que a guarda dos scripts, nos DOIS eixos:
+#
+#   host   `exigir_host_local=True` — para os scripts, um banco chamado
+#          "arqsmart_test" num Supabase ou RDS compartilhado e aceitavel (e o
+#          que permite semear um staging sem flag). Para a suite nao e: a
+#          fixture `engine`, abaixo, roda `drop_all`, e um servidor
+#          compartilhado continua compartilhado por mais descartavel que o
+#          nome do banco pareca.
+#   nome   o sufixo "_test" e obrigatorio mesmo em host local. Um
+#          "localhost/postgres" — o banco da stack Supabase local — passa pela
+#          guarda comum e NAO pode passar aqui.
+#
+# Nenhum dos dois eixos e opcional, e nenhum e mais fraco do que a regra que
+# esta suite tinha antes de a guarda ser unificada.
+from tools.guarda_banco import (  # noqa: E402
+    DestinoIlegivel,
+    descrever_destino,
+    motivo_de_recusa,
+    nome_do_banco,
+)
 
-if not TEST_DATABASE_URL.endswith("_test") or any(
-    h in TEST_DATABASE_URL for h in _HOSTS_PROIBIDOS
-):
+_motivo = motivo_de_recusa(TEST_DATABASE_URL, exigir_host_local=True)
+if _motivo is not None:
     raise RuntimeError(
-        "TEST_DATABASE_URL precisa apontar para um banco descartavel cujo nome "
-        f"termina em '_test' e que nao seja gerenciado: {TEST_DATABASE_URL!r}. "
-        "A suite apaga e recria o schema inteiro — apontar para producao destroi dados."
+        f"TEST_DATABASE_URL nao serve para a suite: {_motivo} "
+        f"Destino: {descrever_destino(TEST_DATABASE_URL)}. "
+        "A suite apaga e recria o schema inteiro — apontar para um banco de "
+        "verdade destroi dados."
+    )
+
+# nome_do_banco() da guarda, e nao um urlsplit local: o nome do banco tem UMA
+# definicao, a mesma que a guarda julga e a mesma em que o psycopg2 vai cair.
+# Reimplementar aqui era como o "?dbname=" escapava — a URL dizia
+# ".../arqsmart_test" e a conexao ia para outro banco.
+try:
+    _NOME_DO_BANCO = nome_do_banco(TEST_DATABASE_URL)
+except DestinoIlegivel as _erro:  # pragma: no cover - a guarda acima ja barrou
+    raise RuntimeError(f"TEST_DATABASE_URL ilegivel: {_erro}.") from _erro
+
+if not _NOME_DO_BANCO.endswith("_test"):
+    raise RuntimeError(
+        "TEST_DATABASE_URL precisa apontar para um banco cujo nome termina em "
+        f"'_test'; a conexao cairia em {_NOME_DO_BANCO!r} "
+        f"(destino: {descrever_destino(TEST_DATABASE_URL)}). A suite apaga e "
+        "recria o schema inteiro; o sufixo e a ultima defesa contra apontar "
+        "para um banco local que alguem usa para outra coisa."
     )
 
 # Sobrescreve INCONDICIONALMENTE. Nao use setdefault: se o ambiente (um runner

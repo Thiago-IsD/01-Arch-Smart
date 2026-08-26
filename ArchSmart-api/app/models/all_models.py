@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum, func
 from sqlalchemy import Uuid as UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -17,17 +17,11 @@ class ProductOriginType(str, enum.Enum):
     WEB_CLIPPER = "WEB_CLIPPER"
     SHOPPING_HUB = "SHOPPING_HUB"
     MANUAL = "MANUAL"
-    # New values from the provided snippet, assuming they are additions/replacements
-    CATALOG = "CATALOG" # Added from snippet
 
 class ProductStateStatus(str, enum.Enum):
     CAPTURED = "CAPTURED"
     NORMALIZED = "NORMALIZED"
     INACTIVE = "INACTIVE"
-    # New values from the provided snippet, assuming they are additions/replacements
-    ACTIVE = "ACTIVE" # Added from snippet
-    ARCHIVED = "ARCHIVED" # Added from snippet
-    DELETED = "DELETED" # Added from snippet
 
 class RuleType(str, enum.Enum): # Added RuleType enum
     FLOOR = "FLOOR"
@@ -308,7 +302,12 @@ class ItemOption(Base):
     budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     is_selected = Column(Boolean, default=True)
-    approval_status = Column(String, default="PENDING", nullable=False)
+    # server_default espelha a migracao d5045c9703e1, que criou a coluna com
+    # server_default='PENDING'. O banco ja tinha o default; o model e que nao o
+    # declarava, e nada verificava a diferenca ate o teste da receita passar a
+    # comparar server_default. Nao muda comportamento: `default=` continua
+    # preenchendo pelo lado do Python, e o banco ja preenchia um INSERT cru.
+    approval_status = Column(String, server_default="PENDING", default="PENDING", nullable=False)
     rejection_reason = Column(String, nullable=True)  # Justificativa do cliente ao recusar a opção
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -415,7 +414,9 @@ class Event(Base):
     end_time = Column(DateTime, nullable=False)
     meet_link = Column(String, nullable=True)
     google_event_id = Column(String, nullable=True)  # Preparação para Google Calendar OAuth
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # NOT NULL com server_default espelha a migracao f1a2b3c4d5e6: o banco
+    # garante o valor mesmo numa escrita que nao passe pelo ORM.
+    created_at = Column(DateTime, nullable=False, server_default=func.now(), default=datetime.utcnow)
 
     # Relationships
     account = relationship("Account", back_populates="events")

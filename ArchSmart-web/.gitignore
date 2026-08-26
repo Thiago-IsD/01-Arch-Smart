@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# artefato de medicao (tools/catraca.py), regenerado a cada execucao
+eslint.json
