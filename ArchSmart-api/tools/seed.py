@@ -84,13 +84,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--eu-sei-o-que-estou-fazendo",
         action="store_true",
         default=False,
-        help="Ignora a guarda de producao (host gerenciado). Use com cuidado extremo.",
+        help="Ignora a guarda de producao. Ela recusa qualquer banco que nao seja local nem tenha nome terminado em _test/_seed -- um staging remoto, por exemplo. Use com cuidado extremo.",
     )
     args = parser.parse_args(argv)
 
-    # Sem isto o script mente por omissao: --projetos 0 criava um cliente orfao
-    # (por causa de um max(1, ...) adiante) e ignorava --ambientes e --itens em
-    # silencio; valores negativos produziam um banco vazio sem aviso nenhum.
+    # Sem isto o script mentia por omissao: --projetos 0 criava um cliente orfao
+    # (havia um max(1, ...) adiante, hoje removido) e ignorava --ambientes e
+    # --itens em silencio; negativos produziam banco vazio sem aviso nenhum.
     for nome in ("projetos", "ambientes", "biblioteca", "itens"):
         valor = getattr(args, nome)
         if valor < 1:
@@ -754,7 +754,7 @@ def main() -> None:
         limpar_dados_de_volume(db, conta.id, m)
 
         produtos = criar_biblioteca(db, Product, conta, origens, estados, args.biblioteca, rng)
-        clientes = criar_clientes(db, Client, conta, max(1, args.projetos), rng)
+        clientes = criar_clientes(db, Client, conta, args.projetos, rng)
         db.flush()
 
         projetos = criar_projetos(db, Project, conta, clientes, args.projetos, rng)

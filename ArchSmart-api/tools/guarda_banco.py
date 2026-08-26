@@ -22,12 +22,19 @@ mercado: a do seed passava livremente por Neon, Railway, DigitalOcean, Azure,
 Cloud SQL, ou pelo IP cru de uma maquina de producao. Aqui, o banco so e aceito
 se provar que e descartavel:
 
-  1. o host e local (localhost, 127.0.0.1, ::1, ou nome de servico do Docker); ou
+  1. o host e local (localhost, 127.0.0.1, ::1 — e so esses tres, ver
+     HOSTS_LOCAIS); ou
   2. o nome do banco termina em "_test" ou "_seed".
 
 Qualquer outra coisa e recusada. Bater num staging remoto de proposito continua
 possivel — com a flag explicita, que e o ponto: vira uma decisao, nao um
 acidente.
+
+Quem precisa de MAIS que isso passa `exigir_host_local=True`, e ai o criterio 2
+deixa de valer. E o caso de tests/conftest.py: um banco chamado "arqsmart_test"
+num Supabase ou RDS compartilhado satisfaz o criterio 2, e a suite apaga o
+schema inteiro a cada execucao. Para os scripts, o criterio 2 e o que permite
+semear um staging sem flag; para a suite, ele e um buraco.
 
 A lista de hosts gerenciados sobrevive so para a MENSAGEM: quando a URL bate num
 deles, dizer "isto e Supabase" ajuda mais que "host nao-local".
@@ -47,9 +54,8 @@ Importar `app.core.config` nao abre conexao — `create_engine` so e chamado em
 from __future__ import annotations
 
 import os
-import re
 import sys
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 # Hosts que significam "esta maquina", e nada mais. Sao os unicos aceitos sem
 # que o nome do banco precise se declarar descartavel.
@@ -73,19 +79,26 @@ SUFIXOS_DESCARTAVEIS = ("_test", "_seed")
 # supabase.co, pooler.supabase.com" para um host terminado em .com.
 HOSTS_GERENCIADOS = ("supabase.co", "render.com", "amazonaws.com")
 
-_SENHA_NA_URL = re.compile(r"(://[^:/@]+):[^@]*@")
-
-
-def redigir_senha(url: str) -> str:
+def descrever_destino(url: str) -> str:
     """
-    Troca a senha da URL por '***', preservando esquema, usuario, host, porta e
-    nome do banco — que e o que a pessoa precisa para entender a recusa.
+    'host:porta/banco' — nunca a URL inteira, nunca credencial.
 
-    A mensagem de recusa dispara PRECISAMENTE quando a URL e a de producao, e
-    esta secao esta construindo uma esteira de CI que arquiva log de build. Uma
-    credencial de producao em log de build e legivel por mais gente que o banco.
+    Esta e a UNICA forma em que uma URL de banco aparece numa mensagem ou num
+    log deste projeto. Houve uma `redigir_senha()` que apagava a senha da URL
+    completa com expressao regular; ela errava em tres formas legitimas de
+    libpq (URL sem usuario, senha contendo '@', e `?password=` na query), e
+    cada erro desses e uma credencial de producao num log de build arquivado.
+    Montar a string a partir dos campos que interessam nao tem como errar: o
+    que nao e host, porta ou nome de banco simplesmente nao entra.
     """
-    return _SENHA_NA_URL.sub(r"\1:***@", url)
+    try:
+        partes = urlsplit(url)
+        host = partes.hostname or "?"
+        porta = f":{partes.port}" if partes.port else ""
+        banco = (partes.path or "").lstrip("/") or "?"
+        return f"{host}{porta}/{banco}"
+    except ValueError:
+        return "<URL nao interpretavel>"
 
 
 def resolver_url_e_origem() -> tuple[str, str]:
@@ -104,21 +117,12 @@ def resolver_url_e_origem() -> tuple[str, str]:
     return url, origem
 
 
-def descrever_destino(url: str) -> str:
-    """'host:porta/banco', sem credencial — para anunciar onde o script escreveu."""
-    try:
-        partes = urlsplit(url)
-        host = partes.hostname or "?"
-        porta = f":{partes.port}" if partes.port else ""
-        banco = (partes.path or "").lstrip("/") or "?"
-        return f"{host}{porta}/{banco}"
-    except ValueError:
-        return "<URL nao interpretavel>"
-
-
-def motivo_de_recusa(url: str) -> str | None:
+def motivo_de_recusa(url: str, exigir_host_local: bool = False) -> str | None:
     """
     Devolve None se o banco for aceitavel, ou o motivo da recusa em uma frase.
+
+    Com `exigir_host_local=True`, so o criterio do host vale — o sufixo
+    "_test"/"_seed" deixa de bastar. E o modo de quem apaga o schema inteiro.
 
     Funcao pura: nao le ambiente, nao encerra o processo, nao conecta. Todo o
     julgamento vive aqui para que ele possa ser testado sem banco.
@@ -131,20 +135,57 @@ def motivo_de_recusa(url: str) -> str | None:
     except ValueError as erro:
         return f"DATABASE_URL nao e uma URL interpretavel ({erro})."
 
+    # O libpq aceita host e hostaddr como parametro de conexao, e eles VENCEM o
+    # host da URL: "postgresql://u:s@localhost/db?host=prod.supabase.co" faz o
+    # psycopg2 conectar em prod.supabase.co. Julgar o host da URL nesse caso e
+    # julgar uma coisa e conectar em outra — a mesma classe do defeito que esta
+    # guarda existe para fechar. Recusar e mais simples que interpretar.
+    sobrepoem_host = {"host", "hostaddr"} & set(parse_qs(partes.query))
+    if sobrepoem_host:
+        return (
+            f"a DATABASE_URL traz {', '.join(sorted(sobrepoem_host))} na query "
+            "string, que sobrepoe o host da URL — a guarda julgaria um host e a "
+            "conexao iria para outro."
+        )
+
     # .hostname do urlsplit ja vem em minuscula, entao db.ABCDEF.SUPABASE.CO
     # nao escapa. A guarda antiga comparava a string crua e escapava.
     host = partes.hostname
     if not host:
         return "DATABASE_URL nao tem host."
 
+    # Comparacao por IGUALDADE, nunca por substring: com "h in host",
+    # "localhost.evil.com" passaria.
     if host in HOSTS_LOCAIS:
         return None
 
+    gerenciados = [h for h in HOSTS_GERENCIADOS if h in host]
+
+    if exigir_host_local:
+        detalhe = (
+            f" (e {', '.join(gerenciados)}, host gerenciado)" if gerenciados else ""
+        )
+        return (
+            f"o host {host!r} nao e local{detalhe}. Neste modo o sufixo "
+            f"{'/'.join(SUFIXOS_DESCARTAVEIS)} no nome do banco NAO basta: um "
+            "banco de nome descartavel num servidor compartilhado continua sendo "
+            "um servidor compartilhado."
+        )
+
+    # O nome do banco e UM segmento de caminho. Mais de um e URL malformada, e
+    # aceita-la abre uma brecha boba: com endswith no caminho inteiro,
+    # ".../prod/_test" passava; pegando so o ultimo segmento, ele continua
+    # passando, porque o ultimo segmento e literalmente "_test". A unica leitura
+    # que fecha e recusar o caminho composto.
     banco = (partes.path or "").lstrip("/")
+    if "/" in banco:
+        return (
+            f"o caminho {partes.path!r} tem mais de um segmento, entao nao e um "
+            "nome de banco valido."
+        )
     if banco.endswith(SUFIXOS_DESCARTAVEIS):
         return None
 
-    gerenciados = [h for h in HOSTS_GERENCIADOS if h in host]
     if gerenciados:
         return (
             f"o host {host!r} contem {', '.join(gerenciados)}, que e host "
@@ -158,7 +199,12 @@ def motivo_de_recusa(url: str) -> str | None:
 
 
 def recusar_se_nao_descartavel(
-    url: str, origem: str, forcado: bool, acao: str, flag: str = "--eu-sei-o-que-estou-fazendo"
+    url: str,
+    origem: str,
+    forcado: bool,
+    acao: str,
+    flag: str = "--eu-sei-o-que-estou-fazendo",
+    exigir_host_local: bool = False,
 ) -> None:
     """
     Encerra o processo com saida 1 se `url` nao for um banco descartavel.
@@ -173,13 +219,23 @@ def recusar_se_nao_descartavel(
     PowerShell 5.1 (ver docs/dev/ambiente.md), onde um travessao sai como "?"
     no console — e uma mensagem de emergencia nao pode depender de encoding.
     """
-    motivo = motivo_de_recusa(url)
-    if motivo is None or forcado:
+    motivo = motivo_de_recusa(url, exigir_host_local=exigir_host_local)
+    if motivo is None:
+        return
+    if forcado:
+        # Nao sai calado. Quem usou a escotilha contra um staging precisa
+        # aparecer no log, senao "passou" e "foi forcado a passar" viram a
+        # mesma linha na hora de entender o que aconteceu.
+        print(
+            f"GUARDA IGNORADA ({flag}): {motivo}\n"
+            f"  Prosseguindo para {descrever_destino(url)} — {acao}.",
+            file=sys.stderr,
+        )
         return
     sys.exit(
         f"Recusando rodar: {motivo}\n"
         f"  Este script vai {acao}.\n"
-        f"  URL: {redigir_senha(url)!r}\n"
+        f"  Destino: {descrever_destino(url)}\n"
         f"  Origem: {origem}\n"
         f"Se e realmente o que voce quer, passe {flag}."
     )

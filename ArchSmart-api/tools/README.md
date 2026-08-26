@@ -17,16 +17,23 @@ Por isso os três scripts passam pela mesma guarda, em [`guarda_banco.py`](guard
 
 A regra é uma **lista de permissão**, não de proibição. O banco só é aceito se:
 
-1. o host for local (`localhost`, `127.0.0.1`, `::1`); **ou**
+1. o host for local (`localhost`, `127.0.0.1`, `::1` — comparados por igualdade, então `localhost.evil.com` não passa); **ou**
 2. o nome do banco terminar em `_test` ou `_seed`.
 
-Qualquer outra coisa é recusada, com saída 1 e sem escrever nada — inclusive hospedagens que uma lista de proibição não anteciparia (Neon, Railway, ou o IP cru de uma máquina de produção). A mensagem diz o motivo, de qual das duas fontes a URL veio, e **redige a senha**.
+Qualquer outra coisa é recusada, com saída 1 e sem escrever nada — inclusive hospedagens que uma lista de proibição não anteciparia (Neon, Railway, ou o IP cru de uma máquina de produção). Também é recusada a URL que traz `host=` ou `hostaddr=` na query string: o libpq deixa esses parâmetros **vencerem** o host da URL, então julgar o host escrito na URL seria julgar uma coisa e conectar em outra.
+
+A mensagem diz o motivo, de qual das duas fontes a URL veio, e o destino como `host:porta/banco` — **nunca a URL inteira**. Houve uma versão que imprimia a URL com a senha apagada por expressão regular; ela errava em três formas legítimas de libpq, e cada erro desses é uma credencial de produção num log de build arquivado. Montar `host:porta/banco` a partir dos campos não tem como errar.
 
 Mandar um script para um staging remoto de propósito continua possível, com `--eu-sei-o-que-estou-fazendo`. É o ponto: vira uma decisão, não um acidente.
 
 > Até a Seção 3, `reset_db.py` e `init_db.py` não tinham guarda **nenhuma** — e `reset_db.py` faz `DROP SCHEMA public CASCADE`. A suíte e o `seed.py` tinham cada um a sua, com listas de hosts diferentes, e nenhuma das duas era superconjunto da outra. A regra agora é uma só, com testes (`tests/test_guarda_banco.py`).
 
-A suíte de testes continua sendo **mais** estrita que a guarda: em `tests/conftest.py`, o sufixo `_test` é obrigatório mesmo num banco local, porque ela apaga e recria o schema inteiro a cada execução.
+A suíte de testes é **mais** estrita que a guarda, nos **dois** eixos — ela chama `motivo_de_recusa(..., exigir_host_local=True)`:
+
+- **host:** para os scripts, um banco chamado `arqsmart_test` num Supabase ou RDS compartilhado é aceitável — é o critério 2, e é o que permite semear um staging sem flag. Para a suíte não é: a fixture `engine` roda `drop_all`, e um servidor compartilhado continua compartilhado por mais descartável que o nome do banco pareça.
+- **nome:** o sufixo `_test` é obrigatório mesmo em host local. O `localhost/postgres` da stack Supabase local passa pela guarda comum e **não** passa aqui.
+
+Nenhum dos dois é opcional, e nenhum é mais fraco do que a regra que a suíte tinha antes de a guarda ser unificada — o que foi verificado depois de uma primeira tentativa em que o eixo do host tinha, sim, afrouxado.
 
 ## `seed.py`
 

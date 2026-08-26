@@ -1,11 +1,14 @@
 import os
 import sys
 
-from dotenv import load_dotenv
-
-# Load env file first
-load_dotenv(".env")
-
+# Havia um `load_dotenv(".env")` aqui. Removido: e redundante — `app/core/config.py`
+# ja traz `SettingsConfigDict(env_file=".env")`, e e isso que resolve a URL de
+# fato — e, pior, ele ATRAPALHAVA. `load_dotenv` grava no os.environ, entao a
+# guarda passava a reportar "origem: variavel de ambiente DATABASE_URL" quando a
+# URL na verdade tinha vindo do arquivo. A linha de origem existe justamente
+# para distinguir esses dois casos; aqui ela dizia o oposto do que aconteceu,
+# para quem foi conferir por que o script recusou.
+#
 # Faz "python tools/init_db.py" achar o pacote `app` e o pacote `tools`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

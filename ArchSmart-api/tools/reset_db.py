@@ -37,7 +37,11 @@ def reset_database(forcado: bool = False):
     )
 
     print(f"Connecting to database: {descrever_destino(url)}  (origem: {origem})")
-    engine = create_engine(settings.DATABASE_URL)
+    # create_engine(url), e nao create_engine(settings.DATABASE_URL): hoje sao o
+    # mesmo valor, mas este e o script do DROP SCHEMA, e ter a URL julgada e a
+    # URL usada como duas expressoes diferentes e a distancia exata em que o
+    # defeito original nasceu. Uma expressao so nao tem como divergir.
+    engine = create_engine(url)
 
     with engine.connect() as connection:
         trans = connection.begin()

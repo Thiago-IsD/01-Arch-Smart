@@ -7,19 +7,24 @@ centenas de linhas. Ate a revisao da Tarefa 9 ela nao tinha teste nenhum — e o
 defeito que a revisao encontrou (ler os.environ em vez de settings) e
 exatamente o tipo que volta num refactor distraido e passa por revisao.
 
-Nao precisam de banco: `motivo_de_recusa` e `redigir_senha` sao funcoes puras.
+Nao precisam de banco: `motivo_de_recusa` e `descrever_destino` sao puras.
 """
 import os
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 from tools.guarda_banco import (
+    HOSTS_LOCAIS,
     descrever_destino,
     motivo_de_recusa,
     recusar_se_nao_descartavel,
-    redigir_senha,
     resolver_url_e_origem,
 )
+
+RAIZ_DA_API = Path(__file__).resolve().parent.parent
 
 URL_TESTE_LOCAL = "postgresql://arqsmart:arqsmart@localhost:55432/arqsmart_test"
 URL_SUPABASE_LOCAL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -94,24 +99,78 @@ class TestBancosRecusados:
         """"_test" no meio do nome nao vale — "producao_teste_final" nao passa."""
         assert motivo_de_recusa("postgresql://u:s@host.exemplo/app_test_producao") is not None
 
+    def test_sufixo_vale_no_ultimo_segmento_do_caminho(self):
+        """
+        Com `endswith` no caminho inteiro, ".../prod/_test" passava — uma
+        aceitacao que o modelo mental "o nome do banco termina em _test" nao
+        preve.
+        """
+        assert motivo_de_recusa("postgresql://u:s@prod.supabase.co/prod/_test") is not None
 
-class TestRedacaoDeSenha:
-    def test_troca_a_senha_e_preserva_o_resto(self):
-        redigida = redigir_senha(URL_PRODUCAO)
-        assert "senha-secreta" not in redigida
-        assert "***" in redigida
-        # o que a pessoa precisa para entender a recusa continua legivel
-        assert "aws-1-sa-east-1.pooler.supabase.com" in redigida
-        assert "postgres.hlyqxgfuhtfmxmwrcmur" in redigida
-        assert "6543" in redigida
+    @pytest.mark.parametrize(
+        "host",
+        ["localhost.evil.com", "127.0.0.1.evil.com", "my-localhost-prod.example.com"],
+    )
+    def test_host_local_e_comparado_por_igualdade_nao_por_substring(self, host):
+        """
+        O predicado de maior valor da guarda. Trocar `host in HOSTS_LOCAIS` por
+        `any(h in host for h in HOSTS_LOCAIS)` deixaria estes tres passarem, e
+        antes deste teste essa mutacao sobrevivia a suite inteira.
+        """
+        assert motivo_de_recusa(f"postgresql://u:s@{host}:5432/prod") is not None
 
-    def test_redige_senha_com_caractere_especial(self):
-        url = "postgresql://usuario:p%40ss-w0rd%21@host.exemplo:5432/banco"
-        assert "p%40ss-w0rd%21" not in redigir_senha(url)
+    @pytest.mark.parametrize("parametro", ["host", "hostaddr"])
+    def test_recusa_host_sobreposto_na_query_string(self, parametro):
+        """
+        O libpq aceita host/hostaddr como parametro de conexao e eles VENCEM o
+        host da URL: o psycopg2 conecta em prod.supabase.co enquanto a guarda
+        le "localhost". E a mesma classe do Critical original — julgar uma
+        coisa e conectar em outra — por parsing em vez de por fonte. Formas
+        reais: pgbouncer, e o socket do Cloud SQL
+        (`?host=/cloudsql/proj:regiao:inst`).
+        """
+        url = f"postgresql://u:s@localhost/prod?{parametro}=prod.supabase.co"
+        motivo = motivo_de_recusa(url)
+        assert motivo is not None
+        assert parametro in motivo
 
-    def test_url_sem_senha_passa_intacta(self):
-        url = "postgresql://localhost:5432/arqsmart_test"
-        assert redigir_senha(url) == url
+
+class TestModoEstritoDaSuite:
+    """
+    `exigir_host_local=True`, usado por tests/conftest.py.
+
+    Estes testes existem por causa de uma regressao real: ao unificar as
+    guardas, a suite passou a aceitar tres classes de URL que recusava antes —
+    um banco "arqsmart_test" hospedado em Supabase, em RDS ou em supabase.com.
+    A fixture `engine` roda `drop_all`, entao aceitar um servidor compartilhado
+    porque o NOME do banco parece descartavel apaga o schema de alguem.
+    """
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "postgresql://u:s@db.abcdefgh.supabase.co:5432/arqsmart_test",
+            "postgresql://u:s@meu-cluster.abc.us-east-1.rds.amazonaws.com/arqsmart_test",
+            "postgresql://u:s@compartilhado.supabase.com:5432/arqsmart_test",
+            "postgresql://u:s@ep-cool-123.aws.neon.tech/arqsmart_test",
+        ],
+    )
+    def test_sufixo_test_nao_basta_em_host_remoto(self, url):
+        motivo = motivo_de_recusa(url, exigir_host_local=True)
+        assert motivo is not None, url
+        assert "nao e local" in motivo
+        # e a guarda dos SCRIPTS continua aceitando: e o comportamento
+        # deliberado que permite semear um staging sem flag
+        assert motivo_de_recusa(url) is None, url
+
+    def test_o_banco_de_teste_local_continua_passando(self):
+        assert motivo_de_recusa(URL_TESTE_LOCAL, exigir_host_local=True) is None
+
+    def test_todos_os_hosts_locais_passam_no_modo_estrito(self):
+        for host in HOSTS_LOCAIS:
+            hospedeiro = f"[{host}]" if ":" in host else host
+            url = f"postgresql://u:s@{hospedeiro}:5432/qualquer_test"
+            assert motivo_de_recusa(url, exigir_host_local=True) is None, host
 
 
 class TestDescreverDestino:
@@ -124,12 +183,26 @@ class TestDescreverDestino:
 
 class TestRecusaEncerraOProcesso:
     def test_sai_com_codigo_1_para_producao(self):
-        with pytest.raises(SystemExit) as saida:
-            recusar_se_nao_descartavel(
-                URL_PRODUCAO, origem="arquivo .env", forcado=False, acao="apagar tudo"
-            )
-        # sys.exit(str) encerra com codigo 1 e imprime a string em stderr
-        assert saida.value.code != 0
+        """
+        `sys.exit(str)` poe a string em `.code` e o processo encerra com 1.
+        Testar `.code != 0` nao provaria nada — qualquer string nao vazia
+        passa. O que prova e o codigo de saida do processo de verdade.
+        """
+        codigo = subprocess.call(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.path.insert(0, sys.argv[1]);"
+                "from tools.guarda_banco import recusar_se_nao_descartavel;"
+                "recusar_se_nao_descartavel(sys.argv[2], origem='sonda',"
+                " forcado=False, acao='apagar tudo')",
+                str(RAIZ_DA_API),
+                URL_PRODUCAO,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        assert codigo == 1
 
     def test_a_mensagem_de_recusa_nao_contem_a_senha(self):
         """
@@ -141,8 +214,11 @@ class TestRecusaEncerraOProcesso:
             recusar_se_nao_descartavel(
                 URL_PRODUCAO, origem="arquivo .env", forcado=False, acao="apagar tudo"
             )
-        assert "senha-secreta" not in str(saida.value.code)
-        assert "***" in str(saida.value.code)
+        mensagem = str(saida.value.code)
+        assert "senha-secreta" not in mensagem
+        # nem a senha, nem a URL inteira: so host:porta/banco
+        assert "postgres.hlyqxgfuhtfmxmwrcmur" not in mensagem
+        assert "aws-1-sa-east-1.pooler.supabase.com:6543/postgres" in mensagem
 
     def test_a_mensagem_diz_a_origem_e_o_estrago(self):
         with pytest.raises(SystemExit) as saida:
@@ -160,6 +236,24 @@ class TestRecusaEncerraOProcesso:
         recusar_se_nao_descartavel(
             URL_PRODUCAO, origem="arquivo .env", forcado=True, acao="apagar tudo"
         )
+
+    def test_a_flag_deixa_rastro_em_stderr(self, capsys):
+        """
+        Sair calado faria "passou" e "foi forcado a passar" virarem a mesma
+        linha no log de quem for entender o que aconteceu depois.
+        """
+        recusar_se_nao_descartavel(
+            URL_PRODUCAO, origem="arquivo .env", forcado=True, acao="apagar tudo"
+        )
+        erro = capsys.readouterr().err
+        assert "GUARDA IGNORADA" in erro
+        assert "senha-secreta" not in erro
+
+    def test_nao_imprime_nada_quando_o_banco_e_aceitavel(self, capsys):
+        recusar_se_nao_descartavel(
+            URL_TESTE_LOCAL, origem="variavel de ambiente", forcado=True, acao="apagar tudo"
+        )
+        assert capsys.readouterr().err == ""
 
     def test_banco_local_nao_e_barrado(self):
         recusar_se_nao_descartavel(

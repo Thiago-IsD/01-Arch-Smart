@@ -30,25 +30,41 @@ TEST_DATABASE_URL = os.getenv(
 # exigia sufixo nenhum. Nenhuma das duas era superconjunto da outra, e a
 # divergencia so foi notada numa revisao.
 #
-# A suite continua sendo MAIS estrita que a guarda: aqui o sufixo "_test" e
-# obrigatorio mesmo em banco local, porque esta suite apaga e recria o schema
-# inteiro a cada execucao. Um "localhost/postgres" passaria pela guarda comum
-# (e local) e nao pode passar aqui.
-from tools.guarda_banco import motivo_de_recusa, redigir_senha  # noqa: E402
+# A suite e MAIS estrita que a guarda dos scripts, nos DOIS eixos:
+#
+#   host   `exigir_host_local=True` — para os scripts, um banco chamado
+#          "arqsmart_test" num Supabase ou RDS compartilhado e aceitavel (e o
+#          que permite semear um staging sem flag). Para a suite nao e: a
+#          fixture `engine`, abaixo, roda `drop_all`, e um servidor
+#          compartilhado continua compartilhado por mais descartavel que o
+#          nome do banco pareca.
+#   nome   o sufixo "_test" e obrigatorio mesmo em host local. Um
+#          "localhost/postgres" — o banco da stack Supabase local — passa pela
+#          guarda comum e NAO pode passar aqui.
+#
+# Nenhum dos dois eixos e opcional, e nenhum e mais fraco do que a regra que
+# esta suite tinha antes de a guarda ser unificada.
+from urllib.parse import urlsplit  # noqa: E402
 
-_motivo = motivo_de_recusa(TEST_DATABASE_URL)
+from tools.guarda_banco import descrever_destino, motivo_de_recusa  # noqa: E402
+
+_motivo = motivo_de_recusa(TEST_DATABASE_URL, exigir_host_local=True)
 if _motivo is not None:
     raise RuntimeError(
-        f"TEST_DATABASE_URL nao e um banco descartavel: {_motivo} "
-        f"URL: {redigir_senha(TEST_DATABASE_URL)!r}. "
-        "A suite apaga e recria o schema inteiro — apontar para producao destroi dados."
+        f"TEST_DATABASE_URL nao serve para a suite: {_motivo} "
+        f"Destino: {descrever_destino(TEST_DATABASE_URL)}. "
+        "A suite apaga e recria o schema inteiro — apontar para um banco de "
+        "verdade destroi dados."
     )
-if not TEST_DATABASE_URL.endswith("_test"):
+
+_NOME_DO_BANCO = urlsplit(TEST_DATABASE_URL).path.lstrip("/").split("/")[-1]
+if not _NOME_DO_BANCO.endswith("_test"):
     raise RuntimeError(
         "TEST_DATABASE_URL precisa apontar para um banco cujo nome termina em "
-        f"'_test': {redigir_senha(TEST_DATABASE_URL)!r}. A suite apaga e recria "
-        "o schema inteiro; o sufixo e a ultima defesa contra apontar para um "
-        "banco local que alguem usa para outra coisa."
+        f"'_test'; este se chama {_NOME_DO_BANCO!r} "
+        f"(destino: {descrever_destino(TEST_DATABASE_URL)}). A suite apaga e "
+        "recria o schema inteiro; o sufixo e a ultima defesa contra apontar "
+        "para um banco local que alguem usa para outra coisa."
     )
 
 # Sobrescreve INCONDICIONALMENTE. Nao use setdefault: se o ambiente (um runner
