@@ -21,10 +21,9 @@ from tools.guarda_banco import (  # noqa: E402
 
 def init_db(forcado: bool = False):
     # Ate a Secao 3 este script nao tinha guarda: ele resolve a URL do mesmo
-    # settings que, sem DATABASE_URL exportada, cai no .env — que na maquina de
-    # desenvolvimento aponta para o Supabase de producao. create_all nao apaga
-    # dado, mas cria tabela em banco alheio, que tambem nao e para acontecer
-    # por acidente.
+    # settings que, sem DATABASE_URL exportada, cai no .env — que aponta para
+    # um projeto Supabase HOSPEDADO. create_all nao apaga dado, mas cria
+    # tabela em banco alheio, que tambem nao e para acontecer por acidente.
     url, origem = resolver_url_e_origem()
     recusar_se_nao_descartavel(
         url,

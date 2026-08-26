@@ -44,9 +44,12 @@ TEST_DATABASE_URL = os.getenv(
 #
 # Nenhum dos dois eixos e opcional, e nenhum e mais fraco do que a regra que
 # esta suite tinha antes de a guarda ser unificada.
-from urllib.parse import urlsplit  # noqa: E402
-
-from tools.guarda_banco import descrever_destino, motivo_de_recusa  # noqa: E402
+from tools.guarda_banco import (  # noqa: E402
+    DestinoIlegivel,
+    descrever_destino,
+    motivo_de_recusa,
+    nome_do_banco,
+)
 
 _motivo = motivo_de_recusa(TEST_DATABASE_URL, exigir_host_local=True)
 if _motivo is not None:
@@ -57,11 +60,19 @@ if _motivo is not None:
         "verdade destroi dados."
     )
 
-_NOME_DO_BANCO = urlsplit(TEST_DATABASE_URL).path.lstrip("/").split("/")[-1]
+# nome_do_banco() da guarda, e nao um urlsplit local: o nome do banco tem UMA
+# definicao, a mesma que a guarda julga e a mesma em que o psycopg2 vai cair.
+# Reimplementar aqui era como o "?dbname=" escapava — a URL dizia
+# ".../arqsmart_test" e a conexao ia para outro banco.
+try:
+    _NOME_DO_BANCO = nome_do_banco(TEST_DATABASE_URL)
+except DestinoIlegivel as _erro:  # pragma: no cover - a guarda acima ja barrou
+    raise RuntimeError(f"TEST_DATABASE_URL ilegivel: {_erro}.") from _erro
+
 if not _NOME_DO_BANCO.endswith("_test"):
     raise RuntimeError(
         "TEST_DATABASE_URL precisa apontar para um banco cujo nome termina em "
-        f"'_test'; este se chama {_NOME_DO_BANCO!r} "
+        f"'_test'; a conexao cairia em {_NOME_DO_BANCO!r} "
         f"(destino: {descrever_destino(TEST_DATABASE_URL)}). A suite apaga e "
         "recria o schema inteiro; o sufixo e a ultima defesa contra apontar "
         "para um banco local que alguem usa para outra coisa."

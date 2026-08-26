@@ -25,15 +25,21 @@ from tools.guarda_banco import (
 
 def reset_database(forcado: bool = False):
     # Este script faz DROP SCHEMA public CASCADE e ate a Secao 3 nao tinha
-    # guarda nenhuma, resolvendo a URL do mesmo settings que na maquina de
-    # desenvolvimento cai no .env — que aponta para o Supabase de producao.
-    # A guarda vem antes de create_engine, nao depois.
+    # guarda nenhuma, resolvendo a URL do mesmo settings que, sem
+    # DATABASE_URL exportada, cai no .env — que aponta para um projeto
+    # Supabase HOSPEDADO, nunca para um banco descartavel. A guarda vem
+    # antes de create_engine, nao depois.
     url, origem = resolver_url_e_origem()
     recusar_se_nao_descartavel(
         url,
         origem=origem,
         forcado=forcado,
         acao="apagar o schema public inteiro (DROP SCHEMA public CASCADE); nao ha desfazer",
+        # Modo estrito, como tests/conftest.py: o criterio do sufixo
+        # "_test"/"_seed" existe para permitir SEMEAR um staging sem flag, nao
+        # para APAGAR um. Sem isto, "staging.qualquer-host.com/arqsmart_seed"
+        # autorizaria um DROP SCHEMA remoto sem flag nenhuma.
+        exigir_host_local=True,
     )
 
     print(f"Connecting to database: {descrever_destino(url)}  (origem: {origem})")

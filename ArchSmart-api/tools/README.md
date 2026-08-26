@@ -11,7 +11,9 @@ Scripts operacionais que não fazem parte da aplicação. **Nenhum deles é impo
 
 ## A guarda
 
-Estes scripts resolvem `DATABASE_URL` do jeito que `app/core/config.py` resolve — não só do ambiente: **variável de ambiente OU, se ela não estiver exportada, o arquivo `.env`** (`SettingsConfigDict(env_file=".env")`). Rodar sem exportar nada não é "sem banco configurado" — é o `.env` local decidindo por você, silenciosamente. E o `.env` da máquina de desenvolvimento aponta para o Supabase **de produção**.
+Estes scripts resolvem `DATABASE_URL` do jeito que `app/core/config.py` resolve — não só do ambiente: **variável de ambiente OU, se ela não estiver exportada, o arquivo `.env`** (`SettingsConfigDict(env_file=".env")`). Rodar sem exportar nada não é "sem banco configurado" — é o `.env` local decidindo por você, silenciosamente. E o `.env` aponta para um projeto Supabase **hospedado**, nunca para um banco descartável: qual dos projetos depende de quem configurou a máquina e de quando. Quando o defeito que originou esta guarda foi encontrado, o projeto ativo era o de **produção**.
+
+> O alvo, a partir da Seção 3, é outro: a máquina de desenvolvimento passa a rodar a [stack Supabase local em Docker](../../docs/dev/ambiente.md), e aí a `DATABASE_URL` do `.env` aponta para `127.0.0.1`. Enquanto essa migração não acontece, é a guarda que separa um comando distraído de um banco de verdade.
 
 Por isso os três scripts passam pela mesma guarda, em [`guarda_banco.py`](guarda_banco.py), antes de abrir qualquer conexão. Ela julga a URL **resolvida** — a mesma que `app/db/session.py` usa para criar o engine — e nunca `os.environ["DATABASE_URL"]` direto.
 

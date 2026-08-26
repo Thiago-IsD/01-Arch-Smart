@@ -276,11 +276,12 @@ migração seriam dois históricos divergentes.
 
 > **Exporte a `DATABASE_URL` em todo comando de Alembic, sem exceção.**
 > `alembic/env.py` lê `settings.DATABASE_URL`, e `app/core/config.py` cai no
-> arquivo `.env` quando a variável não está exportada — e o `.env` desta
-> máquina aponta para o Supabase **de produção**. Os scripts de
-> `ArchSmart-api/tools/` têm uma guarda que recusa host gerenciado
+> arquivo `.env` quando a variável não está exportada — e enquanto o `.env`
+> não estiver apontando para esta stack local, ele aponta para um projeto
+> Supabase **hospedado**. Os scripts de `ArchSmart-api/tools/` têm uma guarda
+> que recusa esse destino
 > ([tools/README.md](../../ArchSmart-api/tools/README.md)); **o Alembic não
-> tem**. Um `alembic upgrade head` sem a variável migra produção.
+> tem**. Um `alembic upgrade head` sem a variável migra o banco hospedado.
 
 ```
 cd ArchSmart-api
@@ -334,8 +335,11 @@ Em `ArchSmart-web/.env.local`:
 
 Dois detalhes que economizam tempo:
 
-- **Os buckets do Storage não precisam ser criados à mão.**
-  `app/utils/supabase_client.py` cria o bucket sob demanda no primeiro upload.
+- **Os buckets do Storage não precisam ser criados à mão** — desde que a
+  `SUPABASE_SERVICE_ROLE_KEY` da tabela acima esteja preenchida.
+  `app/utils/supabase_client.py:94` só autocria o bucket se tiver a chave de
+  service role; sem ela, imprime `Bucket '<nome>' missing but cannot auto-create`
+  e o upload falha.
 - **O e-mail sai no Mailpit**, em <http://127.0.0.1:54324>, não para a caixa de
   verdade. É lá que você lê o link de confirmação e o de recuperação de senha.
 
@@ -409,12 +413,14 @@ pytest -q
 Saída real:
 
 ```
-.............................                                            [100%]
-29 passed in 11.66s
+.............................................................................[100%]
+77 passed, 3 warnings in 30.74s
 ```
 
 **Sinal de sucesso:** todos os testes em verde, `N passed` sem `failed` (o
-número exato de testes cresce com o tempo; hoje é 29).
+número exato cresce com o tempo; em 25/08/2026 são 77, dos quais 45 são da
+guarda de banco em `tools/guarda_banco.py`). Os 3 `warnings` vêm do Alembic e
+são esperados.
 
 **Frontend:**
 
@@ -426,32 +432,29 @@ npx vitest run
 Saída real:
 
 ```
-❯ e2e/auth.spec.ts (0 test)
-❯ e2e/dashboard.spec.ts (0 test)
-...
- Test Files  2 failed | 4 passed (6)
+ Test Files  4 passed (4)
       Tests  7 passed (7)
 ```
 
-**Isso é esperado hoje** — ver "Problemas conhecidos" abaixo, item 1.
-**Sinal de sucesso:** `Tests 7 passed (7)` na última linha, mesmo com
-`2 failed` nos *Test Files* (são os dois arquivos do Playwright, não testes
-de verdade quebrando).
+**Sinal de sucesso:** `Test Files` e `Tests` os dois sem nenhum `failed`.
+
+> Até agosto de 2026 esta suíte **sempre** reportava `2 failed` em
+> *Test Files* — o `vitest.config.ts` não excluía `e2e/`, e o Vitest tentava
+> coletar dois specs do Playwright. A documentação mandava ignorar. **Não
+> ignore mais:** o defeito foi corrigido na Seção 3, e hoje um `failed` ali é
+> um teste realmente quebrado.
 
 ## Problemas conhecidos
 
 Documentar aqui vale mais que esconder — quem travar num destes à noite, sem
 aviso, perde a sessão de trabalho.
 
-1. **`npx vitest run` sempre reporta 2 arquivos falhos.** O `vitest.config.ts`
-   não exclui a pasta `e2e/`, então o Vitest tenta coletar
-   `e2e/auth.spec.ts` e `e2e/dashboard.spec.ts` — specs do Playwright, com
-   `test.describe` de outra biblioteca — e cada um estoura com
-   `Playwright Test did not expect test.describe() to be called here`.
-   **O que fazer:** ignore os dois `Failed Suites`; olhe a linha `Tests` — se
-   ela disser `N passed (N)` sem nenhum falho, a suíte de verdade está ok.
-   Defeito de configuração conhecido, correção prevista para a Seção 3 da
-   reestruturação. Não tente corrigi-lo por conta própria fora dessa tarefa.
+1. ~~**`npx vitest run` sempre reporta 2 arquivos falhos.**~~ **Corrigido**
+   na Seção 3 (`5fde04e`): o `vitest.config.ts` passou a excluir `e2e/`, que
+   contém specs do Playwright e nunca foi para o Vitest coletar. A suíte hoje
+   sai limpa. O item fica registrado porque a orientação anterior era
+   *ignorar* os dois `Failed Suites`, e quem lembrar dela vai ignorar um
+   vermelho de verdade.
 
 2. **`git pull` / `git push` pedem credencial.** O remote é HTTPS. No
    Windows, o Git Credential Manager abre o navegador para login do GitHub na
@@ -511,6 +514,6 @@ Checklist final — se todos os itens abaixo baterem, o ambiente está pronto:
       termina com o container em `Healthy`
 - [ ] `pytest -q` (dentro de `ArchSmart-api`, venv ativado) termina em
       `N passed` sem nenhum `failed`
-- [ ] `npx vitest run` (dentro de `ArchSmart-web`) termina com a linha
-      `Tests N passed (N)` — os `2 failed` em *Test Files* são esperados
-      (problema conhecido 1, acima)
+- [ ] `npx vitest run` (dentro de `ArchSmart-web`) termina com
+      `Test Files N passed (N)` e `Tests N passed (N)` — **nenhum** `failed`
+      em nenhuma das duas linhas

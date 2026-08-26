@@ -31,31 +31,54 @@ possivel — com a flag explicita, que e o ponto: vira uma decisao, nao um
 acidente.
 
 Quem precisa de MAIS que isso passa `exigir_host_local=True`, e ai o criterio 2
-deixa de valer. E o caso de tests/conftest.py: um banco chamado "arqsmart_test"
-num Supabase ou RDS compartilhado satisfaz o criterio 2, e a suite apaga o
-schema inteiro a cada execucao. Para os scripts, o criterio 2 e o que permite
-semear um staging sem flag; para a suite, ele e um buraco.
+deixa de valer. Sao dois os consumidores nesse modo, e pelo mesmo motivo:
+
+  tests/conftest.py  a fixture `engine` roda drop_all a cada execucao
+  tools/reset_db.py  roda DROP SCHEMA public CASCADE
+
+Um banco chamado "arqsmart_test" num Supabase ou RDS compartilhado satisfaz o
+criterio 2, e nenhum dos dois pode apagar o schema de um servidor compartilhado
+so porque o NOME do banco parece descartavel. O criterio 2 existe para permitir
+SEMEAR um staging sem flag (tools/seed.py), nao para apagar um.
 
 A lista de hosts gerenciados sobrevive so para a MENSAGEM: quando a URL bate num
 deles, dizer "isto e Supabase" ajuda mais que "host nao-local".
 
-## Por que a URL vem daqui, e nao de os.environ
+## Julgar o que o engine vai usar — a fonte E o parsing
 
-`resolver_url_e_origem()` le `settings.DATABASE_URL` — o MESMO objeto que
-`app/db/session.py` importa para criar o engine. Ler `os.environ["DATABASE_URL"]`
-foi o Critical da revisao da Tarefa 9: uma variavel nao exportada nao e ausencia
-de URL, e o pydantic cai em silencio para o `.env`, que na maquina de
-desenvolvimento aponta para o pooler do Supabase de producao. A guarda aprovava
-uma URL e o engine conectava em outra.
+Duas divergencias diferentes ja produziram o mesmo defeito nesta guarda, e as
+duas eram "a guarda julga uma coisa e a conexao vai para outra":
 
-Importar `app.core.config` nao abre conexao — `create_engine` so e chamado em
-`app.db.session` — entao resolver a URL antes de liberar o script e seguro.
+**Fonte.** `resolver_url_e_origem()` le `settings.DATABASE_URL` — o MESMO objeto
+que `app/db/session.py` importa para criar o engine. Ler
+`os.environ["DATABASE_URL"]` foi o primeiro Critical: uma variavel nao exportada
+nao e ausencia de URL, e o pydantic cai em silencio para o `.env`.
+
+**Parsing.** O `urlsplit` da stdlib e o parser do SQLAlchemy discordam, e o
+libpq aceita parametros de query que VENCEM o que esta escrito na URL:
+
+  ?host=      sobrepoe o host          ?dbname=   sobrepoe o nome do banco
+  ?hostaddr=  sobrepoe o endereco      #          urlsplit corta o fragmento,
+                                                  o make_url nao
+
+Medido: `postgresql://u:s@localhost/arqsmart_test#?host=prod.supabase.co` faz o
+psycopg2 conectar em `prod.supabase.co`, e uma guarda baseada em `urlsplit` le
+"localhost" e aprova. Enumerar esses parametros um a um ja falhou uma vez — a
+lista {host, hostaddr} foi afirmada como completa e nao incluia `dbname`.
+
+Por isso este modulo NAO interpreta a URL por conta propria: ele pergunta ao
+proprio dialeto do psycopg2 onde a conexao vai parar, com
+`PGDialect_psycopg2().create_connect_args(make_url(url))`, e julga a resposta.
+O que o engine vai fazer e a unica definicao de destino que importa.
+
+Importar SQLAlchemy e `app.core.config` nao abre conexao — `create_engine` so e
+chamado em `app.db.session` — entao resolver a URL antes de liberar o script e
+seguro.
 """
 from __future__ import annotations
 
 import os
 import sys
-from urllib.parse import parse_qs, urlsplit
 
 # Hosts que significam "esta maquina", e nada mais. Sao os unicos aceitos sem
 # que o nome do banco precise se declarar descartavel.
@@ -79,6 +102,80 @@ SUFIXOS_DESCARTAVEIS = ("_test", "_seed")
 # supabase.co, pooler.supabase.com" para um host terminado em .com.
 HOSTS_GERENCIADOS = ("supabase.co", "render.com", "amazonaws.com")
 
+
+class DestinoIlegivel(Exception):
+    """A URL nao pode ser interpretada — trate como recusa, nunca como aceite."""
+
+
+def campos_de_conexao(url: str) -> tuple[str, int | None, str]:
+    """
+    (host, porta, banco) exatamente como o psycopg2 vai receber.
+
+    Nao reimplementa o parsing: pergunta ao dialeto. Ver "Julgar o que o engine
+    vai usar" no docstring do modulo para o porque — resumo: `urlsplit` e o
+    `make_url` discordam sobre o fragmento, e o libpq deixa `?host=`,
+    `?hostaddr=` e `?dbname=` sobreporem a URL.
+
+    Levanta DestinoIlegivel para qualquer coisa que nao de para interpretar com
+    seguranca, inclusive `hostaddr` (que redireciona o endereco de verdade
+    mantendo o `host` so para autenticacao) e URL que nao seja de Postgres.
+    """
+    try:
+        from sqlalchemy.dialects.postgresql import psycopg2 as _psycopg2
+        from sqlalchemy.engine.url import make_url
+
+        endereco = make_url(url)
+    except Exception as erro:  # make_url levanta ArgumentError, entre outros
+        raise DestinoIlegivel(f"nao e uma URL de banco interpretavel ({erro})") from erro
+
+    if endereco.get_backend_name() != "postgresql":
+        raise DestinoIlegivel(
+            f"o esquema {endereco.drivername!r} nao e de Postgres, e esta guarda "
+            "so sabe julgar Postgres"
+        )
+
+    try:
+        _, kwargs = _psycopg2.PGDialect_psycopg2().create_connect_args(endereco)
+    except Exception as erro:
+        raise DestinoIlegivel(f"o driver nao consegue montar a conexao ({erro})") from erro
+
+    if "hostaddr" in kwargs:
+        raise DestinoIlegivel(
+            "a URL traz hostaddr, que redireciona o endereco real da conexao "
+            "mantendo o host so para autenticacao"
+        )
+
+    host = (kwargs.get("host") or "").lower()
+    if not host:
+        raise DestinoIlegivel("a URL nao tem host")
+
+    banco = kwargs.get("dbname") or ""
+    if not banco:
+        raise DestinoIlegivel("a URL nao tem nome de banco")
+
+    # Nome de banco com "/" vem de caminho composto, e abre uma brecha boba:
+    # "prod.supabase.co/prod/_test" termina em "_test" e satisfaria o criterio 2.
+    # Pegar so o ultimo segmento NAO resolve — o ultimo segmento e literalmente
+    # "_test". A leitura que fecha e recusar o caminho composto.
+    if "/" in banco:
+        raise DestinoIlegivel(
+            f"o nome do banco {banco!r} tem uma barra, entao a URL traz caminho "
+            "composto em vez de um nome de banco"
+        )
+
+    return host, kwargs.get("port"), banco
+
+
+def nome_do_banco(url: str) -> str:
+    """
+    O nome do banco em que a conexao vai cair — definicao unica, para ninguem
+    reimplementar o parsing e chegar a uma resposta diferente da guarda.
+
+    Levanta DestinoIlegivel se a URL nao for interpretavel.
+    """
+    return campos_de_conexao(url)[2]
+
+
 def descrever_destino(url: str) -> str:
     """
     'host:porta/banco' — nunca a URL inteira, nunca credencial.
@@ -90,15 +187,16 @@ def descrever_destino(url: str) -> str:
     cada erro desses e uma credencial de producao num log de build arquivado.
     Montar a string a partir dos campos que interessam nao tem como errar: o
     que nao e host, porta ou nome de banco simplesmente nao entra.
+
+    Usa os mesmos campos que a guarda julga, entao a linha "Destino:" que o
+    operador le nunca discorda de onde a conexao iria.
     """
     try:
-        partes = urlsplit(url)
-        host = partes.hostname or "?"
-        porta = f":{partes.port}" if partes.port else ""
-        banco = (partes.path or "").lstrip("/") or "?"
-        return f"{host}{porta}/{banco}"
-    except ValueError:
+        host, porta, banco = campos_de_conexao(url)
+    except DestinoIlegivel:
         return "<URL nao interpretavel>"
+    hospedeiro = f"[{host}]" if ":" in host else host
+    return f"{hospedeiro}{f':{porta}' if porta else ''}/{banco}"
 
 
 def resolver_url_e_origem() -> tuple[str, str]:
@@ -131,28 +229,10 @@ def motivo_de_recusa(url: str, exigir_host_local: bool = False) -> str | None:
         return "DATABASE_URL vazia."
 
     try:
-        partes = urlsplit(url)
-    except ValueError as erro:
-        return f"DATABASE_URL nao e uma URL interpretavel ({erro})."
-
-    # O libpq aceita host e hostaddr como parametro de conexao, e eles VENCEM o
-    # host da URL: "postgresql://u:s@localhost/db?host=prod.supabase.co" faz o
-    # psycopg2 conectar em prod.supabase.co. Julgar o host da URL nesse caso e
-    # julgar uma coisa e conectar em outra — a mesma classe do defeito que esta
-    # guarda existe para fechar. Recusar e mais simples que interpretar.
-    sobrepoem_host = {"host", "hostaddr"} & set(parse_qs(partes.query))
-    if sobrepoem_host:
-        return (
-            f"a DATABASE_URL traz {', '.join(sorted(sobrepoem_host))} na query "
-            "string, que sobrepoe o host da URL — a guarda julgaria um host e a "
-            "conexao iria para outro."
-        )
-
-    # .hostname do urlsplit ja vem em minuscula, entao db.ABCDEF.SUPABASE.CO
-    # nao escapa. A guarda antiga comparava a string crua e escapava.
-    host = partes.hostname
-    if not host:
-        return "DATABASE_URL nao tem host."
+        host, _, banco = campos_de_conexao(url)
+    except DestinoIlegivel as erro:
+        # Fail-closed: o que a guarda nao consegue interpretar, ela recusa.
+        return f"DATABASE_URL recusada porque {erro}."
 
     # Comparacao por IGUALDADE, nunca por substring: com "h in host",
     # "localhost.evil.com" passaria.
@@ -172,17 +252,6 @@ def motivo_de_recusa(url: str, exigir_host_local: bool = False) -> str | None:
             "um servidor compartilhado."
         )
 
-    # O nome do banco e UM segmento de caminho. Mais de um e URL malformada, e
-    # aceita-la abre uma brecha boba: com endswith no caminho inteiro,
-    # ".../prod/_test" passava; pegando so o ultimo segmento, ele continua
-    # passando, porque o ultimo segmento e literalmente "_test". A unica leitura
-    # que fecha e recusar o caminho composto.
-    banco = (partes.path or "").lstrip("/")
-    if "/" in banco:
-        return (
-            f"o caminho {partes.path!r} tem mais de um segmento, entao nao e um "
-            "nome de banco valido."
-        )
     if banco.endswith(SUFIXOS_DESCARTAVEIS):
         return None
 
@@ -228,7 +297,7 @@ def recusar_se_nao_descartavel(
         # mesma linha na hora de entender o que aconteceu.
         print(
             f"GUARDA IGNORADA ({flag}): {motivo}\n"
-            f"  Prosseguindo para {descrever_destino(url)} — {acao}.",
+            f"  Prosseguindo para {descrever_destino(url)} - {acao}.",
             file=sys.stderr,
         )
         return
