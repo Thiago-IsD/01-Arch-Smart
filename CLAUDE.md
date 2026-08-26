@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 25/08/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída no que depende do repositório (esteira, ambientes e branches, merge `<a preencher>`); o que falta dela são passos de painel externo, com roteiro em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md) e caixas desmarcadas no `PROGRESS.md`. Seções 4 a 9 pendentes.
+Estado em 26/08/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída no que depende do repositório (esteira, ambientes e branches, merge `25f0bb8`); o que falta dela são passos de painel externo, com roteiro em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md) e caixas desmarcadas no `PROGRESS.md`. Seções 4 a 9 pendentes.
 
 ## Portões de CI
 
