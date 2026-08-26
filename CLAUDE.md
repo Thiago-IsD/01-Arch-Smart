@@ -23,19 +23,19 @@ Frontend — tipos, testes e catraca
 Repositorio — progresso, links e sincronia
 ```
 
-> ⚠️ **Hoje eles reprovam, mas não bloqueiam.** Branch protection não está
-> disponível: o repositório é privado num plano Free, e a API responde
-> `404` em `/branches/{main,develop,staging}/protection` e
-> `403 "Upgrade to GitHub Pro or make this repository public"` em `/rulesets`.
-> Medido em 25/08/2026. O PR #3 fica `mergeable: MERGEABLE`,
-> `mergeStateStatus: UNSTABLE` — que significa "há check não-verde **e o merge
-> continua permitido**".
+> ⚠️ **Eles reprovam, mas não bloqueiam — e isso é decisão tomada, não
+> pendência.** Branch protection não está disponível: o repositório é privado
+> num plano Free, e a API responde `404` em
+> `/branches/{main,develop,staging}/protection` e `403 "Upgrade to GitHub Pro or
+> make this repository public"` em `/rulesets` (medido em 25/08/2026). Um PR
+> fica `mergeable: MERGEABLE`, `mergeStateStatus: UNSTABLE` — há check não-verde
+> **e o merge continua permitido**.
 >
-> Enquanto isso não mudar, a esteira é um **conselheiro**, não um portão: ela
-> mostra o X vermelho e o botão de merge continua verde. As duas saídas (tornar
-> o repositório público, ou assinar o GitHub Pro) e os nomes exatos dos três
-> checks estão em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md),
-> seção 5.
+> Em 26/08/2026 Thiago decidiu manter assim, sem GitHub Pro e sem tornar o
+> repositório público. **Então a esteira é um conselheiro, e quem mergeia é o
+> portão.** Antes de mergear, olhe os três checks; um X vermelho ali é um
+> defeito real, não ruído. O roteiro para ligar o bloqueio, caso o plano mude,
+> está em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
 
 **O que bloqueia direto:** os testes do backend contra Postgres em Docker (inclui a receita de migrações e a guarda de banco), `tsc --noEmit` e `vitest run` no frontend, os testes de `tools/`, `progresso.py --check`, `checa_links.py`, e a checagem de que `main` não tem conteúdo ausente em `develop`.
 

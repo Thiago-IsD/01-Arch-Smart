@@ -10,7 +10,7 @@
 **Progresso geral: 17/63 (27%)**
 `█████░░░░░░░░░░░░░░░`
 
-_Última atualização: 2026-08-25_
+_Última atualização: 2026-08-26_
 
 ---
 
@@ -39,7 +39,7 @@ _Última atualização: 2026-08-25_
 ## Seção 3 · Esteira, ambientes e branches
 **3/5 (60%)** `████████████░░░░░░░░`
 
-- [x] CI que barra merge (lint, tipos, testes contra Postgres em Docker, literais proibidos, doc de módulo, consistência do PROGRESS.md)
+- [x] CI que reprova em todo PR (lint, tipos, testes contra Postgres em Docker, cores literais, doc de módulo, consistência do PROGRESS.md, sincronia `main`↔`develop`)
 - [ ] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
 - [x] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
 - [ ] Banco de produção novo, criado do zero pela receita de migrações
@@ -51,12 +51,19 @@ _Última atualização: 2026-08-25_
 > falta é a execução, não o plano. A branch `staging` em si já existe e está
 > publicada; o que não existe é o ambiente online ligado a ela.
 >
-> **A primeira caixa é sobre o `ci.yml` existir e reprovar, não sobre ele
-> bloquear.** Os três jobs rodam em todo PR e ficam vermelhos quando devem, mas
-> branch protection **não está disponível** neste repositório — privado em plano
-> Free; medido em 25/08/2026: `404` em `/branches/*/protection` e `403 "Upgrade
-> to GitHub Pro or make this repository public"` em `/rulesets`. Hoje um PR com
-> os três jobs vermelhos ainda pode ser mergeado. As duas saídas estão em
+> **A primeira caixa foi renomeada, e o motivo importa.** Ela dizia "CI que
+> barra merge". O `ci.yml` existe, roda em todo PR e reprova corretamente — mas
+> **não barra**: branch protection não está disponível num repositório privado
+> em plano Free. Medido em 25/08/2026: `404` em `/branches/*/protection`, `403
+> "Upgrade to GitHub Pro or make this repository public"` em `/rulesets`, e o
+> PR fica `mergeable: MERGEABLE / mergeStateStatus: UNSTABLE` — há check
+> não-verde **e o merge continua permitido**.
+>
+> **Decisão de Thiago, 26/08/2026: fica assim.** Sem GitHub Pro, sem tornar o
+> repositório público. A esteira é um **conselheiro**: ela mostra o X vermelho,
+> e quem mergeia decide. O custo assumido é que um PR vermelho pode entrar por
+> distração — e é por isso que a caixa não promete bloqueio. Se o plano mudar, o
+> roteiro para ligar o bloqueio está em
 > [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
 >
 > Do texto original da caixa saiu o **validador de contraste**, que depende dos

@@ -48,8 +48,12 @@ gh pr view 3 --json mergeable,mergeStateStatus → MERGEABLE / UNSTABLE
 ```
 
 `UNSTABLE` significa: há check não-verde **e o merge continua permitido**. Os
-três jobs rodam e reprovam corretamente; ninguém é barrado por isso ainda. As
-duas saídas (repositório público, ou GitHub Pro) estão em
+três jobs rodam e reprovam corretamente; ninguém é barrado por isso.
+
+**Decisão de Thiago, 26/08/2026: fica assim** — sem GitHub Pro e sem tornar o
+repositório público. A esteira é um conselheiro, e quem mergeia é o portão. Isto
+deixou de ser pendência e virou uma característica conhecida do projeto; o
+roteiro para ligar o bloqueio, se o plano mudar, está em
 [`../../dev/ambientes-online.md`](../../dev/ambientes-online.md), seção 5.
 
 ### 2. Ninguém consegue logar na conta semeada

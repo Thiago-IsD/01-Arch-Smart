@@ -190,7 +190,13 @@ migrações funciona do zero antes de apostar produção nela.
 > `UNSTABLE` quer dizer: há check não-verde **e o merge continua permitido**.
 > Enquanto isso durar, a esteira é um conselheiro, não um portão.
 >
-> **Duas saídas, ambas decisão de quem paga a conta:**
+> **Decisão de Thiago, 26/08/2026: fica como está.** Nem GitHub Pro, nem
+> repositório público. A Seção 3 foi mergeada com a esteira funcionando como
+> conselheiro, e o custo assumido é que um PR vermelho pode entrar por
+> distração. **Esta seção não é mais uma pendência a executar; é um roteiro
+> guardado para o dia em que o plano mudar.**
+>
+> As duas saídas, se esse dia chegar:
 >
 > 1. **Tornar o repositório público.** Libera branch protection de graça. Antes
 >    de fazer, varra o histórico atrás de segredo commitado — tornar público é
