@@ -22,15 +22,33 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql://arqsmart:arqsmart@localhost:55432/arqsmart_test",
 )
 
-_HOSTS_PROIBIDOS = ("supabase.co", "supabase.com", "rds.amazonaws.com")
+# A regra de "isto e um banco descartavel?" vive em tools/guarda_banco.py, uma
+# so, compartilhada com seed.py, reset_db.py e init_db.py. Antes da Secao 3
+# cada um tinha a sua: a daqui exigia sufixo "_test" e proibia
+# ("supabase.co", "supabase.com", "rds.amazonaws.com"); a do seed proibia
+# ("supabase.co", "pooler.supabase.com", "render.com", "amazonaws.com") e nao
+# exigia sufixo nenhum. Nenhuma das duas era superconjunto da outra, e a
+# divergencia so foi notada numa revisao.
+#
+# A suite continua sendo MAIS estrita que a guarda: aqui o sufixo "_test" e
+# obrigatorio mesmo em banco local, porque esta suite apaga e recria o schema
+# inteiro a cada execucao. Um "localhost/postgres" passaria pela guarda comum
+# (e local) e nao pode passar aqui.
+from tools.guarda_banco import motivo_de_recusa, redigir_senha  # noqa: E402
 
-if not TEST_DATABASE_URL.endswith("_test") or any(
-    h in TEST_DATABASE_URL for h in _HOSTS_PROIBIDOS
-):
+_motivo = motivo_de_recusa(TEST_DATABASE_URL)
+if _motivo is not None:
     raise RuntimeError(
-        "TEST_DATABASE_URL precisa apontar para um banco descartavel cujo nome "
-        f"termina em '_test' e que nao seja gerenciado: {TEST_DATABASE_URL!r}. "
+        f"TEST_DATABASE_URL nao e um banco descartavel: {_motivo} "
+        f"URL: {redigir_senha(TEST_DATABASE_URL)!r}. "
         "A suite apaga e recria o schema inteiro — apontar para producao destroi dados."
+    )
+if not TEST_DATABASE_URL.endswith("_test"):
+    raise RuntimeError(
+        "TEST_DATABASE_URL precisa apontar para um banco cujo nome termina em "
+        f"'_test': {redigir_senha(TEST_DATABASE_URL)!r}. A suite apaga e recria "
+        "o schema inteiro; o sufixo e a ultima defesa contra apontar para um "
+        "banco local que alguem usa para outra coisa."
     )
 
 # Sobrescreve INCONDICIONALMENTE. Nao use setdefault: se o ambiente (um runner

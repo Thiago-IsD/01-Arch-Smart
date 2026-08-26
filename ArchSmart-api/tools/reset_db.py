@@ -16,10 +16,29 @@ except ImportError:
     sys.path.append(os.getcwd())
     from app.core.config import settings
 
-def reset_database():
-    print(f"Connecting to database...")
+from tools.guarda_banco import (
+    descrever_destino,
+    recusar_se_nao_descartavel,
+    resolver_url_e_origem,
+)
+
+
+def reset_database(forcado: bool = False):
+    # Este script faz DROP SCHEMA public CASCADE e ate a Secao 3 nao tinha
+    # guarda nenhuma, resolvendo a URL do mesmo settings que na maquina de
+    # desenvolvimento cai no .env — que aponta para o Supabase de producao.
+    # A guarda vem antes de create_engine, nao depois.
+    url, origem = resolver_url_e_origem()
+    recusar_se_nao_descartavel(
+        url,
+        origem=origem,
+        forcado=forcado,
+        acao="apagar o schema public inteiro (DROP SCHEMA public CASCADE); nao ha desfazer",
+    )
+
+    print(f"Connecting to database: {descrever_destino(url)}  (origem: {origem})")
     engine = create_engine(settings.DATABASE_URL)
-    
+
     with engine.connect() as connection:
         trans = connection.begin()
         try:
@@ -44,4 +63,4 @@ def reset_database():
             raise
 
 if __name__ == "__main__":
-    reset_database()
+    reset_database(forcado="--eu-sei-o-que-estou-fazendo" in sys.argv)

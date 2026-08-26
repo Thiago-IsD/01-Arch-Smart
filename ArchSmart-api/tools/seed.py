@@ -27,12 +27,12 @@ duplicata. As tabelas de referencia globais (product_origins,
 product_states) e os usuarios do seed nunca sao apagados, so
 reaproveitados por chave natural.
 
-Guarda de producao: julga a MESMA URL que app.db.session vai usar para
-criar o engine — settings.DATABASE_URL, resolvida por
-app/core/config.py (env var OU, na ausencia dela, o arquivo .env). Nunca
-julga os.environ["DATABASE_URL"] diretamente: uma variavel nao exportada
-nao e ausencia de URL, e o pydantic cai silenciosamente para o .env nesse
-caso — que nesta maquina aponta para o pooler do Supabase de producao.
+Guarda de producao: em tools/guarda_banco.py, compartilhada com reset_db.py,
+init_db.py e tests/conftest.py. Ela julga a MESMA URL que app.db.session vai
+usar para criar o engine — settings.DATABASE_URL — e so aceita banco local ou
+com nome terminado em "_test"/"_seed". Mandar o seed para um staging remoto de
+proposito exige --eu-sei-o-que-estou-fazendo, que e o ponto: vira decisao, nao
+acidente.
 """
 from __future__ import annotations
 
@@ -43,54 +43,27 @@ import sys
 import uuid
 from datetime import datetime, timedelta
 
-# Permite "python tools/seed.py" de qualquer cwd: adiciona a raiz de
-# ArchSmart-api (pai de tools/) ao sys.path antes de qualquer "import app".
-# Nao toca o banco — seguro rodar antes da guarda de producao.
+# Faz "python tools/seed.py" achar o pacote `app` de qualquer cwd: adiciona a
+# raiz de ArchSmart-api (pai de tools/) ao sys.path antes de qualquer
+# "import app". Nao toca o banco — seguro rodar antes da guarda.
+#
+# Isto resolve o IMPORT, e so ele. O arquivo .env continua sendo procurado a
+# partir do cwd (SettingsConfigDict(env_file=".env") e relativo), entao rodar
+# de fora de ArchSmart-api morre com ValidationError das outras chaves. E
+# fail-closed — sai com 1 sem escrever nada — mas nao e "funciona de qualquer
+# cwd".
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# ---------------------------------------------------------------------------
-# Guarda de producao — precisa ser a PRIMEIRA coisa que main() chama, antes
-# de abrir qualquer sessao ou engine (app.db.session cria o engine na
-# importacao). Mesma guarda de tests/conftest.py: um seed de centenas de
-# linhas rodado por engano contra o banco do time nao tem desfazer.
-#
-# A guarda julga a URL RESOLVIDA (resolver_url_e_origem, abaixo), nunca
-# os.environ["DATABASE_URL"] direto — ver o docstring do modulo para o
-# porque. Resolver a URL exige "from app.core.config import settings", mas
-# so importar config nao abre conexao (create_engine e lazy, e so
-# app.db.session chama create_engine) — entao isso e seguro de fazer antes
-# da guarda liberar o resto do script.
-# ---------------------------------------------------------------------------
-HOSTS_PROIBIDOS = ("supabase.co", "pooler.supabase.com", "render.com", "amazonaws.com")
-
-
-def resolver_url_e_origem() -> tuple[str, str]:
-    """
-    Resolve a URL do banco exatamente como a aplicacao resolve — importando
-    app.core.config e lendo settings.DATABASE_URL, o mesmo valor que
-    app.db.session usa para criar o engine — e nao os.environ direto.
-    Devolve tambem de onde ela veio, para a mensagem de recusa deixar claro
-    se foi a variavel exportada ou o fallback do .env.
-    """
-    from app.core.config import settings
-
-    url = settings.DATABASE_URL
-    if os.environ.get("DATABASE_URL"):
-        origem = "variavel de ambiente DATABASE_URL"
-    else:
-        origem = "arquivo .env (nenhuma DATABASE_URL exportada no ambiente)"
-    return url, origem
-
-
-def recusar_producao(url: str, forcado: bool, origem: str) -> None:
-    url_normalizada = url.lower()
-    achados = [h for h in HOSTS_PROIBIDOS if h in url_normalizada]
-    if achados and not forcado:
-        sys.exit(
-            f"Recusando rodar: DATABASE_URL contem {', '.join(achados)}, que e "
-            f"host gerenciado.\n  URL: {url!r}\n  Origem: {origem}\n"
-            "Se e realmente o que voce quer, passe --eu-sei-o-que-estou-fazendo."
-        )
+# A guarda de producao vive em tools/guarda_banco.py, compartilhada com
+# reset_db.py, init_db.py e tests/conftest.py. Ate a revisao da Tarefa 9 cada
+# um tinha a sua — duas versoes divergentes e dois scripts sem nenhuma. Ver o
+# docstring de guarda_banco.py para a regra e para o porque de ela julgar
+# settings.DATABASE_URL, e nunca os.environ.
+from tools.guarda_banco import (  # noqa: E402
+    descrever_destino,
+    recusar_se_nao_descartavel,
+    resolver_url_e_origem,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -113,7 +86,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=False,
         help="Ignora a guarda de producao (host gerenciado). Use com cuidado extremo.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    # Sem isto o script mente por omissao: --projetos 0 criava um cliente orfao
+    # (por causa de um max(1, ...) adiante) e ignorava --ambientes e --itens em
+    # silencio; valores negativos produziam um banco vazio sem aviso nenhum.
+    for nome in ("projetos", "ambientes", "biblioteca", "itens"):
+        valor = getattr(args, nome)
+        if valor < 1:
+            parser.error(f"--{nome} precisa ser >= 1 (recebido: {valor}).")
+    if args.ambientes < args.projetos:
+        parser.error(
+            f"--ambientes ({args.ambientes}) e um TOTAL distribuido entre os "
+            f"projetos, entao precisa ser >= --projetos ({args.projetos})."
+        )
+    if args.itens < args.projetos:
+        parser.error(
+            f"--itens ({args.itens}) e um TOTAL distribuido entre os projetos, "
+            f"entao precisa ser >= --projetos ({args.projetos})."
+        )
+    return args
 
 
 NOME_CONTA = "Seed — volume realista"
@@ -352,24 +344,7 @@ def obter_ou_criar_estados(db, ProductState, ProductStateStatus):
     return estados
 
 
-def limpar_dados_de_volume(
-    db,
-    conta_id,
-    Product,
-    Client,
-    Project,
-    Environment,
-    Budget,
-    BudgetItem,
-    ItemOption,
-    Presentation,
-    PresentationEnvironment,
-    PresentationAcceptance,
-    PresentationComment,
-    FinancialEntry,
-    Event,
-    ProjectSlot,
-):
+def limpar_dados_de_volume(db, conta_id, modelos):
     """
     Apaga os dados de volume desta conta antes de recriar — e assim que o
     seed fica idempotente: rodar duas vezes reescreve, nao duplica.
@@ -393,7 +368,27 @@ def limpar_dados_de_volume(
     budget_items->environments e environment_dnas->environments JA tem
     ON DELETE CASCADE no banco — as queries explicitas abaixo continuam
     corretas mesmo assim, so redundantes nesses casos.)
+
+    `modelos` e o modulo app.models.all_models inteiro, e nao um model por
+    parametro: esta funcao chegou a receber 16 posicionais, e trocar dois de
+    lugar na assinatura ou na chamada apagaria a tabela errada em silencio,
+    sem erro de tipo. Ligar os nomes por atributo torna essa troca impossivel.
     """
+    Product = modelos.Product
+    Client = modelos.Client
+    Project = modelos.Project
+    Environment = modelos.Environment
+    Budget = modelos.Budget
+    BudgetItem = modelos.BudgetItem
+    ItemOption = modelos.ItemOption
+    Presentation = modelos.Presentation
+    PresentationEnvironment = modelos.PresentationEnvironment
+    PresentationAcceptance = modelos.PresentationAcceptance
+    PresentationComment = modelos.PresentationComment
+    FinancialEntry = modelos.FinancialEntry
+    Event = modelos.Event
+    ProjectSlot = modelos.ProjectSlot
+
     projeto_ids = [pid for (pid,) in db.query(Project.id).filter(Project.account_id == conta_id)]
     ambiente_ids = (
         [eid for (eid,) in db.query(Environment.id).filter(Environment.project_id.in_(projeto_ids))]
@@ -634,25 +629,96 @@ def criar_opcoes_item(db, ItemOption, itens, produtos, rng):
     return opcoes
 
 
-def imprimir_resumo(db, tabelas) -> None:
+def contar_escopado(db, m, conta_id) -> dict[str, int]:
+    """
+    Conta as linhas que pertencem a ESTA conta, seguindo a cadeia de chaves
+    ate projects quando a tabela nao tem account_id proprio (environments,
+    budgets, budget_items e item_options nao tem).
+
+    As tabelas de referencia global — product_origins, product_states — ficam
+    de fora de proposito: elas nao pertencem a conta nenhuma, e um numero ali
+    seria mentira, nao informacao.
+    """
+    projeto_ids = [pid for (pid,) in db.query(m.Project.id).filter(m.Project.account_id == conta_id)]
+    orcamento_ids = (
+        [bid for (bid,) in db.query(m.Budget.id).filter(m.Budget.project_id.in_(projeto_ids))]
+        if projeto_ids
+        else []
+    )
+    item_ids = (
+        [iid for (iid,) in db.query(m.BudgetItem.id).filter(m.BudgetItem.budget_id.in_(orcamento_ids))]
+        if orcamento_ids
+        else []
+    )
+
+    def por_conta(modelo):
+        return db.query(modelo).filter(modelo.account_id == conta_id).count()
+
+    def por_projeto(modelo):
+        return db.query(modelo).filter(modelo.project_id.in_(projeto_ids)).count() if projeto_ids else 0
+
+    return {
+        "accounts": db.query(m.Account).filter(m.Account.id == conta_id).count(),
+        "users": por_conta(m.User),
+        "products": por_conta(m.Product),
+        "clients": por_conta(m.Client),
+        "projects": len(projeto_ids),
+        "environments": por_projeto(m.Environment),
+        "budgets": len(orcamento_ids),
+        "budget_items": len(item_ids),
+        "item_options": (
+            db.query(m.ItemOption).filter(m.ItemOption.budget_item_id.in_(item_ids)).count()
+            if item_ids
+            else 0
+        ),
+    }
+
+
+def imprimir_resumo(db, tabelas, escopado: dict[str, int]) -> None:
+    """
+    Duas contagens, e nao uma, porque elas divergem exatamente onde importa.
+
+    A global (`count(*)` na tabela inteira) e o que o plano pediu e diz o
+    tamanho do banco. Mas ela so coincide com o volume do seed num banco onde
+    mais nada existe: contra o staging, "products : 300" passaria a somar
+    produtos de outras contas e "accounts : 1" deixaria de ser 1 — e a promessa
+    de que "rodar duas vezes produz os mesmos numeros" deixaria de valer sem
+    que nada estivesse errado. A coluna da direita e a que serve para conferir
+    o seed, e e a que deve bater entre duas execucoes.
+    """
     print("\nResumo contado (SELECT count(*) por tabela, nao contador em memoria):")
     largura = max(len(nome) for nome, _ in tabelas)
+    print(f"  {'tabela'.ljust(largura)} | {'no banco':>8} | {'nesta conta':>11}")
+    print(f"  {'-' * largura} | {'-' * 8} | {'-' * 11}")
     for nome, modelo in tabelas:
         total = db.query(modelo).count()
-        print(f"  {nome.ljust(largura)} : {total}")
+        desta_conta = escopado.get(nome)
+        celula = "-" if desta_conta is None else str(desta_conta)
+        print(f"  {nome.ljust(largura)} | {total:>8} | {celula:>11}")
 
 
 def main() -> None:
     args = parse_args()
 
     url, origem = resolver_url_e_origem()
-    recusar_producao(url, args.eu_sei_o_que_estou_fazendo, origem)
+    recusar_se_nao_descartavel(
+        url,
+        origem=origem,
+        forcado=args.eu_sei_o_que_estou_fazendo,
+        acao="apagar e reescrever todos os dados de volume da conta do seed; nao ha desfazer",
+    )
+
+    # Anunciar o destino ANTES de escrever, sem credencial. Toda a origem do
+    # Critical da revisao foi "nao sei para qual banco isto escreveu": com esta
+    # linha, o bug teria saltado aos olhos na primeira execucao.
+    print(f"Escrevendo em: {descrever_destino(url)}  (origem: {origem})")
 
     # Import tardio, de proposito: SessionLocal usa o MESMO settings.DATABASE_URL
     # ja resolvido em resolver_url_e_origem() (settings e um singleton lido uma
     # unica vez) — guarda e engine nunca podem divergir porque os dois leem da
     # mesma fonte.
     from app.db.session import SessionLocal
+    from app.models import all_models as m
     from app.models.all_models import (
         Account,
         User,
@@ -668,13 +734,6 @@ def main() -> None:
         BudgetItem,
         ItemOption,
         RuleType,
-        Presentation,
-        PresentationEnvironment,
-        PresentationAcceptance,
-        PresentationComment,
-        FinancialEntry,
-        Event,
-        ProjectSlot,
     )
 
     # random.seed(42) fixo (nao um random.Random() local): duas execucoes
@@ -692,24 +751,7 @@ def main() -> None:
         estados = obter_ou_criar_estados(db, ProductState, ProductStateStatus)
         db.flush()
 
-        limpar_dados_de_volume(
-            db,
-            conta.id,
-            Product,
-            Client,
-            Project,
-            Environment,
-            Budget,
-            BudgetItem,
-            ItemOption,
-            Presentation,
-            PresentationEnvironment,
-            PresentationAcceptance,
-            PresentationComment,
-            FinancialEntry,
-            Event,
-            ProjectSlot,
-        )
+        limpar_dados_de_volume(db, conta.id, m)
 
         produtos = criar_biblioteca(db, Product, conta, origens, estados, args.biblioteca, rng)
         clientes = criar_clientes(db, Client, conta, max(1, args.projetos), rng)
@@ -744,7 +786,7 @@ def main() -> None:
             ("budget_items", BudgetItem),
             ("item_options", ItemOption),
         ]
-        imprimir_resumo(db, tabelas)
+        imprimir_resumo(db, tabelas, contar_escopado(db, m, conta.id))
     finally:
         db.close()
 
