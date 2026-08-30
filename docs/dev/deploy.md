@@ -1,37 +1,56 @@
 # Deploy
 
 Onde a Arq Smart roda hoje, como uma mudança chega lá, e como desfazer uma
-mudança ruim. Descreve o **estado atual**, 24/08/2026 — a Seção 3 muda boa
-parte disto (branch `staging`, CI, banco de produção novo); cada mudança
-futura está marcada como tal, nunca descrita como já existindo.
+mudança ruim. Descreve o **estado atual**, 30/08/2026.
 
 ## Onde cada peça roda hoje
 
+Toda a infraestrutura foi recriada do zero em 29–30/08/2026: projeto novo na
+Vercel, dois serviços novos no Render, dois projetos Supabase novos. O
+provisionamento e o estado medido de cada peça estão em
+[`ambientes-online.md`](ambientes-online.md).
+
 | Peça | Onde | Como foi confirmado |
 |---|---|---|
-| `ArchSmart-web` (frontend) | Vercel | Decisão da constitution (Art. 14). O domínio de produção, `https://www.archsmart.com.br`, está confirmado em `extension/popup.js` (`ENVIRONMENTS.prod.web`). **Não confirmado por arquivo**: este repositório não tem `vercel.json` nem outra config que prove a hospedagem exata — ver a mesma ressalva em [`arquitetura.md`](arquitetura.md). Se precisar confirmar como o projeto está configurado na Vercel (build command, variáveis de ambiente, domínio custom), pergunte ao time em vez de assumir. |
-| `ArchSmart-api` (backend) | Render, tier gratuito | URL de produção `https://arch-smart-api.onrender.com`, pingada a cada 10 min por `.github/workflows/keep-alive.yml` (o tier gratuito do Render dorme após ~15 min sem tráfego, cold start de ~20s). |
-| Banco (Postgres) | Supabase, projeto do time, região São Paulo (`aws-1-sa-east-1.pooler.supabase.com`) | Host confirmado em `spec-kit-2/auditoria-codigo-2026-08-23.md` (`ArchSmart-api/.env.example` traz só um placeholder desde a Seção 2); `.github/workflows/keep-db-alive.yml` toca o banco 2x ao dia (o tier gratuito do Supabase pausa o projeto após ~7 dias sem uso). O mesmo projeto Supabase também é o Auth — não há banco de aplicação separado do banco de autenticação hoje. |
+| `ArchSmart-web` (frontend) | Vercel, projeto `arqsmart` | Domínio de produção `https://www.arqsmart.com.br`. Medido em 30/08/2026: `curl -I` devolve `Server: Vercel`. **Ainda sem deployment de produção** (`X-Vercel-Error: NOT_FOUND`). Este repositório não tem `vercel.json`, então build command e variáveis de ambiente só são verificáveis no painel — mesma ressalva de [`arquitetura.md`](arquitetura.md). |
+| `ArchSmart-api` (staging) | Render, tier gratuito, branch `staging` | `https://arqsmart-staging.onrender.com` — `/health` → `{"status":"ok"}`, cold start de 31 s (medido 29/08/2026). |
+| `ArchSmart-api` (produção) | Render, tier gratuito, branch `main` | `https://arqsmart-prod.onrender.com`, pingada a cada 10 min por `.github/workflows/keep-alive.yml`. |
+| Banco de staging | Supabase `ipbhtqzybgdltewwnvnl`, `aws-0-sa-east-1`, **Postgres 17.6** | `SHOW server_version` por conexão direta, 29/08/2026. |
+| Banco de produção | Supabase `wokgnojyrpzndtxzvfcz`, `aws-0-sa-east-1`, **Postgres 17.6** | idem. Cada projeto Supabase também é o Auth do seu ambiente — não há banco de aplicação separado do de autenticação. |
 
-Não existe hoje um **ambiente** de staging: **todo `git push`/merge para
-`main` é o caminho direto para produção**, tanto no Vercel quanto no Render
-(comportamento assumido a partir da configuração de deploy contínuo de cada
-plataforma — não confirmado por um arquivo de config neste repositório,
-mesma ressalva da tabela acima). A **branch** `staging` já existe no
-GitHub, mas nenhum ambiente está ligado a ela ainda — nem serviço no Render,
-nem projeto Supabase, nem preview da Vercel. O roteiro de como ligar cada
-peça, passo a passo de painel, está em
-[`ambientes-online.md`](ambientes-online.md); nada dele foi executado até
-agora — o roteiro existe, a execução está pendente.
+> **Os dois bancos ainda estão vazios** (`0` tabelas, sem `alembic_version`,
+> medido em 29 e 30/08/2026), porque nenhum dos dois serviços recebeu ainda o
+> código que carrega a receita de migrações. `main` está 81 commits atrás de
+> `develop` e `staging`, 26 — os dois anteriores à Seção 3.
 
-## A esteira hoje: nada além de dois workflows de keep-alive
+O deploy de cada plataforma sai da branch correspondente (`staging` → serviço
+de staging; `main` → produção), comportamento assumido a partir da
+configuração de deploy contínuo de cada painel e **confirmado por fingerprint**
+em 29/08/2026: o `/openapi.json` de produção expõe uma rota
+(`/api/products/seed-captured`) que existe só na branch `main`, e o de staging
+não a expõe.
 
-`.github/workflows/` tem exatamente dois arquivos, e nenhum dos dois faz build, teste ou deploy:
+## A esteira hoje
 
-- **`keep-alive.yml`** — `curl` em `/health` a cada 10 minutos, só para evitar o cold start do Render.
-- **`keep-db-alive.yml`** — `curl` em `/health/db` (que executa `SELECT 1`) 2x ao dia, só para evitar a pausa do Supabase.
+`.github/workflows/` tem três arquivos:
 
-**Não existe CI que rode teste, lint ou build antes de mergear.** Não existe branch protegida. Não existe ambiente de staging. Um merge para `main` vai para produção sem nenhum portão automático no meio — a Seção 3 é quem constrói isso (ver "O que a Seção 3 muda", abaixo).
+- **`ci.yml`** — três jobs em todo PR contra `develop`, `staging` e `main`:
+  `Backend — testes contra Postgres real`, `Frontend — tipos, testes e catraca`
+  e `Repositorio — progresso, links e sincronia`. Entregue pela Seção 3.
+- **`keep-alive.yml`** — `curl` em `/health` **de produção** a cada 10 minutos,
+  para evitar o cold start do Render.
+- **`keep-db-alive.yml`** — `curl` em `/health/db` (que executa `SELECT 1`):
+  produção 2x ao dia, staging 1x ao dia, para evitar a pausa do Supabase.
+
+> A cadência assimétrica dos dois keep-alive é orçamento, não descuido: o tier
+> gratuito do Render dá **750 horas de instância por mês na conta inteira**, não
+> por serviço. Produção acordada 24/7 já consome ~730 h; manter staging junto
+> pediria ~1460 h e derrubaria os dois. Os arquivos explicam a conta.
+
+**O CI reprova, mas não bloqueia.** Branch protection não está disponível
+(repositório privado em plano Free) — a decisão de manter assim e o roteiro
+para ligar o bloqueio estão em
+[`ambientes-online.md`](ambientes-online.md), seção 5.
 
 ## Variáveis de ambiente e segredos
 
@@ -43,12 +62,31 @@ os valores exatos configurados hoje em produção, peça a alguém do time).
 
 ## Migração de banco
 
-O Dockerfile de `ArchSmart-api` (`CMD python -m uvicorn app.main:app ...`)
-**não roda `alembic upgrade` automaticamente**. Hoje, aplicar uma migração em
-produção é um passo manual: alguém roda `alembic upgrade head` com a
-`DATABASE_URL` de produção antes ou depois do deploy do código que a
-introduziu, coordenando o momento à mão. Isso muda na Seção 3 (migração
-automática no deploy de staging).
+**A migração é automática, e roda no start do contêiner.** O `CMD` do
+`ArchSmart-api/Dockerfile` executa `alembic upgrade head` antes do uvicorn,
+ligado a ele por `&&`:
+
+```dockerfile
+CMD ["sh", "-c", "alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+```
+
+Não há passo manual, e não há campo de painel: o *Pre-Deploy Command* do Render
+é recurso de instância paga, e os dois serviços rodam no free tier. O porquê
+completo, as alternativas rejeitadas e a verificação estão na
+[ADR 0007](decisoes/0007-migracao-no-start-do-container.md).
+
+Duas consequências operacionais:
+
+- **Migração vermelha = serviço não sobe.** O `&&` é deliberado. Se você vir um
+  deploy falhando logo no start, leia o log do contêiner antes de suspeitar do
+  Render: é provavelmente a migração avisando.
+- **Banco fora do ar no start = serviço não sobe.** Antes, com o banco caído, a
+  API subia e só o `/health/db` ficava vermelho. Agora nada responde.
+
+**Nunca rode `alembic upgrade head` à mão contra staging ou produção.** É o
+sinal que a [ADR 0003](decisoes/0003-descartar-banco-atual-criar-novo.md) usa
+como prova de que o descarte do banco antigo não eliminou a causa da
+divergência original.
 
 ### Mudança de schema simples (uma migração)
 
@@ -177,55 +215,57 @@ aceita `-o`/`-w` nesse formato; use `curl.exe` e `NUL` no lugar de
 `/dev/null`:
 
 ```
-curl https://arch-smart-api.onrender.com/health
-curl https://arch-smart-api.onrender.com/health/db
-curl -o /dev/null -w "%{http_code}\n" https://www.archsmart.com.br
+curl https://arqsmart-prod.onrender.com/health
+curl https://arqsmart-prod.onrender.com/health/db
+curl -o /dev/null -w "%{http_code}\n" https://www.arqsmart.com.br
 ```
 
 No PowerShell 5.1:
 
 ```
-curl.exe https://arch-smart-api.onrender.com/health
-curl.exe https://arch-smart-api.onrender.com/health/db
-curl.exe -o NUL -w "%{http_code}`n" https://www.archsmart.com.br
+curl.exe https://arqsmart-prod.onrender.com/health
+curl.exe https://arqsmart-prod.onrender.com/health/db
+curl.exe -o NUL -w "%{http_code}`n" https://www.arqsmart.com.br
 ```
 
 Espera-se `{"status":"ok"}` no primeiro, confirmação de banco vivo no
-segundo, `200` no terceiro. Nenhum dos três foi executado nesta sessão
-contra produção — são os mesmos endpoints já documentados em
-[`ambiente.md`](ambiente.md) para o ambiente local; contra produção, o
-comportamento esperado é o mesmo, não confirmado aqui.
+segundo, `200` no terceiro. Os dois primeiros **foram executados em
+29/08/2026** e devolveram `200` (com ~31 s de cold start no `/health`). O
+terceiro devolvia `404` naquela data, porque a Vercel ainda não tinha
+deployment de produção.
 
-## O que a Seção 3 muda
+> ⚠️ **O `/health/db` verde não prova schema.** Ele só faz `SELECT 1`
+> (`app/main.py:67`) e responde `{"db":"up"}` contra um banco vazio — foi
+> literalmente o estado dos dois ambientes em 29/08/2026. Depois de uma
+> reversão que envolveu migração, a confirmação que vale é `alembic current`
+> devolvendo a revisão esperada. Como bônus do `&&` no `CMD`
+> ([ADR 0007](decisoes/0007-migracao-no-start-do-container.md)), um `/health`
+> que responde já implica que a migração daquele start passou.
 
-Nada do que está descrito acima como "hoje" continua igual depois da Seção
-3. Ela entrega:
+## O que a Seção 3 entregou, e o que falta
 
-- **CI que barra merge** — lint, tipos, testes contra Postgres em Docker,
-  teste de isolamento entre contas, varredura de literais proibidos,
-  validador de contraste, verificação de doc de módulo, consistência do
-  `PROGRESS.md`. Hoje nenhum desses portões existe.
-- **Branch `staging`, com ambiente online** — API de staging separada no
-  Render, projeto Supabase de staging separado, preview automático da
-  Vercel (recurso já disponível na plataforma, não usado hoje). Fluxo passa
-  a ser `feature/xyz → develop → staging → main` (ver
-  [`decisoes/0005-tres-branches-develop-staging-main.md`](decisoes/0005-tres-branches-develop-staging-main.md)).
-  Migração passa a rodar automaticamente no deploy de staging; produção só
-  recebe depois de validado lá.
-- **Postgres local em Docker com a stack Supabase completa** (Auth, Storage,
-  Studio, via CLI do Supabase) — hoje o Postgres em Docker existe só para a
-  suíte de testes do backend, sem Auth nem Storage.
-- **Banco de produção novo**, criado do zero pela receita de migrações do
-  Alembic — ver
-  [`decisoes/0003-descartar-banco-atual-criar-novo.md`](decisoes/0003-descartar-banco-atual-criar-novo.md).
-- **Seed com volume realista** (`tools/seed.py`) — hoje qualquer teste manual
-  usa o dado que já existir no banco, sem volume padronizado.
+Entregue e no repositório: o **CI de três jobs** (`ci.yml`), a **branch
+`staging`**, o **Postgres local com a stack Supabase completa**, o **seed com
+volume realista** (`ArchSmart-api/tools/seed.py`) e a **migração automática no
+start do contêiner** ([ADR 0007](decisoes/0007-migracao-no-start-do-container.md)).
+O fluxo é `feature/xyz → develop → staging → main`
+([ADR 0005](decisoes/0005-tres-branches-develop-staging-main.md)).
+
+Duas ressalvas sobre o que "entregue" quer dizer:
+
+- O CI **reprova mas não bloqueia** — branch protection exige plano pago, e a
+  decisão registrada é manter assim. A esteira é conselheiro; quem mergeia é o
+  portão.
+- Os ambientes online **existem mas ainda rodam código antigo**. `main` e
+  `staging` estão atrás de `develop`, e os dois bancos novos continuam vazios
+  até a primeira carga chegar. Estado medido, peça a peça, em
+  [`ambientes-online.md`](ambientes-online.md).
 
 ## Onde ler mais
 
 - [`ambientes-online.md`](ambientes-online.md) — roteiro de painel para
   ligar staging e recriar produção (Render, Vercel, Supabase, branch
-  protection); nada dele executado ainda.
+  protection), com o estado medido de cada peça.
 - [`ambiente.md`](ambiente.md) — como subir cada peça localmente.
 - [`arquitetura.md`](arquitetura.md) — o que roda onde e como a identidade é
   resolvida.

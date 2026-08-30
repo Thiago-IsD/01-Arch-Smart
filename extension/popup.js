@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 const ENVIRONMENTS = {
     dev:  { web: "http://localhost:3000",         api: "http://127.0.0.1:8000" },
-    prod: { web: "https://www.archsmart.com.br",  api: "https://arch-smart-api.onrender.com" },
+    prod: { web: "https://www.arqsmart.com.br",   api: "https://arqsmart-prod.onrender.com" },
 };
 
 const ENV = "dev"; // <- troque para "prod" antes de publicar
