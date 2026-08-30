@@ -1,25 +1,48 @@
 # Ambientes online — roteiro de painel
 
-## Estado (25/08/2026)
+## Estado (30/08/2026)
 
-**Nenhum passo deste documento foi executado ainda.** Isto é um roteiro, não
-um registro do que já existe. Todos os passos abaixo exigem acesso
-administrativo ao Render, à Vercel, ao Supabase ou ao GitHub — só o dono das
-contas (Thiago) consegue executá-los; nenhum agente de IA tem esse acesso.
+**A infraestrutura foi criada; falta a primeira carga de código chegar nela.**
+Thiago provisionou, do zero, dois serviços no Render, dois projetos Supabase e
+um projeto novo na Vercel. Os passos que restam exigem acesso administrativo a
+esses painéis — só o dono das contas consegue executá-los; nenhum agente de IA
+tem esse acesso.
 
-O que já existe, confirmado nesta branch:
+O que existe hoje, **medido em 29–30/08/2026** e não apenas afirmado:
 
-- A branch `staging` existe no GitHub, criada a partir de `origin/develop`,
-  hoje apontando para o mesmo commit que `develop`. **Nenhum ambiente está
-  ligado a ela**: não há serviço no Render, não há projeto Supabase de
-  staging, não há preview da Vercel configurado para ela.
-- `.github/workflows/ci.yml` existe nesta branch, com três jobs cujo nome
-  vira check obrigatório na seção 5 abaixo.
+| Peça | Estado medido | Como foi medido |
+|---|---|---|
+| API de staging | no ar, respondendo | `curl https://arqsmart-staging.onrender.com/health` → `{"status":"ok"}` (cold start de 31 s) |
+| API de produção | no ar, respondendo | `curl https://arqsmart-prod.onrender.com/health` → `{"status":"ok"}` (cold start de 31 s) |
+| Supabase staging (`ipbhtqzybgdltewwnvnl`) | **virgem** — Postgres 17.6 | sonda somente-leitura: `tabelas em public: 0`, `alembic_version` inexistente, `auth.users: 0` |
+| Supabase produção (`wokgnojyrpzndtxzvfcz`) | **virgem** — Postgres 17.6 | idem |
+| Vercel (projeto `arqsmart`) | domínio ligado, **sem deployment de produção** | `curl -I https://www.arqsmart.com.br` → `Server: Vercel`, `X-Vercel-Error: NOT_FOUND` |
+| Domínio antigo | desativado | `https://www.archsmart.com.br` → `X-Vercel-Error: DEPLOYMENT_NOT_FOUND` |
 
-Depois de cada seção executada, volte aqui e apague o "não foi executado
-ainda" da linha correspondente na tabela final — é o registro de que aquele
-pedaço passou de alvo para realidade (ver a regra "documento afirma só o que
-é verdade hoje" em [`../README.md`](../README.md)).
+**O código no ar ainda é o antigo, nos dois serviços.** Fingerprint por
+`/openapi.json` em 29/08/2026: staging expõe 57 rotas, produção 58, e a rota a
+mais em produção é `/api/products/seed-captured` — que existe **só** na branch
+`main` (`git show origin/main:ArchSmart-api/app/api/routers/product_router.py`
+→ 1 ocorrência; `staging` e `develop` → 0). Confirma que cada serviço está
+ligado à branch certa, e que o conteúdo dessas branches é anterior à Seção 3:
+
+```
+main     4f5046c  2026-07-18   81 commits atrás de develop   26 migrações
+staging  6226ed9  2026-08-24   26 commits atrás de develop   26 migrações, sem ci.yml
+develop  dc41de2  2026-08-26                                 27 migrações
+```
+
+> ⚠️ Enquanto produção rodar o código de `main`, ela expõe
+> `GET /api/products/seed-captured` — **sem autenticação e gravando no banco**
+> (cria `Account`, `ProductState` e `ProductOrigin`). É um dos dois endpoints
+> sem autenticação que a Seção 1 fechou. Sai do ar no primeiro deploy do código
+> novo; até lá, é mais uma razão para a ordem `develop → staging → main` não
+> ser negociável.
+
+Depois de cada seção executada, volte aqui e atualize a linha correspondente na
+tabela final — é o registro de que aquele pedaço passou de alvo para realidade
+(ver a regra "documento afirma só o que é verdade hoje" em
+[`../README.md`](../README.md)).
 
 ## 1. Serviço de staging no Render
 
@@ -40,38 +63,75 @@ pedaço passou de alvo para realidade (ver a regra "documento afirma só o que
    `http://localhost:3000`, errado para staging). Dois valores **não são os
    de produção**:
    - `DATABASE_URL` → a connection string do projeto Supabase de staging
-     criado na seção 3 deste documento (ainda não existe — anote aqui
-     quando existir).
-   - `FRONTEND_URL` → a URL de preview da Vercel criada na seção 2 (também
-     ainda não existe — anote aqui quando existir).
+     (`ipbhtqzybgdltewwnvnl`), criado na seção 3 deste documento.
+
+     > **Use o host pooler, na porta 6543** — e não a conexão direta. Medido em
+     > 30/08/2026:
+     >
+     > ```
+     > aws-0-sa-east-1.pooler.supabase.com   IPv4 15.229.150.166   IPv6 nao resolve
+     > db.<ref>.supabase.co                  IPv4 nao resolve      IPv6 2600:1f1e:...
+     > ```
+     >
+     > A conexão direta é **IPv6-only** no tier gratuito: numa rede sem IPv6 ela
+     > simplesmente não resolve. É essa a causa dos conflitos de conexão que
+     > aparecem ao seguir tutoriais que mandam usar `db.<ref>.supabase.co:5432`
+     > — o problema é o **host**, não a porta.
+     >
+     > No host pooler, 6543 (*transaction*) e 5432 (*session*) foram medidos
+     > lado a lado e **passaram igual** nas três coisas de que a migração
+     > depende: advisory lock de sessão, DDL transacional e `SET` persistindo
+     > entre comandos. A armadilha conhecida do transaction pooler são
+     > *prepared statements* do lado do servidor, que é problema de `asyncpg`;
+     > esta API usa `psycopg2-binary` síncrono (`requirements.txt:51`), que não
+     > os usa por padrão. A 6543 ainda multiplexa as até 30 conexões que o
+     > engine abre (`app/db/session.py`: `pool_size=10`, `max_overflow=20`)
+     > sobre bem menos conexões reais — o que importa no limite do tier
+     > gratuito.
+   - `FRONTEND_URL` → `https://www.arqsmart.com.br` em produção. Para staging,
+     a URL do ambiente de preview da Vercel (seção 2).
 
    As demais variáveis (`SUPABASE_JWT_SECRET`, `GEMINI_API_KEY`) também
    precisam apontar para o projeto Supabase de staging, não para o de
    produção — peça os valores a quem tiver acesso ao painel do projeto
    novo, o mesmo fluxo que `.env.example` já descreve para desenvolvimento
    local.
-7. **Comando de deploy:** configurar o *Pre-Deploy Command* (ou
-   equivalente — o nome exato do campo pode mudar entre planos do Render;
-   confira no próprio painel) para rodar `alembic upgrade head` **antes** de
-   subir a API. É esse passo que torna a migração de staging automática a
-   cada deploy, em vez do procedimento manual descrito em
-   [`deploy.md`](deploy.md#migração-de-banco).
+7. **Comando de deploy: nada a configurar — e isso é decisão registrada, não
+   esquecimento.** Este passo pedia o *Pre-Deploy Command* do Render rodando
+   `alembic upgrade head` antes de subir a API. Em 30/08/2026 Thiago verificou
+   no painel que **esse campo é recurso de instância paga**, e os dois serviços
+   rodam no free tier.
+
+   A migração passou a rodar no `CMD` do `ArchSmart-api/Dockerfile`, antes do
+   uvicorn e ligada a ele por `&&` — ver
+   [ADR 0007](decisoes/0007-migracao-no-start-do-container.md). Não há campo de
+   painel para preencher aqui: o mecanismo vive no repositório e chega junto com
+   o código, o que é uma melhora sobre o plano original (era configuração de
+   painel, invisível a partir do código).
+
+   Consequência que vale saber antes do primeiro deploy: **se a migração falhar,
+   o serviço não sobe.** É deliberado. Um deploy vermelho aqui é a migração
+   avisando, não o Render quebrando.
 8. Salvar e disparar o primeiro deploy.
-9. **Registrar aqui a URL resultante quando ela existir** (formato esperado:
-   `https://<algo>.onrender.com` — o nome exato só existe depois de criado o
-   serviço):
+9. URL resultante:
 
    ```
-   URL da API de staging: (a preencher)
+   URL da API de staging: https://arqsmart-staging.onrender.com
    ```
 
 ## 2. Preview automático da Vercel
 
-Recurso já disponível no plano atual da Vercel — hoje não usado. Não requer
-plano novo nem serviço novo, só habilitar uma opção existente no projeto do
-frontend.
+Recurso já disponível no plano atual da Vercel. Não requer plano novo nem
+serviço novo, só habilitar uma opção existente no projeto do frontend.
 
-1. No painel da Vercel, abrir o projeto do frontend (`ArchSmart-web`).
+> **Estado em 30/08/2026:** o projeto na Vercel se chama **`arqsmart`** e o
+> domínio **`www.arqsmart.com.br`** já está anexado a ele — mas **ainda não há
+> deployment de produção**. Medido: `curl -I https://www.arqsmart.com.br`
+> devolve `Server: Vercel` com `X-Vercel-Error: NOT_FOUND`, que é a resposta de
+> domínio ligado sem deployment (diferente de `DEPLOYMENT_NOT_FOUND`, que é o
+> que o domínio antigo `www.archsmart.com.br` devolve hoje).
+
+1. No painel da Vercel, abrir o projeto do frontend (`arqsmart`).
 2. Em **Settings → Git** do projeto (o rótulo exato pode variar conforme a
    versão do painel — procure a opção de deployments automáticos por
    branch/PR), confirmar que os deployments de preview para pull requests
@@ -98,9 +158,23 @@ frontend.
 1. No painel do Supabase, criar um **projeto novo**, separado do de
    produção. **Região:** `sa-east-1` (São Paulo) — mesma região do projeto
    de produção, ver [`deploy.md`](deploy.md#onde-cada-peça-roda-hoje).
-2. Depois de criado, em **Database → Extensions**, habilitar a extensão
-   `vector` — a tabela `documents` depende dela (`app/models/all_models.py`);
-   sem a extensão, a migração que cria essa tabela falha.
+
+   > **Feito.** O projeto de staging é `ipbhtqzybgdltewwnvnl`, em
+   > `aws-0-sa-east-1`, **Postgres 17.6**.
+2. **Nada a fazer para a extensão `vector`.** Este passo dizia para habilitá-la
+   no painel, afirmando que "sem a extensão, a migração que cria essa tabela
+   falha". **Isso é falso**, e foi corrigido em 30/08/2026: a própria migração
+   se encarrega —
+
+   ```
+   alembic/versions/9f8a3b2c1d4e_add_documents_table.py:30
+       op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+   ```
+
+   Verificado na prática: um `docker run` da imagem da API contra um Postgres
+   vazio terminou com `extensao vector: habilitada` sem passo de painel nenhum
+   (ver [ADR 0007](decisoes/0007-migracao-no-start-do-container.md), "Como
+   saberemos se foi certo"). Habilitar à mão é inofensivo, mas desnecessário.
 3. Em **Project Settings → API**, copiar as três chaves para as variáveis
    correspondentes do serviço Render de staging (seção 1): `Project URL` →
    `SUPABASE_URL`, `anon public` → `SUPABASE_KEY`, `service_role` →
@@ -115,8 +189,9 @@ frontend.
    para outras configurações de painel).
 5. **O schema deste projeto vem de `alembic upgrade head`, nunca da CLI do
    Supabase** (`supabase migration ...`) — ver
-   [ADR 0004](decisoes/0004-alembic-fonte-unica-do-schema.md). O passo de
-   deploy do Render (seção 1, item 7) já cobre isso a cada deploy; não rode
+   [ADR 0004](decisoes/0004-alembic-fonte-unica-do-schema.md). O `CMD` do
+   `Dockerfile` já cobre isso a cada start do contêiner
+   ([ADR 0007](decisoes/0007-migracao-no-start-do-container.md)); não rode
    migração da CLI do Supabase contra este projeto em nenhuma circunstância.
 6. Em **Authentication → Providers → Email** *deste projeto novo* (de
    staging, não o de produção), confira se **"Confirm email"** está ligada
@@ -139,10 +214,15 @@ migrações funciona do zero antes de apostar produção nela.
 
 1. Repita os passos 1–6 da seção 3, num projeto Supabase novo rotulado como
    produção.
+
+   > **Feito.** O projeto de produção é `wokgnojyrpzndtxzvfcz`, em
+   > `aws-0-sa-east-1`, **Postgres 17.6**.
 2. Aponte a `DATABASE_URL` (e as demais chaves Supabase) do serviço Render
-   de produção existente para o projeto novo.
-3. **A migração roda pelo deploy** (mesmo *Pre-Deploy Command* configurado
-   na seção 1, replicado no serviço de produção) — **não rode
+   de produção (`arqsmart-prod`) para o projeto novo. Vale aqui a mesma
+   ressalva da seção 1, item 6: **host pooler na 6543**, nunca a conexão
+   direta `db.<ref>.supabase.co`, que é IPv6-only.
+3. **A migração roda no start do contêiner**, pelo `CMD` do `Dockerfile`
+   ([ADR 0007](decisoes/0007-migracao-no-start-do-container.md)) — **não rode
    `alembic upgrade head` à mão** contra este banco. Rodar à mão reabre
    exatamente o risco que a [ADR 0003](decisoes/0003-descartar-banco-atual-criar-novo.md)
    descreve (divergência entre schema real e histórico de migrações).
@@ -156,22 +236,22 @@ migrações funciona do zero antes de apostar produção nela.
    > ver [`ArchSmart-api/tools/README.md`](../../ArchSmart-api/tools/README.md).
    > Confira a `DATABASE_URL` antes: a flag desliga a única proteção que existe.
 
-5. **Anote qual versão de Postgres o projeto novo nasceu com** (no painel,
-   *Project Settings → Database*, ou `SHOW server_version;`) e registre-a aqui:
+5. **Versão de Postgres de cada ambiente** — medida em 29/08/2026 com
+   `SHOW server_version` via conexão direta aos dois projetos:
 
    | Ambiente | Postgres | Como foi obtido |
    |---|---|---|
    | Banco de teste (`docker-compose.test.yml`) | **16** | imagem `pgvector/pgvector:pg16` |
    | Stack Supabase local (`supabase start`) | **17** | a CLI rejeita 16; ver `supabase/config.toml` |
-   | Staging (seção 3) | *a preencher* | — |
-   | Produção nova | *a preencher* | — |
+   | Staging (`ipbhtqzybgdltewwnvnl`) | **17.6** | `SHOW server_version` |
+   | Produção (`wokgnojyrpzndtxzvfcz`) | **17.6** | `SHOW server_version` |
 
-   Isso não é burocracia: hoje o banco de teste e a stack local já divergem por
-   um major, porque o Supabase nunca ofereceu Postgres 16 e a CLI recusa esse
-   valor. Se os projetos novos nascerem em 17, quem diverge passa a ser o banco
-   de teste, e vale alinhar o `docker-compose.test.yml` — **numa tarefa
-   dedicada**, não de passagem, porque trocar a imagem do Postgres dos testes
-   é exatamente o tipo de mudança que precisa ser medida sozinha.
+   Isso não é burocracia, e a previsão que estava escrita aqui se confirmou:
+   **quem diverge agora é o banco de teste**, sozinho num major mais velho, já
+   que os dois projetos novos nasceram em 17. Vale alinhar o
+   `docker-compose.test.yml` — **numa tarefa dedicada**, não de passagem,
+   porque trocar a imagem do Postgres dos testes é exatamente o tipo de mudança
+   que precisa ser medida sozinha.
 
 ## 5. Branch protection nas três branches
 
@@ -231,12 +311,19 @@ Adicionalmente, **só em `main` e `staging`**:
 
 ## O que confirmar quando terminar
 
+> ⚠️ **`/health/db` não prova schema — só conectividade.** Ele executa
+> `SELECT 1` (`ArchSmart-api/app/main.py:67`) e responde
+> `{"status":"ok","db":"up"}` contra um banco **completamente vazio**. Foi
+> exatamente o que aconteceu em 29/08/2026: os dois serviços verdes nesse
+> endpoint, e os dois bancos com `0` tabelas. A prova de schema é
+> `alembic_version` bater com o head do repositório — nunca este `curl`.
+
 | Seção | O que confirma | Comando ou tela |
 |---|---|---|
-| 1. Render (staging) | API de staging responde | `curl https://<api-staging>/health` devolvendo `{"status":"ok"}` (URL registrada na seção 1 acima) |
+| 1. Render (staging) | API de staging responde | `curl https://arqsmart-staging.onrender.com/health` → `{"status":"ok"}` |
 | 2. Vercel (preview) | Preview é gerado a partir de PR contra `staging` | Abrir um PR contra `staging` e conferir, na aba *Checks* do PR ou no painel da Vercel, o link do deployment de preview |
-| 3. Supabase (staging) | Projeto novo, schema correto, e-mail confirmado | `alembic current` (rodado com `DATABASE_URL` do projeto de staging) mostra a revisão head; em *Authentication → Providers → Email* do painel, "Confirm email" aparece ligada |
-| 4. Banco de produção novo | API de produção responde contra o banco novo | `curl https://arch-smart-api.onrender.com/health/db` devolvendo confirmação de banco vivo, **depois** de repontar o Render para o projeto novo |
+| 3. Supabase (staging) | Projeto novo, **schema correto**, e-mail confirmado | `alembic current` (com a `DATABASE_URL` de staging) devolvendo `b77a9b5656c2`, que é o head único do repositório; em *Authentication → Providers → Email* do painel, "Confirm email" ligada |
+| 4. Banco de produção novo | API de produção servindo o **schema novo** | Duas coisas, nesta ordem: `curl https://arqsmart-prod.onrender.com/health` → `{"status":"ok"}` (prova que a migração passou, porque o `&&` do `CMD` impede o uvicorn de subir se ela falhar — [ADR 0007](decisoes/0007-migracao-no-start-do-container.md)); e `alembic current` com a `DATABASE_URL` de produção devolvendo `b77a9b5656c2`. **Não use `/health/db` para isto** — ver o aviso acima |
 | 5. Branch protection | As três branches exigem PR e os três checks | Em *Settings → Branches* do GitHub, cada uma das três regras lista os três nomes de job como *Required status checks*; tentar um push direto (sem PR) para qualquer uma das três deve ser recusado pelo GitHub |
 
 ## Onde ler mais

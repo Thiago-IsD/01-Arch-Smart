@@ -2,7 +2,15 @@ name: Keep API warm
 
 # Mantém a instância do Render acordada pingando /health de tempos em tempos.
 # O tier free do Render dorme após ~15 min de inatividade, causando um cold
-# start de ~20s na próxima requisição. Um ping a cada 10 min evita isso.
+# start de ~31s na próxima requisição (medido em 29/08/2026 nos dois serviços).
+# Um ping a cada 10 min evita isso.
+#
+# SÓ PRODUÇÃO, de propósito. O tier free do Render dá 750 horas de instância
+# por MÊS NA CONTA INTEIRA, não por serviço. Manter os dois serviços acordados
+# 24/7 pede ~1460 h — o dobro do limite — e derrubaria os dois no fim do mês.
+# Produção sozinha custa ~730 h. Staging pode ter cold start: ninguém está
+# esperando na frente dele. O toque que staging precisa (para o projeto
+# Supabase não pausar por inatividade) está em keep-db-alive.yml, 1x ao dia.
 #
 # Observações:
 # - Cron do GitHub Actions usa UTC e pode atrasar em períodos de alta carga.
@@ -18,8 +26,8 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping health endpoint
+      - name: Ping health endpoint (produção)
         run: |
-          curl -fsS --max-time 60 https://arch-smart-api.onrender.com/health \
-            && echo " -> API acordada" \
+          curl -fsS --max-time 60 https://arqsmart-prod.onrender.com/health \
+            && echo " -> API de producao acordada" \
             || echo "Ping falhou (possível cold start em andamento)"

@@ -13,8 +13,8 @@
         "<all_urls>",
         "http://localhost:3000/*",
         "http://127.0.0.1:8000/*",
-        "https://www.archsmart.com.br/*",
-        "https://arch-smart-api.onrender.com/*"
+        "https://www.arqsmart.com.br/*",
+        "https://arqsmart-prod.onrender.com/*"
     ],
     "action": {
         "default_popup": "popup.html",
