@@ -65,8 +65,10 @@ tabela final — é o registro de que aquele pedaço passou de alvo para realida
    - `DATABASE_URL` → a connection string do projeto Supabase de staging
      (`ipbhtqzybgdltewwnvnl`), criado na seção 3 deste documento.
 
-     > **Use o host pooler, na porta 6543** — e não a conexão direta. Medido em
-     > 30/08/2026:
+     > **Host pooler, porta 5432.** Os dois pedaços têm motivos diferentes, e
+     > os dois foram medidos em 30/08/2026.
+     >
+     > **O host: nunca a conexão direta.**
      >
      > ```
      > aws-0-sa-east-1.pooler.supabase.com   IPv4 15.229.150.166   IPv6 nao resolve
@@ -74,20 +76,44 @@ tabela final — é o registro de que aquele pedaço passou de alvo para realida
      > ```
      >
      > A conexão direta é **IPv6-only** no tier gratuito: numa rede sem IPv6 ela
-     > simplesmente não resolve. É essa a causa dos conflitos de conexão que
-     > aparecem ao seguir tutoriais que mandam usar `db.<ref>.supabase.co:5432`
-     > — o problema é o **host**, não a porta.
+     > nem resolve o nome. É essa a causa dos conflitos que aparecem ao seguir
+     > tutoriais que mandam usar `db.<ref>.supabase.co:5432` — ali o problema é
+     > o **host**, não a porta.
      >
-     > No host pooler, 6543 (*transaction*) e 5432 (*session*) foram medidos
-     > lado a lado e **passaram igual** nas três coisas de que a migração
-     > depende: advisory lock de sessão, DDL transacional e `SET` persistindo
-     > entre comandos. A armadilha conhecida do transaction pooler são
-     > *prepared statements* do lado do servidor, que é problema de `asyncpg`;
-     > esta API usa `psycopg2-binary` síncrono (`requirements.txt:51`), que não
-     > os usa por padrão. A 6543 ainda multiplexa as até 30 conexões que o
-     > engine abre (`app/db/session.py`: `pool_size=10`, `max_overflow=20`)
-     > sobre bem menos conexões reais — o que importa no limite do tier
-     > gratuito.
+     > **A porta: 5432 (*session*), não 6543 (*transaction*).** No modo
+     > transaction o Supavisor multiplexa vários clientes sobre a mesma conexão
+     > de servidor, e **um `SET` feito por um cliente sobrevive ao disconnect
+     > dele e vale para os próximos**. Não é teórico: em 30/08/2026 uma sonda
+     > deste repositório abriu conexão na 6543 com
+     > `psycopg2.set_session(readonly=True)`, e o
+     > `default_transaction_read_only = on` ficou grudado no backend
+     > compartilhado. O deploy seguinte de staging pegou esse backend e morreu:
+     >
+     > ```
+     > psycopg2.errors.ReadOnlySqlTransaction:
+     >   cannot execute CREATE TABLE in a read-only transaction
+     > [SQL: CREATE TABLE alembic_version (...)]
+     > ==> Exited with status 1
+     > ```
+     >
+     > Diagnóstico, para reconhecer o padrão de novo:
+     >
+     > ```
+     > pg_settings -> setting='on'  source='session'  reset_val='off'
+     >
+     > 8 conexoes novas na 6543:  on,  todas backend_pid=98513
+     > 8 conexoes novas na 5432:  off, backend limpo
+     > ```
+     >
+     > `source='session'` com `reset_val='off'` é a assinatura: não veio de
+     > config nem do painel, veio de um `SET` que vazou. Na 5432 cada cliente
+     > tem sua própria sessão e nada disso acontece.
+     >
+     > A armadilha mais citada do transaction pooler — *prepared statements* do
+     > lado do servidor — de fato **não** afeta esta API, que usa
+     > `psycopg2-binary` síncrono (`requirements.txt:51`). Foi por olhar só para
+     > essa armadilha que a orientação anterior aqui dizia "6543", e estava
+     > errada: o vazamento de estado de sessão é outro eixo, e é o que quebra.
    - `FRONTEND_URL` → `https://www.arqsmart.com.br` em produção. Para staging,
      a URL do ambiente de preview da Vercel (seção 2).
 
@@ -219,8 +245,9 @@ migrações funciona do zero antes de apostar produção nela.
    > `aws-0-sa-east-1`, **Postgres 17.6**.
 2. Aponte a `DATABASE_URL` (e as demais chaves Supabase) do serviço Render
    de produção (`arqsmart-prod`) para o projeto novo. Vale aqui a mesma
-   ressalva da seção 1, item 6: **host pooler na 6543**, nunca a conexão
-   direta `db.<ref>.supabase.co`, que é IPv6-only.
+   ressalva da seção 1, item 6: **host pooler na 5432**, nunca a 6543 (estado
+   de sessão vaza entre clientes) nem a conexão direta
+   `db.<ref>.supabase.co` (IPv6-only).
 3. **A migração roda no start do contêiner**, pelo `CMD` do `Dockerfile`
    ([ADR 0007](decisoes/0007-migracao-no-start-do-container.md)) — **não rode
    `alembic upgrade head` à mão** contra este banco. Rodar à mão reabre

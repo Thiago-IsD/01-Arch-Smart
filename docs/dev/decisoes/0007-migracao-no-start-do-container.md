@@ -113,6 +113,15 @@ deliberado — servir contra um schema errado é pior do que não servir —, ma
 muda o que se vê durante uma indisponibilidade do Supabase: o sintoma deixa de
 ser "um endpoint vermelho" e passa a ser "o serviço não sobe".
 
+**Pré-condição descoberta na prática:** a `DATABASE_URL` precisa apontar para o
+**session pooler (5432)**, não para o transaction pooler (6543). No modo
+transaction o Supavisor compartilha a conexão de servidor entre clientes, e um
+`SET` de um cliente sobrevive para os próximos — em 30/08/2026 um
+`default_transaction_read_only = on` vazado por uma sonda deste repositório
+derrubou o primeiro deploy de staging exatamente aqui, no `CREATE TABLE
+alembic_version`. Detalhe e diagnóstico em
+[`../ambientes-online.md`](../ambientes-online.md), seção 1, item 6.
+
 Segundo efeito: o free tier do Render reinicia o contêiner ao acordar do sono,
 então o `alembic upgrade head` roda a cada despertar, não só a cada deploy.
 Quando já está no head ele é no-op — lê `alembic_version` e sai — e desaparece
