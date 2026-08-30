@@ -34,8 +34,14 @@ Repositorio — progresso, links e sincronia
 > Em 26/08/2026 Thiago decidiu manter assim, sem GitHub Pro e sem tornar o
 > repositório público. **Então a esteira é um conselheiro, e quem mergeia é o
 > portão.** Antes de mergear, olhe os três checks; um X vermelho ali é um
-> defeito real, não ruído. O roteiro para ligar o bloqueio, caso o plano mude,
-> está em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
+> defeito real, não ruído.
+>
+> ⚠️ **Em 30/08/2026 o repositório foi tornado público** (`gh repo view --json
+> visibility` → `PUBLIC`), para destravar a Vercel, que recusava deploy de
+> repositório privado. Efeito colateral: **branch protection ficou disponível
+> de graça**. Ligar ou não continua uma decisão em aberto — enquanto não for
+> ligada, a regra acima vale como está. Roteiro em
+> [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
 
 **O que bloqueia direto:** os testes do backend contra Postgres em Docker (inclui a receita de migrações e a guarda de banco), `tsc --noEmit` e `vitest run` no frontend, os testes de `tools/`, `progresso.py --check`, `checa_links.py`, e a checagem de que `main` não tem conteúdo ausente em `develop`.
 

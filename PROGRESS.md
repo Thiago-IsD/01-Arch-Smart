@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 17/63 (27%)**
-`█████░░░░░░░░░░░░░░░`
+**Progresso geral: 18/63 (29%)**
+`██████░░░░░░░░░░░░░░`
 
-_Última atualização: 2026-08-26_
+_Última atualização: 2026-08-30_
 
 ---
 
@@ -37,19 +37,35 @@ _Última atualização: 2026-08-26_
 - [x] Deploy, ADRs em `docs/dev/decisoes/` e template de PR (Task 8)
 
 ## Seção 3 · Esteira, ambientes e branches
-**3/5 (60%)** `████████████░░░░░░░░`
+**4/5 (80%)** `████████████████░░░░`
 
 - [x] CI que reprova em todo PR (lint, tipos, testes contra Postgres em Docker, cores literais, doc de módulo, consistência do PROGRESS.md, sincronia `main`↔`develop`)
 - [ ] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
 - [x] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
-- [ ] Banco de produção novo, criado do zero pela receita de migrações
+- [x] Banco de produção novo, criado do zero pela receita de migrações
 - [x] Seed com volume realista (`ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
 
-> **As duas caixas desmarcadas dependem de passos em painel externo**, que só o
-> dono das contas executa — Render, Vercel e Supabase. O roteiro campo a campo
-> está em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md); o que
-> falta é a execução, não o plano. A branch `staging` em si já existe e está
-> publicada; o que não existe é o ambiente online ligado a ela.
+> **O banco de produção fechou em 30/08/2026, e foi medido.** O projeto
+> Supabase novo estava virgem (`0` tabelas, sem `alembic_version`); o deploy do
+> código novo em `main` rodou a receita sozinho, pelo `CMD` do contêiner
+> ([ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md)), e o
+> resultado foi `alembic_version=b77a9b5656c2`, 27 tabelas, extensão `vector`
+> habilitada — **sem nenhum passo manual fora do Alembic**, que é exatamente o
+> critério de sucesso da
+> [ADR 0003](docs/dev/decisoes/0003-descartar-banco-atual-criar-novo.md).
+> Staging passou pela mesma receita antes, com o mesmo resultado.
+>
+> **A caixa que continua aberta é só a metade Vercel da primeira.** A API de
+> staging está no ar e servindo o código novo
+> (`https://arqsmart-staging.onrender.com`, 57 rotas, `/health` e `/health/db`
+> verdes). O que falta é o **preview automático**: até 30/08 a Vercel recusava
+> todo deploy com *"Git author must have access to the project"*, e o
+> repositório foi tornado público para destravar. Os deploys passaram a
+> concluir, mas `www.arqsmart.com.br` ainda responde `404 NOT_FOUND` — o
+> domínio não está servindo o deployment. Falta confirmar as duas coisas: um
+> preview gerado a partir de PR contra `staging`, e o domínio de produção
+> atendendo. Roteiro em
+> [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md), seção 2.
 >
 > **A primeira caixa foi renomeada, e o motivo importa.** Ela dizia "CI que
 > barra merge". O `ci.yml` existe, roda em todo PR e reprova corretamente — mas
@@ -62,8 +78,18 @@ _Última atualização: 2026-08-26_
 > **Decisão de Thiago, 26/08/2026: fica assim.** Sem GitHub Pro, sem tornar o
 > repositório público. A esteira é um **conselheiro**: ela mostra o X vermelho,
 > e quem mergeia decide. O custo assumido é que um PR vermelho pode entrar por
-> distração — e é por isso que a caixa não promete bloqueio. Se o plano mudar, o
-> roteiro para ligar o bloqueio está em
+> distração — e é por isso que a caixa não promete bloqueio.
+>
+> ⚠️ **A premissa dessa decisão mudou em 30/08/2026, por outro motivo.** O
+> repositório **foi tornado público** — não para ligar branch protection, mas
+> porque a Vercel recusava todo deploy enquanto ele era privado (*"Git author
+> must have access to the project"*). Confirmado: `gh repo view --json
+> visibility` → `PUBLIC`. Como efeito colateral, **branch protection passou a
+> estar disponível de graça**, e a metade "sem tornar público" da decisão
+> acima não descreve mais a realidade.
+>
+> A decisão de ligar ou não o bloqueio **continua em aberto** — ela não foi
+> tomada junto com a mudança de visibilidade. O roteiro está em
 > [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
 >
 > Do texto original da caixa saiu o **validador de contraste**, que depende dos
