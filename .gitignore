@@ -23,3 +23,8 @@ test-results
 
 # Extensao - pacote dev (aponta para localhost; gerado sob demanda pelo build-clipper)
 ArchSmart-web/public/arch-smart-clipper-dev.zip
+
+# Artefatos locais que nunca deveriam ter sido versionados
+ArchSmart-api/login.json
+ArchSmart-api/mock_database.db
+ArchSmart-api/cacert.pem

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MessageSquare, User } from "lucide-react";
+import { cabecalhoDoPortal, limparTokenEVoltarAoPortao } from "../portal-token";
 
 interface Comment {
     id: string;
@@ -24,7 +25,13 @@ export function PresentationTimeline({ presentationId }: TimelineProps) {
         const fetchComments = async () => {
             try {
                 const url = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").trim();
-                const res = await fetch(`${url}/public/presentations/${presentationId}/comments`);
+                const res = await fetch(`${url}/public/presentations/${presentationId}/comments`, {
+                    headers: cabecalhoDoPortal(presentationId),
+                });
+                if (res.status === 401) {
+                    limparTokenEVoltarAoPortao(presentationId);
+                    return;
+                }
                 if (res.ok) {
                     const data = await res.json();
                     setComments(data);

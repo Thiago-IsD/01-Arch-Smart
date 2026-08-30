@@ -1,24 +1,47 @@
 name: Keep database warm
 
-# Mantém o projeto Supabase (Postgres) ativo pingando /health/db, que executa
-# um SELECT 1 no banco. O tier free do Supabase pausa o projeto após ~7 dias
-# de inatividade; um toque diário no banco evita a pausa.
+# Mantém os projetos Supabase (Postgres) ativos pingando /health/db, que
+# executa um SELECT 1 no banco. O tier free do Supabase pausa o projeto após
+# ~7 dias de inatividade; um toque diário evita a pausa.
 #
-# Roda 2x ao dia por redundância (agendamentos do GitHub podem atrasar/pular).
 # Diferente do keep-alive da API (/health), este endpoint TOCA o banco.
+#
+# ATENÇÃO ao ler o resultado: /health/db responde {"status":"ok","db":"up"}
+# contra um banco COMPLETAMENTE VAZIO — ele só faz SELECT 1 (app/main.py:67).
+# Verde aqui prova conectividade, NUNCA schema. Para schema, o que vale é
+# `alembic current` devolvendo o head do repositório (ver ADR 0007).
+#
+# Cadência assimétrica, e o motivo é custo: o tier free do Render dá 750 horas
+# de instância por mês na CONTA INTEIRA. Produção já consome ~730 h por ficar
+# acordada 24/7 (keep-alive.yml). Cada toque em staging acorda aquele serviço
+# por ~15 min, então 1x ao dia custa ~7 h/mês e cabe no que sobra; 2x ao dia
+# em ambos não caberia.
 
 on:
   schedule:
-    - cron: "0 6 * * *"  # 06:00 UTC
-    - cron: "0 18 * * *" # 18:00 UTC
+    - cron: "0 6 * * *"  # 06:00 UTC — produção e staging
+    - cron: "0 18 * * *" # 18:00 UTC — só produção
   workflow_dispatch:
 
 jobs:
-  ping-db:
+  ping-db-producao:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping database health endpoint
+      - name: Ping database health endpoint (produção)
         run: |
-          curl -fsS --max-time 90 https://arch-smart-api.onrender.com/health/db \
-            && echo " -> banco ativo" \
+          curl -fsS --max-time 90 https://arqsmart-prod.onrender.com/health/db \
+            && echo " -> banco de producao ativo" \
+            || echo "Ping ao banco falhou (possível cold start ou banco pausado)"
+
+  ping-db-staging:
+    runs-on: ubuntu-latest
+    # Só no agendamento das 06:00 (e no disparo manual). Ver a nota de custo
+    # no topo do arquivo: cada despertar de staging consome hora de instância
+    # do mesmo orçamento de 750 h/mês que produção já quase esgota.
+    if: github.event.schedule != '0 18 * * *'
+    steps:
+      - name: Ping database health endpoint (staging)
+        run: |
+          curl -fsS --max-time 90 https://arqsmart-staging.onrender.com/health/db \
+            && echo " -> banco de staging ativo" \
             || echo "Ping ao banco falhou (possível cold start ou banco pausado)"

@@ -1,69 +1,18 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 import time
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.session import get_db
-from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, Account
+from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
 from app.api.users import get_current_user
 from app.models.all_models import User
+from app.core.rate_limit import limiter
 
 router = APIRouter()
-
-@router.get("/seed-captured")
-def seed_captured(db: Session = Depends(get_db)):
-    account = db.query(Account).first()
-    if not account:
-        account = Account(name="Demo Account", company_name="Arch Smart Demo")
-        db.add(account)
-        db.commit()
-        db.refresh(account)
-
-    captured_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.CAPTURED).first()
-    if not captured_state:
-        captured_state = ProductState(name="Captured", status=ProductStateStatus.CAPTURED)
-        db.add(captured_state)
-        
-    clipper_origin = db.query(ProductOrigin).filter(ProductOrigin.type == ProductOriginType.WEB_CLIPPER).first()
-    if not clipper_origin:
-        clipper_origin = ProductOrigin(name="Web Clipper", type=ProductOriginType.WEB_CLIPPER)
-        db.add(clipper_origin)
-
-    db.commit()
-    db.refresh(captured_state)
-    db.refresh(clipper_origin)
-
-    p1 = Product(
-        account_id=account.id,
-        name="Sofa Modular Cinza (Bruto)",
-        store="Tok&Stok",
-        category=None,
-        price=3200.00,
-        image_url="https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&q=80&w=500",
-        state_id=captured_state.id,
-        origin_id=clipper_origin.id,
-        dimensions=None
-    )
-
-    p2 = Product(
-        account_id=account.id,
-        name="Luminária Pendente Industrial",
-        store="Westwing",
-        category="Iluminação",
-        price=None,
-        image_url="https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&q=80&w=500",
-        state_id=captured_state.id,
-        origin_id=clipper_origin.id,
-        dimensions=None
-    )
-
-    db.add(p1)
-    db.add(p2)
-    db.commit()
-    return {"message": "Captured products seeded successfully"}
 
 @router.get("/", response_model=PaginatedProductResponse)
 def get_products(
@@ -173,9 +122,14 @@ AI_ERROR_RESPONSES = {
 }
 
 @router.post("/normalize", response_model=NormalizeResponse)
-async def normalize_product(request: NormalizeRequest):
+@limiter.limit("20/minute")
+async def normalize_product(
+    request: Request,
+    payload: NormalizeRequest,
+    current_user: User = Depends(get_current_user),
+):
     try:
-        return await extract_product_data(request.text, request.source_url)
+        return await extract_product_data(payload.text, payload.source_url)
     except tuple(AI_ERROR_RESPONSES) as e:
         status_code, detail = AI_ERROR_RESPONSES[type(e)]
         raise HTTPException(status_code=status_code, detail=detail)

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react"
 import { Building2, Lock, Loader2 } from "lucide-react"
 import { PortalView, type PublicPresentationData } from "./PortalView"
+import { tokenKey } from "../portal-token"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-const tokenKey = (uuid: string) => `portal_token_${uuid}`
 
 type ViewState = "loading" | "unlocked" | "gate" | "unavailable" | "notfound"
 

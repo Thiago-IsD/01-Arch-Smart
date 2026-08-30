@@ -1,0 +1,151 @@
+"""
+A receita de migracoes e a fonte unica do schema (ADR 0004).
+
+Este teste constroi um banco descartavel so com `alembic upgrade head` e
+compara o resultado com o que os models declaram. Se divergir, um banco novo
+— staging, producao ou o Supabase local — nasce diferente do que a aplicacao
+espera, e o erro so aparece em producao.
+
+Roda contra o mesmo Postgres do docker-compose.test.yml, num banco proprio
+(`arqsmart_receita_test`) para nao colidir com as fixtures da suite.
+"""
+import os
+from pathlib import Path
+
+import pytest
+from alembic import command
+from alembic.autogenerate import compare_metadata
+from alembic.config import Config
+from alembic.migration import MigrationContext
+from sqlalchemy import Enum as SAEnum, create_engine, text
+
+from app.core import config as app_config
+from app.db.base_class import Base
+import app.models.all_models  # noqa: F401  (registra os models no metadata)
+
+RAIZ = Path(__file__).resolve().parents[1]
+# conftest.py exporta a URL do banco de teste em DATABASE_URL no momento em que
+# e importado, antes de qualquer teste rodar.
+URL_BASE = os.environ["DATABASE_URL"].rsplit("/", 1)[0]
+BANCO_RECEITA = "arqsmart_receita_test"
+URL_ADMIN = f"{URL_BASE}/postgres"
+URL_RECEITA = f"{URL_BASE}/{BANCO_RECEITA}"
+
+
+@pytest.fixture
+def banco_da_receita(monkeypatch):
+    """Banco vazio que recebe so a receita de migracoes."""
+    admin = create_engine(URL_ADMIN, isolation_level="AUTOCOMMIT")
+    with admin.connect() as conexao:
+        conexao.execute(text(f"DROP DATABASE IF EXISTS {BANCO_RECEITA}"))
+        conexao.execute(text(f"CREATE DATABASE {BANCO_RECEITA}"))
+    admin.dispose()
+
+    # alembic/env.py le settings.DATABASE_URL em tempo de execucao, entao
+    # trocar o atributo redireciona a receita para o banco descartavel.
+    monkeypatch.setattr(app_config.settings, "DATABASE_URL", URL_RECEITA)
+    cfg = Config(str(RAIZ / "alembic.ini"))
+    cfg.set_main_option("script_location", str(RAIZ / "alembic"))
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(URL_RECEITA)
+    yield engine
+    engine.dispose()
+
+
+def test_receita_reproduz_os_models(banco_da_receita):
+    with banco_da_receita.connect() as conexao:
+        # compare_server_default=True: sem isso, um server_default novo no
+        # model sem migracao correspondente passa batido. Nao e hipotetico —
+        # all_models.py ja usa o padrao, com um comentario afirmando que ele
+        # espelha a migracao f1a2b3c4d5e6, e nada verificava esse espelhamento.
+        # Mesma classe do ponto cego de enum que a Tarefa 2b fechou.
+        contexto = MigrationContext.configure(
+            conexao, opts={"compare_server_default": True}
+        )
+        diferencas = compare_metadata(contexto, Base.metadata)
+
+    assert diferencas == [], (
+        "O banco construido pelas migracoes diverge dos models em "
+        f"{len(diferencas)} ponto(s):\n"
+        + "\n".join(f"  - {d!r}" for d in diferencas)
+    )
+
+
+def test_enums_do_banco_batem_com_os_models(banco_da_receita):
+    """
+    compare_metadata (Alembic) compara tabelas, colunas e tipos, mas nao o
+    conteudo de um Enum do Postgres -- um enum Python com um rotulo a mais
+    do que o tipo no banco passa pelo test_receita_reproduz_os_models sem
+    acusar nada, porque dos dois lados o tipo da coluna e "enum", so os
+    rotulos dentro dele divergem. E foi exatamente assim que quatro valores
+    (ProductOriginType.CATALOG, ProductStateStatus.ACTIVE/.ARCHIVED/.DELETED)
+    ficaram declarados no model sem nenhuma migracao para cria-los: o model
+    promete um valor que o INSERT rejeita em qualquer banco construido pela
+    receita.
+
+    Descobre os enums do lado do model varrendo Base.metadata em busca de
+    colunas Enum (o nome do tipo Postgres e `coluna.type.name`, os rotulos
+    esperados sao `coluna.type.enums`) e compara cada um com pg_type/pg_enum
+    no banco que a receita acabou de construir.
+    """
+    enums_do_model = {}
+    for tabela in Base.metadata.sorted_tables:
+        for coluna in tabela.columns:
+            if isinstance(coluna.type, SAEnum) and coluna.type.enum_class is not None:
+                enums_do_model[coluna.type.name] = set(coluna.type.enums)
+
+    with banco_da_receita.connect() as conexao:
+        linhas = conexao.execute(text(
+            "SELECT t.typname, array_agg(e.enumlabel) "
+            "FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid "
+            "GROUP BY t.typname"
+        )).all()
+    enums_do_banco = {nome: set(valores) for nome, valores in linhas}
+
+    divergencias = {}
+    for nome, valores_model in enums_do_model.items():
+        valores_banco = enums_do_banco.get(nome, set())
+        if valores_model != valores_banco:
+            divergencias[nome] = {
+                "so_no_model": sorted(valores_model - valores_banco),
+                "so_no_banco": sorted(valores_banco - valores_model),
+            }
+
+    assert divergencias == {}, (
+        f"Enums do Postgres divergem dos models em {len(divergencias)} tipo(s):\n"
+        + "\n".join(f"  - {nome}: {info}" for nome, info in divergencias.items())
+    )
+
+
+def test_schema_nao_depende_de_recurso_exclusivo_do_supabase(banco_da_receita):
+    """
+    Portabilidade para AWS (spec, Secao 3): a protecao real fica na aplicacao,
+    nao em RLS, e o schema nao referencia as tabelas internas de autenticacao
+    do Supabase. Postgres e Postgres; e o que torna a troca possivel.
+    """
+    with banco_da_receita.connect() as conexao:
+        com_rls = conexao.execute(text(
+            "SELECT tablename FROM pg_tables "
+            "WHERE schemaname = 'public' AND rowsecurity = true"
+        )).scalars().all()
+        fks_externas = conexao.execute(text(
+            "SELECT DISTINCT ccu.table_schema || '.' || ccu.table_name "
+            "FROM information_schema.table_constraints tc "
+            "JOIN information_schema.constraint_column_usage ccu "
+            "  ON tc.constraint_name = ccu.constraint_name "
+            "  AND tc.constraint_schema = ccu.constraint_schema "
+            "WHERE tc.constraint_type = 'FOREIGN KEY' "
+            "  AND tc.table_schema = 'public' "
+            "  AND ccu.table_schema <> 'public'"
+        )).scalars().all()
+
+    assert com_rls == [], (
+        f"Tabelas com RLS ligado: {com_rls}. A protecao por conta e do "
+        "ScopedRepository (Secao 4), nao do banco — RLS aqui amarra o "
+        "projeto ao Supabase."
+    )
+    assert fks_externas == [], (
+        f"FK apontando para fora de public: {fks_externas}. Referencia as "
+        "tabelas internas do Supabase impede migrar o banco para outro Postgres."
+    )

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func, extract
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
 from app.db.session import get_db
 from app.api.users import get_current_user
@@ -84,7 +84,13 @@ def get_financial_entries(
     Utiliza um JOIN com Project para trazer o nome do projeto caso exista.
     """
     entries_query = db.query(FinancialEntry, Project.name.label("project_name"))\
-        .outerjoin(Project, FinancialEntry.project_id == Project.id)\
+        .outerjoin(
+            Project,
+            and_(
+                FinancialEntry.project_id == Project.id,
+                Project.account_id == current_user.account_id,
+            ),
+        )\
         .filter(
             FinancialEntry.account_id == current_user.account_id,
             extract('month', FinancialEntry.due_date) == month,
@@ -126,6 +132,21 @@ def create_financial_entry(
         raise HTTPException(status_code=400, detail="Invalid Type")
     if payload.status not in ["PREDICTED", "REALIZED"]:
         raise HTTPException(status_code=400, detail="Invalid Status")
+
+    # Isola pelo account do usuario autenticado: project_id vindo do cliente
+    # nunca e confiavel sem essa checagem (mesma falha que o Art. 1 fechou
+    # em outros endpoints).
+    if payload.project_id:
+        projeto = (
+            db.query(Project)
+            .filter(
+                Project.id == payload.project_id,
+                Project.account_id == current_user.account_id,
+            )
+            .first()
+        )
+        if not projeto:
+            raise HTTPException(status_code=404, detail="Projeto não encontrado")
 
     entries = []
     
@@ -233,7 +254,10 @@ def toggle_financial_status(
     # Busca nome do projeto se aplicavel
     pj_name = None
     if entry.project_id:
-        pj = db.query(Project).filter(Project.id == entry.project_id).first()
+        pj = db.query(Project).filter(
+            Project.id == entry.project_id,
+            Project.account_id == current_user.account_id,
+        ).first()
         if pj: pj_name = pj.name
 
     ret = entry.__dict__.copy()
@@ -308,7 +332,10 @@ def update_financial_entry(
     # Busca nome do projeto se aplicavel
     pj_name = None
     if entry.project_id:
-        pj = db.query(Project).filter(Project.id == entry.project_id).first()
+        pj = db.query(Project).filter(
+            Project.id == entry.project_id,
+            Project.account_id == current_user.account_id,
+        ).first()
         if pj: pj_name = pj.name
 
     ret = entry.__dict__.copy()

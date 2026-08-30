@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, staging, main]
+  push:
+    branches: [develop, staging, main]
+
+# Um PR que recebe varios pushes seguidos cancela a execucao anterior: o unico
+# resultado que interessa e o do ultimo commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — testes contra Postgres real
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: arqsmart
+          POSTGRES_PASSWORD: arqsmart
+          POSTGRES_DB: arqsmart_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U arqsmart -d arqsmart_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      # A suite se recusa a rodar contra banco que nao termine em _test (ver
+      # tests/conftest.py). As chaves abaixo sao obrigatorias em
+      # app/core/config.py e precisam existir, mas nenhum teste as usa de
+      # verdade — nao ha segredo de producao no CI.
+      TEST_DATABASE_URL: postgresql://arqsmart:arqsmart@localhost:55432/arqsmart_test
+      SUPABASE_URL: https://ci.invalido.supabase.co
+      SUPABASE_KEY: chave-de-ci-sem-valor
+      SUPABASE_SERVICE_ROLE_KEY: chave-de-ci-sem-valor
+      GEMINI_API_KEY: chave-de-ci-sem-valor
+    defaults:
+      run:
+        working-directory: ArchSmart-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Testes (inclui a receita de migracoes em banco vazio)
+        run: pytest -q
+
+  frontend:
+    name: Frontend — tipos, testes e catraca
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ArchSmart-web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependencias
+        working-directory: ArchSmart-web
+        run: npm ci
+      - name: Tipos
+        working-directory: ArchSmart-web
+        run: npm run typecheck
+      - name: Testes
+        working-directory: ArchSmart-web
+        run: npm test
+      - name: Medir o lint
+        # O eslint sai !=0 quando ha erro, e hoje ha 93. Quem decide se isso
+        # reprova o PR e a catraca, comparando com o baseline versionado.
+        working-directory: ArchSmart-web
+        run: npx eslint . --format json -o eslint.json || true
+      - name: Catraca — lint, cores literais e doc de modulo
+        run: python tools/catraca.py --eslint-json ArchSmart-web/eslint.json
+
+  repo:
+    name: Repositorio — progresso, links e sincronia
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # O diff de tres pontos (`git diff origin/develop...origin/main`)
+          # precisa do merge-base entre as duas branches; sem o historico
+          # completo o merge-base nao e calculavel e o diff de tres pontos
+          # quebra. O checkout raso padrao traz so o ultimo commit.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Testes dos scripts de tools/
+        working-directory: tools
+        run: python -m unittest discover -p "test_*.py" -v
+      - name: PROGRESS.md bate com as caixas marcadas
+        run: python tools/progresso.py --check
+      - name: Links internos da documentacao
+        run: python tools/checa_links.py
+      - name: O baseline da catraca nao afrouxou
+        # A recusa do `--atualizar` guarda a FERRAMENTA; este passo guarda o
+        # ARQUIVO. Quem tem o PR travado pela catraca pode abrir
+        # tools/catraca.json e subir o numero na mao: a catraca passa a dizer
+        # "baixou de 9999 para 521" e sai 0, sem que a pessoa precise sequer
+        # saber que --aceitar-piora existe. So a comparacao com a branch base
+        # enxerga isso, porque ela compara baseline com baseline, e nao com o
+        # medido. Descoberto por auditoria adversarial da propria Secao 3.
+        run: |
+          BASE="${{ github.base_ref || 'develop' }}"
+          git fetch origin "$BASE" --quiet
+          if git show "origin/$BASE:tools/catraca.json" > /tmp/catraca_base.json 2>/dev/null; then
+            python tools/catraca.py --comparar-baseline-com /tmp/catraca_base.json
+          else
+            echo "origin/$BASE nao tem tools/catraca.json ainda; nada a comparar."
+          fi
+      - name: main nao tem mudanca ausente em develop
+        # Hotfix aplicado em main precisa voltar para develop no mesmo dia
+        # (ADR 0005). A comparacao e de CONTEUDO, nao de contagem de commits:
+        # `git rev-list --count origin/develop..origin/main` acusa tambem os
+        # merge commits que o fluxo antigo deixou em main — em 24/08/2026 sao
+        # 9 commits que nao carregam nenhuma mudanca ausente em develop, ou
+        # seja, um alarme falso permanente. O diff de tres pontos compara a
+        # base de merge com main: so acusa quando main tem conteudo que
+        # develop nao tem, que e exatamente o hotfix perdido do ADR 0005.
+        # So volta ao verde com merge para develop, nunca com cherry-pick: e
+        # o merge que avanca o merge-base entre as duas branches.
+        run: |
+          git fetch origin main develop --quiet
+          if ! git diff --quiet origin/develop...origin/main; then
+            echo "main tem mudanca de conteudo ausente em develop:"
+            git diff --stat origin/develop...origin/main
+            echo "commits candidatos:"
+            git log --oneline origin/develop..origin/main
+            echo "corrija com: git checkout develop && git merge origin/main -- cherry-pick nao zera este check, porque o merge-base nao avanca."
+            exit 1
+          fi
+          echo "main nao tem mudanca ausente em develop."
+
+# Portoes que ainda nao existem. Nao sao stub vazio de proposito: verificacao
+# que nao mede nada da a impressao de uma cobertura que nao ha.
+#
+#   validador de contraste (4.5:1 nos dois temas) — Secao 6, junto com os
+#     tokens --success/--warning que hoje faltam
+#   teste GENERICO de isolamento entre contas — Secao 4, junto com o
+#     ScopedRepository. Atencao: `ArchSmart-api/tests/isolation/` JA EXISTE e
+#     roda em todo PR, dentro do `pytest -q` do job backend: 27 testes que
+#     montam recurso na conta A, acessam autenticado como conta B e exigem 404.
+#     Vieram da Secao 1. O que falta e o teste que percorre TODAS as rotas
+#     registradas automaticamente, e esse depende do ScopedRepository.
