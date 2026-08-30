@@ -16,7 +16,7 @@ O que existe hoje, **medido em 29–30/08/2026** e não apenas afirmado:
 | API de produção | no ar, respondendo | `curl https://arqsmart-prod.onrender.com/health` → `{"status":"ok"}` (cold start de 31 s) |
 | Supabase staging (`ipbhtqzybgdltewwnvnl`) | **virgem** — Postgres 17.6 | sonda somente-leitura: `tabelas em public: 0`, `alembic_version` inexistente, `auth.users: 0` |
 | Supabase produção (`wokgnojyrpzndtxzvfcz`) | **virgem** — Postgres 17.6 | idem |
-| Vercel (projeto `arqsmart`) | domínio ligado, **sem deployment de produção** | `curl -I https://www.arqsmart.com.br` → `Server: Vercel`, `X-Vercel-Error: NOT_FOUND` |
+| Vercel (projeto `arqsmart`) | **produção no ar** | `curl https://www.arqsmart.com.br` → `200`, `title: Arch Smart`, 69 KB com `/_next/`; o apex redireciona (`308`) |
 | Domínio antigo | desativado | `https://www.archsmart.com.br` → `X-Vercel-Error: DEPLOYMENT_NOT_FOUND` |
 
 **O código no ar ainda é o antigo, nos dois serviços.** Fingerprint por
@@ -150,12 +150,37 @@ tabela final — é o registro de que aquele pedaço passou de alvo para realida
 Recurso já disponível no plano atual da Vercel. Não requer plano novo nem
 serviço novo, só habilitar uma opção existente no projeto do frontend.
 
-> **Estado em 30/08/2026:** o projeto na Vercel se chama **`arqsmart`** e o
-> domínio **`www.arqsmart.com.br`** já está anexado a ele — mas **ainda não há
-> deployment de produção**. Medido: `curl -I https://www.arqsmart.com.br`
-> devolve `Server: Vercel` com `X-Vercel-Error: NOT_FOUND`, que é a resposta de
-> domínio ligado sem deployment (diferente de `DEPLOYMENT_NOT_FOUND`, que é o
-> que o domínio antigo `www.archsmart.com.br` devolve hoje).
+> **Estado em 30/08/2026:** o projeto na Vercel se chama **`arqsmart`**, o
+> domínio **`www.arqsmart.com.br`** está anexado e **produção está no ar** —
+> `curl` devolve `200`, `title: Arch Smart`, 69 KB com referências a `/_next/`.
+> O apex `arqsmart.com.br` redireciona para o www (`308`).
+>
+> ⚠️ **Chegar aqui exigiu recriar o projeto na Vercel, e o motivo vale
+> registrar.** O primeiro projeto tinha tudo aparentemente certo — Root
+> Directory `ArchSmart-web`, Framework Preset `Next.js`, domínio atribuído a um
+> deployment `Ready` — e mesmo assim **todo build produzia zero arquivos**:
+>
+> ```
+> Running "vercel build"
+> Vercel CLI 59.3.0
+>                        <- o log terminava aqui. Duração: 2–3 s.
+> ```
+>
+> Sem `npm install`, sem `next build`, sem "Build Completed". Um build real
+> desse projeto leva 41–45 s. Não adiantou desligar *Skip deployments*, nem
+> redeployar sem cache, nem reatribuir o domínio. **Recriar o projeto
+> resolveu.**
+>
+> Como diagnosticar isso rápido da próxima vez: **teste a URL própria do
+> deployment**, não só o domínio custom. Se `https://<projeto>-<hash>-<time>.vercel.app`
+> também dá 404, o problema é o build, não o domínio — e nenhuma quantidade de
+> mexida em DNS ou alias vai resolver. Aqui isso custou várias horas
+> investigando domínio à toa.
+>
+> Vale distinguir os dois erros da Vercel: **`NOT_FOUND`** é domínio ligado
+> servindo um deployment vazio; **`DEPLOYMENT_NOT_FOUND`** é não existir
+> deployment nenhum para aquele hostname — é o que uma branch sem push desde a
+> criação do projeto devolve.
 
 1. No painel da Vercel, abrir o projeto do frontend (`arqsmart`).
 2. Em **Settings → Git** do projeto (o rótulo exato pode variar conforme a

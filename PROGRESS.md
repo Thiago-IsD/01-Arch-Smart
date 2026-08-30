@@ -58,14 +58,22 @@ _Última atualização: 2026-08-30_
 > **A caixa que continua aberta é só a metade Vercel da primeira.** A API de
 > staging está no ar e servindo o código novo
 > (`https://arqsmart-staging.onrender.com`, 57 rotas, `/health` e `/health/db`
-> verdes). O que falta é o **preview automático**: até 30/08 a Vercel recusava
-> todo deploy com *"Git author must have access to the project"*, e o
-> repositório foi tornado público para destravar. Os deploys passaram a
-> concluir, mas `www.arqsmart.com.br` ainda responde `404 NOT_FOUND` — o
-> domínio não está servindo o deployment. Falta confirmar as duas coisas: um
-> preview gerado a partir de PR contra `staging`, e o domínio de produção
-> atendendo. Roteiro em
+> verdes), e **o domínio de produção passou a atender** — `www.arqsmart.com.br`
+> devolve `200` com o app Next.js.
+>
+> A Vercel custou duas rodadas. Primeiro ela recusava todo deploy (*"Git author
+> must have access to the project"*), o que levou a tornar o repositório
+> público. Depois os deploys passaram a concluir mas **entregavam zero
+> arquivos** — builds de 2–3 s contra os 41–45 s de um build real —, e a saída
+> foi **recriar o projeto**. O diagnóstico completo, e como reconhecer o padrão
+> em minutos em vez de horas, está em
 > [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md), seção 2.
+>
+> Falta um item só para fechar: **confirmar o preview automático a partir de um
+> PR contra `staging`**. O projeto foi recriado depois do último push, então as
+> branches ainda não têm deployment
+> (`arqsmart-git-staging-arqsmart.vercel.app` → `DEPLOYMENT_NOT_FOUND`); o
+> próximo push resolve.
 >
 > **A primeira caixa foi renomeada, e o motivo importa.** Ela dizia "CI que
 > barra merge". O `ci.yml` existe, roda em todo PR e reprova corretamente — mas
