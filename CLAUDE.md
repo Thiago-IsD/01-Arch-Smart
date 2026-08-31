@@ -11,7 +11,24 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 26/08/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída no que depende do repositório (esteira, ambientes e branches, merge `25f0bb8`); o que falta dela são passos de painel externo, com roteiro em [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md) e caixas desmarcadas no `PROGRESS.md`. Seções 4 a 9 pendentes.
+Estado em 30/08/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). **Seção 3 concluída por inteiro** — esteira, ambientes e branches, 5/5. Seções 4 a 9 pendentes; **a próxima é a Seção 4** (camada de dados do backend).
+
+Os ambientes online existem e estão medidos:
+
+| Ambiente | API (Render) | Banco (Supabase) |
+|---|---|---|
+| staging | `https://arqsmart-staging.onrender.com` | `ipbhtqzybgdltewwnvnl`, Postgres 17.6 |
+| produção | `https://arqsmart-prod.onrender.com` | `wokgnojyrpzndtxzvfcz`, Postgres 17.6 |
+
+Frontend em `https://www.arqsmart.com.br` (Vercel, projeto `arqsmart`), com preview automático por branch. Os dois bancos nasceram da receita de migrações, sem passo manual: `alembic_version = b77a9b5656c2`, 27 tabelas.
+
+Três coisas que economizam tempo antes de mexer em ambiente:
+
+- **A migração roda no `CMD` do `Dockerfile`**, antes do uvicorn e ligada por `&&` ([ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md)). O Render free tier não tem Pre-Deploy Command. Migração vermelha derruba o deploy — é de propósito. **Nunca rode `alembic upgrade head` à mão** contra staging ou produção.
+- **`DATABASE_URL` usa o host pooler na porta 5432**, nunca a 6543 (estado de sessão vaza entre clientes e já derrubou um deploy) nem `db.<ref>.supabase.co` (IPv6-only, não resolve em rede sem IPv6). O caso completo está em [ambientes-online.md](docs/dev/ambientes-online.md), seção 1, item 6.
+- **`develop` é local.** O `ArchSmart-api/.env` tem staging e produção separados, com produção comentada — confira para qual banco ele aponta **antes** de rodar qualquer script.
+
+Duas decisões seguem **em aberto**, e nenhuma delas é para um agente tomar sozinho: ligar ou não branch protection (virou possível quando o repositório foi tornado público em 30/08), e alinhar o `docker-compose.test.yml`, hoje em Postgres 16 enquanto os ambientes online são 17.6.
 
 ## Portões de CI
 
