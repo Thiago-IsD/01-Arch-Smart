@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 18/63 (29%)**
+**Progresso geral: 19/63 (30%)**
 `██████░░░░░░░░░░░░░░`
 
 _Última atualização: 2026-08-30_
@@ -37,10 +37,10 @@ _Última atualização: 2026-08-30_
 - [x] Deploy, ADRs em `docs/dev/decisoes/` e template de PR (Task 8)
 
 ## Seção 3 · Esteira, ambientes e branches
-**4/5 (80%)** `████████████████░░░░`
+**5/5 (100%)** `████████████████████`
 
 - [x] CI que reprova em todo PR (lint, tipos, testes contra Postgres em Docker, cores literais, doc de módulo, consistência do PROGRESS.md, sincronia `main`↔`develop`)
-- [ ] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
+- [x] Branch `staging` e ambiente online (API de staging no Render + preview automático da Vercel)
 - [x] Postgres local em Docker com a stack Supabase completa (Auth + Storage + Studio)
 - [x] Banco de produção novo, criado do zero pela receita de migrações
 - [x] Seed com volume realista (`ArchSmart-api/tools/seed.py`: 5 projetos, 25 ambientes, 300 itens de biblioteca, 500 itens de projeto)
@@ -55,25 +55,28 @@ _Última atualização: 2026-08-30_
 > [ADR 0003](docs/dev/decisoes/0003-descartar-banco-atual-criar-novo.md).
 > Staging passou pela mesma receita antes, com o mesmo resultado.
 >
-> **A caixa que continua aberta é só a metade Vercel da primeira.** A API de
-> staging está no ar e servindo o código novo
+> **A metade Vercel fechou em 30/08/2026, com as duas pontas medidas.** A API
+> de staging está no ar servindo o código novo
 > (`https://arqsmart-staging.onrender.com`, 57 rotas, `/health` e `/health/db`
-> verdes), e **o domínio de produção passou a atender** — `www.arqsmart.com.br`
-> devolve `200` com o app Next.js.
+> verdes), o domínio de produção atende (`www.arqsmart.com.br` → `200` com o
+> app Next.js) e **todo push gera preview**:
+>
+> ```
+> staging  https://arqsmart-git-staging-arqsmart.vercel.app
+> develop  https://arqsmart-git-develop-arqsmart.vercel.app
+> ```
+>
+> Os previews respondem `302` para `vercel.com/sso-api` — Deployment Protection
+> ligada, que exige login. É esperado; o que prova que o deployment existe é
+> justamente esse `302` do SSO em contraste com `DEPLOYMENT_NOT_FOUND`.
 >
 > A Vercel custou duas rodadas. Primeiro ela recusava todo deploy (*"Git author
 > must have access to the project"*), o que levou a tornar o repositório
 > público. Depois os deploys passaram a concluir mas **entregavam zero
 > arquivos** — builds de 2–3 s contra os 41–45 s de um build real —, e a saída
-> foi **recriar o projeto**. O diagnóstico completo, e como reconhecer o padrão
-> em minutos em vez de horas, está em
+> foi **recriar o projeto**. O diagnóstico completo, e o atalho para reconhecer
+> o padrão em minutos em vez de horas, está em
 > [docs/dev/ambientes-online.md](docs/dev/ambientes-online.md), seção 2.
->
-> Falta um item só para fechar: **confirmar o preview automático a partir de um
-> PR contra `staging`**. O projeto foi recriado depois do último push, então as
-> branches ainda não têm deployment
-> (`arqsmart-git-staging-arqsmart.vercel.app` → `DEPLOYMENT_NOT_FOUND`); o
-> próximo push resolve.
 >
 > **A primeira caixa foi renomeada, e o motivo importa.** Ela dizia "CI que
 > barra merge". O `ci.yml` existe, roda em todo PR e reprova corretamente — mas

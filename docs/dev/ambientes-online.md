@@ -195,14 +195,22 @@ serviço novo, só habilitar uma opção existente no projeto do frontend.
    **Produção continua saindo de `main`** com o `NEXT_PUBLIC_API_URL` de
    produção já configurado hoje (escopo Production) — este passo não altera
    isso.
-4. Abrir um PR contra `staging` para confirmar que o preview é gerado e
-   registrar a URL aqui quando existir (o formato muda a cada deploy —
-   `https://<projeto>-git-<branch>-<time>.vercel.app` é o padrão da Vercel,
-   mas o valor exato só existe depois do primeiro preview):
+4. **Confirmado em 30/08/2026.** Todo push para `staging` e `develop` gera
+   preview, e cada branch ganha uma URL estável além da URL por deploy:
 
    ```
-   URL de preview (exemplo do primeiro PR contra staging): (a preencher)
+   staging:  https://arqsmart-git-staging-arqsmart.vercel.app
+   develop:  https://arqsmart-git-develop-arqsmart.vercel.app
+   por deploy: https://arqsmart-<hash>-arqsmart.vercel.app   (muda a cada build)
    ```
+
+   > As URLs de preview respondem **`302` para `vercel.com/sso-api`**, não
+   > `200`: a **Deployment Protection** da Vercel está ligada e exige login
+   > para visualizar. Isso é esperado e não é falha — mas quer dizer que um
+   > `curl` cru contra um preview nunca vai devolver `200`. Para verificar que
+   > o preview existe, o que importa é o `302` do SSO (deployment existe e está
+   > protegido) em contraste com `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`
+   > (deployment não existe).
 
 ## 3. Projeto Supabase de staging
 
