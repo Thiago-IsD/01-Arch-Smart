@@ -12,7 +12,7 @@ provisionamento e o estado medido de cada peça estão em
 
 | Peça | Onde | Como foi confirmado |
 |---|---|---|
-| `ArchSmart-web` (frontend) | Vercel, projeto `arqsmart` | Domínio de produção `https://www.arqsmart.com.br`. Medido em 30/08/2026: `curl -I` devolve `Server: Vercel`. **Ainda sem deployment de produção** (`X-Vercel-Error: NOT_FOUND`). Este repositório não tem `vercel.json`, então build command e variáveis de ambiente só são verificáveis no painel — mesma ressalva de [`arquitetura.md`](arquitetura.md). |
+| `ArchSmart-web` (frontend) | Vercel, projeto `arqsmart` | Domínio de produção `https://www.arqsmart.com.br`. Medido em 30/08/2026: `curl` devolve `200` servindo o app Next.js (`title: Arch Smart`, 69 KB, com `/_next/`). Este repositório não tem `vercel.json`, então build command e variáveis de ambiente só são verificáveis no painel — mesma ressalva de [`arquitetura.md`](arquitetura.md). |
 | `ArchSmart-api` (staging) | Render, tier gratuito, branch `staging` | `https://arqsmart-staging.onrender.com` — `/health` → `{"status":"ok"}`, cold start de 31 s (medido 29/08/2026). |
 | `ArchSmart-api` (produção) | Render, tier gratuito, branch `main` | `https://arqsmart-prod.onrender.com`, pingada a cada 10 min por `.github/workflows/keep-alive.yml`. |
 | Banco de staging | Supabase `ipbhtqzybgdltewwnvnl`, `aws-0-sa-east-1`, **Postgres 17.6** | `SHOW server_version` por conexão direta, 29/08/2026. |

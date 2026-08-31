@@ -16,7 +16,7 @@ O que existe hoje, **medido em 29–30/08/2026** e não apenas afirmado:
 | API de produção | no ar, respondendo | `curl https://arqsmart-prod.onrender.com/health` → `{"status":"ok"}` (cold start de 31 s) |
 | Supabase staging (`ipbhtqzybgdltewwnvnl`) | **virgem** — Postgres 17.6 | sonda somente-leitura: `tabelas em public: 0`, `alembic_version` inexistente, `auth.users: 0` |
 | Supabase produção (`wokgnojyrpzndtxzvfcz`) | **virgem** — Postgres 17.6 | idem |
-| Vercel (projeto `arqsmart`) | domínio ligado, **sem deployment de produção** | `curl -I https://www.arqsmart.com.br` → `Server: Vercel`, `X-Vercel-Error: NOT_FOUND` |
+| Vercel (projeto `arqsmart`) | **produção no ar** | `curl https://www.arqsmart.com.br` → `200`, `title: Arch Smart`, 69 KB com `/_next/`; o apex redireciona (`308`) |
 | Domínio antigo | desativado | `https://www.archsmart.com.br` → `X-Vercel-Error: DEPLOYMENT_NOT_FOUND` |
 
 **O código no ar ainda é o antigo, nos dois serviços.** Fingerprint por
@@ -150,12 +150,37 @@ tabela final — é o registro de que aquele pedaço passou de alvo para realida
 Recurso já disponível no plano atual da Vercel. Não requer plano novo nem
 serviço novo, só habilitar uma opção existente no projeto do frontend.
 
-> **Estado em 30/08/2026:** o projeto na Vercel se chama **`arqsmart`** e o
-> domínio **`www.arqsmart.com.br`** já está anexado a ele — mas **ainda não há
-> deployment de produção**. Medido: `curl -I https://www.arqsmart.com.br`
-> devolve `Server: Vercel` com `X-Vercel-Error: NOT_FOUND`, que é a resposta de
-> domínio ligado sem deployment (diferente de `DEPLOYMENT_NOT_FOUND`, que é o
-> que o domínio antigo `www.archsmart.com.br` devolve hoje).
+> **Estado em 30/08/2026:** o projeto na Vercel se chama **`arqsmart`**, o
+> domínio **`www.arqsmart.com.br`** está anexado e **produção está no ar** —
+> `curl` devolve `200`, `title: Arch Smart`, 69 KB com referências a `/_next/`.
+> O apex `arqsmart.com.br` redireciona para o www (`308`).
+>
+> ⚠️ **Chegar aqui exigiu recriar o projeto na Vercel, e o motivo vale
+> registrar.** O primeiro projeto tinha tudo aparentemente certo — Root
+> Directory `ArchSmart-web`, Framework Preset `Next.js`, domínio atribuído a um
+> deployment `Ready` — e mesmo assim **todo build produzia zero arquivos**:
+>
+> ```
+> Running "vercel build"
+> Vercel CLI 59.3.0
+>                        <- o log terminava aqui. Duração: 2–3 s.
+> ```
+>
+> Sem `npm install`, sem `next build`, sem "Build Completed". Um build real
+> desse projeto leva 41–45 s. Não adiantou desligar *Skip deployments*, nem
+> redeployar sem cache, nem reatribuir o domínio. **Recriar o projeto
+> resolveu.**
+>
+> Como diagnosticar isso rápido da próxima vez: **teste a URL própria do
+> deployment**, não só o domínio custom. Se `https://<projeto>-<hash>-<time>.vercel.app`
+> também dá 404, o problema é o build, não o domínio — e nenhuma quantidade de
+> mexida em DNS ou alias vai resolver. Aqui isso custou várias horas
+> investigando domínio à toa.
+>
+> Vale distinguir os dois erros da Vercel: **`NOT_FOUND`** é domínio ligado
+> servindo um deployment vazio; **`DEPLOYMENT_NOT_FOUND`** é não existir
+> deployment nenhum para aquele hostname — é o que uma branch sem push desde a
+> criação do projeto devolve.
 
 1. No painel da Vercel, abrir o projeto do frontend (`arqsmart`).
 2. Em **Settings → Git** do projeto (o rótulo exato pode variar conforme a
@@ -170,14 +195,22 @@ serviço novo, só habilitar uma opção existente no projeto do frontend.
    **Produção continua saindo de `main`** com o `NEXT_PUBLIC_API_URL` de
    produção já configurado hoje (escopo Production) — este passo não altera
    isso.
-4. Abrir um PR contra `staging` para confirmar que o preview é gerado e
-   registrar a URL aqui quando existir (o formato muda a cada deploy —
-   `https://<projeto>-git-<branch>-<time>.vercel.app` é o padrão da Vercel,
-   mas o valor exato só existe depois do primeiro preview):
+4. **Confirmado em 30/08/2026.** Todo push para `staging` e `develop` gera
+   preview, e cada branch ganha uma URL estável além da URL por deploy:
 
    ```
-   URL de preview (exemplo do primeiro PR contra staging): (a preencher)
+   staging:  https://arqsmart-git-staging-arqsmart.vercel.app
+   develop:  https://arqsmart-git-develop-arqsmart.vercel.app
+   por deploy: https://arqsmart-<hash>-arqsmart.vercel.app   (muda a cada build)
    ```
+
+   > As URLs de preview respondem **`302` para `vercel.com/sso-api`**, não
+   > `200`: a **Deployment Protection** da Vercel está ligada e exige login
+   > para visualizar. Isso é esperado e não é falha — mas quer dizer que um
+   > `curl` cru contra um preview nunca vai devolver `200`. Para verificar que
+   > o preview existe, o que importa é o `302` do SSO (deployment existe e está
+   > protegido) em contraste com `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`
+   > (deployment não existe).
 
 ## 3. Projeto Supabase de staging
 
