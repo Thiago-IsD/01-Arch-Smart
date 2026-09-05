@@ -148,6 +148,8 @@ JA_CONVERTIDOS: list[str] = [
     # Tarefa 11
     "app/api/endpoints/projects.py",
     "app/api/routers/environments_router.py",
+    # Tarefa 12
+    "app/api/routers/budgets_router.py",
 ]
 
 
