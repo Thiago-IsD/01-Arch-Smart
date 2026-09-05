@@ -223,9 +223,9 @@ def test_endpoint_get_project_budget_nao_cresce_com_o_numero_de_itens(
     de cache, e nada neste teste toca `budget.items`/`item.environment`
     antes da serializacao (é exatamente essa leitura, dentro do proprio
     FastAPI, que o teste mede). Expirar aqui so importaria o bug do round
-    anterior: os dependency overrides de `get_current_user`/`get_context`
-    devolvem `conta_a`/`usuario` prontos, sem query — expira-los mediria o
-    fixture, nao o endpoint.
+    anterior: o dependency override de `get_context` devolve `conta_a`/
+    `usuario` prontos, sem query — expira-lo mediria o fixture, nao o
+    endpoint.
     """
     conta = conta_a[0]
 

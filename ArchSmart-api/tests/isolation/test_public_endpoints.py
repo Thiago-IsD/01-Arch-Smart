@@ -29,8 +29,9 @@ def test_seed_captured_nao_existe_mais(client_anon, db):
 def test_normalize_exige_autenticacao(client_anon):
     """
     O status certo aqui e 422, nao 401: o FastAPI rejeita a requisicao por
-    falta do header `authorization` antes mesmo do Depends(get_current_user)
-    rodar. Afirmar so o status deixaria passar despercebida uma mudanca que
+    falta do header `authorization` antes mesmo do Depends(get_repo) (que
+    resolve `get_context`) rodar. Afirmar so o status deixaria passar
+    despercebida uma mudanca que
     trocasse o motivo do 422 (por exemplo, um schema de corpo alterado) sem
     que a autenticacao continuasse exigida — por isso o teste tambem checa
     que o corpo do erro aponta para o header ausente.

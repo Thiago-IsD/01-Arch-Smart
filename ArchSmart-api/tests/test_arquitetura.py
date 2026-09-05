@@ -158,6 +158,13 @@ JA_CONVERTIDOS: list[str] = [
     "app/api/endpoints/dashboard.py",
     "app/api/endpoints/notifications.py",
     "app/services/financial_service.py",
+    # Tarefa 15 — users.py, auth.py, leads.py e product_router.py NAO entram:
+    # todos guardam excecao documentada de catalogo global ou de pre-sessao
+    # (ver os comentarios em cada arquivo). Diferente dos quatro, account.py
+    # nao precisou de nenhuma: a unica tabela sem account_id que ele toca
+    # (accounts) e alcancada por `db.get` (busca por chave primaria, nao
+    # filtro manual), entao o arquivo fica com zero "db.query(" de verdade.
+    "app/api/account.py",
 ]
 
 

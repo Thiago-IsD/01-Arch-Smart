@@ -87,7 +87,6 @@ from app.db.base_class import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.all_models import Account, Client, Project, User  # noqa: E402
-from app.api.users import get_current_user  # noqa: E402
 from app.core.security import RequestContext, get_context  # noqa: E402
 from app.services.entitlements import entitlements_da_conta  # noqa: E402
 
@@ -201,7 +200,6 @@ def conta_b(db: Session) -> tuple[Account, User]:
 def _cliente(db: Session, usuario: User | None) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_db] = lambda: db
     if usuario is not None:
-        app.dependency_overrides[get_current_user] = lambda: usuario
         app.dependency_overrides[get_context] = lambda: _contexto_de(db, usuario)
     with TestClient(app) as c:
         yield c

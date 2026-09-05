@@ -11,7 +11,6 @@ import uuid
 import pytest
 from sqlalchemy.orm import Session
 
-from app.api.users import get_current_user
 from app.core.security import RequestContext, get_context, resolve_identity_por_claims
 from app.main import app
 from app.models.all_models import Account, Plan, Subscription, SubscriptionStatus, User
@@ -107,10 +106,9 @@ def test_get_context_devolve_401_para_token_que_nao_resolve(
     """
     O headline da Tarefa 2, exercitado pelo `get_context` de verdade — nao
     pela sobreposicao de dependencia que os outros testes usam. Toda fixture
-    de cliente sobrepoe `get_current_user` (e `get_context`, que nem chega a
-    ser resolvido pelo FastAPI porque `get_current_user` o chama direto no
-    corpo), entao nenhum teste ate aqui provava o 401 de um token que nao
-    aponta para ninguem passando pelo caminho de verdade.
+    de cliente sobrepoe `get_context`, entao nenhum teste ate aqui provava o
+    401 de um token que nao aponta para ninguem passando pelo caminho de
+    verdade.
 
     `SUPABASE_JWT_SECRET` e forcado a None para a validacao local falhar sem
     rede. A validacao remota e stubada para TER SUCESSO — e essa e a parte
@@ -139,7 +137,7 @@ def test_get_context_devolve_401_para_token_que_nao_resolve(
     monkeypatch.setattr(auth_service, "get_user", _resolve_para_ninguem)
 
     sobrepostos = {}
-    for dependencia in (get_context, get_current_user):
+    for dependencia in (get_context,):
         if dependencia in app.dependency_overrides:
             sobrepostos[dependencia] = app.dependency_overrides.pop(dependencia)
 

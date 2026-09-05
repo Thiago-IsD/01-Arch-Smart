@@ -3,10 +3,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.errors import ValidacaoDeDominio
+from app.db.repository import ScopedRepository, get_repo
 from app.db.session import get_db
 from app.models.all_models import User, Account
 from app.schemas.user import ChangePasswordRequest, UserLogin, UserSignup, MagicLinkRequest, RecoverRequest, CompleteRegisterRequest
-from app.api.users import get_current_user
 from app.services.auth_service import auth_service
 
 router = APIRouter()
@@ -65,11 +65,13 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         supabase_id = user_data["id"]
         email = user_data.get("email")
         
-        # Check if user already exists in our database
+        # Cadastro: acontece ANTES de existir sessao, entao nao ha RequestContext
+        # nem repositorio. A protecao aqui e a do Supabase Auth, nao a do escopo
+        # por conta.
         existing_user = db.query(User).filter(User.supabase_id == supabase_id).first()
-        
+
         if not existing_user and email:
-            # Also check by email (for migration cases)
+            # Mesma excecao de pre-sessao da linha acima.
             existing_user = db.query(User).filter(User.email == email).first()
             if existing_user:
                 # Link supabase_id
@@ -195,13 +197,14 @@ async def signup(payload: UserSignup, db: Session = Depends(get_db)):
 @router.post("/change-password")
 async def change_password(
     password_data: ChangePasswordRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Change current user's password.
     Verifies old password by attempting a silent login.
     """
+    current_user = repo.obter(User, repo.ctx.user_id)
+
     # 1. Verify old password
     try:
         await auth_service.sign_in_with_password(
@@ -215,7 +218,7 @@ async def change_password(
     try:
         # Strategy: Use Service Role (Admin) to force update
         # We already verified the user knows the old password above.
-        
+
         await auth_service.admin_update_user(
             user_id=str(current_user.supabase_id),
             attributes={"password": password_data.new_password}
