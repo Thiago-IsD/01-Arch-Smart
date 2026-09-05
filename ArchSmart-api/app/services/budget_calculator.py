@@ -8,6 +8,14 @@ o dado e `carregar_orcamento`, em 2 queries, uma vez.
 
 Pureza aqui nao e estetica: e o que permite testar a regra de negocio em
 memoria, sem Postgres. Ver tests/services/test_calculo_de_quantidade.py.
+
+As 2 queries de `carregar_orcamento` sao o custo do CALCULO, nao do
+endpoint inteiro: `GET /projects/{id}/budget` tambem paga Project + Budget,
+e a serializacao de `BudgetResponse.items` tem seu proprio N+1 se ninguem
+cuidar (medido: 18 e 68 queries para 5 e 30 itens, antes do fix).
+`popular_relacionamento_de_itens` fecha essa segunda metade — ver
+docs/dev/modulos/budget_calculator.md, secao "O N+1 que sobrava depois de
+carregar_orcamento", e tests/api/test_orcamento_sem_n_mais_um.py.
 """
 from __future__ import annotations
 
@@ -17,8 +25,10 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Query, joinedload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.models.all_models import (
+    Budget,
     BudgetItem,
     EnvironmentDNA,
     ItemOption,
@@ -70,10 +80,16 @@ def calculate_quantity(
         rendimento = 1.0
 
     if dna is None:
-        # Ambiente sem DNA ainda: area 0, e nao ha alerta de rendimento a dar
-        # sobre um calculo que nao aconteceu.
+        # Ambiente sem DNA ainda: area e quantidade zeram, mas o alerta de
+        # rendimento e sobre o PRODUTO (cadastro sem yield_factor valido),
+        # nao sobre o ambiente — falta de DNA nao apaga um alerta que ja era
+        # verdadeiro. Comportamento da funcao anterior
+        # (`calculate_budget_item_quantity`), preservado aqui — ver
+        # test_sem_dna_e_rendimento_invalido_alerta_mesmo_assim.
         return Quantidade(
-            base_area=0.0, calculated_quantity=0, has_yield_alert=False
+            base_area=0.0,
+            calculated_quantity=0,
+            has_yield_alert=alerta_de_rendimento,
         )
 
     base_area = _area_da_regra(item.rule_type, dna)
@@ -105,23 +121,34 @@ def carregar_orcamento(
     """
     Duas queries, sempre — independente do numero de itens.
 
-    1. os itens com `options` e `options.product` ja carregados num unico
-       JOIN (`joinedload` nos dois niveis). A `Query` legada do SQLAlchemy
-       agrupa as linhas duplicadas do JOIN de volta em objetos `BudgetItem`
-       unicos pela identity map — testado por
+    1. os itens com `options`, `options.product` e `environment` ja
+       carregados num unico JOIN (`joinedload` nos tres). A `Query` legada
+       do SQLAlchemy agrupa as linhas duplicadas do JOIN de volta em objetos
+       `BudgetItem` unicos pela identity map — testado por
        `test_montar_o_orcamento_nao_cresce_com_o_numero_de_itens`, que conta
        `len(itens) == 30` sem duplicata. Um `selectinload` encadeado em dois
        niveis (`options` -> `options.product`) parecia mais direto, mas mede
        **3** SELECTs (itens, depois options, depois products) em vez de 1 —
-       cada nivel de `selectinload` e um round-trip proprio;
+       cada nivel de `selectinload` e um round-trip proprio. `environment` e
+       many-to-one (um por item, nao uma colecao) — junta-lo na mesma query
+       nao multiplica linha nenhuma alem do que `options` ja multiplica;
     2. os `EnvironmentDNA` dos ambientes envolvidos, em dicionario.
+
+    `environment` entrou aqui por uma dor medida, nao por simetria: sem ele,
+    `BudgetItemResponse.environment` (campo que toda resposta de item de
+    orcamento serializa) lazy-carrega um `Environment` POR ITEM na
+    serializacao — um N+1 que `calculate_quantity`/`carregar_orcamento`
+    nunca tocavam porque vivem fora do caminho de serializacao. Ver
+    `popular_relacionamento_de_itens` abaixo para a outra metade do mesmo
+    problema (`Budget.items`).
 
     `itens` e uma Query JA FILTRADA por conta por quem chamou — tipicamente
     `repo.query(BudgetItem).filter(BudgetItem.budget_id == ...)`.
     """
     carregados: list[BudgetItem] = (
         itens.options(
-            joinedload(BudgetItem.options).joinedload(ItemOption.product)
+            joinedload(BudgetItem.environment),
+            joinedload(BudgetItem.options).joinedload(ItemOption.product),
         ).all()
     )
     ids_de_ambiente = {i.environment_id for i in carregados if i.environment_id}
@@ -146,3 +173,29 @@ def produto_selecionado(item: BudgetItem) -> Optional[Product]:
     """
     escolhida = next((o for o in item.options if o.is_selected), None)
     return escolhida.product if escolhida else None
+
+
+def popular_relacionamento_de_itens(orcamento: Budget, itens: list[BudgetItem]) -> None:
+    """
+    Preenche `Budget.items` com os itens que `carregar_orcamento` ja
+    carregou — sem query extra, e sem marcar a colecao como suja.
+
+    `Budget.items` (`app/models/all_models.py:317`) e um relationship lazy
+    comum. `GET /projects/{id}/budget` devolve `BudgetResponse`, cujo campo
+    `items: List[BudgetItemResponse]` faz o Pydantic ler `budget.items` na
+    serializacao — se ninguem povoar essa colecao antes, ela dispara sua
+    PRÓPRIA query (redundante com a de `carregar_orcamento`, que ja tem os
+    mesmos itens, com `environment`/`options`/`options.product` inclusos).
+    Medido: sem isto, o endpoint sai de O(1) para O(n) (item de verdade nao
+    era so a query da colecao — cada item ainda lazy-carregaria seu proprio
+    `environment` na ausencia do `joinedload` que `carregar_orcamento` agora
+    faz).
+
+    Usa `sqlalchemy.orm.attributes.set_committed_value` — a forma
+    documentada de popular um relationship por fora do atributo
+    instrumentado. **Nao** faca `orcamento.items = itens`: isso passa pelo
+    setter instrumentado, marca a colecao como "dirty" e arrisca reordenar
+    escritas no proximo `commit()` — o efeito colateral que este helper
+    existe para evitar.
+    """
+    set_committed_value(orcamento, "items", itens)

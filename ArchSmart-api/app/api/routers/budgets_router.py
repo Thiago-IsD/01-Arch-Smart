@@ -15,6 +15,7 @@ from app.api.users import get_current_user
 from app.services.budget_calculator import (
     calculate_quantity,
     carregar_orcamento,
+    popular_relacionamento_de_itens,
     produto_selecionado,
 )
 
@@ -113,6 +114,11 @@ def get_project_budget(
             real_total += price * qty
 
     budget.total_value = real_total
+    # Sem isto, BudgetResponse.items dispara sua PROPRIA leitura de
+    # budget.items na serializacao — uma query redundante com a que acabou
+    # de carregar `itens` acima, e sem o joinedload de environment/options
+    # que carregar_orcamento ja pagou (ver popular_relacionamento_de_itens).
+    popular_relacionamento_de_itens(budget, itens)
 
     return budget
 

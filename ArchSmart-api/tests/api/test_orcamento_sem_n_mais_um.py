@@ -1,7 +1,18 @@
 """
 O orcamento inteiro sem N+1 — medido, nao estimado.
 
-Duas asserções, dois papeis:
+Dois testes:
+
+- `test_montar_o_orcamento_nao_cresce_com_o_numero_de_itens` mede
+  `carregar_orcamento` + `calculate_quantity` isolados, sem HTTP.
+- `test_endpoint_get_project_budget_nao_cresce_com_o_numero_de_itens` mede o
+  round trip HTTP inteiro de `GET /projects/{id}/budget`. Os dois numeros
+  NAO sao o mesmo: o segundo descobriu, na primeira medicao, um N+1
+  separado (`Budget.items` e `item.environment`, fora do que
+  `carregar_orcamento` carrega) que o primeiro teste nunca poderia pegar —
+  ver o docstring desse teste para os numeros antes/depois do fix.
+
+Cada teste faz duas asserções, dois papeis:
 
 - A CONSTANCIA (o numero de queries e o mesmo em 5 e em 30 itens) e a
   garantia de verdade: e o que "sem N+1" significa. Um algoritmo O(n) jamais
@@ -61,7 +72,9 @@ class ContadorDeQueries:
         return len(self.sqls)
 
 
-def _montar_orcamento(db: Session, conta: Account, numero_de_itens: int) -> UUID:
+def _montar_orcamento(
+    db: Session, conta: Account, numero_de_itens: int
+) -> tuple[UUID, UUID]:
     """
     Orcamento com `numero_de_itens` itens, cada um com 3 opcoes de produto
     (uma selecionada). Tres opcoes por item — nao uma — e o caso que
@@ -69,9 +82,9 @@ def _montar_orcamento(db: Session, conta: Account, numero_de_itens: int) -> UUID
     fosse agrupado de volta pela identity map da `Query` legada,
     `len(itens)` sairia maior que `numero_de_itens`.
 
-    Devolve o `id` do orcamento, ja como UUID puro — nao o objeto ORM — para
-    quem chama poder filtrar por ele sem tocar um atributo que `expire_all()`
-    expirou.
+    Devolve `(project_id, budget_id)`, os dois ja como UUID puro — nao o
+    objeto ORM — para quem chama poder filtrar por eles sem tocar um
+    atributo que `expire_all()` expirou.
     """
     cliente = Client(account_id=conta.id, name="Cliente")
     db.add(cliente)
@@ -115,7 +128,7 @@ def _montar_orcamento(db: Session, conta: Account, numero_de_itens: int) -> UUID
                 )
             )
     db.flush()
-    return orcamento.id
+    return projeto.id, orcamento.id
 
 
 def _carregar_e_contar(db: Session, budget_id: UUID) -> tuple[int, int, list[str]]:
@@ -147,12 +160,12 @@ def _carregar_e_contar(db: Session, budget_id: UUID) -> tuple[int, int, list[str
 def test_montar_o_orcamento_nao_cresce_com_o_numero_de_itens(db: Session, conta_a):
     conta = conta_a[0]
 
-    budget_id_pequeno = _montar_orcamento(db, conta, 5)
+    _, budget_id_pequeno = _montar_orcamento(db, conta, 5)
     n_itens_pequeno, n_queries_pequeno, sqls_pequeno = _carregar_e_contar(
         db, budget_id_pequeno
     )
 
-    budget_id_grande = _montar_orcamento(db, conta, 30)
+    _, budget_id_grande = _montar_orcamento(db, conta, 30)
     n_itens_grande, n_queries_grande, sqls_grande = _carregar_e_contar(
         db, budget_id_grande
     )
@@ -178,4 +191,74 @@ def test_montar_o_orcamento_nao_cresce_com_o_numero_de_itens(db: Session, conta_
     assert n_queries_grande <= 3, (
         f"esperava no maximo 3 queries (arvore + DNAs, com 1 de folga), saiu "
         f"{n_queries_grande}:\n" + "\n".join(sqls_grande)
+    )
+
+
+def test_endpoint_get_project_budget_nao_cresce_com_o_numero_de_itens(
+    client_a, db: Session, conta_a
+):
+    """
+    A chamada HTTP inteira de `GET /projects/{id}/budget` — nao so
+    `carregar_orcamento` isolado. `BudgetResponse.items` faz o Pydantic ler
+    `Budget.items` na serializacao, e cada `BudgetItemResponse` le
+    `item.environment`: sem cuidado nenhum, essas sao DUAS fontes de N+1 que
+    `carregar_orcamento`/`calculate_quantity` nunca tocavam, porque vivem
+    fora do caminho que elas carregam.
+
+    **Medido antes de qualquer fix aqui:** 5 itens custavam **18** queries;
+    30 itens custavam **68** — nao O(1), um N+1 de verdade, maior do que uma
+    "query a mais" (`budget.items` refeita do zero, MAIS `item.environment`
+    lazy por item, ja que `carregar_orcamento` so fazia `joinedload` de
+    `options`/`options.product`). Corrigido em duas partes, ambas em
+    `app/services/budget_calculator.py`: `carregar_orcamento` passou a
+    `joinedload(BudgetItem.environment)` tambem (mesma query, mais um JOIN,
+    sem multiplicar linha — `environment` e many-to-one); e
+    `popular_relacionamento_de_itens` poe os itens ja carregados direto em
+    `Budget.items` via `set_committed_value`, para a serializacao nao
+    refazer a consulta. **Medido depois:** 4 e 4 — genuinamente O(1).
+
+    Sem `db.expire_all()` aqui, ao contrario de `_carregar_e_contar`: todo
+    `.query(...).first()`/`.all()` deste endpoint emite SQL de qualquer
+    jeito, expirado ou nao — so leitura de atributo lazy depende de estado
+    de cache, e nada neste teste toca `budget.items`/`item.environment`
+    antes da serializacao (é exatamente essa leitura, dentro do proprio
+    FastAPI, que o teste mede). Expirar aqui so importaria o bug do round
+    anterior: os dependency overrides de `get_current_user`/`get_context`
+    devolvem `conta_a`/`usuario` prontos, sem query — expira-los mediria o
+    fixture, nao o endpoint.
+    """
+    conta = conta_a[0]
+
+    project_id_pequeno, _ = _montar_orcamento(db, conta, 5)
+    with ContadorDeQueries(db.connection()) as contador_pequeno:
+        resposta_pequena = client_a.get(f"/api/projects/{project_id_pequeno}/budget")
+    assert resposta_pequena.status_code == 200
+    assert len(resposta_pequena.json()["items"]) == 5
+
+    project_id_grande, _ = _montar_orcamento(db, conta, 30)
+    with ContadorDeQueries(db.connection()) as contador_grande:
+        resposta_grande = client_a.get(f"/api/projects/{project_id_grande}/budget")
+    assert resposta_grande.status_code == 200
+    assert len(resposta_grande.json()["items"]) == 30
+
+    n_pequeno, n_grande = len(contador_pequeno), len(contador_grande)
+
+    # A GARANTIA, a mesma logica do teste acima: constante entre 5 e 30
+    # itens, nao um numero fixo.
+    assert n_pequeno == n_grande, (
+        "o numero de queries do endpoint cresceu com o numero de itens — "
+        "isso E o N+1:\n"
+        f"  5 itens:  {n_pequeno} queries\n"
+        + "\n".join(f"    {sql}" for sql in contador_pequeno.sqls)
+        + f"\n  30 itens: {n_grande} queries\n"
+        + "\n".join(f"    {sql}" for sql in contador_grande.sqls)
+    )
+
+    # O TETO: pina o custo medido de hoje do round trip HTTP completo —
+    # Project (1) + Budget (1) + as 2 de carregar_orcamento = 4 — com 1 de
+    # folga. Ver docs/dev/modulos/budget_calculator.md para o raciocinio
+    # completo (inclui o N+1 medido ANTES do fix: 18 e 68 queries).
+    assert n_grande <= 5, (
+        f"esperava no maximo 5 queries no round trip HTTP completo, saiu "
+        f"{n_grande}:\n" + "\n".join(contador_grande.sqls)
     )

@@ -62,6 +62,27 @@ def test_sem_dna_a_quantidade_e_zero():
     assert r == Quantidade(base_area=0.0, calculated_quantity=0, has_yield_alert=False)
 
 
+@pytest.mark.parametrize("rendimento", [None, 0.0, -3.0])
+def test_sem_dna_e_rendimento_invalido_alerta_mesmo_assim(rendimento):
+    """
+    Duas ausencias ao mesmo tempo: nem DNA, nem rendimento valido. O alerta
+    de rendimento e sobre o PRODUTO (algo errado no cadastro), nao sobre o
+    ambiente — faltar DNA zera area e quantidade, mas nao apaga um alerta
+    que ja era verdadeiro antes de se descobrir que faltava DNA.
+
+    A versao anterior (`calculate_budget_item_quantity`) preservava esse
+    alerta nesse caso; a reescrita da Tarefa 8 zerava ele por engano — este
+    teste existe para essa combinacao especifica nao regredir de novo.
+    """
+    r = calculate_quantity(_item(), None, _produto(rendimento))
+    assert r == Quantidade(base_area=0.0, calculated_quantity=0, has_yield_alert=True)
+
+
+def test_sem_dna_e_sem_produto_alerta_mesmo_assim():
+    r = calculate_quantity(_item(), None, None)
+    assert r == Quantidade(base_area=0.0, calculated_quantity=0, has_yield_alert=True)
+
+
 def test_sem_produto_e_alerta_com_rendimento_um():
     r = calculate_quantity(_item(), _dna(piso=5.0), None)
     assert r.has_yield_alert is True
