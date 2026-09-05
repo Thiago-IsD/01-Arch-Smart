@@ -102,54 +102,26 @@ Fluxo de ponta a ponta, hoje:
    `ScopedRepository`/`RequestContext` (`app/api/v1/routes/` também não
    existe ainda; as rotas de hoje vivem sob `/api/...`, sem versionamento).
 
-### Advertência: pendência de segurança conhecida em `app/api/users.py`
+### Resolvido em 05/09/2026: o auto-link por e-mail em `app/api/users.py`
 
-Antes de mexer em autenticação, leia esta seção inteira. Não é alarmismo —
-é o comportamento real do código hoje, com linha exata.
+Ate a Secao 4, `get_current_user` procurava usuario pelo **e-mail** do token
+quando o `supabase_id` nao batia com nada, e gravava o `supabase_id` do
+portador naquela linha — entregando a conta a quem tivesse um token do
+Supabase com aquele e-mail no payload. A mesma funcao tambem **criava** conta
+e usuario novos quando nada batia.
 
-Dentro de `get_current_user` (`ArchSmart-api/app/api/users.py`, função que
-resolve a identidade em toda a API), quando **nenhum** usuário tem o
-`supabase_id` do token:
+O risco real dependia da opcao *Authentication → Providers → Email → "Confirm
+email"* do painel do Supabase, verificada ligada por Thiago em 24/08/2026 — ou
+seja, a protecao morava fora do repositorio.
 
-```python
-# If not found and we have email, try to find by email (Legacy/Migration)
-if email:
-    user = db.query(User).filter(User.email == email).first()
-    if user:
-        # Auto-link: Update supabase_id for this user
-        print(f"[WARN] User found by email, linking supabase_id")
-        user.supabase_id = supabase_id
-        db.commit()
-        db.refresh(user)
-        return user
-```
+**A Tarefa 2 da Secao 4 removeu os dois caminhos.** A resolucao de identidade
+vive em `app/core/security.py` e decide **so** pelo `supabase_id`; token que
+nao aponta para usuario existente e `401`. Provisionamento continua tendo rota
+propria (`POST /api/auth/signup`, `POST /api/auth/complete-register`).
 
-O código busca um usuário pelo **e-mail** do token e, se encontrar, grava o
-`supabase_id` do portador do token naquela linha — entregando a conta a quem
-quer que tenha um token do Supabase com aquele e-mail no payload.
-
-**A extensão do risco foi medida.** Ela dependia de uma configuração do projeto
-Supabase que só o dono do projeto pode checar: *Authentication → Providers →
-Email → "Confirm email"*. Thiago verificou no painel em **24/08/2026**: a opção
-está **ligada**. Consequência: quem apenas conhece o e-mail da vítima **não**
-consegue emitir um token com aquele e-mail sem antes provar posse da caixa, e
-o caminho deixa de ser explorável por esse vetor.
-
-Isso muda a **urgência**, não o achado. O código continua errado: ele trata o
-e-mail como se fosse identidade verificada, e a proteção que hoje o salva mora
-num painel externo, fora do repositório e fora do controle de versão — alguém
-desligar aquela opção reabre a falha sem nenhum sinal aqui. A correção tem caixa
-própria na **Seção 4** do [`PROGRESS.md`](../../PROGRESS.md) — *"Fim do
-auto-link por e-mail em `app/api/users.py`"* —, junto com o `RequestContext`.
-
-A mesma função, um pouco abaixo, também **cria** usuário e conta novos do
-zero quando nem `supabase_id` nem e-mail batem com nada — outro caminho que
-se apoia na mesma configuração de painel para ter o efeito esperado.
-
-Quem for tocar em `app/api/users.py` por qualquer outro
-motivo precisa saber que este comportamento existe **antes** de editar o
-arquivo, para não o esconder dentro de uma mudança não relacionada nem
-assumir que o arquivo já está seguro.
+A regressao esta coberta por
+`ArchSmart-api/tests/api/test_identidade.py::test_nao_vincula_conta_alheia_por_email`
+e `::test_nao_cria_conta_sozinho`.
 
 ## Onde mora a regra de negócio
 
