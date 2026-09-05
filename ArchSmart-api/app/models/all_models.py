@@ -66,6 +66,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     supabase_id = Column(String, unique=True, index=True, nullable=True)  # Link to Supabase Auth
@@ -77,7 +78,9 @@ class User(Base):
 
     # Relationships
     account = relationship("Account", back_populates="users")
-    admin_logs = relationship("AdminLog", back_populates="user")
+    admin_logs = relationship(
+        "AdminLog", back_populates="user", foreign_keys="AdminLog.user_id"
+    )
 
 # VerificationToken removed
 
@@ -85,6 +88,7 @@ class Lead(Base):
     __tablename__ = "leads"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True) # 0..1 to 1
     name = Column(String)
     email = Column(String)
@@ -101,6 +105,7 @@ class LegalAcceptance(Base):
     __tablename__ = "legal_acceptances"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True)
     lead_id = Column(UUID(as_uuid=True), ForeignKey("leads.id"), nullable=True)
     document_version = Column(String, nullable=False)
@@ -126,6 +131,7 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=False)
     status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.BETA, nullable=False)
@@ -141,6 +147,7 @@ class ProjectSlot(Base):
     __tablename__ = "project_slots"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
 
@@ -174,6 +181,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     origin_id = Column(UUID(as_uuid=True), ForeignKey("product_origins.id"), nullable=True)
     state_id = Column(UUID(as_uuid=True), ForeignKey("product_states.id"), nullable=True)
@@ -202,6 +210,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
     name = Column(String, nullable=False)
@@ -230,6 +239,7 @@ class Client(Base):
     __tablename__ = "clients"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     name = Column(String, nullable=False)
     email = Column(String)
@@ -243,6 +253,7 @@ class Environment(Base):
     __tablename__ = "environments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
     type = Column(String, nullable=True) # Ex: Interna/Seca
@@ -258,6 +269,7 @@ class EnvironmentDNA(Base):
     __tablename__ = "environment_dnas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=False, unique=True)
     floor_area = Column(Float, default=0.0)
     wall_area = Column(Float, default=0.0)
@@ -273,6 +285,7 @@ class Budget(Base):
     __tablename__ = "budgets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     total_value = Column(Float)
 
@@ -284,6 +297,7 @@ class BudgetItem(Base):
     __tablename__ = "budget_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     budget_id = Column(UUID(as_uuid=True), ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=True)
     rule_type = Column(Enum(RuleType), nullable=False)
@@ -299,6 +313,7 @@ class ItemOption(Base):
     __tablename__ = "item_options"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     is_selected = Column(Boolean, default=True)
@@ -321,6 +336,7 @@ class Presentation(Base):
     __tablename__ = "presentations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
@@ -340,6 +356,7 @@ class PresentationEnvironment(Base):
     __tablename__ = "presentation_environments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id"), nullable=False)
     is_visible = Column(Boolean, default=True)
@@ -357,6 +374,7 @@ class PresentationAcceptance(Base):
     __tablename__ = "presentation_acceptances"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     accepted = Column(Boolean, default=False)
     feedback = Column(Text, nullable=True)
@@ -371,6 +389,7 @@ class PresentationComment(Base):
     __tablename__ = "presentation_comments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     author_type = Column(String, nullable=False) # 'CLIENT' | 'ARCHITECT'
     text = Column(Text, nullable=False)
@@ -385,6 +404,7 @@ class FinancialEntry(Base):
     __tablename__ = "financial_entries"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     description = Column(String)
@@ -406,6 +426,7 @@ class Event(Base):
     __tablename__ = "events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     title = Column(String, nullable=False)
@@ -426,18 +447,20 @@ class AdminLog(Base):
     __tablename__ = "admin_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     action = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", back_populates="admin_logs")
+    user = relationship("User", back_populates="admin_logs", foreign_keys=[user_id])
     account = relationship("Account", back_populates="admin_logs")
 
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
