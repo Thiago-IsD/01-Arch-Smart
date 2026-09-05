@@ -7,10 +7,27 @@
 A spec da reestruturação (23/08/2026) pede `GET /api/v1/me` com `user`,
 `account` e `entitlements`.
 
-Medido em 05/09/2026: **não existe prefixo `/api/v1` na aplicação.** As 62
-rotas de aplicação estão em `/api` e 7 em `/public`
-(`grep -n "include_router" ArchSmart-api/app/main.py`). O perfil já é
-servido por `GET /api/users/me`, chamado pelo front em três lugares:
+Medido em 05/09/2026: **não existe prefixo `/api/v1` na aplicação.**
+`grep -n "include_router" ArchSmart-api/app/main.py` lista as 14 chamadas
+que registram rotas, e nenhuma delas usa `/api/v1` — todas ficam em `/api`
+(inclusive `/api/<algo>`) ou em `/public`. Para contar as rotas em si, e não
+as chamadas que as registram:
+
+```
+./venv/Scripts/python.exe -c "
+import os
+for k,v in {'DATABASE_URL':'postgresql://a:a@localhost:55432/arqsmart_test','SUPABASE_URL':'https://x.invalido.supabase.co','SUPABASE_KEY':'x','SUPABASE_SERVICE_ROLE_KEY':'x','GEMINI_API_KEY':'x'}.items(): os.environ.setdefault(k,v)
+from collections import Counter
+from app.main import app
+c = Counter(r.path.split('/')[1] for r in app.routes if hasattr(r, 'methods'))
+print(c)
+"
+```
+
+roda de dentro de `ArchSmart-api` e devolve
+`Counter({'api': 62, 'public': 7, 'docs': 2, 'health': 2, 'openapi.json': 1, 'redoc': 1, '': 1})`:
+**62 rotas de aplicação em `/api` e 7 em `/public`.** O perfil já é servido
+por `GET /api/users/me`, chamado pelo front em três lugares:
 `src/app/(dashboard)/billing/page.tsx:71`,
 `src/app/(dashboard)/profile/page.tsx:75` e
 `src/hooks/use-user-profile.ts:43`.
