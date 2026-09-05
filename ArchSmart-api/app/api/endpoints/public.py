@@ -1,6 +1,30 @@
 """
 Endpoint público (sem autenticação) para o Portal do Cliente.
 GET /public/presentations/{uuid}
+
+Portal publico da apresentacao — o lado do CLIENTE FINAL.
+
+Este e o unico modulo de endpoint que NAO usa ScopedRepository, e nao e
+esquecimento. Quem chama aqui nao tem conta: e o cliente do arquiteto, que
+entrou com a senha da apresentacao e carrega um token de portal
+(app/core/portal_security.py). Nao existe `account_id` de sessao para filtrar.
+
+O escopo aqui e "esta apresentacao, e o que pende dela", e quem o autoriza e
+`verify_portal_token(token, presentation_id)`. Toda query desce a partir da
+apresentacao ja autorizada — nunca de um id que veio solto do cliente.
+
+Os 10 testes de tests/isolation/test_portal_access.py sao a prova disso, e os
+4 de tests/isolation/test_public_endpoints.py cobrem o rate limit.
+
+**Nao "conserte" isto trocando db.query por repo.query.** Nao ha repo. A
+tentativa levantaria EscopoImpossivel na primeira requisicao.
+
+Isto e permanente, nao transitorio. Diferente do db.query que
+budgets_router.py carregou entre as Tarefas 8 e 12 — que era divida a pagar —,
+aqui nao ha divida nenhuma: nao existe RequestContext para injetar, porque
+nao existe sessao de conta. A proxima tarefa de conversao (Tarefa 14 ou 15)
+NAO inclui este arquivo, e ele nunca entra em JA_CONVERTIDOS
+(tests/test_arquitetura.py) — um db.query aqui nunca e regressao.
 """
 import logging
 import uuid as uuid_module
