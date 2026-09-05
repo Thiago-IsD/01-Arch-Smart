@@ -87,14 +87,18 @@ Fluxo de ponta a ponta, hoje:
    chama `supabase.auth.getUser()` a cada requisição para decidir se
    redireciona para `/auth/login`. Essa chamada de rede ao Supabase é o que
    custa os ~83ms medidos em toda requisição feita por um usuário já logado.
-4. Na API, `Depends(get_current_user)` — definida em `ArchSmart-api/app/api/users.py`
-   — recebe o header, valida o JWT (localmente com `SUPABASE_JWT_SECRET`
-   quando presente; senão, com uma chamada de rede ao Supabase, mais lenta —
-   ver "Problema conhecido" no `ambiente.md`) e extrai `sub` (o
-   `supabase_id`) e o e-mail do payload.
-5. Busca a linha de `User` cujo `supabase_id` bate com o do token. Essa linha
-   já carrega o `account_id` — é dali, e só dali, que o resto do request
-   sabe de qual conta é o dado.
+4. Na API, `get_context` (`ArchSmart-api/app/core/security.py`) — dependência
+   de todo endpoint autenticado — recebe o header, valida o JWT (localmente
+   com `SUPABASE_JWT_SECRET` quando presente; senão, com uma chamada de rede
+   ao Supabase, mais lenta — ver "Problema conhecido" no `ambiente.md`) e
+   extrai `sub` (o `supabase_id`) do payload. `get_current_user`
+   (`ArchSmart-api/app/api/users.py`) é uma casca de compatibilidade sobre
+   `get_context`, usada pelos endpoints ainda não convertidos para
+   `RequestContext` — some na Tarefa 15.
+5. Busca a linha de `User` cujo `supabase_id` bate com o do token, **e só
+   pelo `supabase_id`**: o e-mail do payload nunca é critério de busca. Essa
+   linha já carrega o `account_id` — é dali, e só dali, que o resto do
+   request sabe de qual conta é o dado.
 6. Cada endpoint usa esse `account_id` para filtrar a query manualmente
    (`db.query(Model).filter(Model.account_id == current_user.account_id)`).
    Não existe hoje uma camada que torne esse filtro automático ou que
@@ -104,22 +108,32 @@ Fluxo de ponta a ponta, hoje:
 
 ### Resolvido em 05/09/2026: o auto-link por e-mail em `app/api/users.py`
 
-Ate a Secao 4, `get_current_user` procurava usuario pelo **e-mail** do token
-quando o `supabase_id` nao batia com nada, e gravava o `supabase_id` do
+Até a Seção 4, `get_current_user` procurava usuário pelo **e-mail** do token
+quando o `supabase_id` não batia com nada, e gravava o `supabase_id` do
 portador naquela linha — entregando a conta a quem tivesse um token do
-Supabase com aquele e-mail no payload. A mesma funcao tambem **criava** conta
-e usuario novos quando nada batia.
+Supabase com aquele e-mail no payload. A mesma função também **criava** conta
+e usuário novos quando nada batia.
 
-O risco real dependia da opcao *Authentication → Providers → Email → "Confirm
+O risco real dependia da opção *Authentication → Providers → Email → "Confirm
 email"* do painel do Supabase, verificada ligada por Thiago em 24/08/2026 — ou
-seja, a protecao morava fora do repositorio.
+seja, a proteção morava fora do repositório.
 
-**A Tarefa 2 da Secao 4 removeu os dois caminhos.** A resolucao de identidade
-vive em `app/core/security.py` e decide **so** pelo `supabase_id`; token que
-nao aponta para usuario existente e `401`. Provisionamento continua tendo rota
-propria (`POST /api/auth/signup`, `POST /api/auth/complete-register`).
+**A Tarefa 2 da Seção 4 removeu os dois caminhos do resolvedor de
+identidade** — o que cobre toda requisição autenticada. A resolução vive em
+`app/core/security.py` e decide **só** pelo `supabase_id`; token que não
+aponta para usuário existente é `401`. Provisionamento continua tendo rota
+própria (`POST /api/auth/signup`, `POST /api/auth/complete-register`).
 
-A regressao esta coberta por
+**O mesmo padrão continua vivo em `POST /api/auth/complete-register`**
+(`ArchSmart-api/app/api/auth.py:65-72`): quando o `supabase_id` não bate com
+nada, o endpoint busca por e-mail e, se achar, vincula o `supabase_id` do
+portador **e sobrescreve o `full_name`** da linha encontrada — guardado hoje
+só pela mesma configuração de painel citada acima. Isso é um item de
+segurança pendente, registrado aqui, não algo que esta tarefa fechou; o que
+fazer com o caminho legado de migração é decisão de Thiago, não de uma
+rodada de correção.
+
+A regressão do resolvedor de identidade está coberta por
 `ArchSmart-api/tests/api/test_identidade.py::test_nao_vincula_conta_alheia_por_email`
 e `::test_nao_cria_conta_sozinho`.
 
