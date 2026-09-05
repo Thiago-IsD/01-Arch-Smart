@@ -8,6 +8,7 @@ from app.core.security import get_context
 from app.db.session import get_db
 from app.models.all_models import User, Account, Subscription, Plan
 from app.schemas.user import UserProfileResponse, AccountInfo, UserProfileUpdate
+from app.services.entitlements import entitlements_da_conta
 
 
 router = APIRouter()
@@ -90,7 +91,8 @@ async def get_current_user_profile(
         email=current_user.email,
         avatar_url=None,  # TODO: Implement avatar storage
         role="admin" if account.is_active else "user",  # Simplified role logic
-        account=account_info
+        account=account_info,
+        entitlements=entitlements_da_conta(db, current_user.account_id)
     )
 
 
@@ -148,6 +150,7 @@ async def update_user_profile(
         email=current_user.email,
         avatar_url=None,
         role="admin" if account.is_active else "user",
-        account=account_info
+        account=account_info,
+        entitlements=entitlements_da_conta(db, current_user.account_id)
     )
 

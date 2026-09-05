@@ -46,3 +46,4 @@ O que passa a ser mais fácil e o que passa a ser mais difícil.
 - [0005 — Três branches: `develop`, `staging`, `main`](0005-tres-branches-develop-staging-main.md)
 - [0006 — Portões de CI graduais, com catraca de baseline](0006-portoes-de-ci-com-catraca.md)
 - [0007 — Migração roda no start do contêiner](0007-migracao-no-start-do-container.md)
+- [0008 — `entitlements` entra em `GET /api/users/me`, sem `/api/v1`](0008-me-em-api-users-me.md)
