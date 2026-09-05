@@ -103,6 +103,53 @@ def test_create_ignora_account_id_vindo_do_cliente(db, repo_a, conta_a, conta_b)
     assert cliente.account_id == conta_a[0].id
 
 
+def test_create_ignora_relacionamento_account_vindo_do_cliente(
+    db, repo_a, conta_a, conta_b
+):
+    """
+    O SQLAlchemy escreve a FK de um relacionamento many-to-one no flush,
+    DEPOIS do __init__ — entao passar `account=conta_alheia` (em vez do
+    literal `account_id`) sobrescreve o account_id que create() acabou de
+    injetar, silenciosamente. db.refresh() e obrigatorio: ler o atributo em
+    memoria, sem recarregar do banco, e o que deixava isso escondido.
+    """
+    cliente = repo_a.create(Client, name="Tentativa", account=conta_b[0])
+    db.flush()
+    db.refresh(cliente)
+
+    assert cliente.account_id == conta_a[0].id
+
+
+def test_create_ignora_created_by_vindo_do_cliente(db, repo_a, conta_a, conta_b):
+    """
+    Como account_id, created_by vindo do chamador tambem e ignorado: o unico
+    caminho ate essa coluna e o contexto (o usuario autenticado).
+    """
+    cliente = repo_a.create(
+        Client, name="Tentativa", created_by=conta_b[1].id
+    )
+    db.flush()
+
+    assert cliente.created_by == conta_a[1].id
+
+
+def test_create_em_model_sem_account_id_levanta_escopo_impossivel(repo_a):
+    with pytest.raises(EscopoImpossivel):
+        repo_a.create(Plan, name="Novo Plano")
+
+
+def test_remover_em_model_sem_account_id_levanta_escopo_impossivel(repo_a):
+    """
+    Erro de programacao (EscopoImpossivel), nao 404: nao ha conta nenhuma
+    para comparar, entao NotFound aqui seria um 404 fingindo ser o caso
+    normal de "recurso de outra conta".
+    """
+    plano = Plan(name="Catalogo")
+
+    with pytest.raises(EscopoImpossivel):
+        repo_a.remover(plano)
+
+
 def test_remover_recusa_recurso_alheio(db, repo_a, conta_b):
     alheio = _projeto(db, conta_b[0], "Alheio")
 
