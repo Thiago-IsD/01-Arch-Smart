@@ -4,8 +4,11 @@ Lints de arquitetura, escritos como teste porque o CI ja roda pytest.
 Cada regra aqui existe porque a violacao dela ja custou alguma coisa neste
 repositorio. Elas falham com o arquivo e a linha, nao com "algo esta errado".
 """
+import ast
 import os
 from pathlib import Path
+
+import app.models.all_models  # noqa: F401  (usado via vars() abaixo)
 
 RAIZ = Path(__file__).resolve().parents[1]
 
@@ -140,46 +143,102 @@ def test_nenhum_print_em_app():
     )
 
 
-# Arquivos ja convertidos para ScopedRepository. A lista SO CRESCE. Um
-# db.query() que volte a um arquivo daqui e uma regressao: o filtro por conta
-# volta a ser decisao de quem escreveu o endpoint, que e exatamente a classe de
-# falha que custou a Secao 1 inteira.
-JA_CONVERTIDOS: list[str] = [
-    # Tarefa 11
-    "app/api/endpoints/projects.py",
-    "app/api/routers/environments_router.py",
-    # Tarefa 12
-    "app/api/routers/budgets_router.py",
-    # Tarefa 13 — public.py NAO entra: portal publico, sem conta na sessao.
-    "app/api/endpoints/presentations.py",
-    # Tarefa 14
-    "app/api/endpoints/financial.py",
-    "app/api/endpoints/events.py",
-    "app/api/endpoints/dashboard.py",
-    "app/api/endpoints/notifications.py",
-    "app/services/financial_service.py",
-    # Tarefa 15 — users.py, auth.py, leads.py e product_router.py NAO entram:
-    # todos guardam excecao documentada de catalogo global ou de pre-sessao
-    # (ver os comentarios em cada arquivo). Diferente dos quatro, account.py
-    # nao precisou de nenhuma: a unica tabela sem account_id que ele toca
-    # (accounts) e alcancada por `db.get` (busca por chave primaria, nao
-    # filtro manual), entao o arquivo fica com zero "db.query(" de verdade.
-    "app/api/account.py",
-]
+# O lint mira o MODO DE FALHA (query direta sobre model com account_id), nao
+# o nome do arquivo. Substitui a antiga JA_CONVERTIDOS: aquela lista so podia
+# receber um arquivo TOTALMENTE convertido, e quatro arquivos legitimos —
+# product_router.py, users.py, auth.py e leads.py — mantem excecao
+# documentada de catalogo global ou de pre-sessao, entao nunca entravam e
+# ficavam sem catraca nenhuma. Entre eles esta o de maior valor da secao: a
+# biblioteca de produtos carrega preco de custo e markup, e um
+# `db.query(Product).all()` novo ali passava por todos os portoes.
+#
+# Calculado do metadata, nao digitado a mao: uma tabela nova ganha ou nao
+# account_id no proprio all_models.py (Tarefa 4), e este conjunto acompanha
+# sozinho — sem ninguem lembrar de atualizar uma lista aqui.
+MODELS_COM_ACCOUNT_ID = {
+    nome
+    for nome, cls in vars(app.models.all_models).items()
+    if isinstance(cls, type)
+    and hasattr(cls, "__tablename__")
+    and "account_id" in cls.__table__.columns
+}
+
+# O portal publico. Quem chama nao tem conta, entao nao ha repositorio — a
+# docstring do proprio arquivo explica, e isso e permanente.
+FORA_DO_LINT = ("app/api/endpoints/public.py",)
 
 
-def test_arquivo_convertido_nao_volta_a_usar_db_query():
+def _sob_o_lint(relativo: str) -> bool:
+    """
+    Onde a pergunta "e query direta sobre model com account_id?" faz sentido:
+    a camada de endpoint (app/api/) — e financial_service.py, que a antiga
+    JA_CONVERTIDOS tambem cobria, por orquestrar leitura de FinancialEntry
+    por conta a mando de dashboard.py e financial.py. Fora daqui ha escapes
+    de natureza diferente (app/services/budget_calculator.py recebe uma
+    Query JA filtrada por quem chamou; app/core/security.py resolve
+    identidade a partir do token, antes de existir conta para filtrar;
+    app/db/repository.py e a propria definicao do ScopedRepository) — nenhum
+    deles e "endpoint decidindo escopo sozinho", que e o defeito que este
+    lint mira, e alarga-lo para la sem revisar cada caso e o tipo de mudanca
+    de escopo que esta secao evita fazer de passagem.
+    """
+    if relativo in FORA_DO_LINT:
+        return False
+    return relativo.startswith("app/api/") or relativo == "app/services/financial_service.py"
+
+
+# Uma linha de db.query()/db.get() sobre model com account_id pode ser
+# excecao DELIBERADA de pre-sessao: o codigo roda ANTES de existir
+# RequestContext (cadastro via Supabase em auth.py, formulario publico de
+# leads em leads.py), entao nao ha account_id nenhum para filtrar — filtrar
+# seria logicamente impossivel, nao so indesejado. Cada uma dessas 3 linhas
+# ja tem paragrafo de comentario explicando o motivo; a marca abaixo e so o
+# que o lint consegue ler sem entender portugues.
+MARCA_DE_PRE_SESSAO = "pre-sessao: sem account_id"
+
+
+def test_query_direta_so_em_model_sem_account_id():
     achados = []
-    for caminho in JA_CONVERTIDOS:
-        arquivo = RAIZ / caminho
-        assert arquivo.exists(), f"{caminho} nao existe mais; atualize a lista"
-        for numero, linha in enumerate(
-            arquivo.read_text(encoding="utf-8").splitlines(), start=1
-        ):
-            if "db.query(" in linha:
-                achados.append(f"{caminho}:{numero}: {linha.strip()}")
+    for arquivo in _arquivos_python():
+        relativo = arquivo.relative_to(RAIZ).as_posix()
+        if not _sob_o_lint(relativo):
+            continue
+        linhas = arquivo.read_text(encoding="utf-8").splitlines()
+        arvore = ast.parse("\n".join(linhas), filename=relativo)
+        for no in ast.walk(arvore):
+            if not isinstance(no, ast.Call):
+                continue
+            f = no.func
+            if not isinstance(f, ast.Attribute) or f.attr not in ("query", "get"):
+                continue
+            # So acesso DIRETO ao db conta: `db.query(...)`/`db.get(...)`, ou
+            # `repo.db.query(...)` (a escotilha, quando usada por conta
+            # propria dentro de um endpoint). `repo.query(...)`/
+            # `repo.get(...)` sao o ScopedRepository de verdade — a raiz e
+            # `repo`, nao `db` — e ja filtram por conta sozinhos; sintaxe
+            # identica (`algo.query(X)`), por isso a raiz importa e nao so o
+            # nome do metodo.
+            raiz = f.value
+            eh_acesso_direto_ao_db = (
+                isinstance(raiz, ast.Name) and raiz.id == "db"
+            ) or (isinstance(raiz, ast.Attribute) and raiz.attr == "db")
+            if not eh_acesso_direto_ao_db:
+                continue
+            if not no.args:
+                continue
+            alvo = no.args[0]
+            nome = alvo.id if isinstance(alvo, ast.Name) else None
+            if nome not in MODELS_COM_ACCOUNT_ID:
+                continue
+            linha_fonte = linhas[no.lineno - 1]
+            if MARCA_DE_PRE_SESSAO in linha_fonte:
+                continue
+            achados.append(f"{relativo}:{no.lineno}: {nome}")
     assert not achados, (
-        "use repo.query(model) em vez de db.query(model):\n" + "\n".join(achados)
+        "query direta sobre model com account_id — use repo.query()/"
+        "repo.obter() (ou, se for excecao de pre-sessao de verdade, "
+        f'documente o motivo e marque a linha com "{MARCA_DE_PRE_SESSAO}"):\n'
+        + "\n".join(achados)
     )
 
 

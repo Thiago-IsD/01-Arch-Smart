@@ -10,6 +10,7 @@ Sobe com: docker compose -f docker-compose.test.yml up -d --wait
 """
 import os
 import uuid
+from datetime import datetime
 from typing import Generator
 
 import pytest
@@ -86,7 +87,22 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 from app.db.base_class import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models.all_models import Account, Client, Project, User  # noqa: E402
+from app.models.all_models import (  # noqa: E402
+    Account,
+    Budget,
+    BudgetItem,
+    Client,
+    Environment,
+    Event,
+    FinancialEntry,
+    ItemOption,
+    Notification,
+    Presentation,
+    Product,
+    Project,
+    RuleType,
+    User,
+)
 from app.core.security import RequestContext, get_context  # noqa: E402
 from app.services.entitlements import entitlements_da_conta  # noqa: E402
 
@@ -108,20 +124,146 @@ def _contexto_de(db: Session, usuario: User) -> RequestContext:
     )
 
 
-def criar_projeto(db: Session, conta: Account, nome: str = "Projeto Teste") -> Project:
+def criar_projeto(
+    db: Session, conta: Account, nome: str = "Projeto Teste", usuario: User | None = None
+) -> Project:
     """
     Cria um projeto valido para a conta.
 
     Project.client_id e NOT NULL com FK para clients, entao todo projeto
     exige um Client antes. Esquecer isso quebra a fixture com IntegrityError.
+
+    `usuario` e opcional (e o ultimo argumento) para nao quebrar as chamadas
+    das Tarefas 11-15, que passam so `(db, conta, nome)`.
     """
     cliente = Client(account_id=conta.id, name=f"Cliente de {nome}")
     db.add(cliente)
     db.flush()
-    projeto = Project(account_id=conta.id, client_id=cliente.id, name=nome)
+    projeto = Project(
+        account_id=conta.id,
+        client_id=cliente.id,
+        name=nome,
+        created_by=usuario.id if usuario else None,
+    )
     db.add(projeto)
     db.flush()
     return projeto
+
+
+def criar_ambiente(db: Session, conta: Account, usuario: User) -> Environment:
+    projeto = criar_projeto(db, conta, "Projeto do ambiente")
+    ambiente = Environment(
+        account_id=conta.id,
+        created_by=usuario.id,
+        project_id=projeto.id,
+        name="Sala",
+    )
+    db.add(ambiente)
+    db.flush()
+    return ambiente
+
+
+def criar_orcamento(db: Session, conta: Account, usuario: User) -> Budget:
+    projeto = criar_projeto(db, conta, "Projeto do orcamento")
+    orcamento = Budget(
+        account_id=conta.id, created_by=usuario.id, project_id=projeto.id
+    )
+    db.add(orcamento)
+    db.flush()
+    return orcamento
+
+
+def criar_item_de_orcamento(db: Session, conta: Account, usuario: User) -> BudgetItem:
+    ambiente = criar_ambiente(db, conta, usuario)
+    orcamento = Budget(
+        account_id=conta.id, created_by=usuario.id, project_id=ambiente.project_id
+    )
+    db.add(orcamento)
+    db.flush()
+    item = BudgetItem(
+        account_id=conta.id,
+        created_by=usuario.id,
+        budget_id=orcamento.id,
+        environment_id=ambiente.id,
+        rule_type=RuleType.FLOOR,
+    )
+    db.add(item)
+    db.flush()
+    return item
+
+
+def criar_opcao(db: Session, conta: Account, usuario: User) -> ItemOption:
+    item = criar_item_de_orcamento(db, conta, usuario)
+    produto = criar_produto(db, conta, usuario)
+    opcao = ItemOption(
+        account_id=conta.id,
+        created_by=usuario.id,
+        budget_item_id=item.id,
+        product_id=produto.id,
+        is_selected=True,
+    )
+    db.add(opcao)
+    db.flush()
+    return opcao
+
+
+def criar_produto(db: Session, conta: Account, usuario: User) -> Product:
+    produto = Product(
+        account_id=conta.id, created_by=usuario.id, name="Porcelanato", price=100.0
+    )
+    db.add(produto)
+    db.flush()
+    return produto
+
+
+def criar_apresentacao(db: Session, conta: Account, usuario: User) -> Presentation:
+    projeto = criar_projeto(db, conta, "Projeto da apresentacao")
+    apresentacao = Presentation(
+        account_id=conta.id,
+        created_by=usuario.id,
+        project_id=projeto.id,
+        name="Proposta",
+    )
+    db.add(apresentacao)
+    db.flush()
+    return apresentacao
+
+
+def criar_lancamento(db: Session, conta: Account, usuario: User) -> FinancialEntry:
+    entrada = FinancialEntry(
+        account_id=conta.id,
+        created_by=usuario.id,
+        description="Honorarios",
+        amount=1000.0,
+    )
+    db.add(entrada)
+    db.flush()
+    return entrada
+
+
+def criar_evento(db: Session, conta: Account, usuario: User) -> Event:
+    evento = Event(
+        account_id=conta.id,
+        created_by=usuario.id,
+        title="Visita",
+        start_time=datetime(2026, 9, 5, 10, 0),
+        end_time=datetime(2026, 9, 5, 11, 0),
+    )
+    db.add(evento)
+    db.flush()
+    return evento
+
+
+def criar_notificacao(db: Session, conta: Account, usuario: User) -> Notification:
+    notificacao = Notification(
+        account_id=conta.id,
+        created_by=usuario.id,
+        title="Aviso",
+        message="Mensagem",
+    )
+    db.add(notificacao)
+    db.flush()
+    return notificacao
 
 
 @pytest.fixture(scope="session")

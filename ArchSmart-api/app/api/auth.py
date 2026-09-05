@@ -68,7 +68,7 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         # Cadastro: acontece ANTES de existir sessao, entao nao ha RequestContext
         # nem repositorio. A protecao aqui e a do Supabase Auth, nao a do escopo
         # por conta.
-        existing_user = db.query(User).filter(User.supabase_id == supabase_id).first()
+        existing_user = db.query(User).filter(User.supabase_id == supabase_id).first()  # pre-sessao: sem account_id ainda
 
         if not existing_user and email:
             # ATENCAO: isto NAO e a mesma excecao de pre-sessao da linha
@@ -84,7 +84,7 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
             # decisao de Thiago, nao de uma rodada de conversao. Ver
             # docs/dev/arquitetura.md, secao "Resolvido em 05/09/2026: o
             # auto-link por e-mail em app/api/users.py".
-            existing_user = db.query(User).filter(User.email == email).first()
+            existing_user = db.query(User).filter(User.email == email).first()  # pre-sessao: sem account_id ainda
             if existing_user:
                 # Link supabase_id
                 existing_user.supabase_id = supabase_id

@@ -22,9 +22,10 @@ tentativa levantaria EscopoImpossivel na primeira requisicao.
 Isto e permanente, nao transitorio. Diferente do db.query que
 budgets_router.py carregou entre as Tarefas 8 e 12 — que era divida a pagar —,
 aqui nao ha divida nenhuma: nao existe RequestContext para injetar, porque
-nao existe sessao de conta. A proxima tarefa de conversao (Tarefa 14 ou 15)
-NAO inclui este arquivo, e ele nunca entra em JA_CONVERTIDOS
-(tests/test_arquitetura.py) — um db.query aqui nunca e regressao.
+nao existe sessao de conta. Por isso este arquivo esta em FORA_DO_LINT
+(tests/test_arquitetura.py) — o lint que pergunta "e query direta sobre model
+com account_id?" nunca deveria alcançar este modulo, porque aqui nunca ha
+conta para filtrar por ela.
 """
 import logging
 import uuid as uuid_module
