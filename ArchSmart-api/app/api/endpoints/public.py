@@ -15,7 +15,11 @@ from app.models.all_models import (
     Project, Budget, BudgetItem, ItemOption, Product,
     PresentationAcceptance, Notification, PresentationComment
 )
-from app.services.budget_calculator import calculate_budget_item_quantity
+from app.services.budget_calculator import (
+    calculate_quantity,
+    carregar_orcamento,
+    produto_selecionado,
+)
 from app.utils.supabase_client import get_storage_client
 from app.core.rate_limit import limiter, chave_por_apresentacao
 
@@ -253,23 +257,22 @@ async def get_public_presentation(
         budget = db.query(Budget).filter(Budget.project_id == presentation.project_id).first()
 
         if budget:
-            items = (
-                db.query(BudgetItem)
-                .options(
-                    joinedload(BudgetItem.options).joinedload(ItemOption.product)
-                )
-                .filter(
+            # O portal nunca tem RequestContext: a query aqui e sempre db.query,
+            # autorizada pelo token de portal, nao por conta.
+            itens, dnas = carregar_orcamento(
+                db.query(BudgetItem).filter(
                     BudgetItem.budget_id == budget.id,
                     BudgetItem.environment_id.in_(visible_env_real_ids)
                 )
-                .all()
             )
 
-            for item in items:
+            for item in itens:
                 # Calcular quantidade de forma segura
                 try:
-                    calc = calculate_budget_item_quantity(db, item)
-                    calculated_qty = calc.get("calculated_quantity")
+                    calculo = calculate_quantity(
+                        item, dnas.get(item.environment_id), produto_selecionado(item)
+                    )
+                    calculated_qty = calculo.calculated_quantity
                 except Exception:
                     calculated_qty = 0
 

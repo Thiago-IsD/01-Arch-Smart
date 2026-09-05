@@ -12,7 +12,11 @@ from app.schemas.budget_schema import (
     BudgetItemUpdate,
 )
 from app.api.users import get_current_user
-from app.services.budget_calculator import calculate_budget_item_quantity
+from app.services.budget_calculator import (
+    calculate_quantity,
+    carregar_orcamento,
+    produto_selecionado,
+)
 
 router = APIRouter()
 
@@ -87,21 +91,27 @@ def get_project_budget(
         db.refresh(budget)
 
     # 3. Inject calculated values on the fly and compute correct real-time total
+    # db.query aqui e deliberado: a Tarefa 12 converte este arquivo para
+    # repo.query. O filtro por conta continua sendo o que o endpoint ja fazia
+    # (via buscar_orcamento_da_conta / project.account_id acima).
+    itens, dnas = carregar_orcamento(
+        db.query(BudgetItem).filter(BudgetItem.budget_id == budget.id)
+    )
     real_total = 0.0
-    for item in budget.items:
-        calc = calculate_budget_item_quantity(db, item)
-        item.calculated_quantity = calc["calculated_quantity"]
-        item.base_area = calc["base_area"]
-        item.has_yield_alert = calc["has_yield_alert"]
-        
+    for item in itens:
+        produto = produto_selecionado(item)
+        calculo = calculate_quantity(item, dnas.get(item.environment_id), produto)
+        item.calculated_quantity = calculo.calculated_quantity
+        item.base_area = calculo.base_area
+        item.has_yield_alert = calculo.has_yield_alert
+
         # Calculate row total based ONLY on selected option
-        active_opt = next((o for o in item.options if o.is_selected), None)
-        if active_opt and active_opt.product:
-            price = active_opt.product.price or 0.0
+        if produto:
+            price = produto.price or 0.0
             qty = item.manual_quantity if item.rule_type.value == "UNIT" else item.calculated_quantity
             if qty is None: qty = 1
             real_total += price * qty
-            
+
     budget.total_value = real_total
 
     return budget
@@ -161,12 +171,18 @@ def add_item_to_budget(
     db.refresh(budget_item)
 
     # Attach calculated fields for the response
-    calc = calculate_budget_item_quantity(db, budget_item)
-    budget_item.calculated_quantity = calc["calculated_quantity"]
-    budget_item.base_area = calc["base_area"]
-    budget_item.has_yield_alert = calc["has_yield_alert"]
+    itens, dnas = carregar_orcamento(
+        db.query(BudgetItem).filter(BudgetItem.id == budget_item.id)
+    )
+    item = itens[0]
+    calculo = calculate_quantity(
+        item, dnas.get(item.environment_id), produto_selecionado(item)
+    )
+    item.calculated_quantity = calculo.calculated_quantity
+    item.base_area = calculo.base_area
+    item.has_yield_alert = calculo.has_yield_alert
 
-    return budget_item
+    return item
 
 @router.patch("/budgets/items/{item_id}", response_model=BudgetItemResponse)
 def update_budget_item(
@@ -192,10 +208,16 @@ def update_budget_item(
     db.refresh(item)
     
     # Re-calculate to return the fresh state
-    calc = calculate_budget_item_quantity(db, item)
-    item.calculated_quantity = calc["calculated_quantity"]
-    item.base_area = calc["base_area"]
-    item.has_yield_alert = calc["has_yield_alert"]
+    itens, dnas = carregar_orcamento(
+        db.query(BudgetItem).filter(BudgetItem.id == item.id)
+    )
+    item = itens[0]
+    calculo = calculate_quantity(
+        item, dnas.get(item.environment_id), produto_selecionado(item)
+    )
+    item.calculated_quantity = calculo.calculated_quantity
+    item.base_area = calculo.base_area
+    item.has_yield_alert = calculo.has_yield_alert
 
     return item
 
@@ -321,24 +343,29 @@ def get_budget_summary(
     """
     budget = buscar_orcamento_da_conta(db, budget_id, current_user.account_id)
 
-    items = db.query(BudgetItem).filter(BudgetItem.budget_id == budget_id).all()
-    
+    # db.query aqui e deliberado: a Tarefa 12 converte este arquivo para
+    # repo.query. O filtro por conta continua sendo o que buscar_orcamento_da_conta
+    # ja fez acima.
+    itens, dnas = carregar_orcamento(
+        db.query(BudgetItem).filter(BudgetItem.budget_id == budget_id)
+    )
+
     total_project = 0.0
     environment_totals = {}
 
-    for item in items:
+    for item in itens:
         # Re-run calc in memory just to ensure accuracy for summary
-        calc = calculate_budget_item_quantity(db, item)
-        qty = item.manual_quantity if item.rule_type.value == "UNIT" else calc["calculated_quantity"]
+        produto = produto_selecionado(item)
+        calc = calculate_quantity(item, dnas.get(item.environment_id), produto)
+        qty = item.manual_quantity if item.rule_type.value == "UNIT" else calc.calculated_quantity
         if qty is None:
             qty = 1 # fallback
 
         # Find selected option cost
-        selected_option = next((o for o in item.options if o.is_selected), None)
-        if selected_option and selected_option.product:
-            cost = (selected_option.product.price or 0.0) * qty
+        if produto:
+            cost = (produto.price or 0.0) * qty
             total_project += cost
-            
+
             env_id_str = str(item.environment_id)
             if env_id_str not in environment_totals:
                 environment_totals[env_id_str] = 0.0

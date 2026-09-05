@@ -5,7 +5,6 @@
   "modulos_sem_doc": [
     "ai_service",
     "auth_service",
-    "budget_calculator",
     "financial_service"
   ]
 }
