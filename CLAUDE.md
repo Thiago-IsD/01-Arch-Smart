@@ -28,7 +28,7 @@ Três coisas que economizam tempo antes de mexer em ambiente:
 - **`DATABASE_URL` usa o host pooler na porta 5432**, nunca a 6543 (estado de sessão vaza entre clientes e já derrubou um deploy) nem `db.<ref>.supabase.co` (IPv6-only, não resolve em rede sem IPv6). O caso completo está em [ambientes-online.md](docs/dev/ambientes-online.md), seção 1, item 6.
 - **`develop` é local.** O `ArchSmart-api/.env` tem staging e produção separados, com produção comentada — confira para qual banco ele aponta **antes** de rodar qualquer script.
 
-Duas decisões seguem **em aberto**, e nenhuma delas é para um agente tomar sozinho: ligar ou não branch protection (virou possível quando o repositório foi tornado público em 30/08), e alinhar o `docker-compose.test.yml`, hoje em Postgres 16 enquanto os ambientes online são 17.6.
+Uma decisão segue **em aberto**, e não é para um agente tomar sozinho: ligar ou não branch protection (virou possível quando o repositório foi tornado público em 30/08). O `docker-compose.test.yml` e o CI foram alinhados para Postgres 17 em 05/09/2026, na Tarefa 1 da Seção 4 — a divergência com os 17.6 de staging e produção era o risco de uma migração passar no CI e derrubar o contêiner no deploy (ADR 0007).
 
 ## Portões de CI
 
