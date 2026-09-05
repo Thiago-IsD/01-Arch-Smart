@@ -196,6 +196,56 @@ def _sob_o_lint(relativo: str) -> bool:
 # que o lint consegue ler sem entender portugues.
 MARCA_DE_PRE_SESSAO = "pre-sessao: sem account_id"
 
+# So esta raiz e confiavelmente segura: `repo` (ScopedRepository) ja filtra
+# por conta sozinho quando quem chama `.query()`/`.get()` NELE DIRETO —
+# `repo.query(X)`, `repo.get(X, id)`. Alista SO ela, em vez de desconfiar so
+# de "db" por nome: uma revisao mediu que a versao anterior (checava se a
+# raiz batia literalmente com "db" ou tinha `.attr == "db"`) deixaria passar
+# `session.query(EnvironmentDNA)` — a forma que
+# app/services/budget_calculator.py:159 usa hoje, fora do escopo deste
+# lint, mas prova que a forma existe no repositorio, nao so na teoria — ou
+# uma futura renomeacao de `db` para outro nome de variavel. Com a raiz como
+# ALLOWLIST (so "repo" passa), qualquer outra coisa que chame `.query()`/
+# `.get()` sobre um model com account_id cai aqui, seja `db`, `session`,
+# `self.db` ou o que vier.
+RAIZ_SEGURA = "repo"
+
+
+def _nome_base(no: ast.AST) -> str | None:
+    """
+    Resolve uma expressao Name/Attribute ate o identificador mais a
+    esquerda — 'Modelo' tanto em `Modelo` quanto em `Modelo.coluna`. Usada
+    duas vezes: para reconhecer o MODEL alvo de `db.query(Modelo.coluna)`
+    (um `ast.Attribute`, que `alvo.id` sozinho — a versao anterior — nao
+    resolvia; app/services/entitlements.py:57 tem essa forma hoje, fora do
+    escopo do lint, mas de novo prova que ela ocorre aqui) e para
+    reconstruir o CAMINHO da raiz da chamada (`repo` vs `repo.db` vs `db`)
+    em `_caminho_da_chamada` abaixo.
+    """
+    if isinstance(no, ast.Name):
+        return no.id
+    if isinstance(no, ast.Attribute):
+        return _nome_base(no.value)
+    return None
+
+
+def _caminho_da_chamada(no: ast.AST) -> str:
+    """
+    Reconstroi o caminho pontilhado ate a raiz de quem chamou `.query()`/
+    `.get()` — "repo" para `repo.query(X)`, "repo.db" para
+    `repo.db.query(X)` (a escotilha usada por conta propria), "db" para
+    `db.query(X)`. Precisa ser o caminho INTEIRO, nao so o nome mais a
+    esquerda: `_nome_base` sozinho devolveria "repo" tanto para
+    `repo.query(X)` quanto para `repo.db.query(X)`, apagando exatamente a
+    distincao que importa — `repo.query` e o ScopedRepository de verdade,
+    `repo.db.query` e a Session crua por baixo dele.
+    """
+    if isinstance(no, ast.Name):
+        return no.id
+    if isinstance(no, ast.Attribute):
+        return f"{_caminho_da_chamada(no.value)}.{no.attr}"
+    return "?"
+
 
 def test_query_direta_so_em_model_sem_account_id():
     achados = []
@@ -211,23 +261,11 @@ def test_query_direta_so_em_model_sem_account_id():
             f = no.func
             if not isinstance(f, ast.Attribute) or f.attr not in ("query", "get"):
                 continue
-            # So acesso DIRETO ao db conta: `db.query(...)`/`db.get(...)`, ou
-            # `repo.db.query(...)` (a escotilha, quando usada por conta
-            # propria dentro de um endpoint). `repo.query(...)`/
-            # `repo.get(...)` sao o ScopedRepository de verdade — a raiz e
-            # `repo`, nao `db` — e ja filtram por conta sozinhos; sintaxe
-            # identica (`algo.query(X)`), por isso a raiz importa e nao so o
-            # nome do metodo.
-            raiz = f.value
-            eh_acesso_direto_ao_db = (
-                isinstance(raiz, ast.Name) and raiz.id == "db"
-            ) or (isinstance(raiz, ast.Attribute) and raiz.attr == "db")
-            if not eh_acesso_direto_ao_db:
+            if _caminho_da_chamada(f.value) == RAIZ_SEGURA:
                 continue
             if not no.args:
                 continue
-            alvo = no.args[0]
-            nome = alvo.id if isinstance(alvo, ast.Name) else None
+            nome = _nome_base(no.args[0])
             if nome not in MODELS_COM_ACCOUNT_ID:
                 continue
             linha_fonte = linhas[no.lineno - 1]
@@ -239,6 +277,34 @@ def test_query_direta_so_em_model_sem_account_id():
         "repo.obter() (ou, se for excecao de pre-sessao de verdade, "
         f'documente o motivo e marque a linha com "{MARCA_DE_PRE_SESSAO}"):\n'
         + "\n".join(achados)
+    )
+
+
+def test_marca_de_pre_sessao_nao_cresce_sem_querer():
+    """
+    MARCA_DE_PRE_SESSAO e uma string comum — qualquer comentario que a
+    contenha silencia o lint acima. Isso e aceitavel (e greppable e visivel
+    em diff, como o proprio Passo 2a documenta), mas nao deveria ser FACIL:
+    travar a contagem de hoje faz uma quarta ocorrencia exigir que quem a
+    escreveu tambem mexa nesta linha — deliberado, nao so digitado.
+    """
+    ocorrencias = [
+        f"{arquivo.relative_to(RAIZ).as_posix()}:{numero}"
+        for arquivo in _arquivos_python()
+        if _sob_o_lint(arquivo.relative_to(RAIZ).as_posix())
+        for numero, linha in enumerate(
+            arquivo.read_text(encoding="utf-8").splitlines(), start=1
+        )
+        if MARCA_DE_PRE_SESSAO in linha
+    ]
+    assert ocorrencias == [
+        "app/api/auth.py:71",
+        "app/api/auth.py:87",
+        "app/api/leads.py:14",
+    ], (
+        f'esperava exatamente as 3 marcas conhecidas de "{MARCA_DE_PRE_SESSAO}"; '
+        f"achei {ocorrencias}. Se uma nova excecao de pre-sessao e legitima, "
+        "atualize esta lista tambem — a marca nao pode crescer sozinha."
     )
 
 

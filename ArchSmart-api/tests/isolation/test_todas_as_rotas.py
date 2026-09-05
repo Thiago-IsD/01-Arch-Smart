@@ -9,6 +9,36 @@ ignorar.
 
 Como quebrar de proposito, para ver que funciona: apague o filtro por conta de
 um endpoint qualquer e rode. Se ele continuar verde, este arquivo esta mentindo.
+
+**Nem todo caso e igualmente forte.** GET e DELETE nao tem corpo — 404 e
+exigivel sempre. PUT e PATCH, medido, tambem chegam no handler com `json={}`
+(nenhum tem campo obrigatorio sem default) e por isso tambem exigem 404. Mas
+6 das 6 rotas POST coletadas rejeitariam `json={}` pelo Pydantic ANTES do
+endpoint rodar — um 422 que passaria mesmo se a conta nao fosse filtrada. Por
+isso CORPOS_MINIMOS da a cada uma um corpo que passa da validacao, e a lista
+de casos se divide em CASOS_FORTES (exige 404) e CASOS_FRACOS (rotas cujo
+corpo minimo so seria possivel citando dado de OUTRA conta — nenhuma hoje;
+ver POSTS_SEM_CORPO_MINIMO_POSSIVEL). Uma rota POST sem entrada em
+CORPOS_MINIMOS falha dentro do proprio teste, com a mesma logica de
+`assert fabrica is not None` do RECURSOS abaixo — nao cai numa asercao fraca
+por omissao.
+
+**Gap conhecido, fora do que este arquivo cobre.** Rotas cujo id vem do BODY,
+nao da URL — `PATCH /api/products/batch-approve`
+(`app/api/routers/product_router.py:231`), que recebe uma lista de ids num
+payload — nao aparecem em `_rotas_com_recurso` (sem `{...}` na URL, nada para
+substituir) nem na rede de fumaca abaixo (so cobre GET). Medido em
+05/09/2026: 27 rotas de `/api` sem parametro de caminho, das quais 9 sao GET
+(cobertas pela rede) e as outras 18 (POST/PUT/PATCH/DELETE, `/api/auth/*`,
+`/api/leads`, `/api/projects`, `/api/events`, `/api/financial`,
+`/api/budgets/items`, `/api/products/`, `/api/products/clipper/capture`,
+`/api/products/normalize`, `/api/products/batch-approve`, `/api/account`,
+`/api/account/branding`, `/api/users/profile`) nao sao tocadas por nenhum
+teste novo desta tarefa. Isso nao e um vazamento conhecido — `batch-approve`,
+por exemplo, resolve cada id por conta propria e devolve os alheios em
+`not_found` em vez de vazar — mas e uma classe de rota que nem o teste
+generico nem a rede de fumaca alcancam, e por isso fica registrada aqui em
+vez de descoberta depois.
 """
 import re
 
@@ -95,22 +125,140 @@ def test_ha_rotas_para_percorrer():
     assert len(CASOS) >= 30, f"so {len(CASOS)} rotas coletadas; algo filtrou demais"
 
 
-@pytest.mark.parametrize("metodo,caminho,parametros", CASOS, ids=lambda v: str(v))
-def test_toda_rota_com_id_isola_por_conta(
-    db, client_a, conta_b, metodo, caminho, parametros
-):
-    conta, usuario = conta_b
+# Corpo minimo que faz uma rota POST passar da validacao do Pydantic/FastAPI
+# e chegar no handler. Sem isso, `json={}` pode receber 422 ANTES do endpoint
+# rodar — a rota nunca e exercitada de verdade, e o teste fica verde por um
+# motivo errado. Essa e exatamente a forma de teste decorativo que a Tarefa 2
+# ja pegou uma vez (um 401 que passava contra codigo que vazaria).
+#
+# Nenhum valor aqui precisa apontar para um recurso de VERDADE: em toda rota
+# desta lista, a checagem de posse do recurso da URL (`repo.obter(...)`) roda
+# ANTES de o handler tocar em qualquer campo do corpo — entao um UUID
+# qualquer, mesmo inexistente, e suficiente para o pedido chegar la e ainda
+# assim ser barrado por dono errado, nunca por dado invalido.
+_UUID_QUALQUER = "00000000-0000-0000-0000-000000000000"
+
+CORPOS_MINIMOS: dict[str, dict] = {
+    "/api/budgets/items/{item_id}/options": {
+        "json": {"product_id": _UUID_QUALQUER},
+    },
+    "/api/presentations/{presentation_id}/comments": {
+        "json": {"text": "Comentario minimo"},
+    },
+    "/api/projects/{project_id}/environments": {
+        "json": {"name": "Ambiente minimo"},
+    },
+    "/api/projects/{project_id}/presentations": {
+        "json": {"name": "Apresentacao minima", "project_id": _UUID_QUALQUER},
+    },
+    # Estas duas nao tem corpo JSON: o endpoint declara `file: UploadFile =
+    # File(...)`, entao `json={}` nem chega a ser o motivo do 422 — o
+    # FastAPI exige multipart/form-data com um campo "file".
+    "/api/presentations/{presentation_id}/assets": {
+        "files": {"file": ("teste.png", b"conteudo-fake", "image/png")},
+    },
+    "/api/presentations/{presentation_id}/environments/{env_id}/images": {
+        "files": {"file": ("teste.png", b"conteudo-fake", "image/png")},
+    },
+}
+
+# POSTs cujo corpo minimo so seria possivel citando um recurso de OUTRA
+# conta — o que a propria rota existe para provar que nao vaza, entao pedir
+# isso na fabrica do corpo seria circular. Vazio hoje: as 6 rotas POST
+# coletadas conseguem corpo minimo sem citar nada da conta B (ver
+# CORPOS_MINIMOS). Existe para o dia em que uma rota realmente nao consiga:
+# entra aqui com o motivo, o caso migra para CASOS_FRACOS (asercao mais
+# fraca: nunca 2xx, nunca 403) e NAO precisa de entrada em CORPOS_MINIMOS.
+POSTS_SEM_CORPO_MINIMO_POSSIVEL: dict[str, str] = {}
+
+# So o METODO e o CAMINHO juntos decidem — nao so o caminho. Varios caminhos
+# desta lista respondem a mais de um metodo (GET e POST em
+# /projects/{project_id}/presentations, por exemplo); um `caso[1] in
+# POSTS_SEM_CORPO_MINIMO_POSSIVEL` sozinho rebaixaria o GET junto so por
+# compartilhar caminho com um POST fraco.
+CASOS_FRACOS = [
+    caso
+    for caso in CASOS
+    if caso[0] == "POST" and caso[1] in POSTS_SEM_CORPO_MINIMO_POSSIVEL
+]
+CASOS_FORTES = [caso for caso in CASOS if caso not in CASOS_FRACOS]
+
+
+def _preencher_url(caminho: str, parametros: tuple[str, ...], db, conta, usuario) -> str:
     url = caminho
     for parametro in parametros:
         fabrica = RECURSOS.get(parametro)
         assert fabrica is not None, (
-            f"a rota {metodo} {caminho} tem o parametro {{{parametro}}} e "
-            "ninguem disse que recurso ele endereca. Acrescente uma entrada em "
+            f"a rota {caminho} tem o parametro {{{parametro}}} e ninguem "
+            "disse que recurso ele endereca. Acrescente uma entrada em "
             "RECURSOS (ou, se for rota de portal publico, em "
             "PARAMETROS_FORA_DO_ESCOPO, com o motivo)."
         )
         recurso = fabrica(db, conta, usuario)
         url = url.replace("{" + parametro + "}", str(recurso.id))
+    return url
+
+
+@pytest.mark.parametrize("metodo,caminho,parametros", CASOS_FORTES, ids=lambda v: str(v))
+def test_toda_rota_forte_isola_por_conta_com_404(
+    db, client_a, conta_b, metodo, caminho, parametros
+):
+    """
+    Casos FORTES: GET/DELETE (sem corpo, 404 sempre exigivel) e PUT/PATCH
+    (medido: os 8+5 casos coletados chegam no handler com `json={}`, sem
+    campo obrigatorio faltando) alem dos POST com corpo minimo registrado.
+
+    Para POST, o corpo minimo e OBRIGATORIO aqui dentro — mesma logica do
+    `assert fabrica is not None` em `_preencher_url`: uma rota POST nova sem
+    entrada em CORPOS_MINIMOS FALHA, em vez de silenciosamente virar `{}` e
+    arriscar um 422 decorativo.
+    """
+    conta, usuario = conta_b
+    url = _preencher_url(caminho, parametros, db, conta, usuario)
+
+    if metodo == "POST":
+        corpo = CORPOS_MINIMOS.get(caminho)
+        assert corpo is not None, (
+            f"a rota POST {caminho} esta em CASOS_FORTES mas nao tem corpo "
+            "minimo em CORPOS_MINIMOS. Acrescente um corpo que passe da "
+            "validacao do Pydantic, ou declare em "
+            "POSTS_SEM_CORPO_MINIMO_POSSIVEL (com o motivo) se ele so puder "
+            "ser montado citando dado de outra conta — nesse caso o caso "
+            "migra sozinho para CASOS_FRACOS."
+        )
+    else:
+        corpo = {"json": {}}
+
+    resposta = client_a.request(metodo, url, **corpo)
+
+    assert resposta.status_code not in (200, 201, 202, 204), (
+        f"{metodo} {caminho} devolveu {resposta.status_code} para recurso da "
+        "conta B — vazamento entre contas."
+    )
+    assert resposta.status_code != 403, (
+        f"{metodo} {caminho} devolveu 403, que CONFIRMA a existencia do "
+        "recurso alheio. Use 404."
+    )
+    assert resposta.status_code == 404, (
+        f"{metodo} {caminho} devolveu {resposta.status_code}; esperado 404. "
+        f"Corpo enviado: {corpo}. Resposta: {resposta.text[:400]}"
+    )
+
+
+@pytest.mark.parametrize("metodo,caminho,parametros", CASOS_FRACOS, ids=lambda v: str(v))
+def test_toda_rota_fraca_isola_por_conta_sem_vazamento(
+    db, client_a, conta_b, metodo, caminho, parametros
+):
+    """
+    Casos FRACOS: hoje nenhum — POSTS_SEM_CORPO_MINIMO_POSSIVEL esta vazio,
+    entao este teste coleta 0 casos e nao roda. O esqueleto fica pronto para
+    o dia em que uma rota POST legitimamente nao possa ganhar corpo minimo
+    sem citar dado de outra conta: `json={}` pode receber 422 do Pydantic
+    antes do endpoint rodar, entao 404 nao e exigivel — mas vazamento
+    (2xx/403) continua sendo, e e o que esta asercao ainda prova.
+    """
+    conta, usuario = conta_b
+    url = _preencher_url(caminho, parametros, db, conta, usuario)
 
     resposta = client_a.request(metodo, url, json={})
 
@@ -122,11 +270,6 @@ def test_toda_rota_com_id_isola_por_conta(
         f"{metodo} {caminho} devolveu 403, que CONFIRMA a existencia do "
         "recurso alheio. Use 404."
     )
-    if metodo in ("GET", "DELETE"):
-        # Sem corpo, nao ha validacao do Pydantic no caminho: 404 e exigivel.
-        assert resposta.status_code == 404, (
-            f"{metodo} {caminho} devolveu {resposta.status_code}; esperado 404."
-        )
 
 
 # Rotas GET sem parametro de caminho. O teste de isolamento acima nao as
@@ -154,16 +297,39 @@ def test_ha_gets_sem_parametro_para_percorrer():
     )
 
 
+# Query params minimos para as rotas GET que os exigem. Sem isso o FastAPI
+# devolve 422 antes do handler rodar — a mesma vacuidade dos POSTs acima,
+# so que aqui o teste nem percebia, porque a asercao antiga (`< 500`) deixa
+# 422 passar em silencio. `/api/events` exige `start_date`/`end_date`;
+# `/api/financial` e `/api/financial/summary` exigem `month`/`year`.
+PARAMS_MINIMOS: dict[str, dict] = {
+    "/api/events": {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+    "/api/financial": {"month": 9, "year": 2026},
+    "/api/financial/summary": {"month": 9, "year": 2026},
+}
+
+
 @pytest.mark.parametrize("caminho", GETS_SEM_PARAMETRO)
 def test_get_sem_parametro_nao_estoura(db, client_a, caminho):
     """
-    Fumaca, nao contrato: so exige que a rota RESPONDA. Nao afirma status 200,
-    porque varias dependem de dado que a conta de teste nao tem — o que se
-    afirma e que ela nao morre.
+    Fumaca, nao contrato: so exige que a rota RESPONDA e que a resposta nao
+    seja vazia por FALTA DE PARAMETRO. Nao afirma status 200, porque varias
+    dependem de dado que a conta de teste nao tem — o que se afirma e que
+    ela nao morre (`< 500`) e que a chamada de fato ALCANCOU o handler
+    (`!= 422`): uma rota com query param obrigatorio sem entrada em
+    PARAMS_MINIMOS devolveria 422 sem nunca rodar o handler, e a rede ficaria
+    vazia sem ninguem notar — a mesma classe de vacuidade do corpo dos POSTs
+    acima, so que em query string.
     """
-    resposta = client_a.get(caminho)
+    resposta = client_a.get(caminho, params=PARAMS_MINIMOS.get(caminho, {}))
 
     assert resposta.status_code < 500, (
         f"GET {caminho} devolveu {resposta.status_code}. "
         f"Corpo: {resposta.text[:400]}"
+    )
+    assert resposta.status_code != 422, (
+        f"GET {caminho} devolveu 422 — provavelmente um query param "
+        "obrigatorio sem entrada em PARAMS_MINIMOS. Acrescente um valor "
+        f"minimo la; sem isso a rota nunca chega no handler. Resposta: "
+        f"{resposta.text[:400]}"
     )
