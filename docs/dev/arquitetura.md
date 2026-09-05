@@ -125,7 +125,9 @@ aponta para usuário existente é `401`. Provisionamento continua tendo rota
 própria (`POST /api/auth/signup`, `POST /api/auth/complete-register`).
 
 **O mesmo padrão continua vivo em `POST /api/auth/complete-register`**
-(`ArchSmart-api/app/api/auth.py:65-72`): quando o `supabase_id` não bate com
+(função `complete_register` em `ArchSmart-api/app/api/auth.py`, linhas
+73-91 em 05/09/2026 — cite a função, não só o número, a Tarefa 15 já
+moveu esse bloco uma vez): quando o `supabase_id` não bate com
 nada, o endpoint busca por e-mail e, se achar, vincula o `supabase_id` do
 portador **e sobrescreve o `full_name`** da linha encontrada — guardado hoje
 só pela mesma configuração de painel citada acima. Isso é um item de

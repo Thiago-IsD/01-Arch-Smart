@@ -30,7 +30,14 @@ Hoje cada endpoint filtra por conta manualmente — não existe ainda uma camada
 
 ## De onde vem a identidade
 
-`Depends(get_current_user)` (definido em `app/api/users.py`) resolve `user_id`/`account_id` a partir do token da sessão — é o único jeito certo de obter a identidade num endpoint novo. **Nunca** receba `account_id` como parâmetro de rota, query ou body: o cliente pode mandar qualquer valor ali, e usá-lo é a violação exata do Art. 1.
+`get_current_user` foi apagada na Tarefa 15 da Seção 4. A identidade vem de
+`RequestContext` (`app/core/security.py`), via `Depends(get_repo)`
+(`app/db/repository.py`) quando o endpoint acessa o banco, ou
+`Depends(get_context)` direto quando não precisa — é o único jeito certo de
+obter a identidade num endpoint novo. `repo.ctx` (ou o `ctx` que `get_context`
+devolve) carrega `user_id`, `account_id`, `email` e `entitlements`. **Nunca**
+receba `account_id` como parâmetro de rota, query ou body: o cliente pode
+mandar qualquer valor ali, e usá-lo é a violação exata do Art. 1.
 
 ## Registrar a rota e migrar o schema
 

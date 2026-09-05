@@ -71,7 +71,19 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         existing_user = db.query(User).filter(User.supabase_id == supabase_id).first()
 
         if not existing_user and email:
-            # Mesma excecao de pre-sessao da linha acima.
+            # ATENCAO: isto NAO e a mesma excecao de pre-sessao da linha
+            # acima. A linha 71 resolve por supabase_id (seguro); esta
+            # resolve por E-MAIL e, se achar, sobrescreve o supabase_id e o
+            # full_name da linha encontrada com os dados de quem apresentou
+            # o token — o mesmo padrao que a Tarefa 2 removeu de
+            # security.py. E o unico caminho de resolucao-por-e-mail que
+            # sobra na API; a protecao dele mora fora do repositorio, no
+            # toggle "Confirm email" do painel do Supabase. Pendencia de
+            # seguranca conhecida e registrada, nao um esquecimento desta
+            # conversao — o que fazer com o caminho legado de migracao e
+            # decisao de Thiago, nao de uma rodada de conversao. Ver
+            # docs/dev/arquitetura.md, secao "Resolvido em 05/09/2026: o
+            # auto-link por e-mail em app/api/users.py".
             existing_user = db.query(User).filter(User.email == email).first()
             if existing_user:
                 # Link supabase_id
