@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import Optional
-from starlette.concurrency import run_in_threadpool
 
+from app.core.security import get_context
 from app.db.session import get_db
 from app.models.all_models import User, Account, Subscription, Plan
 from app.schemas.user import UserProfileResponse, AccountInfo, UserProfileUpdate
-from app.services.auth_service import auth_service
 
 
 router = APIRouter()
@@ -18,107 +17,16 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Dependency to extract and validate user from JWT token.
-    Handles legacy users by matching email if supabase_id is missing.
-    Returns the User model instance.
+    Compatibilidade: os endpoints ainda nao convertidos para `RequestContext`
+    dependem desta funcao. Ela NAO tem logica propria — delega para
+    `app.core.security`, de modo que auto-link e auto-create estejam mortos
+    para os dois caminhos. Some quando a ultima rota migrar (Tarefa 15).
     """
-    print(f"\n[DEBUG] get_current_user called")
-    print(f"Authorization header: {authorization[:50]}...")
-    
-    if not authorization.startswith("Bearer "):
-        print("[ERROR] Invalid authorization header format")
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.replace("Bearer ", "")
-    print(f"Token extracted: {token[:20]}...")
-    
-    try:
-        import os
-        from jose import jwt
-        
-        secret = os.getenv("SUPABASE_JWT_SECRET")
-        if secret:
-            secret = secret.strip()
-            try:
-                import base64
-                # Supabase secrets are base64 encoded. We must decode them to bytes to verify HS256 signatures correctly.
-                # Pad the base64 string if necessary
-                padded_secret = secret + '=' * (-len(secret) % 4)
-                secret_bytes = base64.b64decode(padded_secret)
-                
-                # Decode locally (no network delay)
-                payload = jwt.decode(token, secret_bytes, algorithms=["HS256"], options={"verify_aud": False})
-                supabase_id = payload.get("sub")
-                email = payload.get("email")
-            except Exception as jwt_err:
-                print(f"[WARN] Local JWT validation failed ({jwt_err}). Falling back to remote validation.")
-                user_data = await auth_service.get_user(token)
-                supabase_id = user_data["id"]
-                email = user_data.get("email")
-        else:
-            # Fallback to remote service if secret not present (fallback)
-            print("[WARN] SUPABASE_JWT_SECRET missing, using slow remote validation")
-            user_data = await auth_service.get_user(token)
-            supabase_id = user_data["id"]
-            email = user_data.get("email")
-        
-        # 1. DB Operations need to run in threadpool to avoid blocking main event loop
-        def _db_operations():
-            # Try to find by supabase_id
-            user = db.query(User).filter(User.supabase_id == supabase_id).first()
-            if user:
-                print(f"[OK] User found by supabase_id: {user.id}")
-                return user
-                
-            # If not found and we have email, try to find by email (Legacy/Migration)
-            if email:
-                user = db.query(User).filter(User.email == email).first()
-                if user:
-                    # Auto-link: Update supabase_id for this user
-                    print(f"[WARN] User found by email, linking supabase_id")
-                    user.supabase_id = supabase_id
-                    db.commit()
-                    db.refresh(user)
-                    return user
-            
-            # If still not found, Auto-Create User AND Account to ensure sync resiliency
-            if email and supabase_id:
-                print(f"[WARN] User not found in local DB. Auto-creating for email: {email}")
-                
-                # Create a default account
-                new_account = Account(
-                    name=email.split("@")[0], 
-                    company_name=None
-                )
-                db.add(new_account)
-                db.commit()
-                db.refresh(new_account)
-                
-                # Create the user
-                new_user = User(
-                    account_id=new_account.id,
-                    email=email,
-                    supabase_id=supabase_id,
-                    full_name=email.split("@")[0],
-                    role="ARCHITECT"
-                )
-                db.add(new_user)
-                db.commit()
-                db.refresh(new_user)
-                
-                print(f"[OK] User auto-created successfully: {new_user.id}")
-                return new_user
-                
-            return None
-            
-        user = await run_in_threadpool(_db_operations)
-        if user:
-            return user
-            
-        raise HTTPException(status_code=404, detail="User not found and could not be auto-created")
-    except Exception as e:
-        print(f"[ERROR] JWT Validation failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
+    ctx = await get_context(authorization=authorization, db=db)
+    usuario = db.query(User).filter(User.id == ctx.user_id).first()
+    if usuario is None:  # pragma: no cover - get_context ja garantiu
+        raise HTTPException(status_code=401, detail="Credenciais invalidas.")
+    return usuario
 
 
 from app.utils.supabase_client import get_storage_client

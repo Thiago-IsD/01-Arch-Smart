@@ -88,6 +88,17 @@ from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.all_models import Account, Client, Project, User  # noqa: E402
 from app.api.users import get_current_user  # noqa: E402
+from app.core.security import RequestContext, get_context  # noqa: E402
+from app.services.entitlements import PADRAO as ENTITLEMENTS_PADRAO  # noqa: E402
+
+
+def _contexto_de(usuario: User) -> RequestContext:
+    return RequestContext(
+        user_id=usuario.id,
+        account_id=usuario.account_id,
+        email=usuario.email,
+        entitlements=dict(ENTITLEMENTS_PADRAO),
+    )
 
 
 def criar_projeto(db: Session, conta: Account, nome: str = "Projeto Teste") -> Project:
@@ -183,6 +194,7 @@ def _cliente(db: Session, usuario: User | None) -> Generator[TestClient, None, N
     app.dependency_overrides[get_db] = lambda: db
     if usuario is not None:
         app.dependency_overrides[get_current_user] = lambda: usuario
+        app.dependency_overrides[get_context] = lambda: _contexto_de(usuario)
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
