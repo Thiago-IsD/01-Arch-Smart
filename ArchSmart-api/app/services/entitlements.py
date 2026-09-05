@@ -8,10 +8,12 @@ devolver e nunca fixa um numero. Enquanto o front tiver o
 Secao 5, mas a fonte de verdade nasce aqui.
 
 `Plan.limits` e uma coluna JSON livre. Os defaults (`PADRAO`) valem quando a
-conta nao tem assinatura, quando a assinatura nao tem plano, quando o JSON
-nao traz a chave, ou quando a assinatura esta CANCELED — os quatro casos
-existem hoje no banco ou sao alcancaveis pela maquina de estados de
-`SubscriptionStatus`.
+conta nao tem nenhuma assinatura, quando `limits` e SQL NULL, quando o JSON
+nao traz a chave perguntada, ou quando a assinatura esta CANCELED — os
+quatro casos alcancaveis hoje. `Subscription.plan_id` e `nullable=False` com
+FK para `plans.id` (`app/models/all_models.py`); assinatura sem plano ou
+apontando para um plano apagado nao e um estado que o schema permite, entao
+nao esta na lista acima — medido, nao suposto.
 """
 from __future__ import annotations
 
@@ -31,8 +33,14 @@ PADRAO: dict[str, Any] = {
 
 def entitlements_da_conta(db: Session, account_id: UUID) -> dict[str, Any]:
     """
-    Uma query, com outer join para o plano: conta sem assinatura nao vira
-    None no meio do caminho, vira os defaults.
+    Uma query, com outer join para o plano. O outerjoin e defesa redundante,
+    nao resposta a um estado que o schema permita: `Subscription.plan_id` e
+    `nullable=False` com FK para `plans.id`, entao nem `plan_id` nulo nem
+    apontando para um plano apagado sao alcancaveis hoje — se um dia deixarem
+    de ser, o outerjoin evita um crash em vez de propagar o problema para
+    toda requisicao autenticada. Os estados sem limite do plano que SAO
+    alcancaveis: conta sem nenhuma linha em `subscriptions`, `Plan.limits`
+    como SQL NULL, `limits` que nao e um objeto, e assinatura CANCELED.
 
     CANCELED nao concede os limites do plano — a conta cai no `PADRAO`.
     BETA, ACTIVE e READ_ONLY concedem: READ_ONLY e um eixo de permissao de

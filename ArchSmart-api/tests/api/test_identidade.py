@@ -110,19 +110,33 @@ def test_get_context_devolve_401_para_token_que_nao_resolve(
     de cliente sobrepoe `get_current_user` (e `get_context`, que nem chega a
     ser resolvido pelo FastAPI porque `get_current_user` o chama direto no
     corpo), entao nenhum teste ate aqui provava o 401 de um token que nao
-    aponta para ninguem.
+    aponta para ninguem passando pelo caminho de verdade.
 
-    `SUPABASE_JWT_SECRET` e forcado a None e a validacao remota e forcada a
-    falhar, para o teste nao depender de rede nem do `.env` local.
+    `SUPABASE_JWT_SECRET` e forcado a None para a validacao local falhar sem
+    rede. A validacao remota e stubada para TER SUCESSO — e essa e a parte
+    que importa: ela devolve um `sub` que nao esta em nenhuma linha, com o
+    e-mail da vitima (`conta_a`) no payload, exatamente como um token de
+    verdade emitido pelo Supabase para um atacante que conhece aquele
+    e-mail. Isso forca a execucao a passar pelo `resolve_identity_por_claims`
+    de verdade (security.py:99, a linha que a Tarefa 2 corrigiu) e cair no
+    ramo `IdentidadeNaoResolvida` (security.py:143) — nao no ramo generico de
+    "validacao falhou". Um stub que so faz a validacao remota FALHAR (como
+    esta versao tinha antes da revisao) prova 401 pelo ramo errado: o token
+    nunca chega a ser procurado no banco, e restaurar o auto-link por e-mail
+    dentro de `resolve_identity_por_claims` deixaria este teste verde do
+    mesmo jeito.
     """
     monkeypatch.setattr(
         "app.core.security.settings.SUPABASE_JWT_SECRET", None
     )
 
-    async def _falha_sempre(token):
-        raise RuntimeError("validacao remota indisponivel neste teste")
+    async def _resolve_para_ninguem(token):
+        # Validacao remota OK: o token e legitimo aos olhos do Supabase. O
+        # `sub` e que nao esta em nenhuma linha — e o e-mail e o da vitima,
+        # que era exatamente o que o auto-link usava para entregar a conta.
+        return {"id": str(uuid.uuid4()), "email": conta_a[1].email}
 
-    monkeypatch.setattr(auth_service, "get_user", _falha_sempre)
+    monkeypatch.setattr(auth_service, "get_user", _resolve_para_ninguem)
 
     sobrepostos = {}
     for dependencia in (get_context, get_current_user):
