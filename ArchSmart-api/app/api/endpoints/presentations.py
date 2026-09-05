@@ -4,7 +4,6 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
-import traceback
 
 from app.core.errors import ValidacaoDeDominio
 from app.db.session import get_db
@@ -290,9 +289,6 @@ async def upload_presentation_cover(
         
     except Exception as e:
         db.rollback()
-        print("====== UPLOAD EXCEPTION ======")
-        traceback.print_exc()
-        print("==============================")
         logger.error("Falha ao enviar imagem de capa da apresentacao", exc_info=e)
         raise ValidacaoDeDominio("Não foi possível enviar a imagem.")
         
@@ -414,9 +410,6 @@ async def upload_environment_image(
         return {"url": public_url, "image_urls": db_env.image_urls}
     except Exception as e:
         db.rollback()
-        print("====== UPLOAD ENV IMAGE EXCEPTION ======")
-        traceback.print_exc()
-        print("========================================")
         logger.error("Falha ao enviar imagem do ambiente", exc_info=e)
         raise ValidacaoDeDominio("Não foi possível enviar a imagem.")
 

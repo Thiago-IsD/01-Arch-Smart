@@ -97,9 +97,9 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            print(f"✅ Created new user in database: {new_user.id} ({email})")
-        
-        
+            logger.debug("Novo usuario criado no banco: %s", new_user.id)
+
+
         # Return response with email for auto-login
         return {
             **supabase_response,
@@ -107,7 +107,6 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         }
     except Exception as e:
         db.rollback()
-        print(f"❌ Error in complete-register: {str(e)}")
         logger.error("Falha ao concluir cadastro", exc_info=e)
         raise ValidacaoDeDominio("Não foi possível concluir o cadastro.")
 
@@ -182,12 +181,11 @@ async def signup(payload: UserSignup, db: Session = Depends(get_db)):
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            print(f"✅ Created user in database: {new_user.id} ({email})")
-        
+            logger.debug("Usuario criado no banco: %s", new_user.id)
+
         return supabase_response
     except Exception as e:
         db.rollback()
-        print(f"❌ Error in signup: {str(e)}")
         logger.error("Falha ao criar conta no cadastro por senha", exc_info=e)
         # Desvio deliberado da mensagem do brief ("Nao foi possivel entrar.
         # Verifique e-mail e senha.") — aquela e uma mensagem de LOGIN, e este
@@ -225,6 +223,5 @@ async def change_password(
         
         return {"message": "Senha alterada com sucesso."}
     except Exception as e:
-        print(f"❌ Error changing password: {e}")
         logger.error("Falha ao alterar senha", exc_info=e)
         raise ValidacaoDeDominio("Não foi possível alterar a senha.")

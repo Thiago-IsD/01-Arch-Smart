@@ -116,3 +116,40 @@ def test_requestcontext_so_em_security_e_testes():
         "do que ScopedRepository existe para garantir. Fora de la:\n"
         + "\n".join(fora)
     )
+
+
+def test_nenhum_print_em_app():
+    """
+    43 print() em app/ (fora de app/tests/) em 05/09/2026. Eles saem sem
+    timestamp e sem nome de modulo, o que tornou o log do Render inutil para
+    diagnostico — e alguns imprimiam trecho de token.
+    """
+    achados = [
+        a
+        for a in _ocorrencias("print(")
+        if a.replace("\\", "/").startswith("app/")
+        # app/tests/ tem 4 print() e morre inteiro na Tarefa 17. Esta exclusao
+        # e TEMPORARIA: a Tarefa 17, Passo 4, apaga esta linha junto com o
+        # diretorio. Se ela ainda estiver aqui depois da Tarefa 17, o lint
+        # esta cego para um diretorio que nao existe.
+        and not a.replace("\\", "/").startswith("app/tests/")
+    ]
+    assert not achados, (
+        "use logging.getLogger(__name__) em vez de print():\n"
+        + "\n".join(achados)
+    )
+
+
+def test_a_marca_e_arq_smart():
+    """
+    Art. 8: a marca e "Arq Smart" — duas palavras, com Q. A outra grafia e a
+    do nome do diretorio, e ja chegou a sair em assunto de e-mail.
+    """
+    achados = []
+    for grafia in ("Arch Smart", "ArchSmart", "Ark Smart", "Ecowe"):
+        achados += [
+            a
+            for a in _ocorrencias(grafia)
+            if a.replace("\\", "/").startswith("app/")
+        ]
+    assert not achados, "grafia errada da marca:\n" + "\n".join(achados)

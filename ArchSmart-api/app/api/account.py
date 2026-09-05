@@ -60,9 +60,9 @@ async def update_account_branding(
         
         # Read file content
         try:
-            print(f"📂 Uploading file: {unique_filename} to path: {storage_path}")
+            logger.debug("Enviando arquivo %s para %s", unique_filename, storage_path)
             file_bytes = await file.read()
-            
+
             # Upload to Supabase Storage
             storage_client = get_storage_client()
             await storage_client.upload_file(
@@ -71,13 +71,12 @@ async def update_account_branding(
                 file_bytes=file_bytes,
                 content_type=file.content_type or "image/png"
             )
-            print(f"✅ Upload successful. Path: {storage_path}")
-            
+            logger.debug("Upload concluido: %s", storage_path)
+
             # Store PATH in database (not URL)
             account.logo_url = storage_path
-            
+
         except Exception as e:
-            print(f"❌ Upload failed: {str(e)}")
             logger.error("Falha ao subir o logo da conta", exc_info=e)
             raise ValidacaoDeDominio("Não foi possível enviar o arquivo.")
     

@@ -10,8 +10,8 @@ setup_logging()
 
 logger = logging.getLogger(__name__)
 
-# A marca e "Arq Smart" — duas palavras, com Q (Art. 8). Estava "Arch Smart",
-# que e a grafia do nome do diretorio, nao da marca.
+# A marca e "Arq Smart" — duas palavras, com Q (Art. 8). O titulo aqui usava
+# a grafia do nome do diretorio, que nao e a grafia da marca.
 app = FastAPI(title="Arq Smart API", version="1.0.0")
 
 from slowapi.errors import RateLimitExceeded

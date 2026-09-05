@@ -2,10 +2,13 @@
 Supabase Storage client using REST API.
 Lightweight alternative to the full supabase-py library.
 """
+import logging
 import httpx
 import os
 from typing import Optional
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Force load .env
 load_dotenv()
@@ -25,12 +28,11 @@ class SupabaseStorageClient:
         if not self.service_role_key and not self.anon_key:
              raise ValueError("Either SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY must be set")
         
-        # Debug: Check which key is being used
-        print(f"🔑 Supabase Client Init: Service Key Present? {bool(self.service_role_key)}")
-        if self.service_role_key:
-             print(f"   Key starts with: {self.service_role_key[:5]}...")
-        else:
-             print("   Using Anon Key (RLS enforced)")
+        # Debug: Check which key is being used. Nunca logar um trecho da
+        # chave em si.
+        logger.debug("Cliente Supabase iniciado: service key presente? %s", bool(self.service_role_key))
+        if not self.service_role_key:
+            logger.debug("Usando anon key (RLS aplicado)")
 
         # Prefer Service Role Key, fallback to Anon Key
         self.api_key = self.service_role_key or self.anon_key
@@ -61,7 +63,7 @@ class SupabaseStorageClient:
             )
             # 409 Conflict means it already exists (safe to ignore if we handled it correctly)
             if response.status_code not in [200, 201, 409]:
-                print(f"⚠️ Failed to create bucket '{bucket}': {response.text}")
+                logger.warning("Falha ao criar bucket '%s': %s", bucket, response.text)
 
     async def upload_file(
         self,
@@ -92,9 +94,9 @@ class SupabaseStorageClient:
             # If bucket not found (404 typically, or raw error), try to create it
             if response.status_code == 404 or (response.status_code == 400 and "bucket" in response.text.lower()):
                 if self.is_service_role:
-                    print(f"ℹ️ Bucket '{bucket}' might be missing. Attempting to create...")
+                    logger.info("Bucket '%s' pode estar faltando. Tentando criar...", bucket)
                     await self._create_bucket(bucket, public=True)
-                    
+
                     # Retry upload
                     response = await client.post(
                         upload_url,
@@ -103,12 +105,10 @@ class SupabaseStorageClient:
                         timeout=30.0
                     )
                 else:
-                    print(f"⚠️ Bucket '{bucket}' missing but cannot auto-create (No Service Key).")
-            
+                    logger.warning("Bucket '%s' faltando e sem service key para criar.", bucket)
+
             if response.status_code not in [200, 201]:
-                error_msg = f"Upload failed: {response.status_code} - {response.text}"
-                print(f"❌ {error_msg}")
-                raise Exception(error_msg)
+                raise Exception(f"Upload failed: {response.status_code} - {response.text}")
         
         # Return public URL
         return self.get_public_url(bucket, path)
@@ -141,7 +141,7 @@ class SupabaseStorageClient:
             )
             
             if response.status_code != 200:
-                print(f"❌ Failed to sign URL: {response.text}")
+                logger.warning("Falha ao assinar URL: %s", response.text)
                 return ""
             
             # Response format: { "signedURL": "..." }

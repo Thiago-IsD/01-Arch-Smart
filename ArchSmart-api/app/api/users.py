@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -9,6 +11,7 @@ from app.schemas.user import UserProfileResponse, AccountInfo, UserProfileUpdate
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 
@@ -69,7 +72,7 @@ async def get_current_user_profile(
                 path=account.logo_url
             )
         except Exception as e:
-            print(f"⚠️ Failed to sign logo URL: {e}")
+            logger.warning("Falha ao assinar URL do logo: %s", e)
 
     # Build response
     account_info = AccountInfo(
@@ -128,7 +131,7 @@ async def update_user_profile(
                 path=account.logo_url
             )
         except Exception as e:
-            print(f"⚠️ Failed to sign logo URL: {e}")
+            logger.warning("Falha ao assinar URL do logo: %s", e)
 
     account_info = AccountInfo(
         id=account.id,

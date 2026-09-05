@@ -2,6 +2,7 @@
 Endpoint público (sem autenticação) para o Portal do Cliente.
 GET /public/presentations/{uuid}
 """
+import logging
 import uuid as uuid_module
 from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
@@ -24,6 +25,7 @@ from app.utils.supabase_client import get_storage_client
 from app.core.rate_limit import limiter, chave_por_apresentacao
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ==================== Schemas de Resposta Públicos ====================
 
@@ -78,7 +80,7 @@ class PublicEnvironmentInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 class PublicBrandingInfo(BaseModel):
-    office_name: Optional[str] = "Arch Smart"
+    office_name: Optional[str] = "Arq Smart"
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None
     
@@ -207,11 +209,10 @@ async def get_public_presentation(
             if signed_url:
                 logo_url = signed_url
         except Exception as e:
-            # repr() escapa não-ASCII (\uXXXX) para não estourar em consoles cp1252 (Windows).
-            print("[WARN] Erro ao assinar logo no portal:", repr(str(e))[:300])
+            logger.warning("Falha ao assinar logo no portal: %s", e)
 
     branding = PublicBrandingInfo(
-        office_name=office_name or "Arch Smart",
+        office_name=office_name or "Arq Smart",
         logo_url=logo_url,
         cover_url=branding_snapshot.get("cover_url"),
     )
