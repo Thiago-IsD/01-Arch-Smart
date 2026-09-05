@@ -382,12 +382,13 @@ Os dois primeiros testes sao a regressao da pendencia de seguranca registrada
 em docs/dev/arquitetura.md — o auto-link por e-mail e o auto-create. Eles
 falham enquanto app/api/users.py resolver identidade por e-mail.
 """
+import dataclasses
 import uuid
 
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.security import RequestContext, resolve_identity
+from app.core.security import RequestContext, resolve_identity_por_claims
 from app.models.all_models import Account, User
 
 
@@ -467,21 +468,27 @@ def test_contexto_e_imutavel():
         email="a@b.local",
         entitlements={},
     )
-    with pytest.raises(Exception):
+    # FrozenInstanceError, nao Exception: com `Exception` este teste passaria
+    # ate por um TypeError de construtor, sem provar que o objeto e imutavel.
+    with pytest.raises(dataclasses.FrozenInstanceError):
         ctx.account_id = uuid.uuid4()
 ```
 
 Note o nome `resolve_identity_por_claims` usado nos testes: é a metade da
 resolução que **não** decodifica token, e é o que dá para testar sem forjar um
-JWT. Ela é exportada junto com `resolve_identity`; o import no topo do arquivo
-de teste precisa incluí-la:
+JWT. O import no topo do arquivo de teste é exatamente este — `resolve_identity`
+**não** entra, porque nenhum teste deste arquivo a chama (ela é `async` e exige
+token de verdade):
 
 ```python
-from app.core.security import (
-    RequestContext,
-    resolve_identity,
-    resolve_identity_por_claims,
-)
+import dataclasses
+import uuid
+
+import pytest
+from sqlalchemy.orm import Session
+
+from app.core.security import RequestContext, resolve_identity_por_claims
+from app.models.all_models import Account, User
 ```
 
 - [ ] **Passo 2: Rodar e ver falhar**
@@ -1290,80 +1297,194 @@ produção". Crie `ArchSmart-api/tests/test_backfill_account_id.py`:
 
 ```python
 """
-A migracao de account_id roda num banco que ja tem linhas.
+A migracao de account_id roda num banco que JA TEM linhas.
 
-O `alembic upgrade head` da receita e sempre exercitado contra banco vazio
-(tests/test_receita_migracoes.py). Vazio, um `SET NOT NULL` sempre passa. Este
-teste semeia a arvore inteira ANTES e confere que o backfill preencheu — que e
-o caminho que producao percorre.
+Por que este teste nao usa a fixture `db`: o schema dela vem de
+`Base.metadata.create_all`, entao as linhas nasceriam com `account_id` ja
+preenchido pelo ORM e a assercao conferiria o que o proprio teste garantiu —
+um teste que nao testa nada. Aqui a sequencia e outra e e a de producao:
+
+  1. `alembic upgrade <revisao PAI>`  -> schema SEM account_id nas dez
+  2. INSERT por SQL cru               -> linhas legadas, como as que existem
+  3. `alembic upgrade head`           -> a migracao desta tarefa roda
+  4. so entao a conferencia
+
+Se o backfill errar um nivel da arvore, o passo 3 falha no `SET NOT NULL` (e
+a ADR 0007 derrubaria o deploy) ou o passo 4 acusa a divergencia.
 """
+import os
 import uuid
+from pathlib import Path
 
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, text
 
-from app.models.all_models import (
-    Account,
-    Budget,
-    BudgetItem,
-    Client,
-    Environment,
-    ItemOption,
-    Presentation,
-    Project,
-    RuleType,
-)
+from app.core import config as app_config
+
+RAIZ = Path(__file__).resolve().parents[1]
+# conftest.py exporta a URL do banco de teste em DATABASE_URL quando e
+# importado, antes de qualquer teste rodar — e e la que mora a guarda que
+# recusa banco que nao seja local e terminado em `_test`.
+URL_BASE = os.environ["DATABASE_URL"].rsplit("/", 1)[0]
+BANCO_BACKFILL = "arqsmart_backfill_test"
+URL_ADMIN = f"{URL_BASE}/postgres"
+URL_BACKFILL = f"{URL_BASE}/{BANCO_BACKFILL}"
+
+# A revisao PAI desta migracao: a de created_by, da Tarefa 3. Leia o
+# `down_revision` do arquivo que voce escreveu no Passo 4 e cole aqui — nao
+# adivinhe, e nao use "head-1", que nao existe no Alembic.
+REVISAO_PAI = "<down_revision da migracao desta tarefa>"
 
 
-def test_backfill_preenche_a_arvore_inteira(db: Session):
-    conta = Account(name="Conta do backfill")
-    db.add(conta)
-    db.flush()
-    cliente = Client(account_id=conta.id, name="Cliente")
-    db.add(cliente)
-    db.flush()
-    projeto = Project(account_id=conta.id, client_id=cliente.id, name="Projeto")
-    db.add(projeto)
-    db.flush()
-    ambiente = Environment(
-        account_id=conta.id, project_id=projeto.id, name="Sala"
-    )
-    orcamento = Budget(account_id=conta.id, project_id=projeto.id)
-    apresentacao = Presentation(
-        account_id=conta.id, project_id=projeto.id, name="Proposta"
-    )
-    db.add_all([ambiente, orcamento, apresentacao])
-    db.flush()
-    item = BudgetItem(
-        account_id=conta.id,
-        budget_id=orcamento.id,
-        environment_id=ambiente.id,
-        rule_type=RuleType.FLOOR,
-    )
-    db.add(item)
-    db.flush()
-    opcao = ItemOption(account_id=conta.id, budget_item_id=item.id)
-    db.add(opcao)
-    db.flush()
+@pytest.fixture
+def banco_no_estado_anterior(monkeypatch):
+    """
+    Banco PROPRIO, descartavel — mesmo padrao de
+    tests/test_receita_migracoes.py::banco_da_receita, e pelo mesmo motivo:
+    a fixture `db` da conftest e de sessao e ja subiu o schema inteiro com
+    create_all. Mexer naquele schema no meio da suite derrubaria as fixtures
+    de todos os testes seguintes.
+    """
+    admin = create_engine(URL_ADMIN, isolation_level="AUTOCOMMIT")
+    with admin.connect() as conexao:
+        conexao.execute(text(f"DROP DATABASE IF EXISTS {BANCO_BACKFILL}"))
+        conexao.execute(text(f"CREATE DATABASE {BANCO_BACKFILL}"))
+    admin.dispose()
 
-    # O que a migracao garante: descer a arvore por FK e por account_id da a
-    # mesma resposta. Se o backfill errar um nivel, os dois divergem.
-    for tabela, fk, pai in [
-        ("environments", "project_id", "projects"),
-        ("budgets", "project_id", "projects"),
-        ("budget_items", "budget_id", "budgets"),
-        ("item_options", "budget_item_id", "budget_items"),
-        ("presentations", "project_id", "projects"),
-    ]:
-        divergentes = db.execute(
+    engine = create_engine(URL_BACKFILL)
+    with engine.begin() as conexao:
+        conexao.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+
+    # alembic/env.py le settings.DATABASE_URL em tempo de execucao, entao
+    # trocar o atributo redireciona a receita para o banco descartavel.
+    monkeypatch.setattr(app_config.settings, "DATABASE_URL", URL_BACKFILL)
+    cfg = Config(str(RAIZ / "alembic.ini"))
+    cfg.set_main_option("script_location", str(RAIZ / "alembic"))
+    command.upgrade(cfg, REVISAO_PAI)
+
+    yield engine, cfg
+    engine.dispose()
+
+
+def test_backfill_preenche_a_arvore_inteira(banco_no_estado_anterior):
+    engine, cfg = banco_no_estado_anterior
+    conta = uuid.uuid4()
+    cliente = uuid.uuid4()
+    projeto = uuid.uuid4()
+    ambiente = uuid.uuid4()
+    orcamento = uuid.uuid4()
+    item = uuid.uuid4()
+    opcao = uuid.uuid4()
+    apresentacao = uuid.uuid4()
+
+    # INSERT cru, no schema ANTIGO: nenhuma destas tabelas filhas tem
+    # account_id ainda. E exatamente a forma das linhas que ja existem.
+    with engine.begin() as c:
+        c.execute(
+            text("INSERT INTO accounts (id, name) VALUES (:i, 'Conta legada')"),
+            {"i": conta},
+        )
+        c.execute(
             text(
-                f"SELECT count(*) FROM {tabela} t "
-                f"JOIN {pai} p ON p.id = t.{fk} "
-                "WHERE t.account_id <> p.account_id"
+                "INSERT INTO clients (id, account_id, name) "
+                "VALUES (:i, :a, 'Cliente')"
+            ),
+            {"i": cliente, "a": conta},
+        )
+        c.execute(
+            text(
+                "INSERT INTO projects (id, account_id, client_id, name) "
+                "VALUES (:i, :a, :c, 'Projeto')"
+            ),
+            {"i": projeto, "a": conta, "c": cliente},
+        )
+        c.execute(
+            text(
+                "INSERT INTO environments (id, project_id, name) "
+                "VALUES (:i, :p, 'Sala')"
+            ),
+            {"i": ambiente, "p": projeto},
+        )
+        c.execute(
+            text("INSERT INTO budgets (id, project_id) VALUES (:i, :p)"),
+            {"i": orcamento, "p": projeto},
+        )
+        c.execute(
+            text(
+                "INSERT INTO budget_items (id, budget_id, environment_id, rule_type) "
+                "VALUES (:i, :b, :e, 'FLOOR')"
+            ),
+            {"i": item, "b": orcamento, "e": ambiente},
+        )
+        c.execute(
+            text(
+                "INSERT INTO item_options (id, budget_item_id) VALUES (:i, :b)"
+            ),
+            {"i": opcao, "b": item},
+        )
+        c.execute(
+            text(
+                "INSERT INTO presentations (id, project_id, name, status) "
+                "VALUES (:i, :p, 'Proposta', 'DRAFT')"
+            ),
+            {"i": apresentacao, "p": projeto},
+        )
+
+    # A migracao desta tarefa roda AGORA, sobre as linhas acima.
+    command.upgrade(cfg, "head")
+
+    with engine.begin() as c:
+        # 1. Toda linha tem conta, e e a conta certa.
+        for tabela, fk, pai in [
+            ("environments", "project_id", "projects"),
+            ("budgets", "project_id", "projects"),
+            ("budget_items", "budget_id", "budgets"),
+            ("item_options", "budget_item_id", "budget_items"),
+            ("presentations", "project_id", "projects"),
+        ]:
+            divergentes = c.execute(
+                text(
+                    f"SELECT count(*) FROM {tabela} t "
+                    f"JOIN {pai} p ON p.id = t.{fk} "
+                    "WHERE t.account_id IS DISTINCT FROM p.account_id"
+                )
+            ).scalar()
+            assert divergentes == 0, (
+                f"{tabela}.account_id divergiu de {pai} depois do backfill"
             )
-        ).scalar()
-        assert divergentes == 0, f"{tabela}.account_id divergiu de {pai}"
+
+        # 2. A coluna fechou em NOT NULL de verdade — o `SET NOT NULL` da
+        #    migracao e o que impede linha orfa nascer depois.
+        obrigatorias = c.execute(
+            text(
+                "SELECT table_name FROM information_schema.columns "
+                "WHERE column_name = 'account_id' AND is_nullable = 'NO' "
+                "AND table_name IN ('environments','environment_dnas','budgets',"
+                "'budget_items','item_options','presentations',"
+                "'presentation_environments','presentation_acceptances',"
+                "'presentation_comments','project_slots')"
+            )
+        ).scalars().all()
+        assert len(obrigatorias) == 10, (
+            "esperava as 10 tabelas com account_id NOT NULL, achei "
+            f"{sorted(obrigatorias)}"
+        )
 ```
+
+> ⚠️ **Este teste cria e derruba um banco (`arqsmart_backfill_test`), não um
+> schema.** É o mesmo padrão que `tests/test_receita_migracoes.py` já usa, e
+> pelo mesmo motivo: a fixture `db` da conftest é de sessão e já subiu o schema
+> com `create_all`; mexer nele no meio da suíte derrubaria as fixtures de todos
+> os testes seguintes.
+>
+> ⚠️ `URL_BASE` sai de `os.environ["DATABASE_URL"]`, que a `tests/conftest.py`
+> escreve **na importação**, depois de a guarda de `tools/guarda_banco.py`
+> recusar qualquer destino que não seja local e terminado em `_test`. Isso é o
+> que torna o `DROP DATABASE` seguro. **Não troque por `os.getenv` com valor
+> padrão** — seria contornar a guarda, que é exatamente o furo que a Seção 3
+> fechou.
 
 - [ ] **Passo 6: Rodar os testes**
 
@@ -1929,10 +2050,21 @@ APP = RAIZ / "app"
 ONDE_A_ESCOTILHA_E_PERMITIDA = (RAIZ / "tools", RAIZ / "alembic", RAIZ / "tests")
 
 
+# Diretorios de codigo, explicitos. NAO use RAIZ.rglob("*.py"): ele enumera os
+# 4024 arquivos .py do venv/ antes de filtrar, e cada lint deste arquivo pagaria
+# isso de novo.
+DIRETORIOS_DE_CODIGO = ("app", "tools", "alembic", "tests")
+
+
 def _arquivos_python(raiz: Path) -> list[Path]:
+    if raiz.is_dir() and raiz != RAIZ:
+        origens = [raiz]
+    else:
+        origens = [RAIZ / d for d in DIRETORIOS_DE_CODIGO if (RAIZ / d).is_dir()]
     return [
         p
-        for p in raiz.rglob("*.py")
+        for origem in origens
+        for p in origem.rglob("*.py")
         if "venv" not in p.parts and "node_modules" not in p.parts
     ]
 
@@ -2735,6 +2867,13 @@ def produto_selecionado(item: BudgetItem) -> Optional[Product]:
 
 - [ ] **Passo 5: Trocar os 5 pontos de chamada**
 
+> ⚠️ **Nesta tarefa o carregamento usa `db.query`, não `repo.query`.** O
+> `ScopedRepository` só entra em `budgets_router.py` e em `public.py` nas
+> Tarefas 12 e 13; aqui esses arquivos ainda recebem `db` e `current_user`.
+> Use a `Session` que o endpoint já tem, **preservando o filtro por conta que o
+> arquivo já faz** — `carregar_orcamento` aceita qualquer `Query`, e a Tarefa 12
+> troca esta linha por `repo.query(...)` quando converter o arquivo.
+
 Em `app/api/routers/budgets_router.py`, o laço da linha 91 (que hoje chama a
 função velha por item) passa a:
 
@@ -2745,8 +2884,10 @@ função velha por item) passa a:
         produto_selecionado,
     )
 
+    # db.query aqui e deliberado: a Tarefa 12 converte este arquivo para
+    # repo.query. O filtro por conta continua sendo o que o endpoint ja fazia.
     itens, dnas = carregar_orcamento(
-        repo.query(BudgetItem).filter(BudgetItem.budget_id == budget.id)
+        db.query(BudgetItem).filter(BudgetItem.budget_id == budget.id)
     )
     real_total = 0.0
     for item in itens:
@@ -2773,7 +2914,7 @@ laço, o padrão é:
 
 ```python
     itens, dnas = carregar_orcamento(
-        repo.query(BudgetItem).filter(BudgetItem.id == budget_item.id)
+        db.query(BudgetItem).filter(BudgetItem.id == budget_item.id)
     )
     item = itens[0]
     calculo = calculate_quantity(
@@ -2784,12 +2925,13 @@ laço, o padrão é:
     item.has_yield_alert = calculo.has_yield_alert
 ```
 
-> ⚠️ `public.py` é o portal público — **não tem `RequestContext`**. Lá a query
-> não vem de `repo`: ela já é resolvida a partir da apresentação, cujo acesso é
-> autorizado pelo token de portal (`app/core/portal_security.py`). Use
+> ⚠️ `public.py` é o portal público — **nunca terá `RequestContext`**. Lá a
+> query não vem de `repo` em tarefa nenhuma: ela é resolvida a partir da
+> apresentação, cujo acesso é autorizado pelo token de portal
+> (`app/core/portal_security.py`). Use
 > `db.query(BudgetItem).filter(BudgetItem.budget_id == orcamento.id)`. Isso é
-> deliberado e está coberto pelos 10 testes de
-> `tests/isolation/test_portal_access.py`.
+> permanente, não transitório como em `budgets_router.py`, e está coberto pelos
+> 10 testes de `tests/isolation/test_portal_access.py`.
 
 - [ ] **Passo 6: Conferir que a função velha morreu**
 
@@ -2870,11 +3012,20 @@ Acrescente a `ArchSmart-api/tests/test_arquitetura.py`:
 ```python
 def test_nenhum_print_em_app():
     """
-    54 print() em 05/09/2026. Eles saem sem timestamp e sem nome de modulo, o
-    que tornou o log do Render inutil para diagnostico — e alguns imprimiam
-    trecho de token.
+    54 print() em app/ (fora de app/tests/) em 05/09/2026. Eles saem sem
+    timestamp e sem nome de modulo, o que tornou o log do Render inutil para
+    diagnostico — e alguns imprimiam trecho de token.
     """
-    achados = [a for a in _ocorrencias(APP, "print(") if "# noqa: T201" not in a]
+    achados = [
+        a
+        for a in _ocorrencias(APP, "print(")
+        # app/tests/ tem 4 print() e morre inteiro na Tarefa 17. Esta exclusao
+        # e TEMPORARIA: a Tarefa 17, Passo 4, apaga esta linha junto com o
+        # diretorio. Se ela ainda estiver aqui depois da Tarefa 17, o lint
+        # esta cego para um diretorio que nao existe.
+        if not a.replace("\\", "/").startswith("app/tests/")
+        and "# noqa: T201" not in a
+    ]
     assert not achados, (
         "use logging.getLogger(__name__) em vez de print():\n"
         + "\n".join(achados)
@@ -4190,6 +4341,8 @@ foi assim que a Seção 1 aconteceu.
 **Arquivos:**
 - Modificar: os cinco acima
 - Modificar: `ArchSmart-api/tests/test_arquitetura.py`
+- Modificar: `ArchSmart-api/tests/conftest.py` (some a sobreposição de
+  `get_current_user`, que deixa de existir neste passo — ver Passo 5)
 - Testar: `ArchSmart-api/tests/api/test_produtos_e_conta.py` (novo)
 
 **Interfaces:**
@@ -4299,7 +4452,18 @@ Aplique a receita.
 > formulário público, ela não tem sessão e fica como está, com comentário.
 > Verifique qual é antes de converter: `grep -n "db.query" app/api/leads.py`.
 
-- [ ] **Passo 5: Converter as 4 de `users.py` que dão**
+- [ ] **Passo 5: Converter `users.py` e matar o `get_current_user`**
+
+Os dois endpoints (`GET /me` e `PUT /profile`) trocam
+`current_user: User = Depends(get_current_user)` por
+`repo: ScopedRepository = Depends(get_repo)`, e obtêm o usuário assim:
+
+```python
+    usuario = repo.obter(User, repo.ctx.user_id)
+```
+
+`users` tem `account_id`, então o repositório serve — e o `obter` garante que
+o usuário é da conta do próprio token, o que a versão anterior assumia.
 
 `Subscription` converte (`repo.query(Subscription)`). `Account` e `Plan` ficam,
 com comentário:
@@ -4308,8 +4472,28 @@ com comentário:
     # `accounts` e a unica tabela sem account_id — ela E a conta. Chegar nela
     # pelo ctx.account_id do contexto e o caminho certo; repo.query(Account)
     # levantaria EscopoImpossivel.
-    conta = db.query(Account).filter(Account.id == repo.ctx.account_id).first()
+    conta = repo.db.query(Account).filter(Account.id == repo.ctx.account_id).first()
 ```
+
+Com isso, `get_current_user` não tem mais nenhum chamador. **Apague a função** —
+a docstring dela, escrita na Tarefa 2, já dizia que ela sumiria quando a última
+rota migrasse.
+
+> ⚠️ **Apagar a função sozinha quebra a suíte inteira.**
+> `tests/conftest.py` importa `get_current_user` e o sobrepõe em `_cliente`;
+> sem o símbolo, a conftest não importa e os 27 testes de isolamento da Seção 1
+> caem junto com todo o resto. Remova as duas linhas **no mesmo commit**:
+>
+> ```python
+> # sai do topo:
+> from app.api.users import get_current_user  # noqa: E402
+>
+> # e sai de dentro de _cliente():
+>         app.dependency_overrides[get_current_user] = lambda: usuario
+> ```
+>
+> Sobra a sobreposição de `get_context`, que a Tarefa 2 acrescentou — e que
+> agora é a única identidade que os testes precisam montar.
 
 - [ ] **Passo 6: Comentar as 2 de `auth.py`**
 
@@ -4798,7 +4982,20 @@ passa a:
 testpaths = tests
 ```
 
-- [ ] **Passo 5: Rodar a suíte inteira**
+- [ ] **Passo 5: Tirar a exclusão temporária do lint de `print()`**
+
+A Tarefa 9 excluiu `app/tests/` do `test_nenhum_print_em_app` porque aqueles 4
+`print()` existiam e o diretório só morreria agora. Ele morreu. Em
+`ArchSmart-api/tests/test_arquitetura.py`, o filtro volta a ser simples:
+
+```python
+    achados = [a for a in _ocorrencias(APP, "print(") if "# noqa: T201" not in a]
+```
+
+Um lint com exclusão para um diretório que não existe é um lint cego que
+ninguém percebe.
+
+- [ ] **Passo 6: Rodar a suíte inteira**
 
 ```bash
 pytest -q
@@ -4807,10 +5004,10 @@ pytest -q
 Esperado: **o mesmo número da Tarefa 16**. Se mudou, algo em `tests/` dependia
 de `app/tests/` — provavelmente um `conftest.py` compartilhado.
 
-- [ ] **Passo 6: Commit**
+- [ ] **Passo 7: Commit**
 
 ```bash
-git add ArchSmart-api/pytest.ini
+git add ArchSmart-api/pytest.ini ArchSmart-api/tests/test_arquitetura.py
 git commit -m "test: apaga a suite antiga sobre MagicMock, substituida pela suite contra Postgres"
 ```
 
