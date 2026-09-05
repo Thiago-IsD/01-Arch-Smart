@@ -10,18 +10,43 @@ ignorar.
 Como quebrar de proposito, para ver que funciona: apague o filtro por conta de
 um endpoint qualquer e rode. Se ele continuar verde, este arquivo esta mentindo.
 
-**Nem todo caso e igualmente forte.** GET e DELETE nao tem corpo — 404 e
-exigivel sempre. PUT e PATCH, medido, tambem chegam no handler com `json={}`
-(nenhum tem campo obrigatorio sem default) e por isso tambem exigem 404. Mas
-6 das 6 rotas POST coletadas rejeitariam `json={}` pelo Pydantic ANTES do
-endpoint rodar — um 422 que passaria mesmo se a conta nao fosse filtrada. Por
-isso CORPOS_MINIMOS da a cada uma um corpo que passa da validacao, e a lista
-de casos se divide em CASOS_FORTES (exige 404) e CASOS_FRACOS (rotas cujo
-corpo minimo so seria possivel citando dado de OUTRA conta — nenhuma hoje;
-ver POSTS_SEM_CORPO_MINIMO_POSSIVEL). Uma rota POST sem entrada em
-CORPOS_MINIMOS falha dentro do proprio teste, com a mesma logica de
-`assert fabrica is not None` do RECURSOS abaixo — nao cai numa asercao fraca
-por omissao.
+**Todos os 35 casos de CASOS_FORTES sao load-bearing hoje** — cada um
+exige 404 e SO fica verde porque o filtro por conta funciona, nao por
+coincidencia de dado ou de validacao. Isso exigiu dois cuidados, cada um
+medido quebrando o codigo de proposito e vendo o teste acusar (nao so
+supor):
+
+1. **Corpo minimo para POST.** GET e DELETE nao tem corpo — 404 e exigivel
+   sempre. PUT e PATCH, medido, tambem chegam no handler com `json={}`
+   (nenhum tem campo obrigatorio sem default). Mas as 6 rotas POST
+   coletadas rejeitariam `json={}` pelo Pydantic ANTES do endpoint rodar —
+   um 422 que passaria mesmo se a conta nao fosse filtrada, decorativo.
+   CORPOS_MINIMOS da a cada uma um corpo que passa da validacao (e, para
+   `/projects/{project_id}/presentations`, um corpo cujo `project_id`
+   CITA o mesmo id que foi para a URL — ver o comentario de CORPOS_MINIMOS
+   sobre por que um valor fixo mascararia a quebra atras de um 400 em vez
+   de acusar o 201 de verdade). Uma rota POST sem entrada em CORPOS_MINIMOS
+   falha dentro do proprio teste, mesma logica do `assert fabrica is not
+   None` do RECURSOS — nao cai numa asercao fraca por omissao. A lista de
+   casos se divide em CASOS_FORTES (exige 404) e CASOS_FRACOS (rotas cujo
+   corpo minimo so seria possivel citando dado de OUTRA conta — nenhuma
+   hoje; ver POSTS_SEM_CORPO_MINIMO_POSSIVEL).
+
+2. **Recurso certo para `env_id`.** Duas rotas (`PUT` e `POST` em
+   `.../presentations/{presentation_id}/environments/{env_id}[...]`) usam
+   `env_id` para endereçar `PresentationEnvironment`, nao `Environment` —
+   RECURSOS_POR_ROTA da a elas uma fabrica que cria o model certo, filho da
+   MESMA apresentacao que `{presentation_id}` carrega. Sem isso, medido: as
+   duas rotas eram 404 sempre, para QUALQUER conta, porque o `env_id`
+   fabricado nunca batia com nenhum `PresentationEnvironment` de verdade —
+   apagar o filtro por conta de proposito nessas duas rotas nao mudava o
+   resultado. Ver o comentario de `_criar_ambiente_de_apresentacao` para a
+   medicao completa, inclusive uma descoberta lateral: em
+   `upload_environment_image`, o `repo.obter(Presentation, presentation_id)`
+   sozinho NAO e o unico gate — `repo.query(PresentationEnvironment)`
+   tambem filtra por conta (e o que `ScopedRepository.query()` sempre
+   faz), entao remover so aquela linha nao vaza. A quebra que vaza de
+   verdade e desescopar o `repo.query(PresentationEnvironment)` em si.
 
 **Gap conhecido, fora do que este arquivo cobre.** Rotas cujo id vem do BODY,
 nao da URL — `PATCH /api/products/batch-approve`
@@ -41,10 +66,12 @@ generico nem a rede de fumaca alcancam, e por isso fica registrada aqui em
 vez de descoberta depois.
 """
 import re
+from typing import Callable
 
 import pytest
 
 from app.main import app
+from app.models.all_models import PresentationEnvironment
 from tests.conftest import (
     criar_ambiente,
     criar_apresentacao,
@@ -59,21 +86,9 @@ from tests.conftest import (
 )
 
 # Parametro de caminho -> como fabricar um recurso daquele tipo numa conta.
-# TODA rota com id na URL precisa de entrada aqui. E de proposito que a falta
-# de uma entrada seja falha, e nao pulo: rota nova sem isolamento tem que
-# quebrar o build no dia em que e escrita.
-#
-# `env_id` merece uma nota: das 4 ocorrencias, 2 (PUT e POST em
-# /presentations/{presentation_id}/environments/{env_id}[...]) endereçam
-# PresentationEnvironment, nao Environment — sao modelos diferentes com o
-# mesmo nome de parametro. A fabrica abaixo cria um Environment, e nesses
-# dois casos o id cai numa tabela errada; a isolacao dessas duas rotas ainda
-# fica provada porque `repo.obter(Presentation, presentation_id)` roda ANTES
-# de qualquer uso de env_id — para conta B, ja e 404 ali. O que este arquivo
-# NAO prova, por causa disso, e isolacao de PresentationEnvironment por id
-# proprio; nao ha rota hoje que vaze isso (a busca e sempre composta com
-# presentation_id), entao nao criei uma segunda fabrica so para um teste que
-# nao mudaria de resultado.
+# TODA rota com id na URL precisa de entrada aqui (ou em RECURSOS_POR_ROTA,
+# abaixo). E de proposito que a falta de uma entrada seja falha, e nao pulo:
+# rota nova sem isolamento tem que quebrar o build no dia em que e escrita.
 RECURSOS = {
     "project_id": lambda db, conta, usuario: criar_projeto(
         db, conta, "Alheio", usuario
@@ -87,6 +102,88 @@ RECURSOS = {
     "entry_id": criar_lancamento,
     "event_id": criar_evento,
     "notification_id": criar_notificacao,
+}
+
+
+def _criar_ambiente_de_apresentacao(db, conta, usuario, ja_criados: dict):
+    """
+    Fabrica de override para `env_id` nas DUAS rotas onde ele nao endereca
+    `Environment` (o que `RECURSOS["env_id"]` cria), e sim
+    `PresentationEnvironment` — um model diferente, mesmo nome de parametro:
+    `PUT .../presentations/{presentation_id}/environments/{env_id}` e
+    `POST .../presentations/{presentation_id}/environments/{env_id}/images`.
+
+    Isto nao e hipotetico: com `RECURSOS["env_id"]` (um `Environment`) usado
+    aqui, o `env_id` da URL nunca bate com nenhum `PresentationEnvironment.id`
+    de propósito nenhum — o segundo filtro do handler (`.filter(
+    PresentationEnvironment.id == env_id, ...)`) sempre devolve None, e a
+    rota sempre 404, INDEPENDENTE do primeiro filtro (`repo.obter(
+    Presentation, presentation_id)`) estar la ou nao. Medido: apagar
+    `repo.obter(Presentation, presentation_id)` de proposito em
+    `update_presentation_environment_detail` e rodar so esse caso continuava
+    verde — o teste nunca provou isolamento nessas duas rotas, so provava
+    que um id de tabela errada nunca bate.
+
+    O `PresentationEnvironment` fabricado aqui pertence a MESMA
+    `Presentation` que `{presentation_id}` vai carregar na URL —
+    `ja_criados["presentation_id"]`, que `_preencher_url` ja resolveu antes
+    de chegar em `env_id` (a ordem dos parametros na URL importa: nas duas
+    rotas, presentation_id vem primeiro). Um `PresentationEnvironment` preso
+    a uma apresentacao diferente ainda seria "da conta B", mas os dois ids
+    na URL nunca apareceriam juntos assim numa chamada de verdade — e o
+    segundo filtro do handler voltaria a mascarar o primeiro.
+
+    **Com a fabrica certa, uma descoberta lateral em `upload_environment_image`
+    (a rota POST).** Apagar so `repo.obter(Presentation, presentation_id)`
+    (linha 329) e rodar o caso NAO acusa — continua 404. Isso NAO e o mesmo
+    defeito de antes: agora o `env_id` bate com um `PresentationEnvironment`
+    de verdade, mas `repo.query(PresentationEnvironment)`, logo abaixo,
+    filtra por `account_id` sozinho (e o que `ScopedRepository.query()`
+    sempre faz — ver `app/db/repository.py`), entao a rota continua segura
+    mesmo sem aquela linha. Quebrar de verdade exige desescopar o PROPRIO
+    `repo.query(PresentationEnvironment)` (trocar por `repo.db.query(...)`)
+    — aí sim o caso acusa 200, um vazamento de verdade. Isso e defesa em
+    profundidade, nao um teste fraco: `repo.obter(Presentation,
+    presentation_id)` ainda vale por dar um 404 com mensagem melhor
+    ("Apresentação não encontrada" em vez de "Ambiente da apresentação não
+    encontrado") e por evitar tocar a tabela errada quando a apresentacao
+    nem existe — so nao e o UNICO gate de conta nesta rota especifica. Nao
+    quebrei esse segundo gate na rehearsal registrada no relatorio da
+    tarefa: o caminho de sucesso dali em diante chama o Supabase Storage de
+    verdade (`get_storage_client()`, credenciais de `.env`), e a rehearsal
+    usou um `return` antecipado antes do upload para nao bater na rede.
+    """
+    apresentacao = ja_criados["presentation_id"]
+    ambiente = criar_ambiente(db, conta, usuario)
+    presentation_environment = PresentationEnvironment(
+        account_id=conta.id,
+        created_by=usuario.id,
+        presentation_id=apresentacao.id,
+        environment_id=ambiente.id,
+        is_visible=True,
+    )
+    db.add(presentation_environment)
+    db.flush()
+    return presentation_environment
+
+
+# Override por ROTA, consultado ANTES de RECURSOS: o mesmo nome de parametro
+# nem sempre endereca o mesmo model — `env_id` e o caso medido. Chave e
+# (caminho, parametro); valor e uma fabrica de 4 argumentos
+# `(db, conta, usuario, ja_criados)`, onde `ja_criados` e um dict
+# {parametro: objeto} dos parametros MAIS A ESQUERDA na mesma URL, ja
+# resolvidos — permite construir um recurso FILHO do pai correto (aqui, o
+# PresentationEnvironment sob a MESMA Presentation que a URL vai carregar)
+# em vez de um pai solto que nunca bateria com o outro id da mesma URL.
+RECURSOS_POR_ROTA: dict[tuple[str, str], Callable] = {
+    (
+        "/api/presentations/{presentation_id}/environments/{env_id}",
+        "env_id",
+    ): _criar_ambiente_de_apresentacao,
+    (
+        "/api/presentations/{presentation_id}/environments/{env_id}/images",
+        "env_id",
+    ): _criar_ambiente_de_apresentacao,
 }
 
 # O portal publico. Quem chama nao tem conta: e o cliente final do arquiteto,
@@ -131,14 +228,28 @@ def test_ha_rotas_para_percorrer():
 # motivo errado. Essa e exatamente a forma de teste decorativo que a Tarefa 2
 # ja pegou uma vez (um 401 que passava contra codigo que vazaria).
 #
-# Nenhum valor aqui precisa apontar para um recurso de VERDADE: em toda rota
-# desta lista, a checagem de posse do recurso da URL (`repo.obter(...)`) roda
-# ANTES de o handler tocar em qualquer campo do corpo — entao um UUID
-# qualquer, mesmo inexistente, e suficiente para o pedido chegar la e ainda
-# assim ser barrado por dono errado, nunca por dado invalido.
+# A maioria dos valores nao precisa apontar para um recurso de VERDADE: em
+# quase toda rota desta lista, a checagem de posse do recurso da URL
+# (`repo.obter(...)`) roda ANTES de o handler tocar em qualquer campo do
+# corpo — entao um UUID qualquer, mesmo inexistente, e suficiente para o
+# pedido chegar la e ainda assim ser barrado por dono errado, nunca por dado
+# invalido.
+#
+# UMA excecao: `/projects/{project_id}/presentations` tambem valida
+# `presentation_in.project_id != project_id` (o da URL) e devolve 400 se
+# divergirem — um gate DEPOIS do `repo.obter(Project, project_id)`, mas que
+# ainda mascara: se alguem apagar o `repo.obter` de proposito (ou por
+# acidente), um corpo com project_id FIXO e diferente da URL ainda produziria
+# 400 em vez de 404, o teste ainda ficaria vermelho, mas por coincidencia de
+# validacao — nao porque detectou o vazamento. Por isso este corpo e uma
+# FUNCAO de `ja_criados`, nao um dict fixo: usa o MESMO project_id que foi
+# parar na URL, entao o unico jeito de a rota nao vazar e o
+# `repo.obter(Project, project_id)` estar la — se sumir, o corpo bate, o
+# handler cria a apresentacao no projeto da conta B, e o teste acusa 201
+# ("vazamento entre contas"), a mensagem certa para o defeito certo.
 _UUID_QUALQUER = "00000000-0000-0000-0000-000000000000"
 
-CORPOS_MINIMOS: dict[str, dict] = {
+CORPOS_MINIMOS: dict[str, dict | Callable[[dict], dict]] = {
     "/api/budgets/items/{item_id}/options": {
         "json": {"product_id": _UUID_QUALQUER},
     },
@@ -148,8 +259,11 @@ CORPOS_MINIMOS: dict[str, dict] = {
     "/api/projects/{project_id}/environments": {
         "json": {"name": "Ambiente minimo"},
     },
-    "/api/projects/{project_id}/presentations": {
-        "json": {"name": "Apresentacao minima", "project_id": _UUID_QUALQUER},
+    "/api/projects/{project_id}/presentations": lambda ja_criados: {
+        "json": {
+            "name": "Apresentacao minima",
+            "project_id": str(ja_criados["project_id"].id),
+        },
     },
     # Estas duas nao tem corpo JSON: o endpoint declara `file: UploadFile =
     # File(...)`, entao `json={}` nem chega a ser o motivo do 422 — o
@@ -184,19 +298,39 @@ CASOS_FRACOS = [
 CASOS_FORTES = [caso for caso in CASOS if caso not in CASOS_FRACOS]
 
 
-def _preencher_url(caminho: str, parametros: tuple[str, ...], db, conta, usuario) -> str:
+def _preencher_url(
+    caminho: str, parametros: tuple[str, ...], db, conta, usuario
+) -> tuple[str, dict]:
+    """
+    Substitui cada `{parametro}` do caminho pelo id de um recurso fabricado
+    para a conta B, na ordem em que os parametros aparecem na URL (a ordem
+    IMPORTA: e o que permite `_criar_ambiente_de_apresentacao` olhar
+    `ja_criados["presentation_id"]` quando chega a vez de `env_id`).
+
+    Devolve `(url, ja_criados)` — `ja_criados` e o dict {parametro: objeto}
+    completo, usado pelas rotas POST cujo corpo minimo precisa referenciar o
+    MESMO id que acabou de ir para a URL (ver CORPOS_MINIMOS callable).
+    """
     url = caminho
+    ja_criados: dict = {}
     for parametro in parametros:
-        fabrica = RECURSOS.get(parametro)
-        assert fabrica is not None, (
-            f"a rota {caminho} tem o parametro {{{parametro}}} e ninguem "
-            "disse que recurso ele endereca. Acrescente uma entrada em "
-            "RECURSOS (ou, se for rota de portal publico, em "
-            "PARAMETROS_FORA_DO_ESCOPO, com o motivo)."
-        )
-        recurso = fabrica(db, conta, usuario)
+        fabrica_da_rota = RECURSOS_POR_ROTA.get((caminho, parametro))
+        if fabrica_da_rota is not None:
+            recurso = fabrica_da_rota(db, conta, usuario, ja_criados)
+        else:
+            fabrica = RECURSOS.get(parametro)
+            assert fabrica is not None, (
+                f"a rota {caminho} tem o parametro {{{parametro}}} e ninguem "
+                "disse que recurso ele endereca. Acrescente uma entrada em "
+                "RECURSOS (ou, se o MESMO nome de parametro enderecar um "
+                "model diferente NESSA rota, em RECURSOS_POR_ROTA) — ou, se "
+                "for rota de portal publico, em PARAMETROS_FORA_DO_ESCOPO, "
+                "com o motivo)."
+            )
+            recurso = fabrica(db, conta, usuario)
+        ja_criados[parametro] = recurso
         url = url.replace("{" + parametro + "}", str(recurso.id))
-    return url
+    return url, ja_criados
 
 
 @pytest.mark.parametrize("metodo,caminho,parametros", CASOS_FORTES, ids=lambda v: str(v))
@@ -214,11 +348,11 @@ def test_toda_rota_forte_isola_por_conta_com_404(
     arriscar um 422 decorativo.
     """
     conta, usuario = conta_b
-    url = _preencher_url(caminho, parametros, db, conta, usuario)
+    url, ja_criados = _preencher_url(caminho, parametros, db, conta, usuario)
 
     if metodo == "POST":
-        corpo = CORPOS_MINIMOS.get(caminho)
-        assert corpo is not None, (
+        registro = CORPOS_MINIMOS.get(caminho)
+        assert registro is not None, (
             f"a rota POST {caminho} esta em CASOS_FORTES mas nao tem corpo "
             "minimo em CORPOS_MINIMOS. Acrescente um corpo que passe da "
             "validacao do Pydantic, ou declare em "
@@ -226,6 +360,10 @@ def test_toda_rota_forte_isola_por_conta_com_404(
             "ser montado citando dado de outra conta — nesse caso o caso "
             "migra sozinho para CASOS_FRACOS."
         )
+        # Uma entrada pode ser um dict fixo ou uma funcao de `ja_criados`,
+        # para o corpo poder citar o MESMO id que foi parar na URL (ver o
+        # comentario de /projects/{project_id}/presentations acima).
+        corpo = registro(ja_criados) if callable(registro) else registro
     else:
         corpo = {"json": {}}
 
@@ -258,7 +396,7 @@ def test_toda_rota_fraca_isola_por_conta_sem_vazamento(
     (2xx/403) continua sendo, e e o que esta asercao ainda prova.
     """
     conta, usuario = conta_b
-    url = _preencher_url(caminho, parametros, db, conta, usuario)
+    url, _ = _preencher_url(caminho, parametros, db, conta, usuario)
 
     resposta = client_a.request(metodo, url, json={})
 
