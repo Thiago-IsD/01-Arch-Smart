@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
@@ -5,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 import traceback
 
+from app.core.errors import ValidacaoDeDominio
 from app.db.session import get_db
 from app.utils.supabase_client import get_storage_client
 from app.models.all_models import Presentation, PresentationEnvironment, Project, Environment, User, Account, PresentationComment
@@ -17,6 +19,7 @@ class PresentationCommentCreate(BaseModel):
     text: str
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/presentations", response_model=List[PresentationResponse])
 def get_presentations(
@@ -290,7 +293,8 @@ async def upload_presentation_cover(
         print("====== UPLOAD EXCEPTION ======")
         traceback.print_exc()
         print("==============================")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Upload failed: {str(e)}")
+        logger.error("Falha ao enviar imagem de capa da apresentacao", exc_info=e)
+        raise ValidacaoDeDominio("Nao foi possivel enviar a imagem.")
         
     # Reload
     updated_presentation = (
@@ -413,7 +417,8 @@ async def upload_environment_image(
         print("====== UPLOAD ENV IMAGE EXCEPTION ======")
         traceback.print_exc()
         print("========================================")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Upload failed: {str(e)}")
+        logger.error("Falha ao enviar imagem do ambiente", exc_info=e)
+        raise ValidacaoDeDominio("Nao foi possivel enviar a imagem.")
 
 @router.delete("/presentations/{presentation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_presentation(
@@ -439,7 +444,11 @@ def delete_presentation(
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Delete failed: {str(e)}")
+        logger.error("Falha ao remover apresentacao", exc_info=e)
+        # Desvio deliberado da mensagem do brief ("Nao foi possivel remover a
+        # imagem.") — este bloco remove a apresentacao inteira, nao uma
+        # imagem. Ver task-5-report.md.
+        raise ValidacaoDeDominio("Nao foi possivel remover a apresentacao.")
     
     return None
 

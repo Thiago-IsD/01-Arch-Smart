@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -5,6 +6,7 @@ import time
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from app.core.errors import ValidacaoDeDominio
 from app.db.session import get_db
 from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
@@ -13,6 +15,7 @@ from app.models.all_models import User
 from app.core.rate_limit import limiter
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/", response_model=PaginatedProductResponse)
 def get_products(
@@ -358,4 +361,5 @@ async def clipper_capture(
         return {"status": "success", "product_id": str(new_product.id)}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Falha ao processar produto capturado", exc_info=e)
+        raise ValidacaoDeDominio("Nao foi possivel processar o produto.")

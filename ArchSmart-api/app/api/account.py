@@ -1,9 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import Optional
 import uuid
 from pathlib import Path
 
+from app.core.errors import ValidacaoDeDominio
 from app.db.session import get_db
 from app.models.all_models import User, Account
 from app.schemas.account import AccountBrandingUpdate, AccountBrandingResponse
@@ -15,6 +18,7 @@ from app.api.users import get_current_user
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.put("/branding", response_model=AccountBrandingResponse)
@@ -74,10 +78,8 @@ async def update_account_branding(
             
         except Exception as e:
             print(f"❌ Upload failed: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to upload file: {str(e)}"
-            )
+            logger.error("Falha ao subir o logo da conta", exc_info=e)
+            raise ValidacaoDeDominio("Nao foi possivel enviar o arquivo.")
     
     # Commit changes
     db.commit()

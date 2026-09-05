@@ -47,7 +47,7 @@ A suíte roda contra Postgres real em Docker. `app/tests/` é a suíte antiga ba
 
 ## Erros
 
-Mensagem em pt-BR para o usuário; detalhe técnico só no log. Nunca `detail=str(e)` — hoje existem 5 ocorrências no código, todas pendentes de correção, nenhuma para imitar.
+Mensagem em pt-BR para o usuário; detalhe técnico só no log. Nunca coloque a exceção crua (`detail=str(e)` ou uma f-string com `{e}`) numa resposta — use `app/core/errors.py`: levante `DomainError` (ou uma das subclasses — `NotFound`, `Forbidden`, `QuotaExceeded`, `ValidacaoDeDominio`) com a mensagem em pt-BR, e registre o traço técnico com `logger.error(..., exc_info=erro)`. Esse padrão foi removido do código na Seção 4 (Tarefa 5) — não conte um número de ocorrências vivas aqui, ele fica errado assim que alguém escrever a próxima.
 
 ## Convenções
 
