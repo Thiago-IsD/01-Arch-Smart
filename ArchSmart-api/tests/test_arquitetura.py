@@ -152,6 +152,12 @@ JA_CONVERTIDOS: list[str] = [
     "app/api/routers/budgets_router.py",
     # Tarefa 13 — public.py NAO entra: portal publico, sem conta na sessao.
     "app/api/endpoints/presentations.py",
+    # Tarefa 14
+    "app/api/endpoints/financial.py",
+    "app/api/endpoints/events.py",
+    "app/api/endpoints/dashboard.py",
+    "app/api/endpoints/notifications.py",
+    "app/services/financial_service.py",
 ]
 
 

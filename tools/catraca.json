@@ -4,7 +4,6 @@
   "cores_literais": 521,
   "modulos_sem_doc": [
     "ai_service",
-    "auth_service",
-    "financial_service"
+    "auth_service"
   ]
 }

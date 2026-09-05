@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, extract
 from typing import Any
 from datetime import datetime
 
-from app.db.session import get_db
-from app.api.users import get_current_user
-from app.models.all_models import User, Project, Product, Client, Event, FinancialEntry
+from app.db.repository import ScopedRepository, get_repo
+from app.models.all_models import Project, Product, Client, Event, FinancialEntry, User
 from app.schemas.dashboard_schema import DashboardLeanResponse
 from app.api.endpoints.projects import _get_plan_limit
 
@@ -14,8 +12,7 @@ router = APIRouter()
 
 @router.get("/lean", response_model=DashboardLeanResponse)
 def get_dashboard_lean(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ) -> Any:
     """
     Retorna os dados essenciais para a dashboard MVP (Launchpad).
@@ -24,17 +21,16 @@ def get_dashboard_lean(
     - Métricas financeiras e de projetos
     - Próximos compromissos
     """
-    account_id = current_user.account_id
-
     # 1. Projetos Recentes (Top 4 ordenados por data de criação)
-    projects_query = db.query(Project, Client).join(
-        Client, Project.client_id == Client.id
-    ).filter(
-        Project.account_id == account_id,
-        Project.status == "ACTIVE"
-    ).order_by(
-        desc(Project.created_at)
-    ).limit(4).all()
+    projects_query = (
+        repo.query(Project)
+        .join(Client, Project.client_id == Client.id)
+        .filter(Project.status == "ACTIVE")
+        .order_by(desc(Project.created_at))
+        .with_entities(Project, Client)
+        .limit(4)
+        .all()
+    )
 
     recent_projects = []
     for proj, client in projects_query:
@@ -45,18 +41,15 @@ def get_dashboard_lean(
         })
 
     # Contagem de projetos ativos
-    active_projects_count = db.query(Project).filter(
-        Project.account_id == account_id,
+    active_projects_count = repo.query(Project).filter(
         Project.status == "ACTIVE"
     ).count()
 
     # Limite de projetos do plano da assinatura (dinâmico)
-    plan_limit = _get_plan_limit(db, account_id)
+    plan_limit = _get_plan_limit(repo)
 
     # 2. Produtos Recentes (Top 5 ordenados por data de criação)
-    products_query = db.query(Product).filter(
-        Product.account_id == account_id
-    ).order_by(
+    products_query = repo.query(Product).order_by(
         desc(Product.created_at)
     ).limit(5).all()
 
@@ -72,13 +65,13 @@ def get_dashboard_lean(
 
     # 3. Métricas Financeiras
     # Saldo em Caixa Realizado (tudo REALIZED de INCOME menos EXPENSE)
-    balance_query = db.query(
-        func.sum(FinancialEntry.amount).label("total"),
-        FinancialEntry.type
-    ).filter(
-        FinancialEntry.account_id == account_id,
-        FinancialEntry.status == "REALIZED"
-    ).group_by(FinancialEntry.type).all()
+    balance_query = (
+        repo.query(FinancialEntry)
+        .filter(FinancialEntry.status == "REALIZED")
+        .with_entities(func.sum(FinancialEntry.amount).label("total"), FinancialEntry.type)
+        .group_by(FinancialEntry.type)
+        .all()
+    )
 
     financial_balance = 0.0
     for total, f_type in balance_query:
@@ -92,14 +85,16 @@ def get_dashboard_lean(
     month = now.month
     year = now.year
 
-    monthly_query = db.query(
-        func.sum(FinancialEntry.amount).label("total"),
-        FinancialEntry.type
-    ).filter(
-        FinancialEntry.account_id == account_id,
-        extract('month', FinancialEntry.due_date) == month,
-        extract('year', FinancialEntry.due_date) == year
-    ).group_by(FinancialEntry.type).all()
+    monthly_query = (
+        repo.query(FinancialEntry)
+        .filter(
+            extract('month', FinancialEntry.due_date) == month,
+            extract('year', FinancialEntry.due_date) == year,
+        )
+        .with_entities(func.sum(FinancialEntry.amount).label("total"), FinancialEntry.type)
+        .group_by(FinancialEntry.type)
+        .all()
+    )
 
     financial_income = 0.0
     financial_expense = 0.0
@@ -110,14 +105,15 @@ def get_dashboard_lean(
             financial_expense = (total or 0.0)
 
     # 4. Próximos Eventos da Agenda (a partir de hoje)
-    events_query = db.query(Event, Project.name.label("project_name")).outerjoin(
-        Project, Event.project_id == Project.id
-    ).filter(
-        Event.account_id == account_id,
-        Event.start_time >= now
-    ).order_by(
-        Event.start_time.asc()
-    ).limit(5).all()
+    events_query = (
+        repo.query(Event)
+        .outerjoin(Project, Event.project_id == Project.id)
+        .filter(Event.start_time >= now)
+        .order_by(Event.start_time.asc())
+        .with_entities(Event, Project.name.label("project_name"))
+        .limit(5)
+        .all()
+    )
 
     upcoming_events = []
     for event, pj_name in events_query:
@@ -130,8 +126,15 @@ def get_dashboard_lean(
             "project_name": pj_name
         })
 
+    # RequestContext carrega identidade e entitlements, nao o perfil inteiro
+    # do usuario (Art. 1: so o servidor resolve identidade, mas o contrato de
+    # RequestContext e deliberadamente minimo) — full_name ainda vem de uma
+    # leitura de User, agora por repo.get() em vez do current_user injetado.
+    usuario = repo.get(User, repo.ctx.user_id)
+    full_name = usuario.full_name if usuario else None
+
     return {
-        "user_first_name": current_user.full_name or "Usuário",
+        "user_first_name": full_name or "Usuário",
         "recent_projects": recent_projects,
         "recent_products": recent_products,
         "active_projects_count": active_projects_count,

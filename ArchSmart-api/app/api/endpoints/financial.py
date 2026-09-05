@@ -1,14 +1,13 @@
 import uuid
-from typing import List, Optional
-from datetime import date, datetime
+from typing import List
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
 from sqlalchemy.sql import func, extract
-from sqlalchemy import or_, and_
+from sqlalchemy import and_
 
-from app.db.session import get_db
-from app.api.users import get_current_user
-from app.models.all_models import User, FinancialEntry, Project
+from app.core.errors import NotFound
+from app.db.repository import ScopedRepository, get_repo
+from app.models.all_models import FinancialEntry, Project
 from app.schemas.financial_schema import (
     FinancialEntryCreate,
     FinancialEntryUpdate,
@@ -22,23 +21,20 @@ router = APIRouter()
 def get_financial_summary(
     month: int = Query(..., description="Month (1-12)"),
     year: int = Query(..., description="Year (YYYY)"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Retorna o Saldo Total consolidado de tudo que foi 'REALIZED'.
     E soma os Recebimentos e Despesas APENAS do Mês/Ano filtrado (independente se REALIZED ou PREDICTED, dependendo do biz logic. Vamos assumir tudo do mês).
     """
-    account_id = current_user.account_id
-
     # Saldo em Caixa (tudo REALIZED até agora na conta)
-    balance_query = db.query(
-        func.sum(FinancialEntry.amount).label("total"),
-        FinancialEntry.type
-    ).filter(
-        FinancialEntry.account_id == account_id,
-        FinancialEntry.status == "REALIZED"
-    ).group_by(FinancialEntry.type).all()
+    balance_query = (
+        repo.query(FinancialEntry)
+        .filter(FinancialEntry.status == "REALIZED")
+        .with_entities(func.sum(FinancialEntry.amount).label("total"), FinancialEntry.type)
+        .group_by(FinancialEntry.type)
+        .all()
+    )
 
     balance = 0.0
     for total, f_type in balance_query:
@@ -48,14 +44,16 @@ def get_financial_summary(
             balance -= (total or 0.0)
 
     # Entradas e Saídas do Mês Filtrado (qualquer status para prever fluxo de caixa do mes)
-    monthly_query = db.query(
-        func.sum(FinancialEntry.amount).label("total"),
-        FinancialEntry.type
-    ).filter(
-        FinancialEntry.account_id == account_id,
-        extract('month', FinancialEntry.due_date) == month,
-        extract('year', FinancialEntry.due_date) == year
-    ).group_by(FinancialEntry.type).all()
+    monthly_query = (
+        repo.query(FinancialEntry)
+        .filter(
+            extract('month', FinancialEntry.due_date) == month,
+            extract('year', FinancialEntry.due_date) == year,
+        )
+        .with_entities(func.sum(FinancialEntry.amount).label("total"), FinancialEntry.type)
+        .group_by(FinancialEntry.type)
+        .all()
+    )
 
     total_income = 0.0
     total_expense = 0.0
@@ -76,27 +74,30 @@ def get_financial_summary(
 def get_financial_entries(
     month: int = Query(..., description="Month (1-12)"),
     year: int = Query(..., description="Year (YYYY)"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Lista de movimentações financeiras no período.
     Utiliza um JOIN com Project para trazer o nome do projeto caso exista.
     """
-    entries_query = db.query(FinancialEntry, Project.name.label("project_name"))\
+    entries_query = (
+        repo.query(FinancialEntry)
         .outerjoin(
             Project,
             and_(
                 FinancialEntry.project_id == Project.id,
-                Project.account_id == current_user.account_id,
+                Project.account_id == repo.ctx.account_id,
             ),
-        )\
+        )
         .filter(
-            FinancialEntry.account_id == current_user.account_id,
             extract('month', FinancialEntry.due_date) == month,
-            extract('year', FinancialEntry.due_date) == year
-        ).order_by(FinancialEntry.due_date.asc()).all()
-    
+            extract('year', FinancialEntry.due_date) == year,
+        )
+        .order_by(FinancialEntry.due_date.asc())
+        .with_entities(FinancialEntry, Project.name.label("project_name"))
+        .all()
+    )
+
     results = []
     for entry, pj_name in entries_query:
         entry_dict = {
@@ -122,34 +123,25 @@ def get_financial_entries(
 @router.post("", response_model=FinancialEntryResponse)
 def create_financial_entry(
     payload: FinancialEntryCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """ Criação de lançamento manual """
     import calendar
-    
+
     if payload.type not in ["INCOME", "EXPENSE"]:
-        raise HTTPException(status_code=400, detail="Invalid Type")
+        raise HTTPException(status_code=400, detail="Tipo inválido")
     if payload.status not in ["PREDICTED", "REALIZED"]:
-        raise HTTPException(status_code=400, detail="Invalid Status")
+        raise HTTPException(status_code=400, detail="Status inválido")
 
     # Isola pelo account do usuario autenticado: project_id vindo do cliente
     # nunca e confiavel sem essa checagem (mesma falha que o Art. 1 fechou
-    # em outros endpoints).
-    if payload.project_id:
-        projeto = (
-            db.query(Project)
-            .filter(
-                Project.id == payload.project_id,
-                Project.account_id == current_user.account_id,
-            )
-            .first()
-        )
-        if not projeto:
-            raise HTTPException(status_code=404, detail="Projeto não encontrado")
+    # em outros endpoints). Mensagem especifica: tests/isolation/test_financial_isolation.py
+    # confere que o 404 fala de projeto, nao um "recurso" generico.
+    if payload.project_id and repo.get(Project, payload.project_id) is None:
+        raise NotFound("Projeto não encontrado")
 
     entries = []
-    
+
     # 1. Generate Group ID if recurrence is requested
     group_id = str(uuid.uuid4()) if payload.recurrence in ["INSTALLMENT", "RECURRING"] else None
 
@@ -165,9 +157,9 @@ def create_financial_entry(
             except ValueError:
                 last_day = calendar.monthrange(year, month)[1]
                 new_date = payload.due_date.replace(year=year, month=month, day=last_day)
-                
-            e = FinancialEntry(
-                account_id=current_user.account_id,
+
+            e = repo.create(
+                FinancialEntry,
                 project_id=payload.project_id,
                 type=payload.type,
                 status=payload.status,
@@ -179,7 +171,7 @@ def create_financial_entry(
                 installment_number=i+1
             )
             entries.append(e)
-            
+
     elif payload.recurrence == "RECURRING":
         # Gera 24 meses (2 anos) de lançamentos recorrentes como padrão para gestão passiva
         for i in range(24):
@@ -191,9 +183,9 @@ def create_financial_entry(
             except ValueError:
                 last_day = calendar.monthrange(year, month)[1]
                 new_date = payload.due_date.replace(year=year, month=month, day=last_day)
-                
-            e = FinancialEntry(
-                account_id=current_user.account_id,
+
+            e = repo.create(
+                FinancialEntry,
                 project_id=payload.project_id,
                 type=payload.type,
                 status=payload.status,
@@ -207,8 +199,8 @@ def create_financial_entry(
             entries.append(e)
 
     else: # UNIQUE
-        e = FinancialEntry(
-            account_id=current_user.account_id,
+        e = repo.create(
+            FinancialEntry,
             project_id=payload.project_id,
             type=payload.type,
             status=payload.status,
@@ -218,11 +210,10 @@ def create_financial_entry(
             category=payload.category
         )
         entries.append(e)
-    
-    db.add_all(entries)
-    db.commit()
+
+    repo.db.commit()
     for e in entries:
-        db.refresh(e)
+        repo.db.refresh(e)
 
     # Resolve return format using dict for the first mapped item
     ret = entries[0].__dict__.copy()
@@ -232,32 +223,22 @@ def create_financial_entry(
 @router.patch("/{entry_id}/status", response_model=FinancialEntryResponse)
 def toggle_financial_status(
     entry_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """ Altera o status entre PREDICTED e REALIZED (Pagamento de conta) """
-    entry = db.query(FinancialEntry).filter(
-        FinancialEntry.id == entry_id,
-        FinancialEntry.account_id == current_user.account_id
-    ).first()
-    
-    if not entry:
-        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-    
+    entry = repo.obter(FinancialEntry, entry_id)
+
     # Toggle
     entry.status = "REALIZED" if entry.status == "PREDICTED" else "PREDICTED"
     entry.updated_at = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(entry)
-    
+
+    repo.db.commit()
+    repo.db.refresh(entry)
+
     # Busca nome do projeto se aplicavel
     pj_name = None
     if entry.project_id:
-        pj = db.query(Project).filter(
-            Project.id == entry.project_id,
-            Project.account_id == current_user.account_id,
-        ).first()
+        pj = repo.get(Project, entry.project_id)
         if pj: pj_name = pj.name
 
     ret = entry.__dict__.copy()
@@ -268,22 +249,15 @@ def toggle_financial_status(
 def update_financial_entry(
     entry_id: uuid.UUID,
     payload: FinancialEntryUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """ Edita um lançamento financeiro existente """
-    entry = db.query(FinancialEntry).filter(
-        FinancialEntry.id == entry_id,
-        FinancialEntry.account_id == current_user.account_id
-    ).first()
-    
-    if not entry:
-        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-        
+    entry = repo.obter(FinancialEntry, entry_id)
+
     if payload.type is not None and payload.type not in ["INCOME", "EXPENSE"]:
-        raise HTTPException(status_code=400, detail="Invalid Type")
+        raise HTTPException(status_code=400, detail="Tipo inválido")
     if payload.status is not None and payload.status not in ["PREDICTED", "REALIZED"]:
-        raise HTTPException(status_code=400, detail="Invalid Status")
+        raise HTTPException(status_code=400, detail="Status inválido")
 
     # Update fields
     if payload.amount is not None:
@@ -298,44 +272,40 @@ def update_financial_entry(
         entry.type = payload.type
     if payload.status is not None:
         entry.status = payload.status
-        
+
     entry.updated_at = datetime.utcnow()
-    
+
     # Cascade Updates se aplicável (somente altera PREDICTED)
     if entry.group_id and payload.apply_to in ["NEXT", "ALL"]:
-        query = db.query(FinancialEntry).filter(
+        query = repo.query(FinancialEntry).filter(
             FinancialEntry.group_id == entry.group_id,
-            FinancialEntry.account_id == current_user.account_id,
             FinancialEntry.status == "PREDICTED",
             FinancialEntry.id != entry.id # Não atualiza a si mesmo pois já foi setado
         )
-        
+
         if payload.apply_to == "NEXT":
             query = query.filter(FinancialEntry.installment_number > entry.installment_number)
-            
+
         siblings = query.all()
         for sib in siblings:
             if payload.amount is not None: sib.amount = payload.amount
-            if payload.description is not None: 
+            if payload.description is not None:
                 # Preserva o sufixo (x/y) nas parcelas editadas
                 if "(/" in sib.description or payload.recurrence == "INSTALLMENT":
-                     # Simplification: we might lose the perfect (2/10) if the user forces a clean description. 
+                     # Simplification: we might lose the perfect (2/10) if the user forces a clean description.
                      # For now, apply raw description from payload if applying to ALL/NEXT.
                      sib.description = payload.description
             if payload.category is not None: sib.category = payload.category
             if payload.type is not None: sib.type = payload.type
             sib.updated_at = datetime.utcnow()
 
-    db.commit()
-    db.refresh(entry)
-    
+    repo.db.commit()
+    repo.db.refresh(entry)
+
     # Busca nome do projeto se aplicavel
     pj_name = None
     if entry.project_id:
-        pj = db.query(Project).filter(
-            Project.id == entry.project_id,
-            Project.account_id == current_user.account_id,
-        ).first()
+        pj = repo.get(Project, entry.project_id)
         if pj: pj_name = pj.name
 
     ret = entry.__dict__.copy()
@@ -346,33 +316,24 @@ def update_financial_entry(
 def delete_financial_entry(
     entry_id: uuid.UUID,
     apply_to: str = Query("SINGLE", description="SINGLE, NEXT, ALL"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """ Exclui permanentemente um lançamento financeiro """
-    entry = db.query(FinancialEntry).filter(
-        FinancialEntry.id == entry_id,
-        FinancialEntry.account_id == current_user.account_id
-    ).first()
-    
-    if not entry:
-        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-        
+    entry = repo.obter(FinancialEntry, entry_id)
+
     # Cascade Delete apenas de "PREDICTED" na lixeira
     if entry.group_id and apply_to in ["NEXT", "ALL"]:
-        query = db.query(FinancialEntry).filter(
+        query = repo.query(FinancialEntry).filter(
             FinancialEntry.group_id == entry.group_id,
-            FinancialEntry.account_id == current_user.account_id,
             FinancialEntry.status == "PREDICTED",
             FinancialEntry.id != entry.id
         )
-        
+
         if apply_to == "NEXT":
             query = query.filter(FinancialEntry.installment_number > entry.installment_number)
-            
+
         query.delete(synchronize_session=False)
 
-    db.delete(entry)
-    db.commit()
+    repo.remover(entry)
+    repo.db.commit()
     return None
-

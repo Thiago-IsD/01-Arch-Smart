@@ -131,7 +131,7 @@ def create_project(
     repo.db.refresh(project)
 
     # Financial Automation Hook
-    sync_project_financials(project, repo.db, data.custom_installments)
+    sync_project_financials(project, repo, data.custom_installments)
 
     return project
 
@@ -177,7 +177,7 @@ def update_project(
     repo.db.refresh(project)
 
     # Financial Automation: re-sync if values changed
-    sync_project_financials(project, repo.db, data.custom_installments)
+    sync_project_financials(project, repo, data.custom_installments)
 
     return project
 

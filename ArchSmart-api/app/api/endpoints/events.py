@@ -2,12 +2,9 @@ import uuid
 from typing import List, Optional
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
-from app.db.session import get_db
-from app.api.users import get_current_user
-from app.models.all_models import User, Event, Project
+from app.db.repository import ScopedRepository, get_repo
+from app.models.all_models import Event, Project
 from app.schemas.events_schema import EventCreate, EventUpdate, EventResponse
 
 router = APIRouter()
@@ -41,8 +38,7 @@ def _build_response(event: Event, project_name: Optional[str] = None) -> EventRe
 def get_events(
     start_date: date = Query(..., description="Data inicial do filtro (YYYY-MM-DD)"),
     end_date: date = Query(..., description="Data final do filtro (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Lista eventos do período, com JOIN em projects para retornar o nome do projeto.
@@ -52,14 +48,14 @@ def get_events(
     end_dt = datetime.combine(end_date, datetime.max.time())
 
     rows = (
-        db.query(Event, Project.name.label("project_name"))
+        repo.query(Event)
         .outerjoin(Project, Event.project_id == Project.id)
         .filter(
-            Event.account_id == current_user.account_id,
             Event.start_time >= start_dt,
             Event.start_time <= end_dt,
         )
         .order_by(Event.start_time.asc())
+        .with_entities(Event, Project.name.label("project_name"))
         .all()
     )
 
@@ -73,8 +69,7 @@ def get_events(
 @router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 def create_event(
     payload: EventCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Cria um novo evento. Valida que end_time > start_time.
@@ -88,15 +83,10 @@ def create_event(
 
     # Isola pelo account do usuário autenticado
     if payload.project_id:
-        project = db.query(Project).filter(
-            Project.id == payload.project_id,
-            Project.account_id == current_user.account_id,
-        ).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Projeto não encontrado")
+        repo.obter(Project, payload.project_id)
 
-    event = Event(
-        account_id=current_user.account_id,
+    event = repo.create(
+        Event,
         project_id=payload.project_id,
         title=payload.title,
         description=payload.description,
@@ -104,13 +94,12 @@ def create_event(
         end_time=payload.end_time,
         meet_link=payload.meet_link,
     )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
+    repo.db.commit()
+    repo.db.refresh(event)
 
     project_name = None
     if event.project_id:
-        pj = db.query(Project).filter(Project.id == event.project_id).first()
+        pj = repo.get(Project, event.project_id)
         if pj:
             project_name = pj.name
 
@@ -125,19 +114,12 @@ def create_event(
 def update_event(
     event_id: uuid.UUID,
     payload: EventUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Atualiza um evento existente (isolamento por account).
     """
-    event = db.query(Event).filter(
-        Event.id == event_id,
-        Event.account_id == current_user.account_id,
-    ).first()
-
-    if not event:
-        raise HTTPException(status_code=404, detail="Evento não encontrado")
+    event = repo.obter(Event, event_id)
 
     # Determina os valores finais de start/end para validação cruzada
     new_start = payload.start_time if payload.start_time is not None else event.start_time
@@ -162,20 +144,15 @@ def update_event(
     if "project_id" in payload.model_fields_set:
         # Permitir setar project_id = null (desvincula do projeto)
         if payload.project_id is not None:
-            project = db.query(Project).filter(
-                Project.id == payload.project_id,
-                Project.account_id == current_user.account_id,
-            ).first()
-            if not project:
-                raise HTTPException(status_code=404, detail="Projeto não encontrado")
+            repo.obter(Project, payload.project_id)
         event.project_id = payload.project_id
 
-    db.commit()
-    db.refresh(event)
+    repo.db.commit()
+    repo.db.refresh(event)
 
     project_name = None
     if event.project_id:
-        pj = db.query(Project).filter(Project.id == event.project_id).first()
+        pj = repo.get(Project, event.project_id)
         if pj:
             project_name = pj.name
 
@@ -189,20 +166,13 @@ def update_event(
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_event(
     event_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Remove um evento (isolamento por account).
     """
-    event = db.query(Event).filter(
-        Event.id == event_id,
-        Event.account_id == current_user.account_id,
-    ).first()
+    event = repo.obter(Event, event_id)
 
-    if not event:
-        raise HTTPException(status_code=404, detail="Evento não encontrado")
-
-    db.delete(event)
-    db.commit()
+    repo.remover(event)
+    repo.db.commit()
     return None
