@@ -81,7 +81,7 @@ def get_project_budget(
     budget = db.query(Budget).filter(Budget.project_id == project_id).first()
     
     if not budget:
-        budget = Budget(project_id=project_id, total_value=0.0)
+        budget = Budget(account_id=project.account_id, project_id=project_id, total_value=0.0)
         db.add(budget)
         db.commit()
         db.refresh(budget)
@@ -131,15 +131,16 @@ def add_item_to_budget(
     # 2. Ensure Budget exists
     budget = db.query(Budget).filter(Budget.project_id == data.project_id).first()
     if not budget:
-        budget = Budget(project_id=data.project_id, total_value=0.0)
+        budget = Budget(account_id=project.account_id, project_id=data.project_id, total_value=0.0)
         db.add(budget)
         db.flush()
 
     # 3. Create BudgetItem (for the Environment + RuleType logic locus)
     # Default manual_quantity is 1 for UNITs, None for area-based rules
     manual_qtd = 1 if data.rule_type.value == "UNIT" else None
-    
+
     budget_item = BudgetItem(
+        account_id=budget.account_id,
         budget_id=budget.id,
         environment_id=data.environment_id,
         rule_type=data.rule_type,
@@ -150,6 +151,7 @@ def add_item_to_budget(
 
     # 4. Create ItemOption (attaches Product to the context)
     item_option = ItemOption(
+        account_id=budget_item.account_id,
         budget_item_id=budget_item.id,
         product_id=data.product_id,
         is_selected=True
@@ -238,6 +240,7 @@ def create_budget_item_option(
 
     # Add as unselected option by default
     new_option = ItemOption(
+        account_id=item.account_id,
         budget_item_id=item_id,
         product_id=data.product_id,
         is_selected=False

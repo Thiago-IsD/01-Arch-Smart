@@ -24,6 +24,7 @@ def create_environment(
 
     # Create Environment
     new_env = Environment(
+        account_id=project.account_id,
         project_id=project_id,
         name=data.name,
         type=data.type
@@ -37,6 +38,7 @@ def create_environment(
     ceiling = data.dna.ceiling_area if data.dna else 0.0
 
     new_dna = EnvironmentDNA(
+        account_id=new_env.account_id,
         environment_id=new_env.id,
         floor_area=floor,
         wall_area=wall,
@@ -81,7 +83,7 @@ def update_environment_dna(
     dna = db.query(EnvironmentDNA).filter(EnvironmentDNA.environment_id == env_id).first()
     if not dna:
         # Should never happen if creation logic was followed, but safe fallback
-        dna = EnvironmentDNA(environment_id=env_id)
+        dna = EnvironmentDNA(account_id=env.account_id, environment_id=env_id)
         db.add(dna)
 
     # Update areas

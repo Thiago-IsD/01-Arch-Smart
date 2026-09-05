@@ -81,6 +81,7 @@ def create_project_presentation(
 
     # Criar a apresentação
     db_presentation = Presentation(
+        account_id=project.account_id,
         project_id=project_id,
         name=presentation_in.name,
         description=presentation_in.description,
@@ -92,9 +93,10 @@ def create_project_presentation(
 
     # Espelhar os ambientes do projeto
     project_environments = db.query(Environment).filter(Environment.project_id == project_id).all()
-    
+
     for environment in project_environments:
         new_presentation_env = PresentationEnvironment(
+            account_id=db_presentation.account_id,
             presentation_id=db_presentation.id,
             environment_id=environment.id,
             is_visible=True
@@ -493,6 +495,7 @@ def add_presentation_comment(
         
     # Gravar o comentário
     new_comment = PresentationComment(
+        account_id=presentation.account_id,
         presentation_id=presentation.id,
         author_type="ARCHITECT",
         text=payload.text
