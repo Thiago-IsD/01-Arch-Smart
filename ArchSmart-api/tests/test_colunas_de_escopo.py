@@ -7,6 +7,7 @@ all_models.py aparece aqui sem ninguem lembrar de atualizar lista nenhuma: ou
 ela entra em CATALOGO_GLOBAL com justificativa, ou tem as colunas.
 """
 import ast
+import os
 from pathlib import Path
 
 import pytest
@@ -104,12 +105,32 @@ DEZ_QUE_GANHARAM_ACCOUNT_ID = {
 }
 
 
+# Pastas inteiras que a varredura nem entra: venv/node_modules/__pycache__ nao
+# sao codigo nosso (e venv/ sozinho tem milhares de arquivos .py); tests/ e
+# app/tests/ sao suites de teste, e um fixture ali constroi estes models de
+# proposito, as vezes para provar o proprio caminho de falha; alembic/versions/
+# e historico — uma migracao antiga pode citar o nome de um model em comentario
+# ou string, e reescrever uma migracao para agradar um lint de hoje é o
+# proprio defeito que ADR 0004 existe para evitar.
+_PASTAS_PODADAS = {"venv", "node_modules", "__pycache__", "tests"}
+
+
 def _construcoes_sem_account_id() -> list[str]:
     """
-    Varre app/ (exceto app/tests/, a suite antiga que sai na Secao 4) por
-    construcoes diretas `Modelo(...)` de uma das dez tabelas que ganharam
-    account_id NOT NULL nesta tarefa, usando `ast` — nao regex, porque as
-    chamadas se espalham por varias linhas e um regex mentiria.
+    Varre ArchSmart-api/ inteiro por construcoes diretas `Modelo(...)` de uma
+    das dez tabelas que ganharam account_id NOT NULL nesta tarefa, usando
+    `ast` — nao regex, porque as chamadas se espalham por varias linhas e um
+    regex mentiria.
+
+    A varredura e do repositorio inteiro, nao so de app/: a primeira versao
+    deste teste olhava so para app/, e quatro sites quebrados sobraram fora
+    dessa fronteira — em tools/seed.py, um script que escreve em bancos de
+    verdade (inclusive staging). A fronteira de um lint e sempre o lugar onde
+    alguem parou de olhar por conveniencia; por isso ela agora e o repositorio,
+    com exclusoes explicitas (pastas que nao sao nosso codigo, suites de teste
+    que constroem estes models de proposito, e o historico do Alembic) em vez
+    de um diretorio "principal" que parece bastar ate o proximo script passar
+    batido.
 
     So casa `ast.Call` cujo `func` e um `ast.Name` (construcao direta,
     `Modelo(...)`). Depois das Tarefas 11-15 estas viram
@@ -119,22 +140,36 @@ def _construcoes_sem_account_id() -> list[str]:
     brigar com ela.
     """
     ofensores: list[str] = []
-    for caminho in sorted((RAIZ / "app").rglob("*.py")):
-        relativo = caminho.relative_to(RAIZ)
-        if relativo.parts[1:2] == ("tests",):
+    for diretorio_atual, subpastas, arquivos in os.walk(RAIZ):
+        relativo_dir = Path(diretorio_atual).relative_to(RAIZ)
+        partes_dir = relativo_dir.parts
+        # Poda no lugar: os.walk nao desce em subpastas removidas de `subpastas`.
+        # "tests" na lista poda tanto ArchSmart-api/tests/ quanto app/tests/ —
+        # qualquer diretorio chamado exatamente "tests", em qualquer nivel.
+        subpastas[:] = [s for s in subpastas if s not in _PASTAS_PODADAS]
+        if partes_dir[:2] == ("alembic", "versions"):
+            subpastas[:] = []
             continue
-        arvore = ast.parse(
-            caminho.read_text(encoding="utf-8"), filename=str(caminho)
-        )
-        for node in ast.walk(arvore):
-            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+
+        for nome_arquivo in arquivos:
+            if not nome_arquivo.endswith(".py"):
                 continue
-            if node.func.id not in DEZ_QUE_GANHARAM_ACCOUNT_ID:
-                continue
-            nomes_kw = {kw.arg for kw in node.keywords if kw.arg is not None}
-            if "account_id" not in nomes_kw:
-                ofensores.append(f"{relativo.as_posix()}:{node.lineno}")
-    return ofensores
+            caminho = Path(diretorio_atual) / nome_arquivo
+            relativo = caminho.relative_to(RAIZ)
+            arvore = ast.parse(
+                caminho.read_text(encoding="utf-8"), filename=str(caminho)
+            )
+            for node in ast.walk(arvore):
+                if not isinstance(node, ast.Call) or not isinstance(
+                    node.func, ast.Name
+                ):
+                    continue
+                if node.func.id not in DEZ_QUE_GANHARAM_ACCOUNT_ID:
+                    continue
+                nomes_kw = {kw.arg for kw in node.keywords if kw.arg is not None}
+                if "account_id" not in nomes_kw:
+                    ofensores.append(f"{relativo.as_posix()}:{node.lineno}")
+    return sorted(ofensores)
 
 
 def test_toda_construcao_das_dez_tabelas_preenche_account_id():
@@ -142,10 +177,13 @@ def test_toda_construcao_das_dez_tabelas_preenche_account_id():
     As dez colunas de GANHARAM_ACCOUNT_ID sao NOT NULL desde a migracao desta
     tarefa: uma `Modelo(...)` que nao passa `account_id` vira
     `IntegrityError` em tempo de execucao — um 500 no primeiro create que
-    passar por ali. Antes deste teste existir, onze pontos de criacao (em
-    budgets_router.py, environments_router.py e presentations.py) ficaram
-    exatamente assim atras de uma suite verde, porque nenhum teste ate entao
-    exercitava esses caminhos o bastante para estourar o NOT NULL.
+    passar por ali (ou, em `tools/seed.py`, uma falha na primeira linha
+    escrita). Antes deste teste existir, onze pontos de criacao (em
+    budgets_router.py, environments_router.py e presentations.py) mais
+    quatro em tools/seed.py ficaram exatamente assim atras de uma suite
+    verde, porque nenhum teste ate entao exercitava esses caminhos o
+    bastante para estourar o NOT NULL — e a primeira versao deste lint,
+    que so olhava app/, nao alcancava tools/.
     """
     ofensores = _construcoes_sem_account_id()
     assert ofensores == [], (

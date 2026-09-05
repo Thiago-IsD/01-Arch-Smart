@@ -554,6 +554,7 @@ def criar_ambientes(db, Environment, projetos, quantidade_total, rng):
         for _ in range(contagem):
             ambiente = Environment(
                 id=uuid.uuid4(),
+                account_id=projeto.account_id,
                 project_id=projeto.id,
                 name=rng.choice(AMBIENTES_NOMES),
                 type=rng.choice(TIPOS_AMBIENTE),
@@ -569,7 +570,12 @@ def criar_orcamentos(db, Budget, projetos):
     orcamentos = []
     orcamento_por_projeto = {}
     for projeto in projetos:
-        orcamento = Budget(id=uuid.uuid4(), project_id=projeto.id, total_value=None)
+        orcamento = Budget(
+            id=uuid.uuid4(),
+            account_id=projeto.account_id,
+            project_id=projeto.id,
+            total_value=None,
+        )
         orcamentos.append(orcamento)
         orcamento_por_projeto[projeto.id] = orcamento
     db.add_all(orcamentos)
@@ -587,6 +593,7 @@ def criar_itens_orcamento(db, BudgetItem, RuleType, projetos, orcamento_por_proj
             ambiente = rng.choice(ambientes_do_projeto) if ambientes_do_projeto else None
             item = BudgetItem(
                 id=uuid.uuid4(),
+                account_id=orcamento.account_id,
                 budget_id=orcamento.id,
                 environment_id=ambiente.id if ambiente else None,
                 rule_type=rng.choice(tipos_regra),
@@ -617,6 +624,7 @@ def criar_opcoes_item(db, ItemOption, itens, produtos, rng):
             opcoes.append(
                 ItemOption(
                     id=uuid.uuid4(),
+                    account_id=item.account_id,
                     budget_item_id=item.id,
                     product_id=produto.id,
                     is_selected=selecionado,
