@@ -126,8 +126,8 @@ _Última atualização: 2026-09-05_
 - [x] Fim do N+1 no orçamento (`calculate_quantity` pura, de ~300 para 2 queries)
 - [x] Suíte de testes contra banco real (`tests/services/`, `tests/api/`, `tests/isolation/`) substituindo `app/tests/`
 - [x] Tratamento de erro único (exceções de domínio; sem `detail=str(e)` nem `print()`)
-- [x] `GET /api/v1/me` com `user`, `account` e `entitlements`
-- [x] Fim do auto-link por e-mail em `app/api/users.py` (ver [arquitetura.md](docs/dev/arquitetura.md), "pendência de segurança conhecida")
+- [x] `GET /api/users/me` com `user`, `account` e `entitlements`
+- [x] Fim do auto-link por e-mail em `app/api/users.py` (ver [arquitetura.md](docs/dev/arquitetura.md), "Resolvido em 05/09/2026: o auto-link por e-mail em `app/api/users.py`")
 
 > **A Seção 4 fechou em 05/09/2026, e foi medida.** `grep -rn "db\.query("
 > app --include=*.py | wc -l` sai **30** hoje; **29 são chamadas reais** — a
@@ -193,6 +193,25 @@ _Última atualização: 2026-09-05_
 > ([ADR 0008](docs/dev/decisoes/0008-me-em-api-users-me.md)). E o
 > `created_by` foi para as 21 tabelas de dado, não só para as 10 que
 > ganharam `account_id`, para que `create()` não tenha exceção a lembrar.
+>
+> **A oitava caixa foi renomeada, e o motivo importa** — mesmo espírito da
+> renomeação da primeira caixa da Seção 3. Ela dizia `GET /api/v1/me`,
+> copiado da spec original; a spec pedia um prefixo de versionamento que
+> este app nunca teve, e criar `/api/v1` só para uma rota seria
+> versionamento que ninguém mais segue. O [ADR 0008](docs/dev/decisoes/0008-me-em-api-users-me.md)
+> registra essa decisão, e a caixa agora descreve o que de fato subiu:
+> `GET /api/users/me`. A nona caixa também foi corrigida: linkava para a
+> seção "pendência de segurança conhecida" de `arquitetura.md`, um título
+> que não existe mais desde que a Tarefa 2 fechou a pendência — o título
+> hoje é "Resolvido em 05/09/2026: o auto-link por e-mail em
+> `app/api/users.py`", e é para lá que o link aponta agora.
+>
+> **O ADR 0008 vale para a reestruturação inteira, não só para esta caixa.**
+> A Seção 7 (`POST /api/v1/events`, mais abaixo) carrega a mesma suposição
+> de um prefixo `/api/v1` que não existe — quem for fechar aquela seção vai
+> bater no mesmo ponto e não precisa redescobrir do zero: a decisão já está
+> tomada e registrada no ADR. Não mexi na caixa da Seção 7 — não é desta
+> tarefa.
 >
 > **Achado extra, corrigido durante a seção:** a marca escrita errada
 > (`"Arch Smart"`, `"ArchSmart"`, `"Ark Smart"`, `"Ecowe"`) em `app/` está
