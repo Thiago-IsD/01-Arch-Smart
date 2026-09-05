@@ -6,6 +6,7 @@ Os testes de isolamento sao pares: a conta A ve o dela, e recebe 404 no da B.
 """
 from sqlalchemy.orm import Session
 
+from app.models.all_models import Plan, Subscription, SubscriptionStatus
 from tests.conftest import criar_projeto
 
 
@@ -51,6 +52,38 @@ def test_criar_projeto_ignora_account_id_do_corpo(db: Session, client_a, conta_a
 
     criado = db.query(Project).filter(Project.name == "Tentativa").first()
     assert criado is None or criado.account_id == conta_a[0].id
+
+
+def test_limite_de_projetos_vem_dos_entitlements(db: Session, client_a, conta_a):
+    """
+    `_get_plan_limit` costumava ler `Plan.limits["max_active_projects"]` por
+    conta propria, enquanto `entitlements_da_conta` (o que `/api/users/me`
+    publica) le `Plan.limits["project_limit"]` — duas chaves para o mesmo
+    conceito. So nao divergiam porque nada em produção populava
+    `Plan.limits`. Este teste fixa um plano com `project_limit` (a chave que
+    os entitlements usam) e prova que a aplicação do limite bate
+    com o que a paginação devolve.
+    """
+    plano = Plan(name="Estudio", limits={"project_limit": 5})
+    db.add(plano)
+    db.flush()
+    db.add(
+        Subscription(
+            account_id=conta_a[0].id, plan_id=plano.id, status=SubscriptionStatus.ACTIVE
+        )
+    )
+    db.flush()
+
+    for i in range(5):
+        criar_projeto(db, conta_a[0], f"Projeto {i}")
+
+    corpo = client_a.get("/api/projects").json()
+    assert corpo["plan_limit"] == 5
+
+    r = client_a.post(
+        "/api/projects", json={"name": "Sexto", "client_name": "Cliente Sexto"}
+    )
+    assert r.status_code == 403
 
 
 def test_apagar_projeto_alheio_e_404(db: Session, client_a, conta_b):

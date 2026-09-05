@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from app.db.repository import ScopedRepository, get_repo
-from app.models.all_models import Project, Client, Subscription
+from app.models.all_models import Project, Client
 from app.schemas.project_schema import ProjectResponse, PaginatedProjectResponse, ProjectWizardCreate
 from app.services.financial_service import sync_project_financials
 
@@ -12,12 +12,15 @@ router = APIRouter()
 
 
 def _get_plan_limit(repo: ScopedRepository) -> int:
-    """Returns the max active projects allowed for the account's subscription plan."""
-    from app.models.all_models import Plan  # noqa: F401 (usado via Subscription.plan)
-    sub = repo.query(Subscription).first()
-    if sub and sub.plan and sub.plan.limits:
-        return int(sub.plan.limits.get("max_active_projects", 2))
-    return 2  # fallback: Plano Solo
+    """
+    Fonte unica do limite de projetos: os entitlements que o servidor ja
+    resolveu para esta requisicao (Art. 3). Antes daqui esta funcao lia
+    Plan.limits["max_active_projects"] por conta propria, enquanto
+    /api/users/me publicava Plan.limits["project_limit"] — duas chaves
+    diferentes para o mesmo conceito, que so nao divergiam porque nada
+    populava Plan.limits.
+    """
+    return int(repo.ctx.entitlements["project_limit"])
 
 @router.get("", response_model=PaginatedProjectResponse)
 def get_projects(
