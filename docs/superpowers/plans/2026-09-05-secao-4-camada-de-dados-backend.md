@@ -738,7 +738,9 @@ def entitlements_da_conta(db: Session, account_id: UUID) -> dict[str, Any]:
 
 - [ ] **Passo 6: Reescrever `get_current_user` como casca fina**
 
-Os 149 usos de `current_user` só migram para `ctx` nas Tarefas 11–15. Até lá as
+Os **56** endpoints que declaram `Depends(get_current_user)` só migram para
+`ctx` nas Tarefas 11–15 (`grep -rn "Depends(get_current_user)" --include=*.py app/ | grep -v "^app/tests/" | wc -l`).
+Até lá as
 duas dependências convivem — e precisam resolver identidade **pelo mesmo
 caminho**, senão a correção de segurança valeria só para metade das rotas.
 
@@ -2491,6 +2493,16 @@ passam pela função nova, para haver **uma** definição do cálculo.
   - `calculate_budget_item_quantity` **deixa de existir**. Nenhum código novo
     deve chamá-la.
 
+> ⚠️ **Oportunidade de baixar a catraca, e ela é de graça aqui.**
+> `tools/catraca.py` mede `modulos_sem_doc` — "arquivo em `app/services/` ou
+> diretório em `src/features/` sem `.md` de mesmo nome em `docs/dev/modulos/`".
+> O baseline atual lista **4**: `ai_service`, `auth_service`,
+> `budget_calculator`, `financial_service`. Esta tarefa reescreve
+> `budget_calculator.py` inteiro — escreva `docs/dev/modulos/budget_calculator.md`
+> junto, no formato de [`docs/dev/modulos/entitlements.md`](../../dev/modulos/entitlements.md),
+> e a medida cai de 4 para 3. Rode `python tools/catraca.py --atualizar` **no
+> mesmo commit** que fez o número descer, como manda o `CLAUDE.md`.
+
 **Por que pura importa mais que rápida.** Hoje não há um único teste do cálculo
 que não precise de banco, porque a função abre `Session`. Regra de negócio sem
 teste barato é regra de negócio que ninguém mexe.
@@ -4122,6 +4134,14 @@ git commit -m "refactor(api): apresentacoes pelo ScopedRepository; registra por 
 - Produz: os cinco arquivos sem `db.query()`.
   `financial_service.py` passa a receber `repo` em vez de `db` na assinatura
   da função que hoje faz a query.
+
+> ⚠️ **Outra oportunidade de baixar a catraca.** `financial_service` é um dos
+> 4 de `modulos_sem_doc` no `tools/catraca.json`. Esta tarefa muda a assinatura
+> dele (some o parâmetro `account_id`) — escreva
+> `docs/dev/modulos/financial_service.md` junto, no formato de
+> [`docs/dev/modulos/entitlements.md`](../../dev/modulos/entitlements.md), e a
+> medida desce mais um. Rode `python tools/catraca.py --atualizar` no mesmo
+> commit.
 
 **O caso do `dashboard.py`.** As 6 queries dele são agregações
 (`func.count`, `func.sum`). `repo.query(Model)` devolve um `Query` normal, então
