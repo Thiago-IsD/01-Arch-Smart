@@ -25,6 +25,7 @@ def apresentacao_com_senha(db, conta_a):
     projeto = criar_projeto(db, conta, "Projeto Portal")
 
     apresentacao = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta Sala de Estar",
         access_password_hash=hash_password("senha-do-cliente"),
@@ -32,16 +33,26 @@ def apresentacao_com_senha(db, conta_a):
     db.add(apresentacao)
     db.flush()
 
-    orcamento = Budget(project_id=projeto.id, total_value=0.0)
+    orcamento = Budget(account_id=conta.id, project_id=projeto.id, total_value=0.0)
     db.add(orcamento)
     db.flush()
-    item = BudgetItem(budget_id=orcamento.id, rule_type=RuleType.UNIT, manual_quantity=1)
+    item = BudgetItem(
+        account_id=conta.id,
+        budget_id=orcamento.id,
+        rule_type=RuleType.UNIT,
+        manual_quantity=1,
+    )
     db.add(item)
     db.flush()
     produto = Product(account_id=conta.id, name="Luminaria", price=300.0)
     db.add(produto)
     db.flush()
-    opcao = ItemOption(budget_item_id=item.id, product_id=produto.id, is_selected=False)
+    opcao = ItemOption(
+        account_id=conta.id,
+        budget_item_id=item.id,
+        product_id=produto.id,
+        is_selected=False,
+    )
     db.add(opcao)
     db.flush()
 

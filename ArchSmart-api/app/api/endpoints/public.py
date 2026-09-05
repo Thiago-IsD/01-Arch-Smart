@@ -474,6 +474,7 @@ async def accept_public_presentation(
     client_ip = request.client.host if request.client else "unknown"
     
     acceptance = PresentationAcceptance(
+        account_id=presentation.account_id,
         presentation_id=presentation.id,
         accepted=payload.accepted,
         feedback=payload.feedback,
@@ -481,10 +482,11 @@ async def accept_public_presentation(
         selected_options_snapshot=payload.selected_options
     )
     db.add(acceptance)
-    
+
     # 2.5: Gravar o comentário inicial da Thread (Se houver feedback escrito)
     if payload.feedback and str(payload.feedback).strip():
         first_comment = PresentationComment(
+            account_id=presentation.account_id,
             presentation_id=presentation.id,
             author_type="CLIENT",
             text=str(payload.feedback).strip()

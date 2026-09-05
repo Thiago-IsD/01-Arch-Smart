@@ -24,11 +24,12 @@ def item_da_conta_a(db, conta_a):
     conta, _ = conta_a
     projeto = criar_projeto(db, conta, "Projeto A")
 
-    orcamento = Budget(project_id=projeto.id, total_value=0.0)
+    orcamento = Budget(account_id=conta.id, project_id=projeto.id, total_value=0.0)
     db.add(orcamento)
     db.flush()
 
     item = BudgetItem(
+        account_id=conta.id,
         budget_id=orcamento.id,
         rule_type=RuleType.UNIT,
         manual_quantity=1,
@@ -125,6 +126,7 @@ def opcao_da_conta_a(db, conta_a, item_da_conta_a):
     db.flush()
 
     opcao = ItemOption(
+        account_id=conta.id,
         budget_item_id=item_da_conta_a.id,
         product_id=produto.id,
         is_selected=True,

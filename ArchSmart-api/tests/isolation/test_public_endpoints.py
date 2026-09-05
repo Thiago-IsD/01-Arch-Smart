@@ -52,6 +52,7 @@ def test_verify_password_tem_rate_limit(client_anon, db, conta_a):
     conta, _ = conta_a
     projeto = criar_projeto(db, conta, "Projeto RL")
     apresentacao = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta RL",
         access_password_hash=hash_password("certa"),
@@ -92,11 +93,13 @@ def test_rate_limit_do_verify_password_e_por_apresentacao_nao_por_ip(
     projeto = criar_projeto(db, conta, "Projeto RL 2")
 
     apresentacao_a = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta RL A",
         access_password_hash=hash_password("certa"),
     )
     apresentacao_b = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta RL B",
         access_password_hash=hash_password("certa"),

@@ -147,6 +147,7 @@ class ProjectSlot(Base):
     __tablename__ = "project_slots"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=False)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
@@ -253,6 +254,7 @@ class Environment(Base):
     __tablename__ = "environments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
@@ -269,6 +271,7 @@ class EnvironmentDNA(Base):
     __tablename__ = "environment_dnas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=False, unique=True)
     floor_area = Column(Float, default=0.0)
@@ -285,6 +288,7 @@ class Budget(Base):
     __tablename__ = "budgets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     total_value = Column(Float)
@@ -297,6 +301,7 @@ class BudgetItem(Base):
     __tablename__ = "budget_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     budget_id = Column(UUID(as_uuid=True), ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=True)
@@ -313,6 +318,7 @@ class ItemOption(Base):
     __tablename__ = "item_options"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     budget_item_id = Column(UUID(as_uuid=True), ForeignKey("budget_items.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
@@ -336,6 +342,7 @@ class Presentation(Base):
     __tablename__ = "presentations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
@@ -356,6 +363,7 @@ class PresentationEnvironment(Base):
     __tablename__ = "presentation_environments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     environment_id = Column(UUID(as_uuid=True), ForeignKey("environments.id"), nullable=False)
@@ -374,6 +382,7 @@ class PresentationAcceptance(Base):
     __tablename__ = "presentation_acceptances"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     accepted = Column(Boolean, default=False)
@@ -389,6 +398,7 @@ class PresentationComment(Base):
     __tablename__ = "presentation_comments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     presentation_id = Column(UUID(as_uuid=True), ForeignKey("presentations.id"), nullable=False)
     author_type = Column(String, nullable=False) # 'CLIENT' | 'ARCHITECT'
