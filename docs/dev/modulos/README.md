@@ -12,7 +12,7 @@ Um módulo é uma área funcional do produto (por exemplo: projetos, ambientes, 
 
 ## O que ainda não existe
 
-Esta pasta está vazia além deste índice. Cada tela reescrita ao longo da Seção 8 desta reestruturação entrega o documento do seu módulo junto com o código — nenhum módulo é considerado concluído sem ele.
+Esta pasta ainda não tem documento de módulo de produto no sentido da seção acima — só o [`entitlements.md`](entitlements.md), que existe porque a verificação mecânica descrita abaixo cobre `app/services/` independentemente da Seção 8, não porque uma tela foi reescrita. Cada tela reescrita ao longo da Seção 8 desta reestruturação entrega o documento do seu módulo junto com o código — nenhum módulo é considerado concluído sem ele.
 
 ## A verificação mecânica do CI
 

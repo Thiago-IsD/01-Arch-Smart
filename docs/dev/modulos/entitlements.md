@@ -47,9 +47,15 @@ Leitura, com `outerjoin`, de `subscriptions` (`status`, `account_id`,
   `PADRAO` em vez de propagar o formato inesperado — a coluna é JSON livre e
   já existiu no banco com todos esses formatos.
 - **`PADRAO`** cobre três outros casos, além do `CANCELED`: conta sem
-  nenhuma assinatura, assinatura sem plano (`plan_id` nulo ou apagado), e
-  `limits` sem a chave perguntada — o `{**PADRAO, **limites}` garante que uma
-  chave ausente no JSON do plano não vira `None` para quem consome.
+  nenhuma linha em `subscriptions`, `Plan.limits` como SQL `NULL`, e `limits`
+  sem a chave perguntada — o `{**PADRAO, **limites}` garante que uma chave
+  ausente no JSON do plano não vira `None` para quem consome.
+- **O `outerjoin` é defesa redundante, não resposta a um estado real.**
+  `Subscription.plan_id` é `nullable=False` com FK para `plans.id`
+  (`app/models/all_models.py:130`) — nem uma assinatura sem plano nem uma
+  apontando para um plano apagado são alcançáveis pelo schema hoje. O join
+  fica mesmo assim: se isso deixar de ser verdade, ele evita um crash em vez
+  de propagar o problema para toda requisição autenticada.
 
 ## O que quebra se você mexer aqui
 
