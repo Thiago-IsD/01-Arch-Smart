@@ -140,6 +140,32 @@ def test_nenhum_print_em_app():
     )
 
 
+# Arquivos ja convertidos para ScopedRepository. A lista SO CRESCE. Um
+# db.query() que volte a um arquivo daqui e uma regressao: o filtro por conta
+# volta a ser decisao de quem escreveu o endpoint, que e exatamente a classe de
+# falha que custou a Secao 1 inteira.
+JA_CONVERTIDOS: list[str] = [
+    # Tarefa 11
+    "app/api/endpoints/projects.py",
+    "app/api/routers/environments_router.py",
+]
+
+
+def test_arquivo_convertido_nao_volta_a_usar_db_query():
+    achados = []
+    for caminho in JA_CONVERTIDOS:
+        arquivo = RAIZ / caminho
+        assert arquivo.exists(), f"{caminho} nao existe mais; atualize a lista"
+        for numero, linha in enumerate(
+            arquivo.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if "db.query(" in linha:
+                achados.append(f"{caminho}:{numero}: {linha.strip()}")
+    assert not achados, (
+        "use repo.query(model) em vez de db.query(model):\n" + "\n".join(achados)
+    )
+
+
 def test_a_marca_e_arq_smart():
     """
     Art. 8: a marca e "Arq Smart" — duas palavras, com Q. A outra grafia e a
