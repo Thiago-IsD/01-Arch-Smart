@@ -639,9 +639,11 @@ def criar_opcoes_item(db, ItemOption, itens, produtos, rng):
 
 def contar_escopado(db, m, conta_id) -> dict[str, int]:
     """
-    Conta as linhas que pertencem a ESTA conta, seguindo a cadeia de chaves
-    ate projects quando a tabela nao tem account_id proprio (environments,
-    budgets, budget_items e item_options nao tem).
+    Conta as linhas que pertencem a ESTA conta. Desde a Tarefa 4 da Secao 4,
+    environments, budgets, budget_items e item_options tem account_id
+    proprio; esta funcao ainda soma pela cadeia de chaves ate projects em vez
+    de filtrar direto por account_id, por continuidade com o formato de
+    antes — nao porque a coluna falte.
 
     As tabelas de referencia global — product_origins, product_states — ficam
     de fora de proposito: elas nao pertencem a conta nenhuma, e um numero ali

@@ -71,10 +71,12 @@ item único (`BudgetItemResponse`) ou um dicionário simples
 (`get_budget_summary`, `public.py`) não precisa dela.
 
 `calculate_budget_item_quantity`, a função antiga que recebia `db`, não
-existe mais. Nenhum código em `app/` chama esse nome
-(`grep -rn "calculate_budget_item_quantity" app --include=*.py` sai vazio,
-fora de `app/tests/`, a suíte antiga que a Seção 4 vai apagar e que não roda
-no CI).
+existe mais. Nenhum código chama esse nome — a única ocorrência é um
+comentário citando o nome antigo para contexto
+(`grep -rn "calculate_budget_item_quantity" app --include=*.py` dá 1
+resultado, `app/services/budget_calculator.py:87`, dentro de um
+comentário). `app/tests/`, a suíte antiga que rodava sobre esse nome, foi
+apagada na Seção 4 (Tarefa 17).
 
 ## Tabelas que toca
 

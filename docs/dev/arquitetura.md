@@ -92,19 +92,26 @@ Fluxo de ponta a ponta, hoje:
    com `SUPABASE_JWT_SECRET` quando presente; senão, com uma chamada de rede
    ao Supabase, mais lenta — ver "Problema conhecido" no `ambiente.md`) e
    extrai `sub` (o `supabase_id`) do payload. `get_current_user`
-   (`ArchSmart-api/app/api/users.py`) é uma casca de compatibilidade sobre
-   `get_context`, usada pelos endpoints ainda não convertidos para
-   `RequestContext` — some na Tarefa 15.
+   (`ArchSmart-api/app/api/users.py`), a casca de compatibilidade que existia
+   sobre `get_context` para os endpoints ainda não convertidos, **foi apagada
+   na Tarefa 15 da Seção 4** — hoje todo endpoint autenticado depende de
+   `get_context`/`RequestContext` diretamente, ou de `get_repo`
+   (`ArchSmart-api/app/db/repository.py`), que embrulha os dois.
 5. Busca a linha de `User` cujo `supabase_id` bate com o do token, **e só
    pelo `supabase_id`**: o e-mail do payload nunca é critério de busca. Essa
    linha já carrega o `account_id` — é dali, e só dali, que o resto do
    request sabe de qual conta é o dado.
-6. Cada endpoint usa esse `account_id` para filtrar a query manualmente
-   (`db.query(Model).filter(Model.account_id == current_user.account_id)`).
-   Não existe hoje uma camada que torne esse filtro automático ou que
-   detecte a ausência dele — é isso que a Seção 4 entrega com
-   `ScopedRepository`/`RequestContext` (`app/api/v1/routes/` também não
-   existe ainda; as rotas de hoje vivem sob `/api/...`, sem versionamento).
+6. Cada endpoint acessa dado pelo `ScopedRepository` (`repo: ScopedRepository
+   = Depends(get_repo)`), que aplica o filtro por `account_id` sozinho —
+   `repo.query(Model)`/`repo.get(Model, id)` já vêm filtrados, e
+   `repo.create(Model, **campos)` injeta `account_id`/`created_by` e
+   descarta o que vier do cliente nessas duas chaves. Isso é o que a
+   Seção 4 entregou; antes dela cada endpoint filtrava a query manualmente
+   (`db.query(Model).filter(Model.account_id == current_user.account_id)`),
+   sem verificação automática. `app/api/v1/routes/` continua não existindo
+   — a reorganização por versão que uma versão anterior deste documento
+   previa não aconteceu; as rotas continuam sob `/api/...`, sem
+   versionamento (ver `ArchSmart-api/CLAUDE.md`, seção "Sobre `app/api/v1/`").
 
 ### Resolvido em 05/09/2026: o auto-link por e-mail em `app/api/users.py`
 
@@ -126,8 +133,8 @@ própria (`POST /api/auth/signup`, `POST /api/auth/complete-register`).
 
 **O mesmo padrão continua vivo em `POST /api/auth/complete-register`**
 (função `complete_register` em `ArchSmart-api/app/api/auth.py`, linhas
-73-91 em 05/09/2026 — cite a função, não só o número, a Tarefa 15 já
-moveu esse bloco uma vez): quando o `supabase_id` não bate com
+73-92 em 05/09/2026, terminando no `db.commit()` — cite a função, não só o
+número, a Tarefa 15 já moveu esse bloco uma vez): quando o `supabase_id` não bate com
 nada, o endpoint busca por e-mail e, se achar, vincula o `supabase_id` do
 portador **e sobrescreve o `full_name`** da linha encontrada — guardado hoje
 só pela mesma configuração de painel citada acima. Isso é um item de
@@ -157,32 +164,50 @@ em `src/app/(dashboard)/dashboard/page.tsx` e
 independente do plano real da conta — violação registrada do Art. 3, listada
 em `convencoes.md`, ainda não corrigida.
 
-## Escopo por conta hoje, e o que a Seção 4 muda
+## Escopo por conta — o que a Seção 4 mudou
 
-Hoje: cada endpoint filtra manualmente por `account_id` — não existe
-verificação automática nem um lugar único onde esse filtro é garantido. A
-disciplina atual é: toda query nova filtra por `account_id` explicitamente, e
-todo endpoint novo ganha um teste em `ArchSmart-api/tests/isolation/` que
-prova que a conta B não vê o dado da conta A. Hoje esses testes existem e
-passam — 29 testes ao todo (`pytest -q` na raiz de `ArchSmart-api`), rodando
-contra Postgres real em Docker, não contra sessão mockada.
-
-Isso é o resultado de uma correção recente: uma auditoria de 23/08/2026
+Antes da Seção 4, cada endpoint filtrava manualmente por `account_id` — não
+existia verificação automática nem um lugar único onde esse filtro fosse
+garantido. A disciplina da época era: toda query nova filtra por
+`account_id` explicitamente, e todo endpoint novo ganhava um teste em
+`ArchSmart-api/tests/isolation/` que provava que a conta B não via o dado da
+conta A. Isso vinha de uma correção anterior: uma auditoria de 23/08/2026
 encontrou 14 endpoints vazando dado entre contas — 6 de orçamento sem filtro
 por conta, 5 ações do portal do cliente sem verificar o token de acesso, 2
 sem autenticação nenhuma, e 1 em `financial.py` gravando o `project_id`
 enviado pelo cliente sem validar a conta dona. As 14 falhas foram corrigidas
-na Seção 1 (merge `f190a07`, 24/08/2026); a suíte de 29 testes contra
-Postgres real veio junto, substituindo a confiança que a suíte antiga
-(`app/tests/`, baseada em `MagicMock` como sessão de banco, 83 testes) dava
-sem merecer — um mock não tem "linha de outra conta" para vazar, então nunca
-teria pego essas 14 falhas.
+na Seção 1 (merge `f190a07`, 24/08/2026); a suíte de testes contra Postgres
+real veio junto, substituindo a confiança que a suíte antiga (`app/tests/`,
+baseada em `MagicMock` como sessão de banco, 83 testes) dava sem merecer —
+um mock não tem "linha de outra conta" para vazar, então nunca teria pego
+essas 14 falhas.
 
-O que falta, e é alvo da **Seção 4**: `RequestContext` (identidade resolvida
-uma vez por request) e `ScopedRepository` (camada de acesso a dado que aplica
-o filtro por `account_id` automaticamente, tornando o erro estruturalmente
-difícil em vez de apenas disciplinado). Nenhum dos dois existe hoje no
-código.
+Por que a disciplina manual não bastava: nada impedia um endpoint novo de
+esquecer o filtro — foi exatamente esse esquecimento que causou as 14 falhas
+de 23/08/2026. Uma lista de testes escrita à mão cobre as rotas que existiam
+quando alguém lembrou de escrever o teste, não as que vierem depois.
+
+**A Seção 4 entregou os dois pedaços que faltavam.** `RequestContext`
+(`ArchSmart-api/app/core/security.py`) resolve a identidade uma vez por
+request; `ScopedRepository` (`ArchSmart-api/app/db/repository.py`) é a
+camada de acesso a dado que aplica o filtro por `account_id`
+automaticamente — `repo.query(Model)`/`repo.get(Model, id)` já vêm
+filtrados, e um model sem `account_id` levanta `EscopoImpossivel` em vez de
+devolver linha de outra conta por engano. `tests/isolation/test_todas_as_rotas.py`
+substituiu a lista escrita à mão: ele percorre as rotas registradas em
+`app/main.py` e testa cada uma automaticamente, então uma rota nova com id
+na URL sem entrada em `RECURSOS` falha, em vez de simplesmente não ter
+teste. A suíte de isolamento tem hoje 74 testes
+(`pytest tests/isolation -q --collect-only` em `ArchSmart-api`), contra os
+29 de antes da Seção 4.
+
+As 30 chamadas de `db.query(` que restam em `app/` (29 delas de verdade — a
+trigésima é uma docstring citando o número antigo) são exceção documentada,
+não esquecimento: portal público (`public.py`, justificado pelo docstring do
+módulo), catálogo global ou tabela sem `account_id` (`product_router.py`,
+`users.py`), pré-sessão (`auth.py`, `leads.py`, `security.py`), ou a própria
+definição do `ScopedRepository` (`repository.py`). A contagem completa, com
+o motivo de cada grupo, está na nota da Seção 4 em `PROGRESS.md`.
 
 ## Busca de dado no frontend — o que existe e o que não existe
 

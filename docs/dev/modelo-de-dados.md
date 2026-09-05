@@ -6,15 +6,16 @@ mudança de schema. Não é um dump de `\d+` — o Postgres já sabe as colunas;
 que este documento registra é a razão de cada relação e o que quebra se ela
 mudar.
 
-**Consumidor direto: a Seção 4**, que usa a classificação de `account_id` e
-os caminhos até a conta (final deste documento) para planejar a migração de
-`account_id`/`created_by`/índices. Se um caminho aqui estiver errado, o
-backfill que a Seção 4 escrever a partir dele erra junto.
+**Consumidor original: a Seção 4**, que usou a classificação de `account_id`
+e os caminhos até a conta (que este documento registrava) para planejar o
+backfill de `account_id`/`created_by`/índices — e a Seção 4 **fechou em
+05/09/2026**. Este documento foi atualizado junto: as seções de schema
+abaixo descrevem o estado de hoje, não mais o de 24/08/2026.
 
-Descreve o **estado atual**, 24/08/2026. `ScopedRepository`, `created_by` e
-índice em `account_id` **não existem** hoje — são entregues pela Seção 4;
-onde aparecem abaixo é para dizer que faltam, nunca como se já estivessem no
-código.
+`ScopedRepository`, `created_by` e índice em `account_id` **existem** desde
+a Seção 4 — as seções de classificação de `account_id`, `created_by` e
+índices mais abaixo mudaram de resultado por causa disso, e estão
+reescritas para refletir o schema atual, não o de antes do backfill.
 
 ## 1. Conta e identidade
 
@@ -32,8 +33,10 @@ Não existe usuário multi-conta hoje — trocar de escritório significa outro
 usuário, outro login. `supabase_id` é o elo com o Supabase Auth (a senha não
 mora aqui, ver [arquitetura.md](arquitetura.md#como-a-identidade-é-resolvida));
 `email` e `supabase_id` são as duas únicas colunas com `unique=True` que
-também têm índice — não por acaso, são as duas usadas para resolver
-identidade em toda requisição (`get_current_user`, `app/api/users.py`).
+também têm índice — não por acaso, `supabase_id` é a coluna usada para
+resolver identidade em toda requisição (`resolve_identity_por_claims`,
+`app/core/security.py`; `get_current_user`, a versão anterior dessa
+resolução em `app/api/users.py`, foi apagada na Tarefa 15 da Seção 4).
 
 ### `subscriptions` e `plans`
 
@@ -43,9 +46,12 @@ em `budgets` abaixo). Ela aponta para um `Plan`, que é **catálogo global**:
 `Plan.limits` (JSON) define cotas por plano ("Solo", etc.), e o mesmo `Plan`
 é reaproveitado por todas as contas que estão naquele plano — não há
 `account_id` em `plans` porque um plano não pertence a conta nenhuma, é
-oferecido a todas. Confirmado pelo uso real: `app/api/users.py` e
-`app/api/endpoints/projects.py` buscam `Plan` por `id` a partir de
-`subscription.plan_id`, nunca filtrando por `account_id`.
+oferecido a todas. Confirmado pelo uso real: `app/api/users.py` busca `Plan`
+por `id` a partir de `subscription.plan_id`, nunca filtrando por
+`account_id`, só para exibir o nome do plano em `GET /api/users/me`; quem
+decide limite (`_get_plan_limit`, `app/api/endpoints/projects.py`) desde a
+Seção 4 não lê `Plan` direto — lê os entitlements que
+`app/services/entitlements.py` já resolveu para a conta.
 
 **O que quebra se mexer:** hoje o *front-end*, não a API, decide o limite de
 projetos quando a API não devolve o campo esperado
@@ -76,8 +82,9 @@ atravessa conta.
 
 ### `environments`
 
-Um cômodo/ambiente de um projeto (`project_id` `NOT NULL`; sem `account_id`
-próprio — ver seção de caminhos até a conta). `type` (ex.: "Interna/Seca") é
+Um cômodo/ambiente de um projeto (`project_id` `NOT NULL`; ganhou
+`account_id` próprio na Tarefa 4 da Seção 4 — antes disso o caminho até a
+conta era só via `Project`, ver seção de classificação abaixo). `type` (ex.: "Interna/Seca") é
 `String` livre. `environments_count`, usado pelo dashboard, é uma
 `@property` do Python sobre `Project.environments`, não uma coluna — não
 existe cache dessa contagem no banco.
@@ -130,8 +137,8 @@ de "só cria se não achar nenhuma".
 Um orçamento por projeto (`project_id` `NOT NULL`). A relação 1:1 com
 `Project` é **só de aplicação** — não há `unique=True` em `budgets.project_id`
 nem no banco; o padrão "get or create" em `app/api/routers/budgets_router.py`
-(`db.query(Budget).filter(Budget.project_id == project_id).first()`, cria se
-não achar) é o único motivo de nunca existirem duas linhas hoje. Nada no
+(`repo.query(Budget).filter(Budget.project_id == project_id).first()`, cria
+se não achar) é o único motivo de nunca existirem duas linhas hoje. Nada no
 schema impede uma segunda inserção direta. `total_value` **não é fonte de
 verdade persistida**: é recalculado e sobrescrito a cada `GET` do orçamento,
 somando `preço × quantidade` só das opções com `is_selected=True` — ler essa
@@ -167,12 +174,14 @@ produto ser escolhido para ela (`item_options` sobrevive como placeholder de
 variante enquanto o produto é decidido). `ondelete="CASCADE"` a partir de
 `budget_items`: apagar o item apaga as opções junto.
 
-**Caminho até a conta, confirmado no próprio código** — a função
-`buscar_item_da_conta` (`app/api/routers/budgets_router.py:19-23`) já
-documenta isso em comentário: *"O caminho ate a conta e: BudgetItem ->
-Budget -> Project -> account_id"*; a função seguinte no mesmo arquivo,
-`buscar_opcao_da_conta` (linhas 38-45), faz o mesmo `JOIN` com mais um salto
-para `item_options`.
+**Caminho até a conta, antes e depois da Seção 4.** `buscar_item_da_conta` e
+`buscar_opcao_da_conta`, as duas funções de `app/api/routers/budgets_router.py`
+que subiam de `BudgetItem`/`ItemOption` até `Project.account_id` por `JOIN`,
+não existem mais — a Tarefa 4 deu `account_id` próprio às duas tabelas, e
+`repo.obter(BudgetItem, item_id)`/`repo.obter(ItemOption, option_id)`
+filtram pela coluna direto, sem `JOIN`
+(`grep -n "def buscar_item_da_conta\|def buscar_opcao_da_conta" app/api/routers/budgets_router.py`
+não acha nada hoje).
 
 ## 5. Apresentação ao cliente
 
@@ -214,15 +223,19 @@ Existe separado de `presentation_acceptances` porque um comentário não é um
 aceite/rejeição formal — é conversa solta durante a revisão, sem efeito no
 `status` da apresentação por si só.
 
-**O que quebra no agregado inteiro:** todas as quatro tabelas acima só têm
-`presentation_id`/`environment_id`, nunca `account_id` — o isolamento por
-conta em `app/api/endpoints/presentations.py` é feito, em toda rota, com
+**O que mudou no agregado inteiro, na Seção 4.** Até então, nenhuma das
+quatro tabelas acima tinha `account_id` — só `presentation_id`/
+`environment_id` — e o isolamento por conta em
+`app/api/endpoints/presentations.py` era feito, em toda rota, com
 `.join(Project, Presentation.project_id == Project.id).filter(Project.account_id == current_user.account_id)`,
-repetido linha a linha (a comparação `Project.account_id == current_user.account_id`
-aparece 12 vezes no arquivo). Um
-`JOIN` esquecido em uma rota nova deste agregado é, hoje, a única coisa que
-impede vazamento entre contas aqui — é exatamente o problema que a Seção 4
-resolve com `ScopedRepository`.
+repetido linha a linha; um `JOIN` esquecido numa rota nova do agregado era a
+única coisa que impedia vazamento entre contas aqui. A Tarefa 4 deu
+`account_id` próprio às quatro (backfill pelo caminho de FK, fechado em
+`NOT NULL`), e `app/api/endpoints/presentations.py` hoje lê e escreve por
+`ScopedRepository` (`repo.query(Presentation)`, `repo.obter(Project,
+project_id)`) — o `JOIN` manual não existe mais no arquivo
+(`grep -c "Project.account_id == current_user" app/api/endpoints/presentations.py`
+dá `0` hoje).
 
 ## 6. Financeiro
 
@@ -300,66 +313,93 @@ Reserva de "vaga" de projeto dentro do limite do plano da assinatura
 reservada antes de ter projeto atribuído). **Sem nenhum consumidor no código
 hoje**: só existe na migração inicial (`5de7aae8c076_create_mvp_schema.py`) e
 no modelo — nenhuma rota cria, lê ou libera uma vaga. A validação de limite
-de projeto por plano que existe hoje (`app/api/users.py`,
-`app/api/endpoints/projects.py`) é feita contando `Project` diretamente, sem
-passar por `project_slots`.
+de projeto por plano que existe hoje (`_get_plan_limit`, em
+`app/api/endpoints/projects.py`, lendo os entitlements que
+`app/services/entitlements.py` resolveu para a requisição) é feita
+contando `Project` diretamente, sem passar por `project_slots`.
 
-## Tabelas sem `account_id` — classificação e caminho até a conta
+## `account_id`: quem tem, quem ganhou na Seção 4, e quem fica de fora por natureza
 
-Das 26 tabelas, 11 têm `account_id` direto: `admin_logs`, `clients`,
-`events`, `financial_entries`, `leads`, `legal_acceptances`, `notifications`,
-`products`, `projects`, `subscriptions`, `users`. As 15 restantes:
-
-| Tabela | Classificação | Por quê | Caminho até a conta |
-|---|---|---|---|
-| `accounts` | É o tenant | N/A — é a própria conta | — |
-| `plans` | Catálogo global | Reaproveitado por todas as contas de um mesmo plano; consultado por `id`/nome de plano, nunca por conta (`app/api/users.py`) | N/A |
-| `product_origins` | Catálogo global | Uma linha por valor de `ProductOriginType`, criada sob demanda e buscada por `type`, nunca por conta (`product_router.py`, `seed.py`) | N/A |
-| `product_states` | Catálogo global | Mesmo padrão de `product_origins`, por `ProductStateStatus` | N/A |
-| `documents` | Não classificável hoje | Sem FK para `projects` ou `accounts`, sem consumidor em `app/` — scaffolding de RAG não ligado ao produto | Não existe caminho hoje |
-| `project_slots` | Precisa de `account_id` | Vaga de projeto é dado da conta dona da assinatura, mesmo sem consumidor no código hoje | `ProjectSlot → Subscription → account_id` (via `subscription_id`, `NOT NULL`; **não** via `project_id`, que é nulável) |
-| `environments` | Precisa de `account_id` | Ambiente é dado do projeto da conta | `Environment → Project → account_id` |
-| `environment_dnas` | Precisa de `account_id` | Medidas do ambiente | `EnvironmentDNA → Environment → Project → account_id` |
-| `budgets` | Precisa de `account_id` | Orçamento é do projeto | `Budget → Project → account_id` |
-| `budget_items` | Precisa de `account_id` | Linha de orçamento do projeto (via `budget_id`, sempre presente; **não** via `environment_id`, nulável) | `BudgetItem → Budget → Project → account_id` |
-| `item_options` | Precisa de `account_id` | Opção de produto de uma linha de orçamento do projeto | `ItemOption → BudgetItem → Budget → Project → account_id` |
-| `presentations` | Precisa de `account_id` | Apresentação é do projeto | `Presentation → Project → account_id` |
-| `presentation_environments` | Precisa de `account_id` | Ambiente curado dentro de uma apresentação do projeto | `PresentationEnvironment → Presentation → Project → account_id` |
-| `presentation_acceptances` | Precisa de `account_id` | Aceite de uma apresentação do projeto | `PresentationAcceptance → Presentation → Project → account_id` |
-| `presentation_comments` | Precisa de `account_id` | Comentário em uma apresentação do projeto | `PresentationComment → Presentation → Project → account_id` |
-
-**Resultado: 10 tabelas guardam dado de conta e não têm `account_id`**
+Antes da Seção 4, das 26 tabelas só 11 tinham `account_id` direto:
+`admin_logs`, `clients`, `events`, `financial_entries`, `leads`,
+`legal_acceptances`, `notifications`, `products`, `projects`,
+`subscriptions`, `users`. As outras 15 se dividiam em duas classes: 10 que
+guardavam dado de conta mas só chegavam até ela por uma cadeia de FK
 (`project_slots`, `environments`, `environment_dnas`, `budgets`,
-`budget_items`, `item_options`, `presentations`, `presentation_environments`,
-`presentation_acceptances`, `presentation_comments`); 3 são catálogo global
-por natureza (`plans`, `product_origins`, `product_states`); 1
-(`documents`) não tem hoje nenhuma relação que permita classificá-la; e
-`accounts` é o próprio tenant.
-
-Todos os caminhos de mais de um salto acima (`budget_items`, `item_options`,
+`budget_items`, `item_options`, `presentations`,
 `presentation_environments`, `presentation_acceptances`,
-`presentation_comments`) foram confirmados contra o `JOIN` que o próprio
-código já faz para isolar por conta hoje (`app/api/routers/budgets_router.py`,
-`app/api/endpoints/presentations.py`), não deduzidos só a partir do desenho
-do schema.
+`presentation_comments`), e 5 que não têm dono de conta por natureza
+(`accounts`, `plans`, `product_origins`, `product_states`, `documents`).
 
-## `created_by`: não existe em nenhuma tabela
+**A Tarefa 4 da Seção 4 deu `account_id` próprio às 10 primeiras**, com
+backfill pelo caminho de FK que a tabela abaixo documentava e fechamento em
+`NOT NULL` na mesma migração — os caminhos que existiam só na cabeça de quem
+lia este documento viraram coluna de verdade. Medido do metadata do
+SQLAlchemy (comando no fim desta seção): hoje **21 das 26 tabelas** têm
+`account_id`, as mesmas 11 de antes mais as 10 que ganharam.
 
-Nenhuma das 26 tabelas de `all_models.py` tem coluna `created_by`. Não há
-hoje como saber, a partir do banco, qual usuário criou uma linha — só a
-conta dona (quando a tabela tem `account_id` ou um caminho até ele). Isso é
-alvo da Seção 4.
+As **5 que continuam sem `account_id`**, e por quê — nenhuma mudou na Seção
+4, o raciocínio de antes segue valendo:
 
-## Índices: 4 no modelo inteiro, nenhum em `account_id`
+| Tabela | Classificação | Por quê |
+|---|---|---|
+| `accounts` | É o tenant | N/A — é a própria conta |
+| `plans` | Catálogo global | Reaproveitado por todas as contas de um mesmo plano; consultado por `id`/nome de plano, nunca por conta (`app/api/users.py`) |
+| `product_origins` | Catálogo global | Uma linha por valor de `ProductOriginType`, criada sob demanda e buscada por `type`, nunca por conta (`product_router.py`, `seed.py`) |
+| `product_states` | Catálogo global | Mesmo padrão de `product_origins`, por `ProductStateStatus` |
+| `documents` | Não classificável hoje | Sem FK para `projects` ou `accounts`, sem consumidor em `app/` — scaffolding de RAG não ligado ao produto |
 
-Todo o arquivo tem só 4 colunas com `index=True`: `users.email`,
-`users.supabase_id`, `financial_entries.group_id` e `documents.id`. Nenhuma
-das 11 colunas `account_id` tem índice — e é a coluna mais filtrada em
-praticamente toda query do sistema (`filter(Model.account_id == ...)` em
-todo endpoint). Nas migrações de `alembic/versions/`, `op.create_index`
-aparece 7 vezes ao todo, e nenhuma delas cria índice em `account_id`.
-Índice em `account_id` (e nas colunas por onde a Seção 4 fizer o filtro
-automático) é alvo da própria Seção 4.
+`ScopedRepository.query()`/`.get()` (`app/db/repository.py`) sobre qualquer
+uma destas cinco levanta `EscopoImpossivel` — é o jeito de descobrir em
+tempo de execução, não só lendo este documento, que a tabela é catálogo
+global ou a própria conta. Para as três primeiras (catálogo global e
+scripts de manutenção), a escotilha é `ScopedRepository.unscoped_query(db,
+model)`.
+
+```bash
+cd ArchSmart-api
+./venv/Scripts/python.exe -c "
+import os
+for k,v in {'DATABASE_URL':'postgresql://a:a@localhost:55432/arqsmart_test','SUPABASE_URL':'https://x.invalido.supabase.co','SUPABASE_KEY':'x','SUPABASE_SERVICE_ROLE_KEY':'x','GEMINI_API_KEY':'x'}.items(): os.environ.setdefault(k,v)
+from app.db.base_class import Base
+import app.models.all_models
+com = sorted(t for t in Base.metadata.tables if 'account_id' in Base.metadata.tables[t].columns)
+print(len(com), com)
+"
+```
+
+## `created_by`: nas mesmas 21 tabelas que têm `account_id`
+
+Antes da Seção 4, nenhuma das 26 tabelas tinha coluna `created_by` — não
+havia, a partir do banco, como saber qual usuário criou uma linha, só a
+conta dona. A Tarefa 4 acrescentou `created_by` (`NOT NULL`, FK para
+`users.id`) às **21 tabelas de dado** — as mesmas 21 que têm `account_id`,
+não um subconjunto diferente: `ScopedRepository.create()` injeta as duas
+colunas juntas a partir do `RequestContext`, e dar `created_by` só às 10 que
+ganharam `account_id` nesta seção teria deixado `create()` com uma exceção a
+lembrar para as 11 que já tinham `account_id` antes. `accounts`, `plans`,
+`product_origins`, `product_states` e `documents` continuam sem
+`created_by`, pelo mesmo motivo que continuam sem `account_id`.
+
+## Índices: de 4 no modelo inteiro para 29, a maioria em `account_id`
+
+Antes da Seção 4, o arquivo inteiro tinha só 4 colunas com `index=True`:
+`users.email`, `users.supabase_id`, `financial_entries.group_id` e
+`documents.id` — nenhuma das 11 colunas `account_id` de então tinha índice,
+apesar de ser a coluna mais filtrada em praticamente toda query do sistema.
+
+Hoje são **29** índices (contados do metadata do SQLAlchemy, mesmo script da
+seção anterior, iterando `Base.metadata.tables[t].indexes`): os 4 originais
+continuam, mais um `ix_*_account_id` em cada uma das 21 tabelas que têm a
+coluna — 16 simples (`ix_admin_logs_account_id` e semelhantes) e 5
+compostos, porque a query real filtra por mais de uma coluna junto
+(`events(account_id, start_time)`, `financial_entries(account_id,
+due_date)`, `notifications(account_id, created_at)`,
+`products(account_id, created_at)`, `projects(account_id, created_at)`) —
+mais 4 índices novos por padrão de FK/query real que não envolve
+`account_id` diretamente (`budget_items.budget_id`,
+`budget_items.environment_id`, `environments.project_id`,
+`presentation_comments(presentation_id, created_at)`).
 
 ## `Document.embedding`: `Vector(1536)`, exige a extensão `vector`
 
@@ -378,7 +418,7 @@ quebra a criação desta tabela.
 ## Onde ler mais
 
 - [`arquitetura.md`](arquitetura.md) — como a identidade e o filtro por
-  conta funcionam hoje, e o que a Seção 4 muda.
+  conta funcionam hoje, e o que a Seção 4 mudou.
 - [`convencoes.md`](convencoes.md) — regras de nomenclatura de tabela/coluna
   e a proibição de `account_id` recebido do cliente.
 - [`../../ArchSmart-api/CLAUDE.md`](../../ArchSmart-api/CLAUDE.md) — onde os

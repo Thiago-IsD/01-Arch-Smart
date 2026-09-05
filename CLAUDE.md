@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 30/08/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). **Seção 3 concluída por inteiro** — esteira, ambientes e branches, 5/5. Seções 4 a 9 pendentes; **a próxima é a Seção 4** (camada de dados do backend).
+Estado em 05/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída por inteiro** — camada de dados do backend, 9/9. Seções 5 a 9 pendentes; **a próxima é a Seção 5** (camada de dados do frontend).
 
 Os ambientes online existem e estão medidos:
 
@@ -20,13 +20,20 @@ Os ambientes online existem e estão medidos:
 | staging | `https://arqsmart-staging.onrender.com` | `ipbhtqzybgdltewwnvnl`, Postgres 17.6 |
 | produção | `https://arqsmart-prod.onrender.com` | `wokgnojyrpzndtxzvfcz`, Postgres 17.6 |
 
-Frontend em `https://www.arqsmart.com.br` (Vercel, projeto `arqsmart`), com preview automático por branch. Os dois bancos nasceram da receita de migrações, sem passo manual: `alembic_version = b77a9b5656c2`, 27 tabelas.
+Frontend em `https://www.arqsmart.com.br` (Vercel, projeto `arqsmart`), com preview automático por branch. Os dois bancos nasceram da receita de migrações, sem passo manual — mas repositório e ambientes implantados não estão no mesmo lugar hoje, e vale medir os dois separado em vez de repetir um só número: **no repositório**, `alembic heads` aponta para `9b0c34de353b`, 30 migrações (`ls ArchSmart-api/alembic/versions/*.py | wc -l`); **nos dois bancos online**, que só migram no próximo deploy, `alembic_version` ainda é `b77a9b5656c2`, 27 tabelas — o valor medido quando o banco de produção fechou em 30/08/2026 (nota da Seção 3 abaixo). Não repita `9b0c34de353b` como se já estivesse implantado, nem `b77a9b5656c2` como se fosse o head do repositório — confira qual dos dois a pergunta é antes de responder.
 
-Três coisas que economizam tempo antes de mexer em ambiente:
+Quatro coisas que economizam tempo antes de mexer em ambiente:
 
 - **A migração roda no `CMD` do `Dockerfile`**, antes do uvicorn e ligada por `&&` ([ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md)). O Render free tier não tem Pre-Deploy Command. Migração vermelha derruba o deploy — é de propósito. **Nunca rode `alembic upgrade head` à mão** contra staging ou produção.
 - **`DATABASE_URL` usa o host pooler na porta 5432**, nunca a 6543 (estado de sessão vaza entre clientes e já derrubou um deploy) nem `db.<ref>.supabase.co` (IPv6-only, não resolve em rede sem IPv6). O caso completo está em [ambientes-online.md](docs/dev/ambientes-online.md), seção 1, item 6.
 - **`develop` é local.** O `ArchSmart-api/.env` tem staging e produção separados, com produção comentada — confira para qual banco ele aponta **antes** de rodar qualquer script.
+- **Endpoint não fala com o banco direto.** Toda leitura e escrita passa por
+  `ScopedRepository` (`app/db/repository.py`), que filtra por `account_id`
+  sozinho. As 29 chamadas de `db.query(` que restam em `app/` têm razão
+  documentada — portal público, catálogo global, ou código que roda antes de
+  existir sessão; ver a nota da Seção 4 em `PROGRESS.md` para a contagem
+  completa. `tests/test_arquitetura.py::test_query_direta_so_em_model_sem_account_id`
+  reprova um `db.query()` que volte a um arquivo já convertido.
 
 Uma decisão segue **em aberto**, e não é para um agente tomar sozinho: ligar ou não branch protection (virou possível quando o repositório foi tornado público em 30/08). O `docker-compose.test.yml` e o CI foram alinhados para Postgres 17 em 05/09/2026, na Tarefa 1 da Seção 4 — a divergência com os 17.6 de staging e produção era o risco de uma migração passar no CI e derrubar o contêiner no deploy (ADR 0007).
 

@@ -1,6 +1,9 @@
 """
-Endpoint público (sem autenticação) para o Portal do Cliente.
-GET /public/presentations/{uuid}
+Endpoints públicos (sem autenticação) para o Portal do Cliente — 7 rotas,
+todas sob o prefixo /public: GET /presentations/{uuid}, POST
+/presentations/{uuid}/verify-password, POST
+/presentations/{uuid}/options/{option_id}/select, .../approve, .../reject,
+POST /presentations/{uuid}/accept e GET /presentations/{uuid}/comments.
 
 Portal publico da apresentacao — o lado do CLIENTE FINAL.
 
