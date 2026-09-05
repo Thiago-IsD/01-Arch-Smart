@@ -23,9 +23,9 @@ async def get_current_user(
     para os dois caminhos. Some quando a ultima rota migrar (Tarefa 15).
     """
     ctx = await get_context(authorization=authorization, db=db)
-    usuario = db.query(User).filter(User.id == ctx.user_id).first()
+    usuario = db.get(User, ctx.user_id)
     if usuario is None:  # pragma: no cover - get_context ja garantiu
-        raise HTTPException(status_code=401, detail="Credenciais invalidas.")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
     return usuario
 
 

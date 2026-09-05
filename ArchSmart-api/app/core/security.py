@@ -135,7 +135,7 @@ async def get_context(
     Dependencia de todo endpoint autenticado. Substitui `get_current_user`.
     """
     if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Credenciais invalidas.")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
     token = authorization[len("Bearer ") :]
 
     try:
@@ -143,12 +143,12 @@ async def get_context(
     except IdentidadeNaoResolvida:
         # 401, nao 404: para quem chama, "esse token nao vale aqui". Dizer
         # "usuario nao encontrado" confirmaria a existencia de contas.
-        raise HTTPException(status_code=401, detail="Credenciais invalidas.")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
     except HTTPException:
         raise
     except Exception as erro:
         logger.warning("Falha ao validar token: %s", erro, exc_info=True)
-        raise HTTPException(status_code=401, detail="Credenciais invalidas.")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
     entitlements = await run_in_threadpool(
         entitlements_da_conta, db, usuario.account_id

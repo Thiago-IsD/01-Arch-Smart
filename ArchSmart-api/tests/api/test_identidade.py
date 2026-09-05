@@ -11,8 +11,12 @@ import uuid
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.security import RequestContext, resolve_identity_por_claims
-from app.models.all_models import Account, User
+from app.api.users import get_current_user
+from app.core.security import RequestContext, get_context, resolve_identity_por_claims
+from app.main import app
+from app.models.all_models import Account, Plan, Subscription, SubscriptionStatus, User
+from app.services.auth_service import auth_service
+from app.services.entitlements import PADRAO, entitlements_da_conta
 
 
 def _usuario(db: Session, email: str, supabase_id: str) -> User:
@@ -95,3 +99,104 @@ def test_contexto_e_imutavel():
     # ate por um TypeError de construtor, sem provar que o objeto e imutavel.
     with pytest.raises(dataclasses.FrozenInstanceError):
         ctx.account_id = uuid.uuid4()
+
+
+def test_get_context_devolve_401_para_token_que_nao_resolve(
+    client_a, conta_a, monkeypatch
+):
+    """
+    O headline da Tarefa 2, exercitado pelo `get_context` de verdade — nao
+    pela sobreposicao de dependencia que os outros testes usam. Toda fixture
+    de cliente sobrepoe `get_current_user` (e `get_context`, que nem chega a
+    ser resolvido pelo FastAPI porque `get_current_user` o chama direto no
+    corpo), entao nenhum teste ate aqui provava o 401 de um token que nao
+    aponta para ninguem.
+
+    `SUPABASE_JWT_SECRET` e forcado a None e a validacao remota e forcada a
+    falhar, para o teste nao depender de rede nem do `.env` local.
+    """
+    monkeypatch.setattr(
+        "app.core.security.settings.SUPABASE_JWT_SECRET", None
+    )
+
+    async def _falha_sempre(token):
+        raise RuntimeError("validacao remota indisponivel neste teste")
+
+    monkeypatch.setattr(auth_service, "get_user", _falha_sempre)
+
+    sobrepostos = {}
+    for dependencia in (get_context, get_current_user):
+        if dependencia in app.dependency_overrides:
+            sobrepostos[dependencia] = app.dependency_overrides.pop(dependencia)
+
+    try:
+        resposta = client_a.get(
+            "/api/users/me",
+            headers={"Authorization": "Bearer token-que-nao-existe-em-lugar-nenhum"},
+        )
+    finally:
+        app.dependency_overrides.update(sobrepostos)
+
+    assert resposta.status_code == 401
+    corpo = resposta.text
+    assert str(conta_a[0].id) not in corpo
+    assert str(conta_a[1].id) not in corpo
+    assert conta_a[1].email not in corpo
+
+
+def _assinatura(
+    db: Session, conta: Account, status: SubscriptionStatus, limits
+) -> Subscription:
+    plano = Plan(name="Plano de teste", limits=limits)
+    db.add(plano)
+    db.flush()
+    assinatura = Subscription(account_id=conta.id, plan_id=plano.id, status=status)
+    db.add(assinatura)
+    db.flush()
+    return assinatura
+
+
+def test_entitlements_sem_assinatura_usa_padrao(db: Session):
+    conta = Account(name="Conta sem assinatura")
+    db.add(conta)
+    db.flush()
+
+    assert entitlements_da_conta(db, conta.id) == PADRAO
+
+
+def test_entitlements_usa_limites_do_plano_por_cima_do_padrao(db: Session):
+    conta = Account(name="Conta com plano")
+    db.add(conta)
+    db.flush()
+    _assinatura(db, conta, SubscriptionStatus.ACTIVE, {"project_limit": 25})
+
+    resultado = entitlements_da_conta(db, conta.id)
+
+    assert resultado["project_limit"] == 25
+    assert resultado["can_use_ai"] == PADRAO["can_use_ai"]
+    assert resultado["can_use_portal"] == PADRAO["can_use_portal"]
+
+
+def test_entitlements_limits_que_nao_e_objeto_cai_no_padrao(db: Session):
+    conta = Account(name="Conta com limits invalido")
+    db.add(conta)
+    db.flush()
+    _assinatura(db, conta, SubscriptionStatus.ACTIVE, ["nao e um objeto"])
+
+    assert entitlements_da_conta(db, conta.id) == PADRAO
+
+
+def test_entitlements_assinatura_cancelada_nao_concede_limites_do_plano(db: Session):
+    """
+    CANCELED nao herda os limites do plano, mesmo que o plano exista e tenha
+    limites generosos: a conta cai no PADRAO (Important 4 da revisao).
+    """
+    conta = Account(name="Conta cancelada")
+    db.add(conta)
+    db.flush()
+    _assinatura(db, conta, SubscriptionStatus.CANCELED, {"project_limit": 25})
+
+    resultado = entitlements_da_conta(db, conta.id)
+
+    assert resultado == PADRAO
+    assert resultado["project_limit"] == 2
