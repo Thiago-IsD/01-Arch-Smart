@@ -28,7 +28,7 @@ class DomainError(Exception):
     """
 
     status: int = 400
-    mensagem: str = "Requisicao invalida."
+    mensagem: str = "Requisição inválida."
 
     def __init__(self, mensagem: str | None = None) -> None:
         if mensagem is not None:
@@ -40,22 +40,22 @@ class NotFound(DomainError):
     status = 404
     # Deliberadamente vaga: distinguir "nao existe" de "existe e nao e sua"
     # confirmaria a existencia do recurso alheio. Ver tests/isolation/.
-    mensagem = "Recurso nao encontrado."
+    mensagem = "Recurso não encontrado."
 
 
 class Forbidden(DomainError):
     status = 403
-    mensagem = "Voce nao tem permissao para esta acao."
+    mensagem = "Você não tem permissão para esta ação."
 
 
 class QuotaExceeded(DomainError):
     status = 402
-    mensagem = "Seu plano nao permite esta acao."
+    mensagem = "Seu plano não permite esta ação."
 
 
 class ValidacaoDeDominio(DomainError):
     status = 422
-    mensagem = "Dados invalidos."
+    mensagem = "Dados inválidos."
 
 
 def registrar_handlers(app: FastAPI) -> None:

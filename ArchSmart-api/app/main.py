@@ -91,6 +91,6 @@ def health_check_db():
         return {"status": "ok", "db": "up"}
     except Exception as erro:
         logger.error("Health check do banco falhou", exc_info=erro)
-        raise HTTPException(status_code=503, detail="Banco indisponivel.")
+        raise HTTPException(status_code=503, detail="Banco indisponível.")
     finally:
         db.close()

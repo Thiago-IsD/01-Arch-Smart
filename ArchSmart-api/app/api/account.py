@@ -79,7 +79,7 @@ async def update_account_branding(
         except Exception as e:
             print(f"❌ Upload failed: {str(e)}")
             logger.error("Falha ao subir o logo da conta", exc_info=e)
-            raise ValidacaoDeDominio("Nao foi possivel enviar o arquivo.")
+            raise ValidacaoDeDominio("Não foi possível enviar o arquivo.")
     
     # Commit changes
     db.commit()

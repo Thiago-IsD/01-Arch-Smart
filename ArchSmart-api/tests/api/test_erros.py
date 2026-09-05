@@ -52,7 +52,7 @@ def app_de_erro() -> TestClient:
 def test_not_found_vira_404_em_portugues(app_de_erro):
     r = app_de_erro.get("/nao-encontrado")
     assert r.status_code == 404
-    assert r.json()["detail"] == "Recurso nao encontrado."
+    assert r.json()["detail"] == "Recurso não encontrado."
 
 
 def test_forbidden_vira_403(app_de_erro):

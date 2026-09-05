@@ -294,7 +294,7 @@ async def upload_presentation_cover(
         traceback.print_exc()
         print("==============================")
         logger.error("Falha ao enviar imagem de capa da apresentacao", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel enviar a imagem.")
+        raise ValidacaoDeDominio("Não foi possível enviar a imagem.")
         
     # Reload
     updated_presentation = (
@@ -418,7 +418,7 @@ async def upload_environment_image(
         traceback.print_exc()
         print("========================================")
         logger.error("Falha ao enviar imagem do ambiente", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel enviar a imagem.")
+        raise ValidacaoDeDominio("Não foi possível enviar a imagem.")
 
 @router.delete("/presentations/{presentation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_presentation(
@@ -448,7 +448,7 @@ def delete_presentation(
         # Desvio deliberado da mensagem do brief ("Nao foi possivel remover a
         # imagem.") — este bloco remove a apresentacao inteira, nao uma
         # imagem. Ver task-5-report.md.
-        raise ValidacaoDeDominio("Nao foi possivel remover a apresentacao.")
+        raise ValidacaoDeDominio("Não foi possível remover a apresentação.")
     
     return None
 

@@ -27,7 +27,7 @@ async def register_request(payload: MagicLinkRequest):
         )
     except Exception as e:
         logger.error("Falha ao iniciar cadastro por magic link", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel iniciar o cadastro.")
+        raise ValidacaoDeDominio("Não foi possível iniciar o cadastro.")
 
 @router.post("/recover-request")
 async def recover_request(payload: RecoverRequest):
@@ -38,7 +38,7 @@ async def recover_request(payload: RecoverRequest):
         return await auth_service.reset_password_email(email=payload.email)
     except Exception as e:
         logger.error("Falha ao iniciar recuperacao de senha", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel iniciar a recuperacao de senha.")
+        raise ValidacaoDeDominio("Não foi possível iniciar a recuperação de senha.")
 
 @router.post("/complete-register")
 async def complete_register(payload: CompleteRegisterRequest, db: Session = Depends(get_db)):
@@ -109,7 +109,7 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         db.rollback()
         print(f"❌ Error in complete-register: {str(e)}")
         logger.error("Falha ao concluir cadastro", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel concluir o cadastro.")
+        raise ValidacaoDeDominio("Não foi possível concluir o cadastro.")
 
 @router.post("/login")
 async def login(payload: UserLogin):
@@ -192,7 +192,7 @@ async def signup(payload: UserSignup, db: Session = Depends(get_db)):
         # Desvio deliberado da mensagem do brief ("Nao foi possivel entrar.
         # Verifique e-mail e senha.") — aquela e uma mensagem de LOGIN, e este
         # bloco e o de signup (cria conta nova). Ver task-5-report.md.
-        raise ValidacaoDeDominio("Nao foi possivel criar a conta. Tente novamente.")
+        raise ValidacaoDeDominio("Não foi possível criar a conta. Tente novamente.")
 
 @router.post("/change-password")
 async def change_password(
@@ -227,4 +227,4 @@ async def change_password(
     except Exception as e:
         print(f"❌ Error changing password: {e}")
         logger.error("Falha ao alterar senha", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel alterar a senha.")
+        raise ValidacaoDeDominio("Não foi possível alterar a senha.")

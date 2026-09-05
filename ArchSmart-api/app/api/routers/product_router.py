@@ -362,4 +362,4 @@ async def clipper_capture(
     except Exception as e:
         db.rollback()
         logger.error("Falha ao processar produto capturado", exc_info=e)
-        raise ValidacaoDeDominio("Nao foi possivel processar o produto.")
+        raise ValidacaoDeDominio("Não foi possível processar o produto.")
