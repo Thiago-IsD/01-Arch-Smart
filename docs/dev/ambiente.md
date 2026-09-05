@@ -399,7 +399,7 @@ Saída real:
  Container archsmart-api-postgres-test-1  Healthy
 ```
 
-Sobe a imagem `pgvector/pgvector:pg16` na porta `55432`, com dados em
+Sobe a imagem `pgvector/pgvector:pg17` na porta `55432`, com dados em
 `tmpfs` (efêmeros — reiniciar o container apaga tudo, de propósito). **Sinal
 de sucesso:** a última linha da saída diz `Healthy`.
 

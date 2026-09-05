@@ -301,17 +301,29 @@ migrações funciona do zero antes de apostar produção nela.
 
    | Ambiente | Postgres | Como foi obtido |
    |---|---|---|
-   | Banco de teste (`docker-compose.test.yml`) | **16** | imagem `pgvector/pgvector:pg16` |
+   | Banco de teste (`docker-compose.test.yml`) | **17** | imagem `pgvector/pgvector:pg17` |
    | Stack Supabase local (`supabase start`) | **17** | a CLI rejeita 16; ver `supabase/config.toml` |
    | Staging (`ipbhtqzybgdltewwnvnl`) | **17.6** | `SHOW server_version` |
    | Produção (`wokgnojyrpzndtxzvfcz`) | **17.6** | `SHOW server_version` |
 
-   Isso não é burocracia, e a previsão que estava escrita aqui se confirmou:
-   **quem diverge agora é o banco de teste**, sozinho num major mais velho, já
-   que os dois projetos novos nasceram em 17. Vale alinhar o
-   `docker-compose.test.yml` — **numa tarefa dedicada**, não de passagem,
-   porque trocar a imagem do Postgres dos testes é exatamente o tipo de mudança
-   que precisa ser medida sozinha.
+   **A divergência foi fechada em 05/09/2026, na Tarefa 1 da Seção 4**, a tarefa
+   dedicada que este parágrafo pedia. O `docker-compose.test.yml` e o
+   `services.postgres` do `.github/workflows/ci.yml` passaram para
+   `pgvector/pgvector:pg17`. Medido depois da troca:
+   ```bash
+   docker compose -f docker-compose.test.yml exec -T postgres-test psql -U arqsmart -d arqsmart_test -c "select version();"
+   ```
+   retornou `PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit`.
+   A suíte inteira passou contra o 17:
+   ```
+   pytest -q
+   ```
+   retornou `81 passed, 3 warnings in 19.67s`. **O risco que a divergência carregava:**
+   uma migração podia passar no CI em 16 e falhar em 17.6 no deploy — e pela
+   [ADR 0007](decisoes/0007-migracao-no-start-do-container.md) a migração roda
+   no `CMD` do contêiner, então falha de migração derruba o deploy. A imagem `pg17`
+   resolve hoje para 17.11 enquanto staging e produção são 17.6 — mesma *major*,
+   que é o que importa para compatibilidade de migração entre as duas versões.
 
 ## 5. Branch protection nas três branches
 
