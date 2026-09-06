@@ -81,6 +81,11 @@ describe("filtrosDaUrl", () => {
         expect(filtrosDaUrl(new URLSearchParams(""))).toEqual(filtrosDaUrl({}))
         expect(filtrosDaUrl(new URLSearchParams("tab=inbox&page=2&categories=A&categories=B")))
             .toEqual(filtrosDaUrl({ tab: "inbox", page: "2", categories: ["A", "B"] }))
+        // Um so parametro repetido: a URL de verdade (`?categories=Cadeiras`)
+        // chega ao servidor como string solta, nao como array de um item — a
+        // forma que o prefetch da Tarefa 8 alimenta de fato.
+        expect(filtrosDaUrl(new URLSearchParams("categories=A&origins=Manual&q=x&sort_by=name&size=30")))
+            .toEqual(filtrosDaUrl({ categories: "A", origins: "Manual", q: "x", sort_by: "name", size: "30" }))
     })
 
     it("preenche os padroes que o LibraryContent usava inline", () => {

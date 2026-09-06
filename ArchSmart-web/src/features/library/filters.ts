@@ -21,9 +21,16 @@ export const FILTROS_PADRAO = {
 type ParamsDaUrl = URLSearchParams | Record<string, string | string[] | undefined>
 
 function pegar(params: ParamsDaUrl, chave: string): string | undefined {
-    if (params instanceof URLSearchParams) return params.get(chave) ?? undefined
-    const valor = params[chave]
-    return Array.isArray(valor) ? valor[0] : valor
+    // String vazia volta undefined, igual ao `||` que este arquivo substituiu:
+    // `?tab=` nao pode zerar o default, só a ausencia da chave zera.
+    const valor =
+        params instanceof URLSearchParams
+            ? params.get(chave)
+            : (() => {
+                  const bruto = params[chave]
+                  return Array.isArray(bruto) ? (bruto[0] ?? null) : (bruto ?? null)
+              })()
+    return valor === null || valor === "" ? undefined : valor
 }
 
 function pegarTodos(params: ParamsDaUrl, chave: string): string[] {
