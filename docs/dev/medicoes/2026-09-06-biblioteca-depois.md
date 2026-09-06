@@ -294,7 +294,7 @@ opts.fetchImpl ?? fetch` — e chama `chamar(...)`, não literalmente
 `fetch(...)`), e 1 dentro de comentário
 (`src/__tests__/library-hooks.test.tsx:108`, citando o código antigo de
 `ProductCard.tsx`). **76 é exatamente o `fetch_fora_de_lib_api` que a catraca
-mediu na Seção 2** — os dois números batem porque são a mesma contagem, e
+mediu na seção "### 2. Catraca" acima, desta mesma tarefa** — os dois números batem porque são a mesma contagem, e
 isso fecha a conta: não sobra nenhum `fetch(` real dentro de `lib/api/` para
 explicar uma diferença entre os dois. Os 75 restantes (76 menos o comentário)
 são chamadas reais nas telas ainda não migradas.
