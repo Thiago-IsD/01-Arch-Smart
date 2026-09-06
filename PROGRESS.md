@@ -157,6 +157,39 @@ _Última atualização: 2026-09-05_
 > rota nova com id na URL e sem entrada em `RECURSOS` **falha**, em vez de
 > passar despercebida.
 >
+> **O limite exato dessa garantia, e o que o fecha.** `RECURSOS` é indexado
+> por **nome de parâmetro**. Um nome *novo* falha alto — ninguém disse que
+> recurso aquele id endereça. Um nome **já registrado, reusado para
+> endereçar outro model**, não: a fábrica devolve o objeto errado, o id
+> nunca casa, a rota devolve 404 para *toda* conta e o caso passa sem ter
+> exercitado filtro nenhum. Foi o defeito de `env_id` que esta seção
+> encontrou e corrigiu para duas rotas — mas corrigir duas rotas não
+> corrige a classe. Medido em 05/09/2026 com uma rota
+> `GET /api/vazamento/{project_id}` acrescentada a `app/main.py`, que
+> consulta `Product` sem filtro de conta e vaza `cost_price` e `markup` de
+> todas: com o arquivo na versão anterior, `47 passed, 1 skipped`.
+>
+> O que fecha a classe é o **controle positivo**, acrescentado agora: antes
+> de exigir 404 da conta A, o teste exige que a conta **B alcance o próprio
+> recurso** por aquela mesma rota. Se B também levar 404, o caso não prova
+> nada e falha com essa mensagem ("CASO VACUO"). Com ele, a mesma rota de
+> vazamento dá `1 failed, 46 passed, 1 skipped`. A asserção é `!= 404` de
+> propósito, e não 2xx: o corpo mínimo atravessa o portão de conta, não
+> toda regra de negócio do handler — exigir 2xx transformaria "regra mudou"
+> em "isolamento quebrou".
+>
+> Duas correções vieram junto, ambas de harness. `client_a` e `client_b`
+> gravavam a **mesma** chave em `app.dependency_overrides`, então pedir as
+> duas fixtures no mesmo teste fazia a última vencer as duas — medido:
+> `client_a` autenticado como B devolvia 200 para um projeto de B.
+> `_ClienteDeConta` (em `tests/conftest.py`) re-arma o override a cada
+> chamada. E `criar_lancamento` fabricava um `FinancialEntry` sem `type`,
+> `status` nem `due_date`, os três obrigatórios em
+> `FinancialEntryResponse`: um lançamento que o `POST /api/financial` nunca
+> cria, e que fazia `PUT /api/financial/{entry_id}` estourar 500 na
+> validação da resposta assim que o controle positivo percorreu o caminho
+> de sucesso.
+>
 > **O schema.** As 21 tabelas de dado ganharam `created_by`; as mesmas 21
 > têm hoje `account_id` (11 já tinham antes da Seção 4, 10 ganharam agora),
 > com backfill pelo caminho de FK e fechamento em `NOT NULL` na mesma

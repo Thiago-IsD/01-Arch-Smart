@@ -11,8 +11,7 @@ import uuid
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.security import RequestContext, get_context, resolve_identity_por_claims
-from app.main import app
+from app.core.security import RequestContext, resolve_identity_por_claims
 from app.models.all_models import Account, Plan, Subscription, SubscriptionStatus, User
 from app.services.auth_service import auth_service
 from app.services.entitlements import PADRAO, entitlements_da_conta
@@ -136,18 +135,15 @@ def test_get_context_devolve_401_para_token_que_nao_resolve(
 
     monkeypatch.setattr(auth_service, "get_user", _resolve_para_ninguem)
 
-    sobrepostos = {}
-    for dependencia in (get_context,):
-        if dependencia in app.dependency_overrides:
-            sobrepostos[dependencia] = app.dependency_overrides.pop(dependencia)
-
-    try:
+    # O cliente de teste re-arma o override de `get_context` a cada chamada
+    # (ver `_ClienteDeConta` em tests/conftest.py); aqui e preciso o
+    # contrario — suspender o re-armamento E remover o override, para a
+    # requisicao passar pelo `get_context` de verdade.
+    with client_a.sem_sobreposicao_de_contexto():
         resposta = client_a.get(
             "/api/users/me",
             headers={"Authorization": "Bearer token-que-nao-existe-em-lugar-nenhum"},
         )
-    finally:
-        app.dependency_overrides.update(sobrepostos)
 
     assert resposta.status_code == 401
     corpo = resposta.text

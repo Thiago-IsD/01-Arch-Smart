@@ -10,7 +10,8 @@ Sobe com: docker compose -f docker-compose.test.yml up -d --wait
 """
 import os
 import uuid
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import date, datetime
 from typing import Generator
 
 import pytest
@@ -230,11 +231,27 @@ def criar_apresentacao(db: Session, conta: Account, usuario: User) -> Presentati
 
 
 def criar_lancamento(db: Session, conta: Account, usuario: User) -> FinancialEntry:
+    """
+    `type`, `status` e `due_date` sao NULLABLE na tabela mas OBRIGATORIOS em
+    `FinancialEntryResponse` (app/schemas/financial_schema.py) — o
+    `POST /api/financial` nunca cria um lancamento sem eles. Uma entrada
+    fabricada sem os tres nao existe em producao, e faz `PUT /api/financial/
+    {entry_id}` estourar 500 na validacao da RESPOSTA em vez de responder.
+    Medido em 05/09/2026, quando o controle positivo de
+    tests/isolation/test_todas_as_rotas.py passou a percorrer o caminho de
+    sucesso desta rota: `ValidationError: 2 validation errors for
+    FinancialEntryResponse` (type=None, due_date=None). A fixture e que
+    estava incompleta.
+    """
     entrada = FinancialEntry(
         account_id=conta.id,
         created_by=usuario.id,
         description="Honorarios",
         amount=1000.0,
+        type="INCOME",
+        status="PREDICTED",
+        due_date=date(2026, 9, 5),
+        category="Honorarios",
     )
     db.add(entrada)
     db.flush()
@@ -339,11 +356,68 @@ def conta_b(db: Session) -> tuple[Account, User]:
     return _criar_conta(db, "ContaB")
 
 
+class _ClienteDeConta(TestClient):
+    """
+    TestClient que RE-ARMA o override de `get_context` a cada requisicao.
+
+    `app.dependency_overrides` e um dict UNICO do app: `client_a` e
+    `client_b` gravam a MESMA chave, entao a fixture montada por ULTIMO
+    vencia as duas. Medido em 05/09/2026, antes desta classe, com a
+    assinatura `(db, client_a, client_b, conta_a, conta_b)`:
+
+        client_a.get(f"/api/projects/{projeto_da_conta_b.id}")  ->  200
+        client_a.get(f"/api/projects/{projeto_da_conta_a.id}")  ->  404
+
+    Nao era vazamento do app: `client_a` estava autenticado como B, e um
+    teste "A nao alcanca B" escrito assim provaria o contrario do que diz.
+    Re-armar no momento da chamada — e nao na montagem da fixture — faz as
+    duas conviverem no mesmo teste, que e o que o controle positivo de
+    tests/isolation/test_todas_as_rotas.py precisa.
+
+    `contexto=None` e o cliente anonimo: ali o override e REMOVIDO, para o
+    `get_context` de verdade rodar (401 sem credencial). Sem a remocao, um
+    client_anon usado ao lado de um client_a herdaria a identidade de A.
+    """
+
+    def __init__(self, *args, contexto=None, **kwargs):
+        self._contexto = contexto
+        self._rearmar = True
+        super().__init__(*args, **kwargs)
+
+    @contextmanager
+    def sem_sobreposicao_de_contexto(self):
+        """
+        Suspende o re-armamento e REMOVE o override, para o `get_context` de
+        verdade rodar (token do header, banco, 401). E o que
+        tests/api/test_identidade.py precisa: sem isto, o re-armamento acima
+        devolveria a identidade sobreposta e o 401 nunca aconteceria.
+        """
+        anterior = self._rearmar
+        sobreposto = app.dependency_overrides.pop(get_context, None)
+        self._rearmar = False
+        try:
+            yield self
+        finally:
+            self._rearmar = anterior
+            if sobreposto is not None:
+                app.dependency_overrides[get_context] = sobreposto
+
+    def request(self, *args, **kwargs):
+        if self._rearmar:
+            if self._contexto is None:
+                app.dependency_overrides.pop(get_context, None)
+            else:
+                app.dependency_overrides[get_context] = self._contexto
+        return super().request(*args, **kwargs)
+
+
 def _cliente(db: Session, usuario: User | None) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_db] = lambda: db
+    contexto = None
     if usuario is not None:
-        app.dependency_overrides[get_context] = lambda: _contexto_de(db, usuario)
-    with TestClient(app) as c:
+        contexto = lambda: _contexto_de(db, usuario)  # noqa: E731
+        app.dependency_overrides[get_context] = contexto
+    with _ClienteDeConta(app, contexto=contexto) as c:
         yield c
     app.dependency_overrides.clear()
 

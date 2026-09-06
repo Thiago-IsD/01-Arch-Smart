@@ -10,9 +10,18 @@ ignorar.
 Como quebrar de proposito, para ver que funciona: apague o filtro por conta de
 um endpoint qualquer e rode. Se ele continuar verde, este arquivo esta mentindo.
 
+**A garantia, em uma frase.** Uma rota com nome de parametro NOVO falha
+alto (`assert fabrica is not None` em `_preencher_url`): ninguem disse que
+recurso aquele id endereca, e o teste recusa adivinhar. Uma rota que REUSA
+um nome ja registrado para enderecar OUTRO model e o caso que o nome
+sozinho nao pega — e quem o fecha e o CONTROLE POSITIVO
+(`_controle_positivo`), que exige que a conta DONA alcance o proprio
+recurso antes de o 404 da conta A valer como prova. Os dois juntos cobrem
+a classe, nao so as instancias que alguem lembrou de registrar.
+
 **Todos os 35 casos de CASOS_FORTES sao load-bearing hoje** — cada um
 exige 404 e SO fica verde porque o filtro por conta funciona, nao por
-coincidencia de dado ou de validacao. Isso exigiu dois cuidados, cada um
+coincidencia de dado ou de validacao. Isso exigiu tres cuidados, cada um
 medido quebrando o codigo de proposito e vendo o teste acusar (nao so
 supor):
 
@@ -47,6 +56,28 @@ supor):
    tambem filtra por conta (e o que `ScopedRepository.query()` sempre
    faz), entao remover so aquela linha nao vaza. A quebra que vaza de
    verdade e desescopar o `repo.query(PresentationEnvironment)` em si.
+
+3. **Controle positivo, contra a vacuidade por nome de parametro
+   reusado.** O item 2 acima corrigiu DUAS rotas; nao corrigiu a classe.
+   `RECURSOS` e indexado por NOME de parametro, entao qualquer rota futura
+   que reuse um nome registrado para outro model recebe o objeto errado,
+   404 para TODA conta, e passa sem exercitar filtro nenhum. Medido em
+   05/09/2026 com a rota abaixo acrescentada a `app/main.py` — que vaza
+   `cost_price` e `markup` de todas as contas:
+
+       @app.get("/api/vazamento/{project_id}")
+       def rota_de_vazamento(project_id: str, db=Depends(get_db)):
+           produto = db.query(Product).filter(
+               Product.id == project_id).first()
+           if produto is None:
+               raise HTTPException(status_code=404, ...)
+           return {"cost_price": produto.cost_price, ...}
+
+   Com este arquivo na versao anterior: `47 passed, 1 skipped`. Com o
+   controle positivo: `1 failed, 46 passed, 1 skipped`, com a mensagem
+   "CASO VACUO: GET /api/vazamento/{project_id} devolveu 404 para a conta
+   DONA do recurso". Ver `_controle_positivo` para por que a asercao e
+   `!= 404` e nao algo mais forte.
 
 **Gap conhecido, fora do que este arquivo cobre.** Rotas cujo id vem do BODY,
 nao da URL — `PATCH /api/products/batch-approve`
@@ -228,14 +259,15 @@ def test_ha_rotas_para_percorrer():
 # motivo errado. Essa e exatamente a forma de teste decorativo que a Tarefa 2
 # ja pegou uma vez (um 401 que passava contra codigo que vazaria).
 #
-# A maioria dos valores nao precisa apontar para um recurso de VERDADE: em
-# quase toda rota desta lista, a checagem de posse do recurso da URL
-# (`repo.obter(...)`) roda ANTES de o handler tocar em qualquer campo do
-# corpo — entao um UUID qualquer, mesmo inexistente, e suficiente para o
-# pedido chegar la e ainda assim ser barrado por dono errado, nunca por dado
-# invalido.
+# Todo id citado num corpo daqui aponta para um recurso de VERDADE da conta
+# B. Um UUID inexistente CHEGA no handler (a checagem de posse do recurso da
+# URL roda antes), entao ele bastaria para o 404 da conta A — mas nao basta
+# para o controle positivo, e nao basta para a quebra deliberada: se o
+# handler tem uma SEGUNDA checagem sobre o id do corpo, o UUID inexistente
+# faz ela devolver 404 sozinha, e apagar o portao de conta da URL nao muda o
+# resultado. Ver o comentario logo acima de CORPOS_MINIMOS.
 #
-# UMA excecao: `/projects/{project_id}/presentations` tambem valida
+# DUAS rotas ilustram, cada uma de um jeito: `/projects/{project_id}/presentations` tambem valida
 # `presentation_in.project_id != project_id` (o da URL) e devolve 400 se
 # divergirem — um gate DEPOIS do `repo.obter(Project, project_id)`, mas que
 # ainda mascara: se alguem apagar o `repo.obter` de proposito (ou por
@@ -247,24 +279,36 @@ def test_ha_rotas_para_percorrer():
 # `repo.obter(Project, project_id)` estar la — se sumir, o corpo bate, o
 # handler cria a apresentacao no projeto da conta B, e o teste acusa 201
 # ("vazamento entre contas"), a mensagem certa para o defeito certo.
-_UUID_QUALQUER = "00000000-0000-0000-0000-000000000000"
-
-CORPOS_MINIMOS: dict[str, dict | Callable[[dict], dict]] = {
-    "/api/budgets/items/{item_id}/options": {
-        "json": {"product_id": _UUID_QUALQUER},
-    },
+#
+# Uma entrada callable recebe `(ja_criados, db, conta, usuario)` — os quatro,
+# e nao so `ja_criados`, porque um corpo pode precisar FABRICAR um recurso da
+# conta B em vez de so citar um id que ja foi para a URL. Foi o que o controle
+# positivo cobrou de `/budgets/items/{item_id}/options`: com um product_id
+# inexistente, a conta B (a DONA do item) tambem levava 404 — "Produto nao
+# encontrado na biblioteca" — e o caso era vacuo dos dois lados. Pior: com o
+# produto inexistente, apagar o `repo.get(BudgetItem, item_id)` de proposito
+# NAO acusava, porque a checagem seguinte devolvia 404 sozinha. Com um
+# produto de verdade da conta B, o unico 404 possivel vem do portao de conta.
+CORPOS_MINIMOS: dict[str, dict | Callable[..., dict]] = {
+    "/api/budgets/items/{item_id}/options": (
+        lambda ja_criados, db, conta, usuario: {
+            "json": {"product_id": str(criar_produto(db, conta, usuario).id)},
+        }
+    ),
     "/api/presentations/{presentation_id}/comments": {
         "json": {"text": "Comentario minimo"},
     },
     "/api/projects/{project_id}/environments": {
         "json": {"name": "Ambiente minimo"},
     },
-    "/api/projects/{project_id}/presentations": lambda ja_criados: {
-        "json": {
-            "name": "Apresentacao minima",
-            "project_id": str(ja_criados["project_id"].id),
-        },
-    },
+    "/api/projects/{project_id}/presentations": (
+        lambda ja_criados, db, conta, usuario: {
+            "json": {
+                "name": "Apresentacao minima",
+                "project_id": str(ja_criados["project_id"].id),
+            },
+        }
+    ),
     # Estas duas nao tem corpo JSON: o endpoint declara `file: UploadFile =
     # File(...)`, entao `json={}` nem chega a ser o motivo do 422 — o
     # FastAPI exige multipart/form-data com um campo "file".
@@ -296,6 +340,34 @@ CASOS_FRACOS = [
     if caso[0] == "POST" and caso[1] in POSTS_SEM_CORPO_MINIMO_POSSIVEL
 ]
 CASOS_FORTES = [caso for caso in CASOS if caso not in CASOS_FRACOS]
+
+
+@pytest.fixture(autouse=True)
+def storage_sem_rede(monkeypatch):
+    """
+    O controle positivo (conta B alcancando o PROPRIO recurso) percorre o
+    caminho de SUCESSO das duas rotas de upload, e o caminho de sucesso
+    delas chama o Supabase Storage de verdade (`get_storage_client()`, com
+    credenciais do `.env`, timeout de 30s). Um teste de isolamento nao pode
+    depender de rede nem gravar num bucket real, entao o cliente e trocado
+    por um dublê que devolve uma URL e nao sai da maquina.
+
+    Isto NAO enfraquece nada: o que o controle positivo precisa provar e que
+    a requisicao ATRAVESSOU o portao de conta e chegou no corpo do handler.
+    O upload em si nao e o assunto deste arquivo.
+    """
+
+    class _StorageFalso:
+        async def upload_file(self, bucket, path, file_bytes, content_type=None):
+            return self.get_public_url(bucket, path)
+
+        def get_public_url(self, bucket, path):
+            return f"https://storage.invalido.local/{bucket}/{path}"
+
+    monkeypatch.setattr(
+        "app.api.endpoints.presentations.get_storage_client",
+        lambda: _StorageFalso(),
+    )
 
 
 def _preencher_url(
@@ -333,9 +405,52 @@ def _preencher_url(
     return url, ja_criados
 
 
+def _controle_positivo(client_b, metodo: str, caminho: str, url: str, corpo: dict):
+    """
+    Prova que o recurso fabricado e ALCANCAVEL por esta rota — sem isso, o
+    404 exigido da conta A nao prova nada.
+
+    O buraco que isto fecha: `RECURSOS` e indexado por NOME DE PARAMETRO. Um
+    nome novo falha alto (`assert fabrica is not None`), mas um nome JA
+    REGISTRADO reusado para enderecar OUTRO model recebe o objeto errado — o
+    id nunca bate com nada, a rota 404 para TODA conta, e o caso fica verde
+    sem nunca ter exercitado filtro de conta nenhum. Foi o defeito medido em
+    `env_id` (ver `_criar_ambiente_de_apresentacao`), e RECURSOS_POR_ROTA
+    corrigiu as DUAS instancias conhecidas — nao a classe. Medido em
+    05/09/2026, antes deste controle: uma rota `GET /api/vazamento/
+    {project_id}` acrescentada a `app/main.py` que consultava `Product` sem
+    filtro de conta — vazando `cost_price` e `markup` de todas as contas —
+    passava, porque `project_id` ja estava em RECURSOS e o `Project`
+    fabricado nunca batia com nenhum `Product.id`.
+
+    **A asercao e `!= 404`, e nao algo mais forte, de proposito.** "B
+    alcancou o proprio recurso" nao quer dizer "B recebeu 200": o corpo
+    minimo dos POST e o `json={}` dos PUT/PATCH sao o suficiente para
+    ATRAVESSAR o portao de conta, nao para satisfazer toda regra de negocio
+    do handler — B pode legitimamente receber 400 (limite atingido, campo
+    incoerente), 422 (validacao de dominio), 200/201/204. Qualquer um desses
+    prova o que precisa ser provado: a requisicao passou do `repo.obter(...)`
+    e chegou no corpo do handler, entao o 404 que a conta A recebeu veio do
+    filtro por conta e nao de um id que nao endereca nada. Exigir 2xx aqui
+    tornaria o controle refem de regra de negocio e transformaria "regra
+    mudou" em "isolamento quebrou".
+    """
+    resposta_b = client_b.request(metodo, url, **corpo)
+
+    assert resposta_b.status_code != 404, (
+        f"CASO VACUO: {metodo} {caminho} devolveu 404 para a conta DONA do "
+        f"recurso ({url}). Entao o 404 da conta A nao provou isolamento — "
+        "provou so que este id nao endereca nada nesta rota. Quase sempre a "
+        "causa e a fabrica errada: o parametro de caminho esta em RECURSOS "
+        "com um model, e ESTA rota o usa para enderecar outro. Registre a "
+        "fabrica certa em RECURSOS_POR_ROTA, com a chave (caminho, "
+        f"parametro). Resposta da conta B: {resposta_b.text[:400]}"
+    )
+
+
 @pytest.mark.parametrize("metodo,caminho,parametros", CASOS_FORTES, ids=lambda v: str(v))
 def test_toda_rota_forte_isola_por_conta_com_404(
-    db, client_a, conta_b, metodo, caminho, parametros
+    db, client_a, client_b, conta_b, metodo, caminho, parametros
 ):
     """
     Casos FORTES: GET/DELETE (sem corpo, 404 sempre exigivel) e PUT/PATCH
@@ -360,13 +475,23 @@ def test_toda_rota_forte_isola_por_conta_com_404(
             "ser montado citando dado de outra conta — nesse caso o caso "
             "migra sozinho para CASOS_FRACOS."
         )
-        # Uma entrada pode ser um dict fixo ou uma funcao de `ja_criados`,
-        # para o corpo poder citar o MESMO id que foi parar na URL (ver o
-        # comentario de /projects/{project_id}/presentations acima).
-        corpo = registro(ja_criados) if callable(registro) else registro
+        # Uma entrada pode ser um dict fixo ou uma funcao de
+        # `(ja_criados, db, conta, usuario)`, para o corpo poder citar o
+        # MESMO id que foi parar na URL ou fabricar um recurso novo da conta
+        # B (ver o comentario de CORPOS_MINIMOS acima).
+        corpo = (
+            registro(ja_criados, db, conta, usuario)
+            if callable(registro)
+            else registro
+        )
     else:
         corpo = {"json": {}}
 
+    # Controle NEGATIVO primeiro, e de proposito: varias destas rotas sao
+    # DELETE ou mutacao, e o controle positivo abaixo executa o caminho de
+    # sucesso da conta B. Se ele rodasse antes, o recurso poderia ja estar
+    # apagado quando a conta A tentasse alcanca-lo, e o 404 de A seria "nao
+    # existe mais" em vez de "nao e seu" — vacuidade nova no lugar da antiga.
     resposta = client_a.request(metodo, url, **corpo)
 
     assert resposta.status_code not in (200, 201, 202, 204), (
@@ -382,10 +507,12 @@ def test_toda_rota_forte_isola_por_conta_com_404(
         f"Corpo enviado: {corpo}. Resposta: {resposta.text[:400]}"
     )
 
+    _controle_positivo(client_b, metodo, caminho, url, corpo)
+
 
 @pytest.mark.parametrize("metodo,caminho,parametros", CASOS_FRACOS, ids=lambda v: str(v))
 def test_toda_rota_fraca_isola_por_conta_sem_vazamento(
-    db, client_a, conta_b, metodo, caminho, parametros
+    db, client_a, client_b, conta_b, metodo, caminho, parametros
 ):
     """
     Casos FRACOS: hoje nenhum — POSTS_SEM_CORPO_MINIMO_POSSIVEL esta vazio,
@@ -408,6 +535,8 @@ def test_toda_rota_fraca_isola_por_conta_sem_vazamento(
         f"{metodo} {caminho} devolveu 403, que CONFIRMA a existencia do "
         "recurso alheio. Use 404."
     )
+
+    _controle_positivo(client_b, metodo, caminho, url, {"json": {}})
 
 
 # Rotas GET sem parametro de caminho. O teste de isolamento acima nao as
