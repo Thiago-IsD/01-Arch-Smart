@@ -170,11 +170,21 @@ def carregar_orcamento(
     Sem `RequestContext`, (2) e o limite maximo de aperto possivel aqui — e
     e o aperto certo: a identidade vem da linha, nao de quem pediu.
     """
+    # `order_by(BudgetItem.id)` nao e cosmetico: sem ORDER BY o Postgres
+    # devolve as linhas na ordem que quiser, e essa ordem chega no
+    # `BudgetResponse.items` do front (via `popular_relacionamento_de_itens`,
+    # que copia ESTA lista para `Budget.items`). Duas leituras do mesmo
+    # orcamento podiam sair com os itens em ordens diferentes, sem nada ter
+    # mudado. `id` e UUID4 — a ordem nao significa nada, mas e ESTAVEL, que e
+    # a propriedade que faltava; escolher `environment_id` ou um campo de
+    # data embutiria uma decisao de produto que nao e desta correcao.
     carregados: list[BudgetItem] = (
         itens.options(
             joinedload(BudgetItem.environment),
             joinedload(BudgetItem.options).joinedload(ItemOption.product),
-        ).all()
+        )
+        .order_by(BudgetItem.id)
+        .all()
     )
     ids_de_ambiente = {i.environment_id for i in carregados if i.environment_id}
     if not ids_de_ambiente:

@@ -35,7 +35,16 @@ async def get_current_user_profile(
         raise HTTPException(status_code=404, detail="Account not found")
 
     # Subscription tem account_id: converte de verdade.
-    subscription = repo.query(Subscription).first()
+    #
+    # `order_by(Subscription.id)` pelo MESMO motivo que
+    # `entitlements_da_conta` (app/services/entitlements.py) ja usava, e
+    # tem que ser a MESMA ordenacao: nao ha unique constraint em
+    # `subscriptions.account_id`, e esta resposta carrega os dois campos
+    # juntos. Com uma conta de duas linhas e ordenacoes diferentes, o
+    # `subscription_status`/`plan_name` daqui e o `entitlements` de la
+    # sairiam de assinaturas DIFERENTES na mesma resposta — incoerencia
+    # silenciosa, e o cliente nao tem como notar.
+    subscription = repo.query(Subscription).order_by(Subscription.id).first()
     plan_name = None
     subscription_status = "BETA"  # Default
 
