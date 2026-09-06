@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building2, User, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getAccessToken, supabaseBrowser } from "@/lib/api/auth";
+import { getAccessToken, getUser } from "@/lib/api/auth";
 
 interface ProfileFormData {
     full_name: string;
@@ -62,7 +62,7 @@ export default function ProfilePage() {
                 }
 
                 // Load user email
-                const { data: { user } } = await supabaseBrowser().auth.getUser();
+                const user = await getUser();
                 if (user) {
                     setUserEmail(user.email || "");
                 }

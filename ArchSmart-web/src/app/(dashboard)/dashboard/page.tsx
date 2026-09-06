@@ -101,10 +101,8 @@ export default function DashboardPage() {
             setLoading(true)
             try {
                 const accessToken = await getAccessToken()
-                console.log("Access token in dashboard:", accessToken)
 
                 if (!accessToken) {
-                    console.log("No session found in dashboard, redirecting to login...")
                     router.push("/auth/login")
                     return
                 }

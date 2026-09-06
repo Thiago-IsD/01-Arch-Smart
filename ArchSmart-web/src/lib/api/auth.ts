@@ -1,7 +1,7 @@
 "use client"
 
 import { createBrowserClient } from "@supabase/ssr"
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { env } from "@/lib/env"
 
 /**
@@ -41,4 +41,9 @@ export async function setSession(tokens: {
 }): Promise<void> {
     const { error } = await supabaseBrowser().auth.setSession(tokens)
     if (error) throw error
+}
+
+export async function getUser(): Promise<User | null> {
+    const { data } = await supabaseBrowser().auth.getUser()
+    return data.user
 }
