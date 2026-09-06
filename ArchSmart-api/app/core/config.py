@@ -15,7 +15,16 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = Field(..., description="Supabase project URL")
     SUPABASE_KEY: str = Field(..., description="Supabase anon/public key")
     SUPABASE_SERVICE_ROLE_KEY: str = Field(..., description="Supabase service role key for admin operations")
-    
+    SUPABASE_JWT_SECRET: Optional[str] = Field(
+        None,
+        description=(
+            "Segredo HS256 do projeto Supabase, em base64. Opcional: sem ele a "
+            "validacao cai no caminho remoto (auth_service.get_user), que "
+            "funciona mas custa uma ida a rede por requisicao. O CI nao o "
+            "define de proposito."
+        ),
+    )
+
     # SMTP Settings (Optional - for future email features)
     SMTP_HOST: Optional[str] = Field(None, description="SMTP server host")
     SMTP_PORT: int = Field(587, description="SMTP server port")

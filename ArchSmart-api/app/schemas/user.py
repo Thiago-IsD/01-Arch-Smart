@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class AccountInfo(BaseModel):
@@ -21,6 +21,10 @@ class UserProfileResponse(BaseModel):
     avatar_url: Optional[str] = None
     role: str  # "admin" or "user" - can be expanded later
     account: AccountInfo
+    # Art. 3: o limite de plano vem daqui, nunca de um numero fixo no front.
+    # Dicionario livre de proposito: um entitlement novo nao deve exigir
+    # deploy coordenado de API e front.
+    entitlements: Dict[str, Any] = {}
 
     model_config = ConfigDict(from_attributes=True)
 

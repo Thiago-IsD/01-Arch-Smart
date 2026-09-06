@@ -1,7 +1,10 @@
+import logging
 import os
 import httpx
 from typing import Optional, Dict, Any
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class SimpleSupabaseClient:
     def __init__(self, url: str, key: str):
@@ -29,15 +32,14 @@ class SupabaseAuth:
             req_headers.update(headers)
             
         try:
-            print(f"DEBUG: Sending to {endpoint} | JSON: {json}")
+            # Sem log do payload nem do corpo da resposta aqui: este metodo
+            # atende login, troca de senha e outras chamadas de auth, e o
+            # payload pode conter a senha do usuario em texto puro.
             response = httpx.request(method, endpoint, json=json, headers=req_headers)
-            print(f"DEBUG: Response Status: {response.status_code}")
-            print(f"DEBUG: Response Body: {response.text}")
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
-            # Try to return the detailed error from Supabase
-            print(f"DEBUG: HTTP Error: {e.response.text}")
+            logger.error("Falha na chamada ao Supabase Auth: HTTP %s", e.response.status_code)
             raise Exception(f"HTTP {e.response.status_code}: {e.response.text}")
         except Exception as e:
             raise Exception(str(e))
@@ -75,11 +77,11 @@ url = settings.SUPABASE_URL
 key = settings.SUPABASE_KEY
 
 if not url:
-    print("WARNING: SUPABASE_URL not found in settings. Using placeholder.")
+    logger.warning("SUPABASE_URL nao encontrada nas settings. Usando placeholder.")
     url = "https://placeholder.supabase.co"
 
 if not key:
-     print("WARNING: SUPABASE_KEY not found in settings. Using placeholder.")
-     key = "placeholder"
+    logger.warning("SUPABASE_KEY nao encontrada nas settings. Usando placeholder.")
+    key = "placeholder"
 
 supabase = SimpleSupabaseClient(url, key)

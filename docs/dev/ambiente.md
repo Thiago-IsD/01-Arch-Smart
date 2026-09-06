@@ -306,8 +306,12 @@ docker exec supabase_db_arqsmart psql -U postgres -tAc "select count(*) from inf
 docker exec supabase_db_arqsmart psql -U postgres -tAc "select extname, extversion from pg_extension where extname='vector';"          # -> vector|0.8.2
 ```
 
-As 27 migrações aplicam sem erro (`ls alembic/versions/*.py | wc -l` → 27), e a
-extensão `vector` é habilitada pela própria migração `9f8a3b2c1d4e`.
+A transcrição acima é de quando o repositório tinha 27 migrações e a Seção 4
+ainda não tinha rodado; hoje são 30 (`ls alembic/versions/*.py | wc -l`),
+com head `9b0c34de353b`, não `b77a9b5656c2` — rode `alembic heads` para
+conferir o de hoje em vez de repetir um destes dois números. O mecanismo não
+mudou: todas aplicam sem erro, e a extensão `vector` é habilitada pela
+migração `9f8a3b2c1d4e`, que continua sendo uma das 30.
 
 ### Apontar a aplicação para a stack local
 
@@ -399,7 +403,7 @@ Saída real:
  Container archsmart-api-postgres-test-1  Healthy
 ```
 
-Sobe a imagem `pgvector/pgvector:pg16` na porta `55432`, com dados em
+Sobe a imagem `pgvector/pgvector:pg17` na porta `55432`, com dados em
 `tmpfs` (efêmeros — reiniciar o container apaga tudo, de propósito). **Sinal
 de sucesso:** a última linha da saída diz `Healthy`.
 

@@ -12,7 +12,7 @@ Um módulo é uma área funcional do produto (por exemplo: projetos, ambientes, 
 
 ## O que ainda não existe
 
-Esta pasta está vazia além deste índice. Cada tela reescrita ao longo da Seção 8 desta reestruturação entrega o documento do seu módulo junto com o código — nenhum módulo é considerado concluído sem ele.
+Esta pasta ainda não tem documento de módulo de produto no sentido da seção acima — só o [`entitlements.md`](entitlements.md), que existe porque a verificação mecânica descrita abaixo cobre `app/services/` independentemente da Seção 8, não porque uma tela foi reescrita. Cada tela reescrita ao longo da Seção 8 desta reestruturação entrega o documento do seu módulo junto com o código — nenhum módulo é considerado concluído sem ele.
 
 ## A verificação mecânica do CI
 
@@ -29,9 +29,16 @@ sem documentação correspondente, mesmo que essa documentação ainda não
 descreva o módulo de produto inteiro no sentido da seção acima.
 
 Essa verificação roda como **catraca** (`tools/catraca.py`, ver
-[ADR 0006](../decisoes/0006-portoes-de-ci-com-catraca.md)): os 4 services de
-hoje sem doc — `ai_service`, `auth_service`, `budget_calculator`,
-`financial_service` — estão no baseline versionado em `tools/catraca.json`,
-porque documentá-los pertence à Seção 8, não à Seção 3. `ArchSmart-web/src/features/`
+[ADR 0006](../decisoes/0006-portoes-de-ci-com-catraca.md)): os **2** services
+que ainda faltam doc — `ai_service` e `auth_service` — estão no baseline
+versionado em `tools/catraca.json`, porque documentá-los pertence à Seção 8,
+não à Seção 3. `budget_calculator` ganhou o doc na Tarefa 8 da Seção 4, como
+parte da reescrita que o tornou puro (ver
+[`budget_calculator.md`](budget_calculator.md)); `financial_service` e
+`entitlements` também já têm o seu — uma versão anterior desta linha contava
+`financial_service` entre os que faltavam, com
+[`financial_service.md`](financial_service.md) no mesmo diretório
+(`ls docs/dev/modulos/` mostra os quatro: `budget_calculator.md`,
+`entitlements.md`, `financial_service.md` e este README). `ArchSmart-web/src/features/`
 ainda não existe — nasce na Seção 5. Um módulo **novo** sem doc, a partir de
 agora, reprova o PR: a catraca só deixa esse número baixar.

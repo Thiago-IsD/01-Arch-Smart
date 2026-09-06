@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 19/63 (30%)**
-`██████░░░░░░░░░░░░░░`
+**Progresso geral: 28/63 (44%)**
+`█████████░░░░░░░░░░░`
 
-_Última atualização: 2026-08-30_
+_Última atualização: 2026-09-05_
 
 ---
 
@@ -54,6 +54,11 @@ _Última atualização: 2026-08-30_
 > critério de sucesso da
 > [ADR 0003](docs/dev/decisoes/0003-descartar-banco-atual-criar-novo.md).
 > Staging passou pela mesma receita antes, com o mesmo resultado.
+>
+> *`b77a9b5656c2` era o head do repositório em 30/08/2026. A Seção 4
+> acrescentou migrações desde então — ver o bloco de estado no `CLAUDE.md`
+> para o head de hoje e o que já está implantado em cada ambiente; os dois
+> números não são intercambiáveis.*
 >
 > **A metade Vercel fechou em 30/08/2026, com as duas pontas medidas.** A API
 > de staging está no ar servindo o código novo
@@ -112,17 +117,208 @@ _Última atualização: 2026-08-30_
 > registradas em vez de uma lista escrita à mão.
 
 ## Seção 4 · Camada de dados do backend
-**0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**9/9 (100%)** `████████████████████`
 
-- [ ] `RequestContext` em `app/core/security.py`
-- [ ] `ScopedRepository` em `app/db/repository.py`
-- [ ] `account_id` e `created_by` nas 10 tabelas que faltam
-- [ ] Índices derivados das queries reais
-- [ ] Fim do N+1 no orçamento (`calculate_quantity` pura, de ~300 para 2 queries)
-- [ ] Suíte de testes contra banco real (`tests/services/`, `tests/api/`, `tests/isolation/`) substituindo `app/tests/`
-- [ ] Tratamento de erro único (exceções de domínio; sem `detail=str(e)` nem `print()`)
-- [ ] `GET /api/v1/me` com `user`, `account` e `entitlements`
-- [ ] Fim do auto-link por e-mail em `app/api/users.py` (ver [arquitetura.md](docs/dev/arquitetura.md), "pendência de segurança conhecida")
+- [x] `RequestContext` em `app/core/security.py`
+- [x] `ScopedRepository` em `app/db/repository.py`
+- [x] `account_id` e `created_by` nas 10 tabelas que faltam
+- [x] Índices derivados das queries reais
+- [x] Fim do N+1 no orçamento (`calculate_quantity` pura, de ~300 para 2 queries)
+- [x] Suíte de testes contra banco real (`tests/services/`, `tests/api/`, `tests/isolation/`) substituindo `app/tests/`
+- [x] Tratamento de erro único (exceções de domínio; sem `detail=str(e)` nem `print()`)
+- [x] `GET /api/users/me` com `user`, `account` e `entitlements`
+- [x] Fim do auto-link por e-mail em `app/api/users.py` (ver [arquitetura.md](docs/dev/arquitetura.md), "Resolvido em 05/09/2026: o auto-link por e-mail em `app/api/users.py`")
+
+> **A Seção 4 fechou em 05/09/2026, e foi medida.** `grep -rn "db\.query("
+> app --include=*.py | wc -l` sai **30** hoje; **29 são chamadas reais** — a
+> trigésima é a própria docstring de `repository.py` citando o número antigo
+> (117) da auditoria pré-Seção-4. Das 29: **11 estão em `public.py`**
+> (portal público, sem conta na sessão — justificadas pelo **docstring do
+> módulo**, não por comentário linha a linha, ao contrário do que uma versão
+> anterior deste texto dizia); **3 têm o comentário literal
+> `# pre-sessao: sem account_id ainda`** (2 em `auth.py`, 1 em `leads.py` —
+> a contagem é travada por
+> `test_marca_de_pre_sessao_nao_cresce_sem_querer`); **11 são sobre modelo
+> sem `account_id` nenhum** — catálogo global ou a própria conta (7 em
+> `product_router.py`, sobre `ProductState`/`ProductOrigin`; 4 em
+> `users.py`, sobre `Account`/`Plan` — cada uma com comentário dizendo por
+> quê, logo acima da linha); **1 em `security.py`** resolve identidade a
+> partir do token antes de existir sessão; **2 em `repository.py`** são a
+> própria definição do `ScopedRepository` (`.query()` e
+> `unscoped_query()`); e **1 em `entitlements.py`** faz um `outerjoin` de
+> duas colunas que `repo.query(model)` não sabe expressar, documentado no
+> docstring da função.
+>
+> **O que agora é impossível de escrever.** `ScopedRepository.query(model)`
+> filtra por `account_id` sozinho e levanta `EscopoImpossivel` num model que
+> não tem a coluna. `create()` injeta `account_id` e `created_by` e
+> **descarta** o que vier do cliente nessas duas chaves. E
+> `tests/isolation/test_todas_as_rotas.py` percorre as rotas registradas: uma
+> rota nova com id na URL e sem entrada em `RECURSOS` **falha**, em vez de
+> passar despercebida.
+>
+> **O limite exato dessa garantia, e o que o fecha.** `RECURSOS` é indexado
+> por **nome de parâmetro**. Um nome *novo* falha alto — ninguém disse que
+> recurso aquele id endereça. Um nome **já registrado, reusado para
+> endereçar outro model**, não: a fábrica devolve o objeto errado, o id
+> nunca casa, a rota devolve 404 para *toda* conta e o caso passa sem ter
+> exercitado filtro nenhum. Foi o defeito de `env_id` que esta seção
+> encontrou e corrigiu para duas rotas — mas corrigir duas rotas não
+> corrige a classe. Medido em 05/09/2026 com uma rota
+> `GET /api/vazamento/{project_id}` acrescentada a `app/main.py`, que
+> consulta `Product` sem filtro de conta e vaza `cost_price` e `markup` de
+> todas: com o arquivo na versão anterior, `47 passed, 1 skipped`.
+>
+> O que fecha a classe é o **controle positivo**, acrescentado agora: antes
+> de exigir 404 da conta A, o teste exige que a conta **B alcance o próprio
+> recurso** por aquela mesma rota. Se B também levar 404, o caso não prova
+> nada e falha com essa mensagem ("CASO VACUO"). Com ele, a mesma rota de
+> vazamento dá `1 failed, 46 passed, 1 skipped`. A asserção é `!= 404` de
+> propósito, e não 2xx: o corpo mínimo atravessa o portão de conta, não
+> toda regra de negócio do handler — exigir 2xx transformaria "regra mudou"
+> em "isolamento quebrou".
+>
+> Duas correções vieram junto, ambas de harness. `client_a` e `client_b`
+> gravavam a **mesma** chave em `app.dependency_overrides`, então pedir as
+> duas fixtures no mesmo teste fazia a última vencer as duas — medido:
+> `client_a` autenticado como B devolvia 200 para um projeto de B.
+> `_ClienteDeConta` (em `tests/conftest.py`) re-arma o override a cada
+> chamada. E `criar_lancamento` fabricava um `FinancialEntry` sem `type`,
+> `status` nem `due_date`, os três obrigatórios em
+> `FinancialEntryResponse`: um lançamento que o `POST /api/financial` nunca
+> cria, e que fazia `PUT /api/financial/{entry_id}` estourar 500 na
+> validação da resposta assim que o controle positivo percorreu o caminho
+> de sucesso.
+>
+> **O schema.** As 21 tabelas de dado ganharam `created_by`; as mesmas 21
+> têm hoje `account_id` (11 já tinham antes da Seção 4, 10 ganharam agora),
+> com backfill pelo caminho de FK e fechamento em `NOT NULL` na mesma
+> migração. Os 4 índices do schema viraram **29** (contados do metadata do
+> SQLAlchemy, script no Passo 6 do brief desta tarefa): um `ix_*_account_id`
+> em cada uma das 21 tabelas — 16 simples e 5 compostos, como
+> `events(account_id, start_time)` —, mais 4 índices novos por padrão de
+> query real (`budget_items.budget_id`, `budget_items.environment_id`,
+> `environments.project_id`, `presentation_comments(presentation_id,
+> created_at)`); os 4 originais (`users.email`, `users.supabase_id`,
+> `financial_entries.group_id`, `documents.id`) continuam.
+>
+> **O N+1 do orçamento.** `calculate_budget_item_quantity(db, item)` fazia até
+> 3 queries por item — ~300 num orçamento de 100. Ela virou
+> `calculate_quantity(item, dna, produto)`, **pura**, e o carregamento virou 2
+> queries. O número é contado, não estimado:
+> `tests/api/test_orcamento_sem_n_mais_um.py` registra as queries num listener
+> do SQLAlchemy. **Os tetos que ele exige são `<= 3` e `<= 5`, não `== 2`** —
+> e o próprio teste argumenta contra o número fixo: um teto exato transforma
+> "alguém trocou a estratégia de carregamento deliberadamente" em falha de
+> isolamento, e a propriedade que importa é a outra, `n_queries_pequeno ==
+> n_queries_grande` (5 itens e 30 itens custando o mesmo). `<= 3` guarda
+> `carregar_orcamento` isolado (2 hoje); `<= 5` guarda o round trip HTTP de
+> `GET /projects/{id}/budget` (5 hoje).
+>
+> **A suíte.** A antiga (`app/tests/`, 83 testes sobre `MagicMock`) foi
+> apagada — o diretório hoje só contém `__pycache__`. A nova tem **308**
+> testes coletados contra Postgres real (`pytest --collect-only -q`; a
+> execução real é **307 passam, 1 skip deliberado** — `pytest -q`). O grosso
+> mora em `tests/services/` (16, função pura), `tests/api/` (70, endpoint
+> com dado semeado) e `tests/isolation/` (77, vazamento entre contas); os
+> 145 restantes são 8 arquivos de teste de arquitetura, schema e migração na
+> raiz de `tests/` (`test_arquitetura.py`, `test_colunas_de_escopo.py`,
+> `test_guarda_banco.py`, `test_indices.py` e outros quatro). Os 5 testes
+> acrescentados pela onda final da revisão são `test_join_entre_contas.py`
+> (3, isolamento) e `test_ordem_deterministica.py` (2, API).
+>
+> **Duas coisas mudaram em relação à spec, e as duas estão registradas.** O
+> `/me` ficou em `GET /api/users/me` e não em `/api/v1/me` — não existe
+> prefixo `/api/v1` no app, e criar um para uma rota só seria versionamento
+> que ninguém mais segue
+> ([ADR 0008](docs/dev/decisoes/0008-me-em-api-users-me.md)). E o
+> `created_by` foi para as 21 tabelas de dado, não só para as 10 que
+> ganharam `account_id`, para que `create()` não tenha exceção a lembrar.
+>
+> **A oitava caixa foi renomeada, e o motivo importa** — mesmo espírito da
+> renomeação da primeira caixa da Seção 3. Ela dizia `GET /api/v1/me`,
+> copiado da spec original; a spec pedia um prefixo de versionamento que
+> este app nunca teve, e criar `/api/v1` só para uma rota seria
+> versionamento que ninguém mais segue. O [ADR 0008](docs/dev/decisoes/0008-me-em-api-users-me.md)
+> registra essa decisão, e a caixa agora descreve o que de fato subiu:
+> `GET /api/users/me`. A nona caixa também foi corrigida: linkava para a
+> seção "pendência de segurança conhecida" de `arquitetura.md`, um título
+> que não existe mais desde que a Tarefa 2 fechou a pendência — o título
+> hoje é "Resolvido em 05/09/2026: o auto-link por e-mail em
+> `app/api/users.py`", e é para lá que o link aponta agora.
+>
+> **O ADR 0008 vale para a reestruturação inteira, não só para esta caixa.**
+> A Seção 7 (`POST /api/v1/events`, mais abaixo) carrega a mesma suposição
+> de um prefixo `/api/v1` que não existe — quem for fechar aquela seção vai
+> bater no mesmo ponto e não precisa redescobrir do zero: a decisão já está
+> tomada e registrada no ADR. Não mexi na caixa da Seção 7 — não é desta
+> tarefa.
+>
+> **O contrato de erro mudou em ~10 caminhos, e o registro anterior dizia
+> só "duas mensagens de erro mudaram de idioma".** `ValidacaoDeDominio`
+> (`app/core/errors.py`) tem `status = 422`, e a Tarefa 5 trocou por ela
+> exceções que respondiam 400 ou 500. A lista foi conferida contra
+> `git show 1bcc0f3:<arquivo>`, casando cada `raise` novo com a função que o
+> continha antes:
+>
+> | Onde (hoje) | Função | Antes | Agora |
+> |---|---|---|---|
+> | `app/api/auth.py:30` | `register_request` | 400 | 422 |
+> | `app/api/auth.py:41` | `recover_request` | 400 | 422 |
+> | `app/api/auth.py:125` | `complete_register` | 400 | 422 |
+> | `app/api/auth.py:207` | `signup` | 400 | 422 |
+> | `app/api/auth.py:242` | `change_password` | 500 | 422 |
+> | `app/api/account.py:80` | `update_account_branding` | 500 | 422 |
+> | `app/api/endpoints/presentations.py:262` | `upload_presentation_cover` | 500 | 422 |
+> | `app/api/endpoints/presentations.py:367` | `upload_environment_image` | 500 | 422 |
+> | `app/api/endpoints/presentations.py:388` | `delete_presentation` | 500 | 422 |
+> | `app/api/routers/product_router.py:351` | `clipper_capture` | 500 | 422 |
+>
+> São 10, e são todas
+> (`grep -rn "raise ValidacaoDeDominio" app --include=*.py`).
+>
+> **Por que isso vai no registro e não só no código.** A Seção 5 constrói o
+> cliente contra esta API. Um front que ramifique em 400-vs-422 vai errar
+> aqui — e os dois 422 não têm a mesma forma: o do Pydantic traz uma
+> **lista** em `detail`, o de `DomainError` traz uma **string**. Medido em
+> 05/09/2026: `POST /api/products/` com `json={}` devolve
+> `{"detail": [{"type": "missing", "loc": ["body", "name"], ...}]}`, contra o
+> `{"detail": "Não foi possível enviar a imagem."}` que
+> `registrar_handlers` produz.
+>
+> **A taxonomia continua em aberto — decisão de Thiago, não desta seção.** A
+> maioria desses caminhos é falha de **infraestrutura** (storage fora do ar,
+> Supabase sem responder), e 422 significa "entendi o pedido, mas o conteúdo
+> não é processável", o que descreve mal um serviço indisponível; 5xx
+> descrevia melhor, e era o que eles eram. O que a Tarefa 5 decidiu foi o
+> **mecanismo** — nenhuma exceção crua no `detail` —, e o 422 veio junto por
+> ser o status da classe escolhida. Mudar o status de qualquer uma dessas
+> rotas é mudança de contrato, e não foi feita aqui.
+
+> **Achado extra, corrigido durante a seção:** a marca escrita errada
+> (`"Arch Smart"`, `"ArchSmart"`, `"Ark Smart"`, `"Ecowe"`) em `app/` está
+> hoje em **zero** ocorrências
+> (`grep -rn "Arch Smart\|ArchSmart\|Ark Smart\|Ecowe" app --include=*.py`),
+> travada por `tests/test_arquitetura.py::test_a_marca_e_arq_smart` — Art. 8.
+>
+> **Duas pendências abertas, registradas por esta tarefa, não fechadas por
+> ela — decisão de Thiago, não de uma rodada de conversão.** Primeiro: o
+> auto-link por e-mail sobrevive em `POST /api/auth/complete-register`
+> (`app/api/auth.py`, função `complete_register`, linhas 73-92). A Tarefa 2
+> removeu o padrão do resolvedor de identidade que cobre toda requisição
+> autenticada (`app/core/security.py`), mas este caminho legado de
+> migração ainda resolve usuário por e-mail e sobrescreve `supabase_id` e
+> `full_name` — protegido só pelo toggle "Confirm email" do painel do
+> Supabase. Segundo: 4 migrações mais antigas têm `downgrade()` não vazio
+> que **estoura em runtime**
+> (`grep -rln "drop_constraint(None" alembic/versions/*.py`, hoje
+> `299f1faf8dd8_add_budget_models_and_ruletype_enum.py`,
+> `368eb3cacbeb_refactor_client_and_project_schemas.py`,
+> `d2509ab61a6f_add_auth_v2_tables.py`,
+> `ea296ec7dc5e_add_environment_and_dna.py`) — chamam
+> `op.drop_constraint(None, ...)`, que exige um `naming_convention` que
+> `app/db/base.py` não define. "`downgrade()` não vazio" nunca quis dizer
+> "`downgrade()` funciona".
 
 ## Seção 5 · Camada de dados do frontend
 **0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`

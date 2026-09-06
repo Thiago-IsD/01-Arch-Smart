@@ -92,4 +92,4 @@ class PaginatedProjectResponse(BaseModel):
     size: int
     pages: int
     items: List[ProjectResponse]
-    plan_limit: int = 2  # Dynamic limit from subscription plan
+    plan_limit: int = 2  # Default only; real value comes from entitlements_da_conta() (app/services/entitlements.py)

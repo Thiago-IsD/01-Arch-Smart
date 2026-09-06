@@ -29,8 +29,9 @@ def test_seed_captured_nao_existe_mais(client_anon, db):
 def test_normalize_exige_autenticacao(client_anon):
     """
     O status certo aqui e 422, nao 401: o FastAPI rejeita a requisicao por
-    falta do header `authorization` antes mesmo do Depends(get_current_user)
-    rodar. Afirmar so o status deixaria passar despercebida uma mudanca que
+    falta do header `authorization` antes mesmo do Depends(get_repo) (que
+    resolve `get_context`) rodar. Afirmar so o status deixaria passar
+    despercebida uma mudanca que
     trocasse o motivo do 422 (por exemplo, um schema de corpo alterado) sem
     que a autenticacao continuasse exigida — por isso o teste tambem checa
     que o corpo do erro aponta para o header ausente.
@@ -52,6 +53,7 @@ def test_verify_password_tem_rate_limit(client_anon, db, conta_a):
     conta, _ = conta_a
     projeto = criar_projeto(db, conta, "Projeto RL")
     apresentacao = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta RL",
         access_password_hash=hash_password("certa"),
@@ -92,11 +94,13 @@ def test_rate_limit_do_verify_password_e_por_apresentacao_nao_por_ip(
     projeto = criar_projeto(db, conta, "Projeto RL 2")
 
     apresentacao_a = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta RL A",
         access_password_hash=hash_password("certa"),
     )
     apresentacao_b = Presentation(
+        account_id=conta.id,
         project_id=projeto.id,
         name="Proposta RL B",
         access_password_hash=hash_password("certa"),

@@ -19,12 +19,12 @@ conf = ConnectionConfig(
 async def send_verification_email(email: str, token: str, frontend_url: str, type: str = "REGISTRATION"):
     verification_link = f"{frontend_url}/auth/verify?token={token}"
     
-    subject = "Arch Smart - Confirmação de E-mail"
+    subject = "Arq Smart - Confirmação de E-mail"
     title = "Verifique seu e-mail"
     action = "Confirmar E-mail"
-    
+
     if type == "RECOVERY":
-        subject = "Arch Smart - Recuperação de Senha"
+        subject = "Arq Smart - Recuperação de Senha"
         title = "Redefinir Senha"
         action = "Redefinir Minha Senha"
     
@@ -38,7 +38,7 @@ async def send_verification_email(email: str, token: str, frontend_url: str, typ
         <p>Ou cole este link no navegador:</p>
         <p>{verification_link}</p>
         <p>Se você não solicitou, ignore este e-mail.</p>
-        <p>Atenciosamente,<br>Equipe Arch Smart</p>
+        <p>Atenciosamente,<br>Equipe Arq Smart</p>
     </div>
     """
 
