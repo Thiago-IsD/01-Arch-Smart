@@ -34,12 +34,14 @@ não pode medir.
 
 **A leitura real (API quente, sessão de um usuário de verdade) continua
 pendente** até que `E2E_EMAIL` e `E2E_PASSWORD` sejam configuradas com
-credenciais válidas de staging:
+credenciais válidas de staging. **Este é o valor vigente hoje** — a única
+outra ocorrência de `mediana_ms=` neste arquivo, logo abaixo, é o molde a
+preencher quando a medição real existir, não um segundo valor:
 
-    mediana_ms=pendente
+    mediana_ms=pendente  # PENDENTE — ainda não medido, ver Tarefa 12
 
 Quando as credenciais existirem, rodar o comando acima e substituir a linha
-acima por:
+`mediana_ms=pendente` logo acima (não esta) por:
 
     amostras_ms=<colar AMOSTRAS da saída>
     mediana_ms=<colar MEDIANA_MS da saída>
