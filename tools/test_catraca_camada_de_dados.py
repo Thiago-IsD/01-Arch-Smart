@@ -1,10 +1,13 @@
 """Testes das duas medidas que a Secao 5 acrescentou a catraca."""
+import json
 import re
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from catraca import RE_FETCH, RE_SUPABASE, contar_ocorrencias
+import catraca
+from catraca import DiretorioMedidoSumiu, RE_FETCH, RE_SUPABASE, contar_ocorrencias
 
 
 class TestContagem(unittest.TestCase):
@@ -35,6 +38,59 @@ class TestContagem(unittest.TestCase):
     def test_ignora_arquivo_que_nao_e_ts(self):
         raiz = self._arvore({"leia.md": "fetch(url)\n"})
         self.assertEqual(contar_ocorrencias(raiz, RE_FETCH), 0)
+
+    def test_diretorio_inexistente_falha(self):
+        """
+        Fail-closed, no mesmo espirito de `contar_cores` (ver
+        `test_catraca.py::test_diretorio_de_cores_inexistente_falha`). A
+        Secao 9 renomeia ArchSmart-web/ para web/; sem isto, o dia do rename
+        zeraria `fetch_fora_de_lib_api`/`supabase_fora_de_lib_api` em
+        silencio, e o portao ficaria verde convidando a gravar 0 no baseline.
+        """
+        raiz = Path(tempfile.mkdtemp()) / "nao_existe"
+        with self.assertRaises(DiretorioMedidoSumiu):
+            contar_ocorrencias(raiz, RE_FETCH)
+
+
+class TestAuditarBaselineComChaveNova(unittest.TestCase):
+    """
+    Regressao do achado do Review de Codigo na Tarefa 11: `_auditar_baseline`
+    chamava `medidas_pioradas` sem distinguir "chave nova nesta branch" de
+    "chave que sumiu desta branch" — as duas caiam no mesmo `base is None`, e
+    uma medida nova (nascendo do zero, como as duas desta tarefa) reprovava o
+    job `Repositorio` com o diagnostico invertido de "o baseline afrouxou".
+    """
+
+    def _catraca_json(self, dados: dict) -> Path:
+        arquivo = Path(tempfile.mkdtemp()) / "catraca.json"
+        arquivo.write_text(json.dumps(dados), encoding="utf-8")
+        return arquivo
+
+    def test_chave_nova_nesta_branch_nao_reprova(self):
+        atual = self._catraca_json({"cores_literais": 521, "fetch_fora_de_lib_api": 76})
+        base = self._catraca_json({"cores_literais": 521})
+        with mock.patch.object(catraca, "BASELINE", atual):
+            self.assertEqual(catraca._auditar_baseline(base), 0)
+
+    def test_chave_que_sumiu_desta_branch_reprova(self):
+        atual = self._catraca_json({"cores_literais": 521})
+        base = self._catraca_json({"cores_literais": 521, "fetch_fora_de_lib_api": 76})
+        with mock.patch.object(catraca, "BASELINE", atual):
+            self.assertEqual(catraca._auditar_baseline(base), 1)
+
+    def test_leia_me_so_no_lado_da_base_nao_reprova(self):
+        """
+        `_leia-me` e filtrado do lado de `atual` (comentario, nao medida) mas
+        o arquivo de referencia (`base`) e lido sem filtro nenhum. Um
+        `catraca.json` mais antigo com `_leia-me` e um mais novo sem ele
+        pareceria "chave sumiu" se os dois lados nao forem filtrados da
+        mesma forma -- foi exatamente o que a primeira versao deste conserto
+        fazia, e este teste existe para nao deixar isso voltar.
+        """
+        atual = self._catraca_json({"cores_literais": 521})
+        base = self._catraca_json({"_leia-me": "texto qualquer", "cores_literais": 521})
+        with mock.patch.object(catraca, "BASELINE", atual):
+            self.assertEqual(catraca._auditar_baseline(base), 0)
 
 
 if __name__ == "__main__":

@@ -186,9 +186,32 @@ def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
     return ok, linhas
 
 
-def medidas_pioradas(baseline: dict, medido: dict) -> list[str]:
-    """Descricoes ('chave: de -> para') de cada medida que piorou de `baseline` para `medido`."""
+def medidas_pioradas(baseline: dict, medido: dict, chave_nova_e_piora: bool = True) -> list[str]:
+    """Descricoes ('chave: de -> para') de cada medida que piorou de `baseline` para `medido`.
+
+    As duas direcoes de "chave so existe de um lado" nao sao o mesmo caso:
+
+    - chave em `baseline` e ausente de `medido`: a chave sumiu do lado atual.
+      Sempre piora, com a mensagem "a chave sumiu do catraca.json" -- pega
+      tanto apagar a chave do catraca.json local quanto apagar a chave do
+      catraca.json desta branch em relacao ao da branch base.
+    - chave em `medido` e ausente de `baseline`: uma medida nova. So conta
+      como piora quando `chave_nova_e_piora` e True (o default).
+      `decidir_atualizacao` usa o default: contra o proprio tools/catraca.json
+      local, uma chave sem baseline fica fail-closed ate `--atualizar` gravar
+      de proposito -- por isso a Tarefa 11 precisou de `--aceitar-piora` para
+      registrar `fetch_fora_de_lib_api`/`supabase_fora_de_lib_api` pela
+      primeira vez. `_auditar_baseline` passa `chave_nova_e_piora=False`:
+      ali `baseline` e `medido` sao dois catraca.json (o da branch base e o
+      desta branch), e uma chave nova e uma medida apertando do nada para um
+      numero real -- nao um afrouxamento. Sem essa distincao, o job
+      `Repositorio` reprova todo PR que introduz uma medida nova, com o
+      diagnostico invertido de que o baseline afrouxou.
+    """
     pioras = []
+    for chave in sorted(set(baseline) - set(medido)):
+        # Chave existia e sumiu do lado atual -- sempre piora, nos dois usos.
+        pioras.append(f"{chave}: {baseline[chave]!r} -> sumiu (a chave sumiu do catraca.json)")
     for chave, valor in sorted(medido.items()):
         base = baseline.get(chave)
         if isinstance(valor, list):
@@ -196,6 +219,8 @@ def medidas_pioradas(baseline: dict, medido: dict) -> list[str]:
             if novos:
                 pioras.append(f"{chave}: novo(s) sem doc: {', '.join(novos)}")
         elif base is None:
+            if not chave_nova_e_piora:
+                continue
             # Chave numerica ausente conta como piora. Sem isto, apagar a chave
             # do catraca.json e rodar --atualizar gravava o numero novo em
             # silencio, saida 0 — o cenario que o ADR 0006 nomeia como prova de
@@ -238,6 +263,12 @@ def _auditar_baseline(referencia: Path) -> int:
 
     Este modo nao mede nada. Compara baseline com baseline, e e por isso que ele
     pega o que a comparacao com o medido nao pega.
+
+    Passa `chave_nova_e_piora=False` para `medidas_pioradas`: uma chave que
+    existe nesta branch e nao existe na base e uma medida nova sendo
+    registrada, nao um afrouxamento. Sem isso, todo PR que acrescenta uma
+    medida (como as duas que a Tarefa 11 da Secao 5 acrescentou) reprovaria
+    aqui com o diagnostico invertido de "o baseline afrouxou".
     """
     atual = json.loads(BASELINE.read_text(encoding="utf-8"))
     try:
@@ -246,7 +277,11 @@ def _auditar_baseline(referencia: Path) -> int:
         print(f"[X] baseline de referencia nao encontrado: {referencia}")
         return 1
 
-    pioras = medidas_pioradas(base, {c: v for c, v in atual.items() if not c.startswith("_")})
+    pioras = medidas_pioradas(
+        {c: v for c, v in base.items() if not c.startswith("_")},
+        {c: v for c, v in atual.items() if not c.startswith("_")},
+        chave_nova_e_piora=False,
+    )
     if not pioras:
         print(f"[v] tools/catraca.json nao afrouxou em relacao a {referencia}")
         return 0
