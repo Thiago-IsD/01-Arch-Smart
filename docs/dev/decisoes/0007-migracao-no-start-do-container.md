@@ -128,3 +128,20 @@ Quando já está no head ele é no-op — lê `alembic_version` e sai — e desa
 dentro dos ~31 s de cold start já medidos. Como efeito colateral útil, toca o
 banco a cada start, o que ajuda a manter o projeto Supabase fora da pausa por
 inatividade.
+
+**Terceiro efeito, e o que ele custou fechar:** a migração roda com o
+contêiner **antigo ainda servindo tráfego**, e `alembic/env.py` de propósito
+não passa `transaction_per_migration` — as 30 migrações commitam juntas ou
+nenhuma commita. Essa transação única é o que faz um contêiner morto no meio
+do `upgrade` desfazer tudo limpo, e o que torna seguros os `add_column` não
+idempotentes; ela não é para ser trocada. O preço dela é que o `ACCESS
+EXCLUSIVE` — que bloqueia até leitura — fica segurado até o fim do upgrade
+inteiro. O padrão de `lock_timeout` no Postgres é `0`, esperar para sempre
+(medido: `SHOW lock_timeout` numa conexão sem configuração sai `0`), então
+uma transação aberta do contêiner antigo prendia o novo indefinidamente, sem
+mensagem — e o que aparecia no log era o health check do Render matando o
+deploy, um sintoma que não aponta para o lock. Desde 05/09/2026 `env.py`
+abre a conexão com `connect_args={"options": "-c lock_timeout=10s"}`: o
+deploy travado morre em 10 s com `canceling statement due to lock timeout`,
+que nomeia a causa. O raciocínio sobre o valor está no comentário ao lado do
+próprio parâmetro.
