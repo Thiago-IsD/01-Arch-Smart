@@ -1171,6 +1171,7 @@ git commit -m "feat(query): chaves hierarquicas e politica de cache por natureza
 
 **Files:**
 - Create: `ArchSmart-web/src/features/library/types.ts`
+- Create: `ArchSmart-web/src/features/library/filters.ts`
 - Create: `ArchSmart-web/src/features/library/api.ts`
 - Create: `ArchSmart-web/src/features/library/hooks.ts`
 - Create: `docs/dev/modulos/library.md` — **Art. 13, senão a catraca reprova**
@@ -1182,6 +1183,8 @@ git commit -m "feat(query): chaves hierarquicas e politica de cache por natureza
   (Tarefa 5).
 - Produces:
   - `types.ts`: `Product`, `ProductsResponse`, `RESPOSTA_VAZIA`
+  - `filters.ts`: `FILTROS_PADRAO`, `filtrosDaUrl(params)` — **a Tarefa 8
+    depende desta função para a hidratação casar**
   - `api.ts`: `listarProdutos(filtros, signal)`, `obterProduto(id, signal)`
   - `hooks.ts`: `useProducts(filtros, opts?)`, `useProduct(id, ativo)`,
     `useInboxCount()`
@@ -1222,6 +1225,88 @@ export const RESPOSTA_VAZIA: ProductsResponse = {
     size: 15,
     pages: 0,
 }
+```
+
+- [ ] **Step 1B: Escrever `filters.ts` — a forma canônica dos filtros**
+
+Esta é a correção de um defeito encontrado antes da execução. A chave do
+cache é montada em **dois** lugares — no servidor (Tarefa 8, `page.tsx`) e no
+cliente (`LibraryContent`) — e se as duas divergirem em um único campo a
+hidratação nunca casa: a tela busca de novo, o prefetch vira custo puro e
+**nenhum erro aparece**. `LibraryContent` hoje resolve `tab` como
+`searchParams.get("tab") || "library"`; um `page.tsx` que passasse
+`tab: undefined` produziria outra chave. A defesa é não ter dois lugares.
+
+```ts
+import type { FiltrosDeProduto } from "@/lib/query/keys"
+
+/**
+ * A forma canonica dos filtros da Biblioteca, derivada da URL.
+ *
+ * UMA funcao, usada pelo Server Component e pelo client component, porque a
+ * chave de cache montada em dois lugares diverge em silencio — e o modo de
+ * falha e o prefetch da Tarefa 8 virar custo puro sem erro nenhum.
+ *
+ * Aceita as duas formas de parametro que o Next entrega: `URLSearchParams`
+ * (de `useSearchParams`, no cliente) e o objeto simples de `searchParams`
+ * (no servidor).
+ */
+export const FILTROS_PADRAO = {
+    tab: "library",
+    sortBy: "created_at_desc",
+    page: 1,
+    size: 15,
+} as const
+
+type ParamsDaUrl = URLSearchParams | Record<string, string | string[] | undefined>
+
+function pegar(params: ParamsDaUrl, chave: string): string | undefined {
+    if (params instanceof URLSearchParams) return params.get(chave) ?? undefined
+    const valor = params[chave]
+    return Array.isArray(valor) ? valor[0] : valor
+}
+
+function pegarTodos(params: ParamsDaUrl, chave: string): string[] {
+    if (params instanceof URLSearchParams) return params.getAll(chave)
+    const valor = params[chave]
+    if (valor === undefined) return []
+    return Array.isArray(valor) ? valor : [valor]
+}
+
+export function filtrosDaUrl(params: ParamsDaUrl): FiltrosDeProduto {
+    return {
+        tab: pegar(params, "tab") ?? FILTROS_PADRAO.tab,
+        q: pegar(params, "q"),
+        sortBy: pegar(params, "sort_by") ?? FILTROS_PADRAO.sortBy,
+        page: Number(pegar(params, "page") ?? FILTROS_PADRAO.page),
+        size: Number(pegar(params, "size") ?? FILTROS_PADRAO.size),
+        categories: pegarTodos(params, "categories"),
+        origins: pegarTodos(params, "origins"),
+    }
+}
+```
+
+O teste desta função é o que trava o defeito, e vai no Step 4:
+
+```ts
+import { filtrosDaUrl } from "@/features/library/filters"
+
+describe("filtrosDaUrl", () => {
+    it("da a MESMA chave a partir de URLSearchParams e do objeto do servidor", () => {
+        // Se estes dois divergirem, a hidratacao da Tarefa 8 nunca casa e o
+        // prefetch vira custo puro sem erro nenhum aparecer.
+        expect(filtrosDaUrl(new URLSearchParams(""))).toEqual(filtrosDaUrl({}))
+        expect(filtrosDaUrl(new URLSearchParams("tab=inbox&page=2&categories=A&categories=B")))
+            .toEqual(filtrosDaUrl({ tab: "inbox", page: "2", categories: ["A", "B"] }))
+    })
+
+    it("preenche os padroes que o LibraryContent usava inline", () => {
+        expect(filtrosDaUrl({})).toMatchObject({
+            tab: "library", sortBy: "created_at_desc", page: 1, size: 15,
+            categories: [], origins: [],
+        })
+    })
+})
 ```
 
 - [ ] **Step 2: Escrever `api.ts`**
@@ -1411,17 +1496,25 @@ Expected: primeiro FAIL (import não resolve), depois PASS — 4 testes.
 
 Remova de `LibraryContent.tsx`: as interfaces `ProductQuery` e
 `ProductsResponse`, a constante `EMPTY_RESPONSE`, as funções `fetchProducts` e
-`fetchProduct`, e os imports de `getToken` e `apiUrl`. O corpo do componente
-troca os três `useQuery` por:
+`fetchProduct`, e os imports de `getToken` e `apiUrl`. Remova também a leitura
+campo a campo dos `searchParams` para montar filtro — ela vira
+`filtrosDaUrl()`. O corpo do componente passa a ser:
 
 ```tsx
 import { useProducts, useProduct, useInboxCount, RESPOSTA_VAZIA } from "@/features/library/hooks"
+import { filtrosDaUrl } from "@/features/library/filters"
 
-// ...dentro do componente, no lugar dos tres useQuery:
-const { data, isLoading } = useProducts(
-    { tab, q, categories, origins, sortBy: sort_by, page, size },
-    { ativo: needsList },
-)
+// ...dentro do componente:
+const searchParams = useSearchParams()
+const filtros = filtrosDaUrl(searchParams)
+
+// Estes dois nao sao filtro de busca — sao estado de UI vindo da URL.
+const action = searchParams.get("action") || undefined
+const editId = searchParams.get("id") || undefined
+
+const needsList = filtros.tab === "library" || filtros.tab === "inbox"
+
+const { data, isLoading } = useProducts(filtros, { ativo: needsList })
 const { data: inboxCount = 0 } = useInboxCount()
 const { data: productToEdit } = useProduct(editId, action === "edit" || action === "normalize")
 
@@ -1429,8 +1522,15 @@ const result = data ?? RESPOSTA_VAZIA
 const products = result.items
 ```
 
+O resto do JSX passa a ler `filtros.tab` onde lia `tab`, e `filtros.q`,
+`filtros.categories`, `filtros.origins` onde lia as variáveis soltas.
+
 Apague também `const productState = tab === "inbox" ? "CAPTURED" : "NORMALIZED"`
 — isso agora é `stateDaAba()` dentro de `features/library/api.ts`.
+
+> **Preserve os dois `data-testid`** que a Tarefa 1 acrescentou
+> (`product-grid` e `library-empty`). Eles são o instrumento de medição da
+> Tarefa 12, que é o portão da seção — apagá-los cega o portão.
 
 - [ ] **Step 7: Escrever a doc do módulo (Art. 13)**
 
@@ -1816,8 +1916,16 @@ git commit -m "fix(library): mutacoes por hook — DELETE com header e invalidac
 
 **Interfaces:**
 - Consumes: `apiServer` (Tarefa 4); `queryKeys`, `cachePolicy` (Tarefa 5);
-  `stateDaAba` (Tarefa 6).
-- Produces: `criarQueryClientDoServidor()`, `<LibraryData searchParams>`.
+  `stateDaAba` e **`filtrosDaUrl`** (Tarefa 6).
+- Produces: `criarQueryClientDoServidor()`, `tentarPrefetch()`,
+  `<LibraryData filtros>`.
+
+> **A hidratação só casa se a chave casar, e a defesa disso é `filtrosDaUrl`.**
+> O `page.tsx` (servidor) e o `LibraryContent` (cliente) derivam os filtros
+> pela **mesma** função da Tarefa 6. Não monte o objeto de filtros inline
+> aqui: um único campo divergente — `tab: undefined` contra `tab: "library"`,
+> por exemplo — faz a hidratação falhar em silêncio, e o sintoma é só o
+> prefetch não adiantar nada.
 
 - [ ] **Step 1: Escrever `hydration.ts`**
 
@@ -1930,15 +2038,7 @@ o `<Suspense>`:
         <Loader2 className="h-8 w-8 animate-spin" />
     </div>
 }>
-    <LibraryData filtros={{
-        tab: typeof searchParams.tab === "string" ? searchParams.tab : undefined,
-        q: typeof searchParams.q === "string" ? searchParams.q : undefined,
-        sortBy: typeof searchParams.sort_by === "string" ? searchParams.sort_by : "created_at_desc",
-        page: Number(searchParams.page ?? 1),
-        size: Number(searchParams.size ?? 15),
-        categories: typeof searchParams.categories === "string" ? [searchParams.categories] : (searchParams.categories ?? []),
-        origins: typeof searchParams.origins === "string" ? [searchParams.origins] : (searchParams.origins ?? []),
-    }} />
+    <LibraryData filtros={filtrosDaUrl(searchParams)} />
 </Suspense>
 ```
 

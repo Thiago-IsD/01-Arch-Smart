@@ -28,3 +28,6 @@ ArchSmart-web/public/arch-smart-clipper-dev.zip
 ArchSmart-api/login.json
 ArchSmart-api/mock_database.db
 ArchSmart-api/cacert.pem
+
+# Scratch do subagent-driven-development (ledger, briefs, pacotes de revisao)
+.superpowers/
