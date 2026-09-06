@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,12 +100,10 @@ export default function DashboardPage() {
         async function fetchDashboard() {
             setLoading(true)
             try {
-                const supabase = createClient()
-                console.log("Supabase client created in dashboard:", supabase)
-                const { data: { session } } = await supabase.auth.getSession()
-                console.log("Session in dashboard:", session)
+                const accessToken = await getAccessToken()
+                console.log("Access token in dashboard:", accessToken)
 
-                if (!session) {
+                if (!accessToken) {
                     console.log("No session found in dashboard, redirecting to login...")
                     router.push("/auth/login")
                     return
@@ -115,7 +113,7 @@ export default function DashboardPage() {
                 const res = await fetch(apiUrl("/api/dashboard/lean"), {
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${session.access_token}`,
+                        "Authorization": `Bearer ${accessToken}`,
                     },
                 })
 

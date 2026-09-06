@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { X, Send, User, MessageSquare } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { apiUrl } from "@/lib/api-url";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -39,12 +39,11 @@ export function PresentationCommentsDrawer({ presentationId, isOpen, onOpenChang
     const fetchComments = async () => {
         setIsLoading(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+            const accessToken = await getAccessToken();
+            if (!accessToken) return;
 
             const res = await fetch(apiUrl(`/api/presentations/${presentationId}/comments`), {
-                headers: { "Authorization": `Bearer ${session.access_token}` },
+                headers: { "Authorization": `Bearer ${accessToken}` },
             });
             if (res.ok) {
                 const data = await res.json();
@@ -68,14 +67,13 @@ export function PresentationCommentsDrawer({ presentationId, isOpen, onOpenChang
         setIsSending(true);
 
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+            const accessToken = await getAccessToken();
+            if (!accessToken) return;
 
             const res = await fetch(apiUrl(`/api/presentations/${presentationId}/comments`), {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${session.access_token}`,
+                    "Authorization": `Bearer ${accessToken}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ text: newText.trim() }),

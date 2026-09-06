@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronDown, Upload, X, Loader2, ImageIcon } from "lucide-react";
 import { apiUrl } from "@/lib/api-url";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 
 export interface PresentationEnvDetail {
@@ -25,9 +25,7 @@ interface EnvironmentAccordionProps {
 }
 
 async function getToken(): Promise<string> {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || "";
+    return (await getAccessToken()) || "";
 }
 
 function EnvAccordionItem({

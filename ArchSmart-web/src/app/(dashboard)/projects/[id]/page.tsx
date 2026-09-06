@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server"
+import { getServerAccessToken } from "@/lib/api/auth.server"
 import { notFound } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 import Link from "next/link"
@@ -9,9 +9,7 @@ import { ProjectHeader } from "@/components/projects/ProjectHeader"
 import { apiUrl } from "@/lib/api-url"
 
 async function getProjectDetails(id: string) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     if (!token) return null
 
@@ -28,9 +26,7 @@ async function getProjectDetails(id: string) {
 }
 
 async function getProjectEnvironments(id: string) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     if (!token) return []
 

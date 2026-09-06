@@ -159,11 +159,10 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
             }
 
             // Get Supabase session to extract token
-            const { createClient } = await import("@/utils/supabase/client");
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
+            const { getAccessToken } = await import("@/lib/api/auth");
+            const accessToken = await getAccessToken();
 
-            if (!session) throw new Error("Usuário não autenticado");
+            if (!accessToken) throw new Error("Usuário não autenticado");
 
             const method = productToEdit ? "PUT" : "POST"
             const url = productToEdit
@@ -174,7 +173,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 method,
                 headers: { 
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${session.access_token}`
+                    "Authorization": `Bearer ${accessToken}`
                 },
                 body: JSON.stringify(payload),
             })

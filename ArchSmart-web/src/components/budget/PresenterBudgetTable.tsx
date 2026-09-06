@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { ExternalLink, Loader2, ShoppingCart } from "lucide-react"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { apiUrl } from "@/lib/api-url"
 
 // ======= Types =======
@@ -52,9 +52,7 @@ export interface PresentationEnvInfo {
 // ======= Helpers =======
 
 async function getToken(): Promise<string> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token || ""
+    return (await getAccessToken()) || ""
 }
 
 const RULE_LABEL: Record<string, string> = {

@@ -3,15 +3,13 @@ import { ProjectWizard } from "@/components/projects/ProjectWizard"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@/utils/supabase/server"
+import { getServerAccessToken } from "@/lib/api/auth.server"
 import { UpgradeAlertModal } from "@/components/projects/UpgradeAlertModal"
 import { apiUrl } from "@/lib/api-url"
 
 // Function to fetch projects
 async function getProjects(page = 1, size = 20) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     try {
         const res = await fetch(apiUrl(`/api/projects?page=${page}&size=${size}`), {

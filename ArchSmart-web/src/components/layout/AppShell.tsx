@@ -56,7 +56,7 @@ export interface NotificationItem {
     created_at: string;
 }
 
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 
 export function AppShell({ children }: AppShellProps) {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -66,9 +66,7 @@ export function AppShell({ children }: AppShellProps) {
     useEffect(() => {
         const fetchNotifications = async () => {
             try {
-                const supabase = createClient();
-                const { data: sessionData } = await supabase.auth.getSession();
-                const token = sessionData?.session?.access_token;
+                const token = await getAccessToken();
 
                 const headers: HeadersInit = {};
                 if (token) {
@@ -94,9 +92,7 @@ export function AppShell({ children }: AppShellProps) {
 
     const handleMarkAsRead = async (id: string) => {
         try {
-            const supabase = createClient();
-            const { data: sessionData } = await supabase.auth.getSession();
-            const token = sessionData?.session?.access_token;
+            const token = await getAccessToken();
 
             const headers: HeadersInit = {};
             if (token) {
@@ -403,9 +399,8 @@ function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen, setMo
 
 
     const handleLogout = async () => {
-        const { createClient } = await import("@/utils/supabase/client");
-        const supabase = createClient();
-        await supabase.auth.signOut();
+        const { signOut } = await import("@/lib/api/auth");
+        await signOut();
         router.push("/auth/login");
     };
 

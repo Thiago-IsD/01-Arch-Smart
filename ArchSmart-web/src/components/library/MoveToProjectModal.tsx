@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
 import {
@@ -54,9 +54,7 @@ export function MoveToProjectModal({
         const fetchProjects = async () => {
             setIsLoadingProjects(true)
             try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
-                const token = session?.access_token || ""
+                const token = (await getAccessToken()) || ""
 
                 const res = await fetch(apiUrl("/api/projects"), {
                     headers: { "Authorization": `Bearer ${token}` }
@@ -87,9 +85,7 @@ export function MoveToProjectModal({
         const fetchEnvs = async () => {
             setIsLoadingEnvs(true)
             try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
-                const token = session?.access_token || ""
+                const token = (await getAccessToken()) || ""
 
                 const res = await fetch(apiUrl(`/api/projects/${selectedProjectId}/environments`), {
                     headers: { "Authorization": `Bearer ${token}` }
@@ -116,9 +112,7 @@ export function MoveToProjectModal({
 
         setIsSubmitting(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
             const payload = {
                 project_id: selectedProjectId,
                 environment_id: selectedEnvId,

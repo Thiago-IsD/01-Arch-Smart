@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building2, User, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken, supabaseBrowser } from "@/lib/api/auth";
 
 interface ProfileFormData {
     full_name: string;
@@ -55,15 +55,14 @@ export default function ProfilePage() {
     useEffect(() => {
         const loadUserData = async () => {
             try {
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
+                const accessToken = await getAccessToken();
 
-                if (!session) {
+                if (!accessToken) {
                     return;
                 }
 
                 // Load user email
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user } } = await supabaseBrowser().auth.getUser();
                 if (user) {
                     setUserEmail(user.email || "");
                 }
@@ -74,7 +73,7 @@ export default function ProfilePage() {
 
                 const profileResponse = await fetch(apiUrlFn("/api/users/me"), {
                     headers: {
-                        "Authorization": `Bearer ${session.access_token}`,
+                        "Authorization": `Bearer ${accessToken}`,
                     },
                 });
 
@@ -122,10 +121,9 @@ export default function ProfilePage() {
     const onSubmitProfile = async (data: ProfileFormData) => {
         setIsLoadingProfile(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = await getAccessToken();
 
-            if (!session) {
+            if (!accessToken) {
                 throw new Error("No active session");
             }
 
@@ -133,7 +131,7 @@ export default function ProfilePage() {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${session.access_token}`,
+                    "Authorization": `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify(data),
             });
@@ -162,10 +160,9 @@ export default function ProfilePage() {
     const onSubmitBranding = async (data: BrandingFormData) => {
         setIsLoadingBranding(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = await getAccessToken();
 
-            if (!session) {
+            if (!accessToken) {
                 throw new Error("No active session");
             }
 
@@ -178,7 +175,7 @@ export default function ProfilePage() {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/account/branding`, {
                 method: "PUT",
                 headers: {
-                    "Authorization": `Bearer ${session.access_token}`,
+                    "Authorization": `Bearer ${accessToken}`,
                 },
                 body: formData,
             });

@@ -10,7 +10,7 @@ import { Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import CalendarView from "@/components/calendar/CalendarView"
 import EventDialog, { type CalendarEvent } from "@/components/calendar/EventDialog"
 
@@ -19,11 +19,10 @@ import EventDialog, { type CalendarEvent } from "@/components/calendar/EventDial
 // ---------------------------------------------------------------------------
 
 async function getAuthHeaders(): Promise<HeadersInit> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = await getAccessToken()
     return {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${session?.access_token ?? ""}`,
+        "Authorization": `Bearer ${accessToken ?? ""}`,
     }
 }
 

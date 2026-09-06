@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Presentation } from "@/types/presentation";
 import { apiUrl } from "@/lib/api-url";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { CreatePresentationDialog } from "../../../presentations/components/CreatePresentationDialog";
 
 interface PresentationsTabProps {
@@ -14,9 +14,7 @@ interface PresentationsTabProps {
 }
 
 async function fetchProjectPresentations(projectId: string): Promise<Presentation[]> {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || "";
+    const token = (await getAccessToken()) || "";
 
     const response = await fetch(apiUrl(`/api/projects/${projectId}/presentations`), {
         headers: {

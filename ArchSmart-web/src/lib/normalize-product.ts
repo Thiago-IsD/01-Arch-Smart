@@ -1,5 +1,5 @@
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 
 export interface NormalizedProduct {
     name?: string | null
@@ -21,9 +21,7 @@ const NORMALIZE_TIMEOUT_MS = 45_000
 export const NORMALIZE_CONCURRENCY = 4
 
 export async function getToken(): Promise<string | undefined> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token
+    return getAccessToken()
 }
 
 /**

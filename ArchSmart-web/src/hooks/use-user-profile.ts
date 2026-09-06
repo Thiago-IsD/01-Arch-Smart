@@ -32,17 +32,16 @@ export function useUserProfile(): UseUserProfileReturn {
         async function fetchUserProfile() {
             try {
                 // Get Supabase session to extract token
-                const { createClient } = await import("@/utils/supabase/client");
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
+                const { getAccessToken } = await import("@/lib/api/auth");
+                const accessToken = await getAccessToken();
 
-                if (!session) {
+                if (!accessToken) {
                     throw new Error("No active session");
                 }
 
                 const response = await fetch(apiUrl("/api/users/me"), {
                     headers: {
-                        "Authorization": `Bearer ${session.access_token}`,
+                        "Authorization": `Bearer ${accessToken}`,
                     },
                 });
 
