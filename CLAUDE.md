@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 05/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída por inteiro** — camada de dados do backend, 9/9. Seções 5 a 9 pendentes; **a próxima é a Seção 5** (camada de dados do frontend).
+Estado em 06/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. Seções 5 a 9 pendentes; **a próxima é a Seção 5** (camada de dados do frontend). Produção ainda não recebeu: `main` está na Seção 3.
 
 Os ambientes online existem e estão medidos:
 
@@ -35,7 +35,18 @@ Quatro coisas que economizam tempo antes de mexer em ambiente:
   completa. `tests/test_arquitetura.py::test_query_direta_so_em_model_sem_account_id`
   reprova um `db.query()` que volte a um arquivo já convertido.
 
-Uma decisão segue **em aberto**, e não é para um agente tomar sozinho: ligar ou não branch protection (virou possível quando o repositório foi tornado público em 30/08). O `docker-compose.test.yml` e o CI foram alinhados para Postgres 17 em 05/09/2026, na Tarefa 1 da Seção 4 — a divergência com os 17.6 de staging e produção era o risco de uma migração passar no CI e derrubar o contêiner no deploy (ADR 0007).
+O `docker-compose.test.yml` e o CI foram alinhados para Postgres 17 em 05/09/2026, na Tarefa 1 da Seção 4 — a divergência com os 17.6 de staging e produção era o risco de uma migração passar no CI e derrubar o contêiner no deploy (ADR 0007).
+
+## O que a Seção 4 deixou em aberto
+
+Nenhuma destas é para um agente decidir sozinho. Estão aqui porque quem começar a Seção 5 vai esbarrar em pelo menos duas delas.
+
+1. **Branch protection ligada ou não** — virou possível quando o repositório foi tornado público em 30/08. Anterior à Seção 4; roteiro em [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
+2. **O auto-link por e-mail sobrevive em `POST /api/auth/complete-register`.** A Seção 4 removeu esse padrão do resolvedor de identidade — que cobre toda requisição autenticada —, mas o caminho legado continua resolvendo usuário por e-mail e gravando o `supabase_id` do portador. **O efeito não é vincular: é tomada de conta completa**, porque a partir dali o resolvedor entrega a conta da vítima ao token do atacante. É alcançável por dois fluxos vivos do front (`auth/verify` e `auth/reset-password`), e a única proteção é a opção *Confirm email* do painel do Supabase — fora do controle de versão, e nada neste repositório consegue testá-la. Detalhe em [arquitetura.md](docs/dev/arquitetura.md), seção "Resolvido em 05/09/2026".
+3. **`ValidacaoDeDominio` responde 422 também para falha de infraestrutura.** Dez rotas mudaram de status na Seção 4 (400→422 e 500→422); a tabela com arquivo, função e o antes/depois está na nota da Seção 4 no `PROGRESS.md`. **A Seção 5 escreve o tratamento de erro do cliente contra essas rotas**, então decidir isso antes vale mais do que decidir depois.
+4. **Quatro migrações antigas têm `downgrade()` não vazio que estoura em execução** (`op.drop_constraint(None, ...)` sem `naming_convention` em `app/db/base.py`). A regra da casa é "todo `downgrade()` não vazio" — o que se descobriu é que "não vazio" nunca significou "funciona". Medir com `grep -rn "drop_constraint(None" ArchSmart-api/alembic/versions/*.py`.
+5. **`app/services/`, `app/core/` e `app/db/` não têm catraca estática.** O lint de query direta cobre `app/api/` e `financial_service.py`; uma query sem escopo escrita fora daí não é reprovada por nada.
+6. **18 rotas recebem ids no corpo** e não são alcançadas pelo teste genérico de isolamento, que percorre rotas com id na URL. `PATCH /api/products/batch-approve` é uma delas.
 
 ## Portões de CI
 

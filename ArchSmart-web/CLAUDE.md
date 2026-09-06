@@ -22,6 +22,24 @@ Componente usado só por uma rota fica junto dela, em `<rota>/components/` (ex.:
 
 Tela nova no dashboard busca dado com `useQuery`. O `QueryProvider` já está montado em `src/app/(dashboard)/layout.tsx` (`staleTime` 30 s, `gcTime` 5 min) — **não** use `useEffect` + `fetch`. URL base sempre de `getApiUrl()` em `src/lib/api-url.ts`; nunca escreva `http://localhost:8000` ou qualquer host na tela (Art. 4).
 
+## O que a Seção 4 mudou na API que este front consome
+
+A Seção 4 fechou em 06/09/2026 e está implantada em staging. Três coisas mudaram no contrato, e a Seção 5 é escrita contra elas.
+
+**O `/me` ganhou `entitlements`, e ele fica em `/api/users/me`.** A spec pedia `GET /api/v1/me`; não existe prefixo `/api/v1` nesta aplicação e criar um para uma rota só foi recusado — [ADR 0008](../docs/dev/decisoes/0008-me-em-api-users-me.md). O corpo hoje traz `id`, `full_name`, `email`, `avatar_url`, `role`, `account` e:
+
+```json
+"entitlements": { "project_limit": 2, "can_use_ai": true, "can_use_portal": true }
+```
+
+É dicionário aberto de propósito (um entitlement novo não deve exigir deploy casado de API e front), então **o front não tem lista de chaves para tipar contra** — vale a Seção 5 declarar o seu próprio tipo parcial. `PUT /api/users/profile` devolve o mesmo schema e também carrega `entitlements`; preencher só um dos dois faz o campo sumir depois que o usuário salva o perfil.
+
+**Isso mata a violação do Art. 3 que está aberta aqui.** `data?.plan_limit ?? 2` continua em `src/app/(dashboard)/dashboard/page.tsx:217` e `src/app/(dashboard)/projects/page.tsx:44` — agora existe fonte no servidor para substituir o número fixo. Cuidado com o nome: a resposta paginada de `/api/projects` devolve o campo como `plan_limit`, e o `/me` devolve como `entitlements.project_limit`. São o mesmo conceito com dois nomes; unificar o nome de fio é trabalho desta seção, não da 4.
+
+**Dez rotas mudaram de status: 400→422 e 500→422.** A tabela com arquivo, função e antes/depois está na nota da Seção 4 no `PROGRESS.md`. O que importa para o cliente: **existem duas formas de 422 na mesma API.** A do Pydantic traz `detail` como **lista** de erros de validação; a de domínio (`ValidacaoDeDominio`) traz `detail` como **string** em pt-BR pronta para exibir. Um cliente que ramifica em "400 = mostro a mensagem, 422 = renderizo `detail[].msg`" quebra nessas dez. Se a taxonomia está certa é decisão em aberto — ver `../CLAUDE.md`, "O que a Seção 4 deixou em aberto".
+
+**Erro de domínio tem forma única:** `{"detail": "<frase em pt-BR>"}` com status 404, 403, 402 ou 422. Recurso de outra conta responde **404, nunca 403** — um 403 confirmaria que o recurso existe, e o backend tem teste garantindo isso. Não trate 404 nesses caminhos como "sumiu": pode ser "não é seu".
+
 ## Autenticação da chamada — até a Seção 5 existir
 
 Siga exatamente o padrão do arquivo vizinho mais parecido: `getSession()` e header `Authorization: Bearer ${session.access_token}`. **Não crie uma abstração nova** (`apiClient`, hook de fetch genérico, wrapper de sessão): a Seção 5 migra os 70 call sites de uma vez com `lib/api/client.ts`, então repetir o padrão manual custa zero a mais — uma abstração concorrente feita agora só duplicaria trabalho e seria jogada fora nesse dia.
