@@ -33,7 +33,22 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
   { files: ["src/**/*.{ts,tsx}"], rules: { "no-restricted-syntax": ["warn", ...PROIBICOES] } },
+  // Territorio que a Secao 5 ja migrou: aqui o lint bloqueia de verdade, em
+  // vez de so avisar. O resto do app (~30 telas) fica em "warn" ate a Secao 8
+  // migrar cada uma; subir o numero delas de uma vez so faria o PR nascer
+  // vermelho e o portao ser desligado na primeira semana (ADR 0006).
+  {
+    files: [
+      "src/features/**/*.{ts,tsx}",
+      "src/lib/**/*.{ts,tsx}",
+      "src/app/(dashboard)/library/**/*.{ts,tsx}",
+    ],
+    rules: { "no-restricted-syntax": ["error", ...PROIBICOES] },
+  },
   // lib/api/ e o territorio isento: e onde `fetch` e o Supabase devem morar.
+  // Tem que vir por ultimo — casa "src/lib/**" tambem, e em flat config o
+  // ultimo bloco que casa um arquivo vence; se viesse antes do bloco de erro
+  // acima, o bloco de erro apagaria esta isencao para tudo em src/lib/api/.
   { files: ["src/lib/api/**/*.ts", "src/proxy.ts"], rules: { "no-restricted-syntax": "off" } },
 ]);
 

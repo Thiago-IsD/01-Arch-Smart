@@ -4,7 +4,9 @@ Catraca dos portoes graduais do CI.
 Medidas que hoje estao vermelhas e nao podem piorar enquanto as secoes
 que as consertam nao chegam (ver ADR 0006):
 
-  - eslint_erros     93 hoje; as Secoes 5 e 6 derrubam
+  - eslint_erros     o `errorCount` somado do `npx eslint . --format json`
+                     (ver tools/catraca.json para o numero medido hoje); as
+                     Secoes 5 e 6 derrubam
   - cores_literais   521 hoje; a Secao 6 zera, quando os tokens existirem
   - modulos_sem_doc  os 4 services de hoje; a Secao 8 documenta
 
@@ -317,7 +319,16 @@ def main(argv: list[str] | None = None) -> int:
     medido = medir(args.eslint_json)
 
     if args.atualizar:
-        grava, avisos = decidir_atualizacao(baseline, medido, args.aceitar_piora)
+        # `_leia-me` (e qualquer outra chave de documentacao com "_") nao e
+        # medida — `medir()` nunca a devolve, entao compara-la contra o
+        # baseline cru sempre acusa "a chave sumiu" e reprova todo
+        # `--atualizar`, mesmo sem regressao nenhuma. Mesmo filtro que
+        # `_auditar_baseline` ja aplica dos dois lados.
+        grava, avisos = decidir_atualizacao(
+            {c: v for c, v in baseline.items() if not c.startswith("_")},
+            medido,
+            args.aceitar_piora,
+        )
         if avisos:
             print("\n".join(avisos))
         if not grava:

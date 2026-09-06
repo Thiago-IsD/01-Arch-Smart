@@ -6,16 +6,20 @@ Rode com: cd tools; python -m unittest test_catraca -v
 Usa `unittest` da biblioteca padrao pelo mesmo motivo de test_progresso.py: o
 script nao tem dependencia externa, e o teste dele nao deve introduzir uma.
 """
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+import catraca
 from catraca import (
     DiretorioMedidoSumiu,
     comparar,
     contar_cores,
     decidir_atualizacao,
     medidas_pioradas,
+    medir,
     modulos_sem_doc,
 )
 
@@ -194,6 +198,31 @@ class TestDecidirAtualizacao(unittest.TestCase):
         )
         self.assertFalse(grava)
         self.assertIn("cobranca_service", "\n".join(avisos))
+
+
+class TestMainAtualizarIgnoraChaveDeDocumentacao(unittest.TestCase):
+    """`_leia-me` documenta o catraca.json; `medir()` nunca a devolve.
+
+    `decidir_atualizacao`, chamado com o baseline cru, tratava a ausencia de
+    `_leia-me` em `medido` como "a chave sumiu" — uma piora — e isso reprovava
+    TODO `--atualizar` sem `--aceitar-piora`, mesmo sem nenhuma medida real
+    ter piorado. So nao apareceu antes porque todo teste de
+    `decidir_atualizacao`/`medidas_pioradas` neste arquivo usa dicts sem
+    `_leia-me`; o defeito só existia no caminho de `main()` contra o
+    catraca.json de verdade, que sempre tem essa chave.
+    """
+
+    def test_atualizar_grava_mesmo_sem_flag_quando_nada_piorou(self):
+        medido_real = medir(None)
+        baseline_sem_regressao = {"_leia-me": "comentario, nao e medida", **medido_real}
+        with tempfile.TemporaryDirectory() as diretorio:
+            baseline_temp = Path(diretorio) / "catraca.json"
+            baseline_temp.write_text(json.dumps(baseline_sem_regressao), encoding="utf-8")
+            with mock.patch.object(catraca, "BASELINE", baseline_temp):
+                codigo = catraca.main(["--atualizar"])
+            self.assertEqual(codigo, 0)
+            gravado = json.loads(baseline_temp.read_text(encoding="utf-8"))
+            self.assertEqual(gravado["_leia-me"], "comentario, nao e medida")
 
 
 if __name__ == "__main__":

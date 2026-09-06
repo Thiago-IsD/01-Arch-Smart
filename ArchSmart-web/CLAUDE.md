@@ -69,9 +69,9 @@ Comparado com `develop` (antes da Seção 5), medido em 06/09/2026 (`docs/dev/me
 | `createClient(`/`createBrowserClient(`/`createServerClient(` — chamadas reais | 62 | **0** (a única ocorrência restante é comentário em `lib/api/auth.ts:18`) |
 | `getSession()` — chamadas reais | 56 | **2**, ambas dentro de `lib/api/` |
 | `Authorization` montado à mão em telas/componentes (exclui `lib/api/` e `__tests__/`) | 73 | **63** |
-| `fetch(` com fronteira de palavra | 87 | **76** — idêntico ao `fetch_fora_de_lib_api` da catraca |
-| Testes de frontend | 7 | **62**, em 10 arquivos |
-| Catraca | — | `eslint_erros` 85 (era 93), `fetch_fora_de_lib_api` 76, `supabase_fora_de_lib_api` 0 |
+| `fetch(` com fronteira de palavra | 87 | **75** — idêntico ao `fetch_fora_de_lib_api` da catraca (medido em 06/09/2026 como 76; a revisão final da Seção 5 reescreveu um comentário que continha um `fetch(` literal falso-positivo e a medida caiu para 75 — ver a nota de correção em `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`) |
+| Testes de frontend | 7 | **63**, em 11 arquivos |
+| Catraca | — | `eslint_erros` 85 (era 93), `fetch_fora_de_lib_api` 75, `supabase_fora_de_lib_api` 0 |
 
 Uma tela nova que soma outro `createClient()`/`getSession()`/header manual fora de `lib/api/`, ou um `fetch(` fora de `lib/api/` numa tela que a catraca já contava como migrada, piora esses números — meça antes de assumir que não piorou. **O ganho de tempo/latência que a spec exigia como confirmação não foi medido** — falta credencial de usuário real e checagem de hidratação ao vivo; ver `PROGRESS.md`, nota da Seção 5, e `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`.
 
@@ -93,7 +93,7 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 `tsc --noEmit`). Os dois são o que o job **Frontend** do CI executa; rode-os
 antes de abrir PR.
 
-A suíte sai limpa: `Test Files 10 passed (10)` e `Tests 62 passed (62)` (a Seção 5 acrescentou os testes de `lib/api/`, `lib/query/` e `features/*`; eram 4 arquivos/7 testes antes dela). **Um
+A suíte sai limpa: `Test Files 11 passed (11)` e `Tests 63 passed (63)` (a Seção 5 acrescentou os testes de `lib/api/`, `lib/query/` e `features/*`; eram 4 arquivos/7 testes antes dela). **Um
 `failed` em qualquer das duas linhas é um teste realmente quebrado.** Até a
 Seção 3, o `vitest.config.ts` não excluía `e2e/` e o Vitest tentava coletar
 dois specs do Playwright, reportando `2 failed` de forma permanente — a

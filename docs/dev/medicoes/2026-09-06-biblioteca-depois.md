@@ -372,3 +372,40 @@ distingue as duas. Corrigido nesta tarefa: a linha pendente agora é
 passou a dizer explicitamente "substituir a linha `mediana_ms=pendente`
 acima por", para não haver ambiguidade de qual das duas um leitor futuro (ou
 um script) deve tratar como o valor vigente.
+
+## Correção pós-revisão — o 76 tinha um falso positivo (revisão final da Seção 5)
+
+As seções acima registram o que foi medido em 06/09/2026, na Tarefa 12, e
+esse número — **76** — não foi alterado nelas: é evidência de uma medição
+que de fato aconteceu, com o comando que a reproduz. Mas a própria análise
+daquele dia (ver "`fetch(` — 76, não 78", acima) já apontava que 1 das 76
+ocorrências estava dentro de um **comentário**
+(`src/__tests__/library-hooks.test.tsx:108`, citando o código antigo de
+`ProductCard.tsx` — `fetch(url, { method: "DELETE" })`), não uma chamada
+real. `RE_FETCH` em `tools/catraca.py` mede texto, sem distinguir código de
+comentário, então esse comentário sempre contou como se fosse uma tela a
+migrar.
+
+Na revisão final da Seção 5 (mesmo dia, antes do merge) o comentário foi
+reescrito para não conter mais o literal `fetch(` — descreve a mesma chamada
+antiga sem reproduzir a sintaxe (`fetch cru (\`url\`, { method: "DELETE" })`).
+Re-medido com o mesmo comando de sempre:
+
+```
+python tools/catraca.py --eslint-json ArchSmart-web/eslint.json
+[v] fetch_fora_de_lib_api: baixou de 76 para 75. Rode `python tools/catraca.py --atualizar`.
+```
+
+Baseline atualizado com a própria ferramenta
+(`python tools/catraca.py --eslint-json ArchSmart-web/eslint.json --atualizar`,
+sem `--aceitar-piora` — é uma queda, o caminho normal). **A partir de agora,
+`fetch_fora_de_lib_api=75` é o número vigente**, não mais 76 — todo lugar que
+cita 76 neste documento é o registro do que foi medido naquele dia,
+inclusive o falso positivo; não republique 76 como o número atual.
+
+A mesma revisão final também unificou o payload de `/api/products` numa
+função só (`queryDeProdutos`, em `features/library/api.ts`) e acrescentou um
+teste garantindo que as duas montagens não voltam a divergir — por isso
+`npm test` sai hoje `Test Files 11 passed (11)`, `Tests 63 passed (63)`, um
+arquivo e um teste a mais que o `Test Files 10 passed (10)`/`Tests 62 passed
+(62)` registrado acima.

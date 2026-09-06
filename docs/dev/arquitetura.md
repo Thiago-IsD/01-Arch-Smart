@@ -249,17 +249,19 @@ frontend a camada de dados que faltava:
   porta de entrada para dado numa tela nova; `useEffect` + `fetch` manual
   não é mais o padrão a seguir.
 - **Prefetch no servidor com hidratação**, no piloto migrado (Biblioteca):
-  `page.tsx` (Server Component) roda `queryClient.prefetchQuery` via
-  `apiServer` dentro de um `<Suspense>`, com teto de tempo
-  (`tentarPrefetch()`, `lib/query/hydration.ts`), e desidrata num
-  `HydrationBoundary` que envolve o client component. A chave usada nos dois
-  lados vem da mesma função (`filtrosDaUrl()`), para que o cache do cliente
-  reconheça o prefetch como o mesmo dado em vez de refazer a chamada.
+  `LibraryData.tsx` (Server Component) roda `queryClient.prefetchQuery` via
+  `apiServer`, com teto de tempo (`tentarPrefetch()`,
+  `lib/query/hydration.ts`), e desidrata num `HydrationBoundary` que envolve
+  o client component. `page.tsx` só renderiza o `<Suspense>` que envolve
+  `LibraryData.tsx` — quem faz o prefetch é o componente de dentro dele. A
+  chave usada nos dois lados vem da mesma função (`filtrosDaUrl()`), para
+  que o cache do cliente reconheça o prefetch como o mesmo dado em vez de
+  refazer a chamada.
 
 O resto do app (~30 telas fora da Biblioteca) continua no padrão manual
 anterior — `useEffect` + `fetch`, `getSession()` e header montados à mão,
 sem cache estruturado — até a Seção 8 migrar. `tools/catraca.py` mede esse
-padrão em duas medidas que só podem descer: `fetch_fora_de_lib_api` (76 hoje)
+padrão em duas medidas que só podem descer: `fetch_fora_de_lib_api` (75 hoje)
 e `supabase_fora_de_lib_api` (0 hoje, já no piso). Detalhe completo, número a
 número, em [`ArchSmart-web/CLAUDE.md`](../../ArchSmart-web/CLAUDE.md) e em
 [`medicoes/2026-09-06-biblioteca-depois.md`](medicoes/2026-09-06-biblioteca-depois.md).

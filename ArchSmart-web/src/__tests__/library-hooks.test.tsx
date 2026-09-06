@@ -105,7 +105,7 @@ describe("filtrosDaUrl", () => {
 
 describe("useDeleteProduct — Defeito A", () => {
     it("manda Authorization no DELETE", async () => {
-        // ProductCard.tsx:89 chamava fetch(url, { method: "DELETE" }) sem
+        // ProductCard.tsx:89 chamava fetch cru (`url`, { method: "DELETE" }) sem
         // header nenhum. get_context declara `authorization: str = Header(...)`,
         // entao o FastAPI respondia 422 e a exclusao nunca funcionava.
         const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })

@@ -2,7 +2,7 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query"
 import { apiServer } from "@/lib/api/server"
 import { queryKeys, type FiltrosDeProduto } from "@/lib/query/keys"
 import { criarQueryClientDoServidor, tentarPrefetch } from "@/lib/query/hydration"
-import { stateDaAba } from "@/features/library/api"
+import { queryDeProdutos } from "@/features/library/api"
 import type { ProductsResponse } from "@/features/library/types"
 import { LibraryContent } from "./LibraryContent"
 
@@ -23,15 +23,7 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
             queryFn: () =>
                 apiServer<ProductsResponse>("/api/products", {
                     signal,
-                    query: {
-                        page: filtros.page,
-                        size: filtros.size,
-                        q: filtros.q,
-                        sort_by: filtros.sortBy,
-                        state: stateDaAba(filtros.tab),
-                        categories: filtros.categories,
-                        origins: filtros.origins,
-                    },
+                    query: queryDeProdutos(filtros),
                 }),
         }),
     )

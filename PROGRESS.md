@@ -330,7 +330,7 @@ _Última atualização: 2026-09-06_
 - [x] Prefetch no servidor com hidratação
 - [x] `proxy.ts` corrigido (desvio antes do `getUser()`, matcher sem `/assets`, sem `console.log`)
 - [x] Cancelamento automático via `AbortSignal`
-- [x] Lint que impede a volta (`fetch` fora de `lib/api/`, `createClient()` fora de `lib/api/`, `useEffect` com busca de dado)
+- [x] Lint que impede a volta — `no-restricted-syntax` (`fetch` fora de `lib/api/`, `createClient()`/`createServerClient()` fora de `lib/api/`, `useEffect` com busca de dado) é **erro** em `src/features/**`, `src/lib/**` e na rota da Biblioteca (o território que esta seção migrou, medido em zero ocorrências); nas ~30 telas ainda não migradas continua **aviso**, e a catraca (`fetch_fora_de_lib_api`, `supabase_fora_de_lib_api`) é o que impede esse resto de crescer até a Seção 8 migrar cada uma.
 
 > ## 🚧 O PORTÃO DA SEÇÃO ESTÁ ABERTO — leia isto antes de começar a Seção 6
 >
@@ -385,9 +385,16 @@ _Última atualização: 2026-09-06_
 >
 > 1. **~30 telas fora do piloto (Biblioteca) continuam no padrão manual**
 >    (`getSession()`, `createClient()`, header à mão, `useEffect` + `fetch`).
->    Migrá-las é a **Seção 8**; `fetch_fora_de_lib_api=76` e
+>    Migrá-las é a **Seção 8**; `fetch_fora_de_lib_api` e
 >    `supabase_fora_de_lib_api=0` são a régua que mede esse trabalho a partir
 >    de agora — o segundo já está no piso, o primeiro só pode descer.
+>    *Correção da revisão final desta seção:* a tabela acima mediu 76 na
+>    Tarefa 12, mas 1 dessas ocorrências era um falso positivo — um `fetch(`
+>    literal dentro de um comentário
+>    (`src/__tests__/library-hooks.test.tsx:108`), não uma chamada real. O
+>    comentário foi reescrito e o número vigente, gravado no baseline com a
+>    própria ferramenta, é **75** — ver a nota em
+>    `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`.
 > 2. **`plan_limit` (em `/api/projects`) e `entitlements.project_limit` (em
 >    `/api/users/me`) continuam dois nomes para o mesmo conceito no
 >    backend.** O front lê só o segundo (`useMe()` em

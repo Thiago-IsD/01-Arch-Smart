@@ -14,21 +14,32 @@ export function stateDaAba(tab: string | undefined): "CAPTURED" | "NORMALIZED" {
     return tab === "inbox" ? "CAPTURED" : "NORMALIZED"
 }
 
+/**
+ * A forma unica do query de produtos. O servidor (LibraryData) e o cliente
+ * (listarProdutos) montam por aqui: a chave ja e fonte unica via
+ * `filtrosDaUrl`, e o payload sob essa chave tem de ser tambem — senao o
+ * prefetch grava uma resposta de forma diferente sob a chave que o cliente
+ * aceita como sua.
+ */
+export function queryDeProdutos(filtros: FiltrosDeProduto) {
+    return {
+        page: filtros.page,
+        size: filtros.size,
+        q: filtros.q,
+        sort_by: filtros.sortBy,
+        state: stateDaAba(filtros.tab),
+        categories: filtros.categories,
+        origins: filtros.origins,
+    }
+}
+
 export function listarProdutos(
     filtros: FiltrosDeProduto,
     signal?: AbortSignal,
 ): Promise<ProductsResponse> {
     return api<ProductsResponse>("/api/products", {
         signal,
-        query: {
-            page: filtros.page,
-            size: filtros.size,
-            q: filtros.q,
-            sort_by: filtros.sortBy,
-            state: stateDaAba(filtros.tab),
-            categories: filtros.categories,
-            origins: filtros.origins,
-        },
+        query: queryDeProdutos(filtros),
     })
 }
 
