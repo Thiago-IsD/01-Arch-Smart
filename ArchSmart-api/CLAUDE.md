@@ -86,7 +86,7 @@ docker compose -f docker-compose.test.yml up -d --wait
 pytest
 ```
 
-A suíte roda contra Postgres real em Docker. `app/tests/` era a suíte antiga baseada em `MagicMock` como sessão de banco — foi apagada na Seção 4 (Tarefa 17). A suíte hoje mora só em `tests/` (307 testes coletados, `tests/services/`, `tests/api/`, `tests/isolation/` e um punhado de arquivos de arquitetura/schema/migração na raiz).
+A suíte roda contra Postgres real em Docker. `app/tests/` era a suíte antiga baseada em `MagicMock` como sessão de banco — foi apagada na Seção 4 (Tarefa 17). A suíte hoje mora só em `tests/` (308 testes coletados, `tests/services/`, `tests/api/`, `tests/isolation/` e um punhado de arquivos de arquitetura/schema/migração na raiz).
 
 ## Erros
 

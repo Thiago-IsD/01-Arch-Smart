@@ -144,4 +144,19 @@ deploy, um sintoma que não aponta para o lock. Desde 05/09/2026 `env.py`
 abre a conexão com `connect_args={"options": "-c lock_timeout=10s"}`: o
 deploy travado morre em 10 s com `canceling statement due to lock timeout`,
 que nomeia a causa. O raciocínio sobre o valor está no comentário ao lado do
-próprio parâmetro.
+próprio `SET`.
+
+**E o mecanismo importa tanto quanto o valor.** A primeira versão desse
+timeout usava `connect_args={"options": "-c lock_timeout=10s"}`, e foi
+trocada antes de subir: `options` é um **parâmetro de startup**, negociado
+no handshake da conexão, e a `DATABASE_URL` de staging e de produção aponta
+para o **pooler do Supabase** (Supavisor na 5432 — a mesma pré-condição da
+seção acima). Um pooler pode repassar, ignorar ou **recusar** um parâmetro de
+startup, e a recusa não degrada com elegância: a conexão morre antes da
+primeira migração e, como a migração roda no `CMD` do contêiner, **todo
+deploy morre** — staging e produção — sem passo manual no meio para segurar.
+Um `SET lock_timeout` na sessão já estabelecida é um comando comum: não há o
+que o pooler negociar. Medido em 05/09/2026, na conexão que as migrações de
+fato usam (`SHOW lock_timeout` dentro do `env.py`, fora e dentro da
+transação das migrações): `10s` nas duas, contra `0` sem o `SET`. Não
+troque de volta por parecer mais enxuto.

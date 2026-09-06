@@ -42,7 +42,10 @@ def run_migrations_online() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        # lock_timeout de sessao, aplicado antes da primeira migracao: se
+    )
+
+    with connectable.connect() as connection:
+        # lock_timeout de SESSAO, aplicado antes da primeira migracao: se
         # QUALQUER lock demorar mais que isto para ser adquirido, o comando
         # falha com "canceling statement due to lock timeout", a transacao
         # inteira desfaz e o container sai com erro visivel no log do deploy.
@@ -68,24 +71,41 @@ def run_migrations_online() -> None:
         # parecer que o container travou): 10s erra para o lado de falhar
         # legivel.
         #
-        # Isto NAO substitui a transacao unica, e nao mexe nela. `env.py` de
-        # proposito NAO passa `transaction_per_migration`, entao as 30
-        # migracoes commitam juntas ou nenhuma commita — e o que faz um
-        # container morto no meio do upgrade desfazer tudo limpo, e o que
-        # torna seguros os `add_column` nao idempotentes que estas migracoes
-        # usam. O custo dessa escolha e justamente segurar o ACCESS
-        # EXCLUSIVE ate o fim do upgrade; o lock_timeout limita a espera
-        # POR lock, nao a duracao da transacao.
-        connect_args={"options": "-c lock_timeout=10s"},
-    )
+        # **Por que um SET, e nao `connect_args={"options": "-c
+        # lock_timeout=10s"}`.** A primeira versao disto usava connect_args,
+        # e foi trocada antes de subir. `options` e um PARAMETRO DE STARTUP,
+        # negociado no handshake da conexao — e a `DATABASE_URL` de staging e
+        # de producao aponta para o POOLER do Supabase (Supavisor, porta
+        # 5432; ver o CLAUDE.md da raiz). Um pooler pode repassar, ignorar
+        # ou RECUSAR um parametro de startup, e a recusa nao e um degrade
+        # elegante: a conexao morre antes da primeira migracao, e como a
+        # migracao roda no CMD do container (ADR 0007), TODO deploy morre —
+        # staging e producao — sem passo manual no meio para segurar.
+        # `SET lock_timeout` e um comando comum, na sessao ja estabelecida:
+        # o pooler nao tem o que negociar. Nao troque de volta por parecer
+        # mais enxuto; o que se ganharia em linhas se paga na primeira vez
+        # que o Supavisor nao gostar do parametro.
+        #
+        # O `commit()` e necessario: `SET` (sem LOCAL) e de sessao, mas
+        # desfaz junto se a transacao implicita que o SQLAlchemy 2.0 abriu
+        # for revertida. Commitando aqui, o valor sobrevive para a
+        # transacao das migracoes — e fecha a transacao implicita antes de
+        # `context.begin_transaction()`, que abriria outra e reclamaria.
+        connection.exec_driver_sql("SET lock_timeout = '10s'")
+        connection.commit()
 
-    with connectable.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
 
-        # Transacao unica para as 30 migracoes, de proposito — ver o bloco
-        # do lock_timeout acima e o ADR 0007.
+        # Transacao unica para as 30 migracoes, de proposito. `env.py` NAO
+        # passa `transaction_per_migration`: as 30 commitam juntas ou
+        # nenhuma commita — e o que faz um container morto no meio do
+        # upgrade desfazer tudo limpo, e o que torna seguros os `add_column`
+        # nao idempotentes que estas migracoes usam. O custo dessa escolha e
+        # justamente segurar o ACCESS EXCLUSIVE ate o fim do upgrade; o
+        # lock_timeout acima limita a espera POR lock, nao a duracao da
+        # transacao. Ver ADR 0007.
         with context.begin_transaction():
             context.run_migrations()
 

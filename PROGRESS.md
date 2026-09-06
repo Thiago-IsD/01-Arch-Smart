@@ -216,16 +216,16 @@ _Última atualização: 2026-09-05_
 > `GET /projects/{id}/budget` (5 hoje).
 >
 > **A suíte.** A antiga (`app/tests/`, 83 testes sobre `MagicMock`) foi
-> apagada — o diretório hoje só contém `__pycache__`. A nova tem **307**
+> apagada — o diretório hoje só contém `__pycache__`. A nova tem **308**
 > testes coletados contra Postgres real (`pytest --collect-only -q`; a
-> execução real é **306 passam, 1 skip deliberado** — `pytest -q`). O grosso
+> execução real é **307 passam, 1 skip deliberado** — `pytest -q`). O grosso
 > mora em `tests/services/` (16, função pura), `tests/api/` (70, endpoint
-> com dado semeado) e `tests/isolation/` (76, vazamento entre contas); os
+> com dado semeado) e `tests/isolation/` (77, vazamento entre contas); os
 > 145 restantes são 8 arquivos de teste de arquitetura, schema e migração na
 > raiz de `tests/` (`test_arquitetura.py`, `test_colunas_de_escopo.py`,
-> `test_guarda_banco.py`, `test_indices.py` e outros quatro). Os 4 testes
+> `test_guarda_banco.py`, `test_indices.py` e outros quatro). Os 5 testes
 > acrescentados pela onda final da revisão são `test_join_entre_contas.py`
-> (2, isolamento) e `test_ordem_deterministica.py` (2, API).
+> (3, isolamento) e `test_ordem_deterministica.py` (2, API).
 >
 > **Duas coisas mudaram em relação à spec, e as duas estão registradas.** O
 > `/me` ficou em `GET /api/users/me` e não em `/api/v1/me` — não existe

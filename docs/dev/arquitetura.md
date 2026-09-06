@@ -197,7 +197,7 @@ devolver linha de outra conta por engano. `tests/isolation/test_todas_as_rotas.p
 substituiu a lista escrita à mão: ele percorre as rotas registradas em
 `app/main.py` e testa cada uma automaticamente, então uma rota nova com id
 na URL sem entrada em `RECURSOS` falha, em vez de simplesmente não ter
-teste. A suíte de isolamento tem hoje 76 testes
+teste. A suíte de isolamento tem hoje 77 testes
 (`pytest tests/isolation -q --collect-only` em `ArchSmart-api`), contra os
 **27** de antes da Seção 4 — os 27 escritos à mão na Seção 1, o mesmo número
 que o `PROGRESS.md` registra. (Uma versão anterior desta linha dizia 29;

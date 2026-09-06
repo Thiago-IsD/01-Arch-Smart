@@ -26,6 +26,10 @@ from app.models.all_models import Client, Event, Project
 # falso vermelho ao casar com outro dado.
 CLIENTE_DE_B = "CLIENTE-SO-DA-CONTA-B"
 PROJETO_DE_B = "PROJETO-SO-DA-CONTA-B"
+# Evento da conta A SEM projeto nenhum. Ele nao testa vazamento — testa que
+# a correcao do vazamento nao levou um evento junto. Ver
+# `test_dashboard_nao_perde_evento_sem_projeto`.
+EVENTO_SEM_PROJETO = "EVENTO-SEM-PROJETO-DA-CONTA-A"
 
 
 def _fk_cruzado(db, conta_a, conta_b):
@@ -62,7 +66,16 @@ def _fk_cruzado(db, conta_a, conta_b):
         start_time=datetime(2099, 1, 1, 10, 0),
         end_time=datetime(2099, 1, 1, 11, 0),
     )
-    db.add_all([projeto_a, evento_a])
+    # Evento da conta A SEM projeto — o lado da moeda que a correcao pode
+    # quebrar em silencio. Ver `test_dashboard_nao_perde_evento_sem_projeto`.
+    evento_sem_projeto = Event(
+        account_id=conta_a.id,
+        project_id=None,
+        title=EVENTO_SEM_PROJETO,
+        start_time=datetime(2099, 1, 2, 10, 0),
+        end_time=datetime(2099, 1, 2, 11, 0),
+    )
+    db.add_all([projeto_a, evento_a, evento_sem_projeto])
     db.flush()
 
 
@@ -84,6 +97,52 @@ def test_dashboard_nao_devolve_cliente_nem_projeto_de_outra_conta(
     )
 
 
+def test_dashboard_nao_perde_evento_sem_projeto(db, client_a, conta_a, conta_b):
+    """
+    A METADE que o teste acima nao cobre, e que uma revisao mediu faltando.
+
+    As duas asercoes de vazamento sao sobre AUSENCIA de string, e uma
+    correcao errada as satisfaz de sobra: mover a condicao de conta do ON
+    para um `.filter()` transforma o `outerjoin` em INNER JOIN, e ai todo
+    evento SEM projeto some da agenda da dashboard — as strings secretas
+    continuam ausentes, e o teste continua verde. Medido em 05/09/2026 com
+    essa mutacao aplicada em `app/api/endpoints/dashboard.py`: a suite
+    INTEIRA passava, `306 passed, 1 skipped`.
+
+    O irmao desta rota ja estava protegido — `GET /api/events` afirma
+    `len(resposta.json()) == 1`, e falha sob a mesma mutacao. Aqui a forma
+    da resposta e outra (a lista de eventos vem dentro de
+    `upcoming_events`), entao a asercao equivalente precisa ser escrita, nao
+    herdada.
+
+    O cenario de falha real que isto guarda: alguem move o predicado para o
+    WHERE num refactor, e todo compromisso sem projeto vinculado desaparece
+    em silencio da lista de proximos compromissos da dashboard.
+    """
+    _fk_cruzado(db, conta_a[0], conta_b[0])
+
+    resposta = client_a.get("/api/dashboard/lean")
+
+    assert resposta.status_code == 200, resposta.text
+    titulos = [e["title"] for e in resposta.json()["upcoming_events"]]
+    assert EVENTO_SEM_PROJETO in titulos, (
+        "o evento SEM projeto sumiu de upcoming_events: a condicao de conta "
+        "foi parar no WHERE, e o outerjoin de Project virou inner join. "
+        f"Eventos devolvidos: {titulos}"
+    )
+    # E o outro evento, o que aponta para projeto de OUTRA conta, continua
+    # na lista — so sem nome de projeto. Um inner join levaria os dois; sem
+    # esta linha, a asercao acima sozinha ainda passaria se alguem
+    # "consertasse" filtrando por `Event.project_id IS NULL`.
+    por_titulo = {e["title"]: e for e in resposta.json()["upcoming_events"]}
+    assert "Visita" in por_titulo, (
+        "o evento com projeto de outra conta sumiu de upcoming_events; ele "
+        "e da conta A e deve aparecer, so que sem project_name."
+    )
+    assert por_titulo["Visita"]["project_name"] is None
+    assert por_titulo[EVENTO_SEM_PROJETO]["project_name"] is None
+
+
 def test_agenda_nao_devolve_nome_de_projeto_de_outra_conta(
     db, client_a, conta_a, conta_b
 ):
@@ -99,12 +158,18 @@ def test_agenda_nao_devolve_nome_de_projeto_de_outra_conta(
         "o outerjoin de Project em GET /api/events devolveu o nome do "
         "projeto de outra conta — a condicao de conta sumiu do ON."
     )
-    # A semantica de OUTER JOIN tem que sobreviver a correcao: o evento
-    # continua na lista, so que com project_name nulo. Se a condicao de
-    # conta tivesse ido para um `.filter()` em vez do ON, o outerjoin
-    # viraria INNER e o evento sumiria — um bug diferente, e silencioso.
-    assert len(resposta.json()) == 1, (
-        "o evento sumiu da agenda: a condicao de conta foi parar no WHERE, "
-        "e o outerjoin virou inner join."
+    # A semantica de OUTER JOIN tem que sobreviver a correcao: os DOIS
+    # eventos da conta A continuam na lista, so que com project_name nulo —
+    # o que aponta para projeto de outra conta e o que nao tem projeto
+    # nenhum. Se a condicao de conta tivesse ido para um `.filter()` em vez
+    # do ON, o outerjoin viraria INNER e os dois sumiriam — um bug
+    # diferente, e silencioso.
+    eventos = resposta.json()
+    assert len(eventos) == 2, (
+        "evento sumiu da agenda: a condicao de conta foi parar no WHERE, e "
+        f"o outerjoin virou inner join. Devolvidos: "
+        f"{[e['title'] for e in eventos]}"
     )
-    assert resposta.json()[0]["project_name"] is None
+    titulos = {e["title"] for e in eventos}
+    assert titulos == {"Visita", EVENTO_SEM_PROJETO}
+    assert all(e["project_name"] is None for e in eventos)
