@@ -16,10 +16,10 @@ import { Lock } from "lucide-react"
 import Link from "next/link"
 
 interface UpgradeAlertModalProps {
-    planLimit?: number
+    planLimit: number
 }
 
-export function UpgradeAlertModal({ planLimit = 2 }: UpgradeAlertModalProps) {
+export function UpgradeAlertModal({ planLimit }: UpgradeAlertModalProps) {
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>

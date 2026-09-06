@@ -51,7 +51,7 @@ export default async function ProjectsPage(props: {
     // equivalente que `/api/projects` devolve com outro nome (ver
     // docs/dev/modulos/account.md). Se a chamada a `/me` falhar, `planLimit`
     // fica `undefined` e a tela nao inventa um numero.
-    const planLimit = me?.entitlements.project_limit
+    const planLimit = me?.entitlements?.project_limit
     const activeProjectsCount = projects.filter((p: any) => p.status === 'ACTIVE').length
     const isAtLimit = planLimit !== undefined && activeProjectsCount >= planLimit
 
