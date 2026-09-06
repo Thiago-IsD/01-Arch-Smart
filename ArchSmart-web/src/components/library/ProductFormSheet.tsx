@@ -175,7 +175,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
             console.error(error)
             toast({
                 title: "Erro",
-                description: "Não foi possível salvar o produto.",
+                description: error instanceof Error ? error.message : "Não foi possível salvar o produto.",
                 variant: "destructive",
             })
         }

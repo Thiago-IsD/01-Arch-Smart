@@ -99,11 +99,12 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
     useEffect(() => {
         if (!isOpen) return
         let cancelled = false
+        const controller = new AbortController()
 
         const load = async () => {
             setLoading(true)
             try {
-                const items = await listarInboxCompleto()
+                const items = await listarInboxCompleto(controller.signal)
 
                 if (cancelled) return
 
@@ -131,7 +132,10 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
         }
 
         load()
-        return () => { cancelled = true }
+        return () => {
+            cancelled = true
+            controller.abort()
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 

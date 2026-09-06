@@ -147,7 +147,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
             console.error(error)
             toast({
                 title: "Erro",
-                description: "Não foi possível aprovar o produto.",
+                description: error instanceof Error ? error.message : "Não foi possível aprovar o produto.",
                 variant: "destructive",
             })
         }

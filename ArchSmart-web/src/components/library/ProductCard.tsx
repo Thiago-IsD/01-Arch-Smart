@@ -96,7 +96,7 @@ export function ProductCard({
             console.error(error)
             toast({
                 title: "Erro",
-                description: "Não foi possível excluir o produto.",
+                description: error instanceof Error ? error.message : "Não foi possível excluir o produto.",
                 variant: "destructive"
             })
         } finally {

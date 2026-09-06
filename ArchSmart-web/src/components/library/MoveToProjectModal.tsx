@@ -42,6 +42,13 @@ export function MoveToProjectModal({
     const moverParaProjetoMutation = useMoveToProject()
     const isSubmitting = moverParaProjetoMutation.isPending
 
+    // O ambiente efetivo: o que o usuario escolheu, ou o primeiro da lista como
+    // sugestao. Calculado no render, nao guardado em estado — um efeito que so
+    // faz `setState` a partir de `environments` reexecuta a cada troca de
+    // referencia do array (toda vez que a query refaz fetch) e "puxa de volta"
+    // a escolha do usuario para o primeiro item sem ele ter pedido nada.
+    const envIdEfetivo = selectedEnvId || environments[0]?.id || ""
+
     // Reseta a selecao quando o modal fecha.
     useEffect(() => {
         if (!isOpen) {
@@ -50,22 +57,19 @@ export function MoveToProjectModal({
         }
     }, [isOpen])
 
-    // Auto-seleciona o primeiro ambiente quando a lista chega.
-    useEffect(() => {
-        if (!selectedProjectId) {
-            setSelectedEnvId("")
-            return
-        }
-        setSelectedEnvId(environments.length > 0 ? environments[0].id : "")
-    }, [selectedProjectId, environments])
+    const handleProjectChange = (value: string) => {
+        setSelectedProjectId(value)
+        // O ambiente escolhido pertencia ao projeto anterior.
+        setSelectedEnvId("")
+    }
 
     const handleSubmit = async () => {
-        if (!product || !selectedProjectId || !selectedEnvId) return
+        if (!product || !selectedProjectId || !envIdEfetivo) return
 
         try {
             await moverParaProjetoMutation.mutateAsync({
                 project_id: selectedProjectId,
-                environment_id: selectedEnvId,
+                environment_id: envIdEfetivo,
                 product_id: product.id,
                 rule_type: ruleType,
             })
@@ -80,7 +84,7 @@ export function MoveToProjectModal({
             toast({
                 variant: "destructive",
                 title: "Erro",
-                description: "Não foi possível vincular o produto.",
+                description: error instanceof Error ? error.message : "Não foi possível vincular o produto.",
             })
         }
     }
@@ -98,7 +102,7 @@ export function MoveToProjectModal({
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">1. Escolha o Projeto</label>
-                        <Select value={selectedProjectId} onValueChange={setSelectedProjectId} disabled={isLoadingProjects}>
+                        <Select value={selectedProjectId} onValueChange={handleProjectChange} disabled={isLoadingProjects}>
                             <SelectTrigger>
                                 <SelectValue placeholder={isLoadingProjects ? "Carregando projetos..." : "Selecione um projeto"} />
                             </SelectTrigger>
@@ -112,7 +116,7 @@ export function MoveToProjectModal({
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium">2. Escolha o Ambiente</label>
-                        <Select value={selectedEnvId} onValueChange={setSelectedEnvId} disabled={!selectedProjectId || isLoadingEnvs || environments.length === 0}>
+                        <Select value={envIdEfetivo} onValueChange={setSelectedEnvId} disabled={!selectedProjectId || isLoadingEnvs || environments.length === 0}>
                             <SelectTrigger>
                                 <SelectValue placeholder={
                                     !selectedProjectId ? "Selecione o projeto primeiro" :
@@ -146,7 +150,7 @@ export function MoveToProjectModal({
 
                 <div className="flex gap-2 justify-end mt-2">
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
-                    <Button onClick={handleSubmit} disabled={isSubmitting || !selectedProjectId || !selectedEnvId}>
+                    <Button onClick={handleSubmit} disabled={isSubmitting || !selectedProjectId || !envIdEfetivo}>
                         {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Enviar Produto
                     </Button>
