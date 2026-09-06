@@ -30,13 +30,26 @@ _PASTAS_PODADAS = {"venv", "node_modules", "__pycache__"}
 
 
 def _arquivos_python() -> list[Path]:
+    """
+    Ordem ESTAVEL, nao a do sistema de arquivos.
+
+    `os.walk` devolve na ordem que o sistema de arquivos entrega, e ela muda
+    entre plataformas: medido em 06/09/2026, NTFS aqui entrega `auth.py` antes
+    de `leads.py` e o ext4 do runner do CI entrega ao contrario. Um lint que
+    so afirma "nao ha achados" nao se importa — mas um teste que compara a
+    lista encontrada passa numa plataforma e reprova na outra, com os mesmos
+    itens. Foi o que aconteceu com
+    `test_marca_de_pre_sessao_nao_cresce_sem_querer`: verde no Windows,
+    vermelho no CI. Ordenar na origem tira a pegadinha de quem escrever o
+    proximo consumidor.
+    """
     arquivos = []
     for diretorio_atual, subpastas, nomes in os.walk(RAIZ):
         subpastas[:] = [s for s in subpastas if s not in _PASTAS_PODADAS]
         for nome in nomes:
             if nome.endswith(".py"):
                 arquivos.append(Path(diretorio_atual) / nome)
-    return arquivos
+    return sorted(arquivos)
 
 
 def _ocorrencias(agulha: str) -> list[str]:
@@ -283,7 +296,14 @@ def test_marca_de_pre_sessao_nao_cresce_sem_querer():
     travar a contagem de hoje faz uma quarta ocorrencia exigir que quem a
     escreveu tambem mexa nesta linha — deliberado, nao so digitado.
     """
-    ocorrencias = [
+    # sorted() nos DOIS lados: `_arquivos_python()` usa os.walk, cuja ordem de
+    # diretorios vem do sistema de arquivos. Medido em 06/09/2026: no Windows
+    # (NTFS) sai auth.py antes de leads.py; no runner do CI (Linux, ext4) sai
+    # leads.py primeiro. A primeira versao deste teste comparava a lista na
+    # ordem em que veio e passava aqui e reprovava la, com os MESMOS tres
+    # itens — o que se afirma e QUAIS marcas existem, nunca em que ordem o
+    # os.walk as encontrou.
+    ocorrencias = sorted(
         f"{arquivo.relative_to(RAIZ).as_posix()}:{numero}"
         for arquivo in _arquivos_python()
         if _sob_o_lint(arquivo.relative_to(RAIZ).as_posix())
@@ -291,12 +311,14 @@ def test_marca_de_pre_sessao_nao_cresce_sem_querer():
             arquivo.read_text(encoding="utf-8").splitlines(), start=1
         )
         if MARCA_DE_PRE_SESSAO in linha
-    ]
-    assert ocorrencias == [
-        "app/api/auth.py:71",
-        "app/api/auth.py:87",
-        "app/api/leads.py:14",
-    ], (
+    )
+    assert ocorrencias == sorted(
+        [
+            "app/api/auth.py:71",
+            "app/api/auth.py:87",
+            "app/api/leads.py:14",
+        ]
+    ), (
         f'esperava exatamente as 3 marcas conhecidas de "{MARCA_DE_PRE_SESSAO}"; '
         f"achei {ocorrencias}. Se uma nova excecao de pre-sessao e legitima, "
         "atualize esta lista tambem — a marca nao pode crescer sozinha."
