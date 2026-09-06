@@ -88,6 +88,13 @@ describe("filtrosDaUrl", () => {
             .toEqual(filtrosDaUrl({ categories: "A", origins: "Manual", q: "x", sort_by: "name", size: "30" }))
     })
 
+    it("trata chave presente e vazia como ausente — tolerancia que o antigo `||` dava", () => {
+        // `?tab=` e `?page=` (chave presente, valor vazio) nao podem zerar o
+        // filtro: o antigo `||` caia no default nesse caso, e `??` sozinho
+        // deixaria passar `tab: ""` e `page: 0`.
+        expect(filtrosDaUrl(new URLSearchParams("tab=&page="))).toMatchObject({ tab: "library", page: 1 })
+    })
+
     it("preenche os padroes que o LibraryContent usava inline", () => {
         expect(filtrosDaUrl({})).toMatchObject({
             tab: "library", sortBy: "created_at_desc", page: 1, size: 15,

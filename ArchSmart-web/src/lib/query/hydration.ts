@@ -10,7 +10,12 @@ import { QueryClient } from "@tanstack/react-query"
  */
 export function criarQueryClientDoServidor(): QueryClient {
     return new QueryClient({
-        defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
+        // `retry: false`: sem isso o padrao do React Query e 3 tentativas com
+        // backoff — um prefetch abortado ou com erro seria tentado de novo
+        // duas vezes, dentro (ou pior, depois) do teto de 3 s. Retry no
+        // servidor dentro desse orcamento nao rende nada, so multiplica a
+        // conexao pendurada que o teto existe para evitar.
+        defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: false } },
     })
 }
 
@@ -25,17 +30,26 @@ export function criarQueryClientDoServidor(): QueryClient {
  */
 export const TIMEOUT_DO_PREFETCH_MS = 3_000
 
-export async function tentarPrefetch(tarefa: () => Promise<unknown>): Promise<void> {
+/**
+ * `tarefa` recebe o `AbortSignal` do teto e tem que repassa-lo ate o `fetch`
+ * (via `apiServer`). Sem isso o teto so para de *esperar* — a chamada
+ * continua correndo no servidor, sem ninguem escutando, ate a API responder
+ * (ate ~42 s num cold start) ou a plataforma cortar a conexao sozinha. Contra
+ * um free tier onde o timeout e o caso esperado, e nao o raro, essa conexao
+ * pendurada e o custo real do atalho de so "desistir de esperar".
+ */
+export async function tentarPrefetch(
+    tarefa: (signal: AbortSignal) => Promise<unknown>,
+): Promise<void> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_DO_PREFETCH_MS)
     try {
-        await Promise.race([
-            tarefa(),
-            new Promise((_, rejeitar) =>
-                setTimeout(() => rejeitar(new Error("timeout do prefetch")), TIMEOUT_DO_PREFETCH_MS),
-            ),
-        ])
+        await tarefa(controller.signal)
     } catch (erro) {
         // Prefetch e otimizacao, nao contrato: falhar aqui degrada para busca
         // no cliente, e a tela funciona igual. Engolir e deliberado.
         console.warn("[prefetch] desistiu, o cliente vai buscar:", erro)
+    } finally {
+        clearTimeout(timer)
     }
 }

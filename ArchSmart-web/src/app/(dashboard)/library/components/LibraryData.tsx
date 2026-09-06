@@ -17,11 +17,12 @@ import { LibraryContent } from "./LibraryContent"
 export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
     const queryClient = criarQueryClientDoServidor()
 
-    await tentarPrefetch(() =>
+    await tentarPrefetch((signal) =>
         queryClient.prefetchQuery({
             queryKey: queryKeys.products.list(filtros),
             queryFn: () =>
                 apiServer<ProductsResponse>("/api/products", {
+                    signal,
                     query: {
                         page: filtros.page,
                         size: filtros.size,
