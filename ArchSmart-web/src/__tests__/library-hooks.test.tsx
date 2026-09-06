@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { ReactNode } from "react"
-import { useProducts, useInboxCount } from "@/features/library/hooks"
+import { useProducts, useInboxCount, useDeleteProduct, useBatchApprove } from "@/features/library/hooks"
 import { filtrosDaUrl } from "@/features/library/filters"
+import { queryKeys } from "@/lib/query/keys"
 
 vi.mock("@/lib/api/auth", () => ({
     getAccessToken: async () => "tok123",
@@ -16,9 +17,10 @@ vi.mock("@/lib/api/auth", () => ({
 
 function envolver() {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    return ({ children }: { children: ReactNode }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-    )
+    function Wrapper({ children }: { children: ReactNode }) {
+        return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    }
+    return Wrapper
 }
 
 beforeEach(() => {
@@ -86,5 +88,42 @@ describe("filtrosDaUrl", () => {
             tab: "library", sortBy: "created_at_desc", page: 1, size: 15,
             categories: [], origins: [],
         })
+    })
+})
+
+describe("useDeleteProduct — Defeito A", () => {
+    it("manda Authorization no DELETE", async () => {
+        // ProductCard.tsx:89 chamava fetch(url, { method: "DELETE" }) sem
+        // header nenhum. get_context declara `authorization: str = Header(...)`,
+        // entao o FastAPI respondia 422 e a exclusao nunca funcionava.
+        const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+        const wrapper = ({ children }: { children: ReactNode }) => (
+            <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        )
+        const { result } = renderHook(() => useDeleteProduct(), { wrapper })
+
+        await result.current.mutateAsync("p1")
+
+        const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+        expect(String(url)).toContain("/api/products/p1")
+        expect(init.method).toBe("DELETE")
+        expect(new Headers(init.headers).get("Authorization")).toBe("Bearer tok123")
+    })
+})
+
+describe("mutacoes — Defeito B", () => {
+    it("invalidar products alcanca lista, detalhe e badge do inbox com uma chamada", async () => {
+        const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+        const espia = vi.spyOn(client, "invalidateQueries")
+        const wrapper = ({ children }: { children: ReactNode }) => (
+            <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        )
+        const { result } = renderHook(() => useBatchApprove(), { wrapper })
+
+        await result.current.mutateAsync({ items: [{ id: "p1", name: "Cadeira" }] })
+
+        expect(espia).toHaveBeenCalledWith({ queryKey: queryKeys.products.all })
+        // Uma so: a hierarquia da Tarefa 5 dispensa invalidar o badge a parte.
+        expect(espia).toHaveBeenCalledTimes(1)
     })
 })

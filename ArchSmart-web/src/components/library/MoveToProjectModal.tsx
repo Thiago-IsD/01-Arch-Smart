@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getAccessToken } from "@/lib/api/auth"
 import { useToast } from "@/hooks/use-toast"
-import { apiUrl } from "@/lib/api-url"
+import { useAmbientesDoProjeto, useMoveToProject, useProjetosParaMover } from "@/features/library/hooks"
 import {
     Dialog,
     DialogContent,
@@ -32,104 +31,44 @@ export function MoveToProjectModal({
 }) {
     const { toast } = useToast()
 
-    const [projects, setProjects] = useState<any[]>([])
-    const [environments, setEnvironments] = useState<any[]>([])
-
     const [selectedProjectId, setSelectedProjectId] = useState<string>("")
     const [selectedEnvId, setSelectedEnvId] = useState<string>("")
     const [ruleType, setRuleType] = useState<string>("UNIT")
 
-    const [isLoadingProjects, setIsLoadingProjects] = useState(false)
-    const [isLoadingEnvs, setIsLoadingEnvs] = useState(false)
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const { data: projects = [], isLoading: isLoadingProjects } = useProjetosParaMover(isOpen)
+    const { data: environments = [], isLoading: isLoadingEnvs } = useAmbientesDoProjeto(
+        selectedProjectId || undefined,
+    )
+    const moverParaProjetoMutation = useMoveToProject()
+    const isSubmitting = moverParaProjetoMutation.isPending
 
-    // 1. Fetch Projects on mount
+    // Reseta a selecao quando o modal fecha.
     useEffect(() => {
         if (!isOpen) {
             setSelectedProjectId("")
             setSelectedEnvId("")
-            return
         }
-
-        const fetchProjects = async () => {
-            setIsLoadingProjects(true)
-            try {
-                const token = (await getAccessToken()) || ""
-
-                const res = await fetch(apiUrl("/api/projects"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                })
-
-                if (res.ok) {
-                    const data = await res.json()
-                    setProjects(data.items || [])
-                }
-            } catch (e) {
-                console.error("Failed to fetch projects", e)
-            } finally {
-                setIsLoadingProjects(false)
-            }
-        }
-        fetchProjects()
-
     }, [isOpen])
 
-    // 2. Fetch Environments when Project changes
+    // Auto-seleciona o primeiro ambiente quando a lista chega.
     useEffect(() => {
         if (!selectedProjectId) {
-            setEnvironments([])
             setSelectedEnvId("")
             return
         }
-
-        const fetchEnvs = async () => {
-            setIsLoadingEnvs(true)
-            try {
-                const token = (await getAccessToken()) || ""
-
-                const res = await fetch(apiUrl(`/api/projects/${selectedProjectId}/environments`), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                })
-
-                if (res.ok) {
-                    const data = await res.json()
-                    setEnvironments(data)
-                    // Auto-select first environment if available
-                    if (data.length > 0) setSelectedEnvId(data[0].id)
-                    else setSelectedEnvId("")
-                }
-            } catch (e) {
-                console.error(e)
-            } finally {
-                setIsLoadingEnvs(false)
-            }
-        }
-        fetchEnvs()
-    }, [selectedProjectId])
+        setSelectedEnvId(environments.length > 0 ? environments[0].id : "")
+    }, [selectedProjectId, environments])
 
     const handleSubmit = async () => {
         if (!product || !selectedProjectId || !selectedEnvId) return
 
-        setIsSubmitting(true)
         try {
-            const token = (await getAccessToken()) || ""
-            const payload = {
+            await moverParaProjetoMutation.mutateAsync({
                 project_id: selectedProjectId,
                 environment_id: selectedEnvId,
                 product_id: product.id,
-                rule_type: ruleType
-            }
-
-            const res = await fetch(apiUrl("/api/budgets/items"), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
+                rule_type: ruleType,
             })
-
-            if (!res.ok) throw new Error("Failed to move to project")
 
             toast({
                 title: "Sucesso!",
@@ -143,8 +82,6 @@ export function MoveToProjectModal({
                 title: "Erro",
                 description: "Não foi possível vincular o produto.",
             })
-        } finally {
-            setIsSubmitting(false)
         }
     }
 

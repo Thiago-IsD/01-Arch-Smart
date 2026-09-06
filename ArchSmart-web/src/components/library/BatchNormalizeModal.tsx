@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import {
     Dialog,
     DialogContent,
@@ -30,15 +29,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { apiUrl } from "@/lib/api-url"
 import {
     NORMALIZE_CONCURRENCY,
     NormalizedProduct,
-    apiErrorMessage,
-    getToken,
     mapWithConcurrency,
     normalizeProduct,
 } from "@/lib/normalize-product"
+import { listarInboxCompleto } from "@/features/library/api"
+import { useBatchApprove } from "@/features/library/hooks"
 
 const CATEGORIES = [
     "Mobiliário",
@@ -79,12 +77,12 @@ interface BatchNormalizeModalProps {
 
 export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModalProps) {
     const { toast } = useToast()
-    const queryClient = useQueryClient()
+    const aprovarEmLoteMutation = useBatchApprove()
 
     const [rows, setRows] = useState<Row[]>([])
     const [loading, setLoading] = useState(false)
     const [aiRunning, setAiRunning] = useState(false)
-    const [approving, setApproving] = useState(false)
+    const approving = aprovarEmLoteMutation.isPending
     // Linhas em que a loja bloqueou o acesso: a IA extraiu só pelo nome e os dados
     // precisam de conferência manual.
     const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set())
@@ -105,24 +103,7 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
         const load = async () => {
             setLoading(true)
             try {
-                const token = await getToken()
-                const headers: Record<string, string> = {}
-                if (token) headers["Authorization"] = `Bearer ${token}`
-
-                // A API limita size a 100 (le=100), então paginamos para trazer
-                // todo o inbox, independente da quantidade.
-                const size = 100
-                let page = 1
-                let totalPages = 1
-                const items: any[] = []
-                do {
-                    const res = await fetch(apiUrl(`/api/products?state=CAPTURED&page=${page}&size=${size}`), { headers })
-                    if (!res.ok) throw new Error("fetch inbox failed")
-                    const data = await res.json()
-                    items.push(...(data.items || []))
-                    totalPages = data.pages || 1
-                    page++
-                } while (page <= totalPages && !cancelled)
+                const items = await listarInboxCompleto()
 
                 if (cancelled) return
 
@@ -173,13 +154,11 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
         aiAbortRef.current = abort
 
         try {
-            const token = await getToken()
-
             const results = await mapWithConcurrency(targets, NORMALIZE_CONCURRENCY, async (r) => ({
                 id: r.id,
                 data: await normalizeProduct(
                     { text: r.name, source_url: r.source_url },
-                    { token, signal: abort.signal },
+                    { signal: abort.signal },
                 ),
             }))
 
@@ -243,12 +222,7 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
             return
         }
 
-        setApproving(true)
         try {
-            const token = await getToken()
-            const headers: Record<string, string> = { "Content-Type": "application/json" }
-            if (token) headers["Authorization"] = `Bearer ${token}`
-
             const payload = {
                 items: validSelected.map((r) => ({
                     id: r.id,
@@ -266,17 +240,8 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                 })),
             }
 
-            const res = await fetch(apiUrl("/api/products/batch-approve"), {
-                method: "PATCH",
-                headers,
-                body: JSON.stringify(payload),
-            })
-            if (!res.ok) throw new Error(await apiErrorMessage(res, "Falha ao aprovar em lote."))
-            const data = await res.json()
+            const data = await aprovarEmLoteMutation.mutateAsync(payload)
             const approvedCount = data.approved?.length ?? validSelected.length
-
-            queryClient.invalidateQueries({ queryKey: ["products"] })
-            queryClient.invalidateQueries({ queryKey: ["inbox-count"] })
 
             toast({
                 title: "Produtos aprovados!",
@@ -291,8 +256,6 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                 title: "Erro",
                 description: err instanceof Error ? err.message : "Falha ao aprovar em lote.",
             })
-        } finally {
-            setApproving(false)
         }
     }
 

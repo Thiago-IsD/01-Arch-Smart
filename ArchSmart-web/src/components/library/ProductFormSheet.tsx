@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { apiUrl } from "@/lib/api-url"
+import { useCreateProduct, useUpdateProduct } from "@/features/library/hooks"
 import {
     Select,
     SelectContent,
@@ -69,7 +69,9 @@ interface ProductFormSheetProps {
 export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProps) {
     const router = useRouter()
     const { toast } = useToast()
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const criarProdutoMutation = useCreateProduct()
+    const atualizarProdutoMutation = useUpdateProduct()
+    const isSubmitting = criarProdutoMutation.isPending || atualizarProdutoMutation.isPending
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema) as any,
@@ -136,9 +138,7 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
     }
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        setIsSubmitting(true)
         try {
-            // Prepare payload
             const payload = {
                 name: values.name,
                 store: values.store,
@@ -158,27 +158,11 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 yield_factor: values.yield_factor || null
             }
 
-            // Get Supabase session to extract token
-            const { getAccessToken } = await import("@/lib/api/auth");
-            const accessToken = await getAccessToken();
-
-            if (!accessToken) throw new Error("Usuário não autenticado");
-
-            const method = productToEdit ? "PUT" : "POST"
-            const url = productToEdit
-                ? apiUrl(`/api/products/${productToEdit.id}`)
-                : apiUrl("/api/products/")
-
-            const res = await fetch(url, {
-                method,
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${accessToken}`
-                },
-                body: JSON.stringify(payload),
-            })
-
-            if (!res.ok) throw new Error("Falha ao salvar produto")
+            if (productToEdit) {
+                await atualizarProdutoMutation.mutateAsync({ id: productToEdit.id, payload })
+            } else {
+                await criarProdutoMutation.mutateAsync(payload)
+            }
 
             toast({
                 title: productToEdit ? "Produto atualizado!" : "Produto criado!",
@@ -186,7 +170,6 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
             })
 
             onClose()
-            router.refresh()
 
         } catch (error) {
             console.error(error)
@@ -195,8 +178,6 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                 description: "Não foi possível salvar o produto.",
                 variant: "destructive",
             })
-        } finally {
-            setIsSubmitting(false)
         }
     }
 

@@ -26,9 +26,9 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { apiUrl } from "@/lib/api-url"
+import { useDeleteProduct } from "@/features/library/hooks"
 import { MoveToProjectModal } from "./MoveToProjectModal"
 
 interface ProductCardProps {
@@ -57,13 +57,13 @@ export function ProductCard({
     isInbox,
 }: ProductCardProps) {
     const searchParams = useSearchParams()
-    const router = useRouter()
     const { toast } = useToast()
+    const excluirProdutoMutation = useDeleteProduct()
 
     // State for Dialogs
     const [isMoveOpen, setIsMoveOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-    const [isDeleting, setIsDeleting] = useState(false)
+    const isDeleting = excluirProdutoMutation.isPending
 
     // Formatter BRL
     const formatter = new Intl.NumberFormat('pt-BR', {
@@ -84,20 +84,13 @@ export function ProductCard({
     }
 
     const handleDelete = async () => {
-        setIsDeleting(true)
         try {
-            const res = await fetch(apiUrl(`/api/products/${id}`), {
-                method: "DELETE",
-            })
-
-            if (!res.ok) throw new Error("Erro ao excluir")
+            await excluirProdutoMutation.mutateAsync(id)
 
             toast({
                 title: "Produto excluído",
                 description: "O item foi movido para a lixeira.",
             })
-
-            router.refresh()
 
         } catch (error) {
             console.error(error)
@@ -107,7 +100,6 @@ export function ProductCard({
                 variant: "destructive"
             })
         } finally {
-            setIsDeleting(false)
             setIsDeleteDialogOpen(false)
         }
     }
