@@ -130,7 +130,7 @@ export function LibraryContent() {
                                 <Loader2 className="h-8 w-8 animate-spin" />
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            <div data-testid="product-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                                 {products.length > 0 ? (
                                     products.map((product: any) => (
                                         <ProductCard
@@ -147,7 +147,7 @@ export function LibraryContent() {
                                         />
                                     ))
                                 ) : (
-                                    <div className="col-span-full flex flex-col items-center justify-center py-10 text-muted-foreground">
+                                    <div data-testid="library-empty" className="col-span-full flex flex-col items-center justify-center py-10 text-muted-foreground">
                                         <p>Nenhum produto encontrado com os filtros selecionados.</p>
                                         {(q || categories.length > 0 || origins.length > 0) && (
                                             <Button variant="link" className="mt-2" asChild>
