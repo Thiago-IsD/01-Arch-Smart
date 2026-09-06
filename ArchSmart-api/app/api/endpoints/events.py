@@ -2,6 +2,7 @@ import uuid
 from typing import List, Optional
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_
 
 from app.db.repository import ScopedRepository, get_repo
 from app.models.all_models import Event, Project
@@ -47,9 +48,20 @@ def get_events(
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
 
+    # `Project.account_id == repo.ctx.account_id` no ON: `repo.query(Event)`
+    # escopa EVENT, e o `with_entities` abaixo traz `Project.name`, coluna de
+    # outra tabela, para a resposta. A condicao fica no ON e nao no WHERE
+    # porque este e um `outerjoin` - no WHERE ela viraria INNER JOIN e sumiria
+    # com todo evento sem projeto.
     rows = (
         repo.query(Event)
-        .outerjoin(Project, Event.project_id == Project.id)
+        .outerjoin(
+            Project,
+            and_(
+                Event.project_id == Project.id,
+                Project.account_id == repo.ctx.account_id,
+            ),
+        )
         .filter(
             Event.start_time >= start_dt,
             Event.start_time <= end_dt,

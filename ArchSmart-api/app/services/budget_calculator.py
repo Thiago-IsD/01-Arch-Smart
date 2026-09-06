@@ -142,8 +142,33 @@ def carregar_orcamento(
     `popular_relacionamento_de_itens` abaixo para a outra metade do mesmo
     problema (`Budget.items`).
 
-    `itens` e uma Query JA FILTRADA por conta por quem chamou — tipicamente
-    `repo.query(BudgetItem).filter(BudgetItem.budget_id == ...)`.
+    **Escopo das DUAS queries, nao so da primeira.** `itens` chega JA
+    FILTRADA por quem chamou — `repo.query(BudgetItem).filter(
+    BudgetItem.budget_id == ...)` nos endpoints autenticados, e
+    `db.query(BudgetItem).filter(BudgetItem.budget_id == ...)` no portal
+    publico (`app/api/endpoints/public.py`), onde nao existe conta na
+    sessao: quem autoriza ali e o token de portal, e o recorte e a
+    apresentacao. Esta funcao NAO recebe `RequestContext`, e nao pode
+    receber — o portal nao tem um para dar.
+
+    A segunda query (os `EnvironmentDNA`) herda esse escopo por dois
+    caminhos, e o segundo foi acrescentado depois de a revisao final da
+    Secao 4 notar que so o primeiro estava escrito:
+
+    1. `environment_id.in_(ids_de_ambiente)`, e `ids_de_ambiente` sai de
+       `carregados` — as linhas que a query JA filtrada devolveu. O
+       conjunto de ambientes nunca e maior do que o que o chamador
+       autorizou.
+    2. `account_id.in_(contas)`, e `contas` sai das MESMAS linhas
+       (`BudgetItem.account_id`, `NOT NULL` desde a Tarefa 3). Nao vem do
+       cliente, nao vem de parametro: vem do dado que ja passou pelo
+       filtro. Fecha o caso que (1) sozinho nao fecha — uma linha de
+       `environment_dnas` cujo `account_id` diverge do da conta dona do
+       ambiente. O banco nao proibe isso; nenhuma constraint casa as duas
+       colunas.
+
+    Sem `RequestContext`, (2) e o limite maximo de aperto possivel aqui — e
+    e o aperto certo: a identidade vem da linha, nao de quem pediu.
     """
     carregados: list[BudgetItem] = (
         itens.options(
@@ -155,9 +180,16 @@ def carregar_orcamento(
     if not ids_de_ambiente:
         return carregados, {}
 
+    # As duas condicoes saem de `carregados`, nunca do chamador: o escopo
+    # desta query e literalmente o dado que a query JA filtrada devolveu.
+    # Ver o bloco "Escopo das DUAS queries" no docstring acima.
+    contas = {i.account_id for i in carregados if i.account_id}
     dnas = (
         itens.session.query(EnvironmentDNA)
-        .filter(EnvironmentDNA.environment_id.in_(ids_de_ambiente))
+        .filter(
+            EnvironmentDNA.environment_id.in_(ids_de_ambiente),
+            EnvironmentDNA.account_id.in_(contas),
+        )
         .all()
     )
     return carregados, {d.environment_id: d for d in dnas}

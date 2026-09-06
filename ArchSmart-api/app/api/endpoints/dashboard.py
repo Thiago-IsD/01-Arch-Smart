@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import desc, func, extract
+from sqlalchemy import and_, desc, func, extract
 from typing import Any
 from datetime import datetime
 
@@ -22,9 +22,25 @@ def get_dashboard_lean(
     - Próximos compromissos
     """
     # 1. Projetos Recentes (Top 4 ordenados por data de criação)
+    #
+    # O `Client.account_id == repo.ctx.account_id` no ON e obrigatorio, e nao
+    # redundante. `repo.query(Project)` escopa PROJECT; o `with_entities` traz
+    # colunas de CLIENT, que o escopo do repositorio nao alcanca - e o
+    # `client.name` vai para a resposta logo abaixo. Nenhuma constraint do
+    # banco proibe um `projects.client_id` apontando para o cliente de outra
+    # conta; hoje nao acontece porque todo caminho que grava esse FK resolve o
+    # cliente por `repo.obter`/`repo.get` antes, mas isso e disciplina de
+    # codigo, nao invariante de schema. Mesmo padrao de
+    # `financial.py::list_financial_entries`.
     projects_query = (
         repo.query(Project)
-        .join(Client, Project.client_id == Client.id)
+        .join(
+            Client,
+            and_(
+                Project.client_id == Client.id,
+                Client.account_id == repo.ctx.account_id,
+            ),
+        )
         .filter(Project.status == "ACTIVE")
         .order_by(desc(Project.created_at))
         .with_entities(Project, Client)
@@ -105,9 +121,21 @@ def get_dashboard_lean(
             financial_expense = (total or 0.0)
 
     # 4. Próximos Eventos da Agenda (a partir de hoje)
+    #
+    # A condicao de conta fica no ON, e nao num `.filter()`: com `outerjoin`,
+    # movida para o WHERE ela viraria um INNER JOIN disfarcado e sumiria com
+    # todo evento sem projeto. No ON, o evento continua aparecendo - so com
+    # `project_name` nulo, que e o comportamento certo tanto para "evento sem
+    # projeto" quanto para "projeto de outra conta".
     events_query = (
         repo.query(Event)
-        .outerjoin(Project, Event.project_id == Project.id)
+        .outerjoin(
+            Project,
+            and_(
+                Event.project_id == Project.id,
+                Project.account_id == repo.ctx.account_id,
+            ),
+        )
         .filter(Event.start_time >= now)
         .order_by(Event.start_time.asc())
         .with_entities(Event, Project.name.label("project_name"))

@@ -234,6 +234,15 @@ def test_endpoint_get_project_budget_nao_cresce_com_o_numero_de_itens(
         resposta_pequena = client_a.get(f"/api/projects/{project_id_pequeno}/budget")
     assert resposta_pequena.status_code == 200
     assert len(resposta_pequena.json()["items"]) == 5
+    # `base_area` sai do `floor_area` do EnvironmentDNA (10.0 em
+    # `_montar_orcamento`). Sem isto, contar queries nao distingue "as 2
+    # queries de carregar_orcamento" de "a segunda query voltou vazia": um
+    # filtro errado nos EnvironmentDNA derrubaria o dado do calculo e o
+    # teste continuaria verde, contando as mesmas queries.
+    assert resposta_pequena.json()["items"][0]["base_area"] == 10.0, (
+        "base_area zerada: a query dos EnvironmentDNA em carregar_orcamento "
+        "nao trouxe o DNA do ambiente."
+    )
 
     project_id_grande, _ = _montar_orcamento(db, conta, 30)
     with ContadorDeQueries(db.connection()) as contador_grande:
