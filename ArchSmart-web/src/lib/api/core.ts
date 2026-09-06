@@ -47,9 +47,17 @@ function montarQuery(query: Record<string, ValorDeQuery> | undefined): string {
 
 export function criarCliente(opts: OpcoesDoCliente): ClienteApi {
     const base = opts.baseUrl ?? getApiUrl
-    const chamar = opts.fetchImpl ?? fetch
 
     return async function requisitar<T>(path: string, req: Requisicao = {}): Promise<T> {
+        // `fetch` e resolvido aqui dentro, nao guardado numa const no escopo
+        // de `criarCliente` — `api`/`apiServer` sao criados uma vez, no
+        // carregamento do modulo, e um `fetch` capturado naquele instante
+        // fica preso a essa referencia para sempre. Em producao ninguem
+        // reatribui `window.fetch` depois do load, entao nunca dava para
+        // notar; em teste, `vi.stubGlobal("fetch", ...)` troca a referencia
+        // global depois que o modulo ja carregou, e a const antiga continuava
+        // apontando pro fetch real — a chamada saia pra rede de verdade.
+        const chamar = opts.fetchImpl ?? fetch
         const token = await opts.resolverToken()
 
         const headers = new Headers()
