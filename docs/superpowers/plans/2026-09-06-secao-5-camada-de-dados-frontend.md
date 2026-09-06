@@ -767,20 +767,31 @@ git commit -m "feat(api): auth.ts e auth.server.ts como ponto unico do Supabase,
 ## Tarefa 4: `lib/api/client.ts` — o cliente único
 
 **Files:**
-- Create: `ArchSmart-web/src/lib/api/client.ts`
-- Create: `ArchSmart-web/src/lib/api/server.ts`
+- Create: `ArchSmart-web/src/lib/api/core.ts` — a fábrica isomórfica
+- Create: `ArchSmart-web/src/lib/api/client.ts` — a instância do browser
+- Create: `ArchSmart-web/src/lib/api/server.ts` — a instância do servidor
 - Test: `ArchSmart-web/src/__tests__/api-client.test.ts`
 
 **Interfaces:**
 - Consumes: `ApiError`, `erroDaResposta` (Tarefa 2); `getAccessToken`
-  (Tarefa 3); `apiUrl` de `@/lib/api-url`.
+  (Tarefa 3); `getApiUrl` de `@/lib/api-url`.
 - Produces:
-  - `type ValorDeQuery = string | number | boolean | string[] | undefined | null`
-  - `interface Requisicao { method?, body?, signal?, query?, fallbackDeErro? }`
-  - `function criarCliente(opts: OpcoesDoCliente): ClienteApi`
-  - `type ClienteApi = <T>(path: string, req?: Requisicao) => Promise<T>`
-  - `const api: ClienteApi` (browser) — em `client.ts`
-  - `const apiServer: ClienteApi` (servidor) — em `server.ts`
+  - `core.ts`: `ValorDeQuery`, `Requisicao`, `ClienteApi`, `OpcoesDoCliente`,
+    `criarCliente(opts)`
+  - `client.ts`: `const api: ClienteApi` (browser)
+  - `server.ts`: `const apiServer: ClienteApi` (servidor)
+
+> **Três arquivos, não dois — e o motivo é uma fronteira do Next.**
+> `auth.ts` carrega `"use client"` (Tarefa 3). Se `server.ts` importasse
+> `criarCliente` de `client.ts`, todo Server Component que usa `apiServer`
+> arrastaria `client.ts` → `auth.ts`, atravessando a fronteira de cliente e
+> avaliando `criarCliente({ resolverToken: getAccessToken })` no servidor com
+> `getAccessToken` já convertido em referência de cliente pelo bundler. Pode
+> até funcionar enquanto ninguém chamar `api()` no servidor — e é exatamente
+> o tipo de dependência frágil que quebra num build futuro sem erro claro.
+> `core.ts` **não importa `auth.ts` nem `auth.server.ts`**: recebe
+> `resolverToken` por parâmetro, então é neutro por construção, e cada ponta
+> amarra a sua própria instância.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -788,7 +799,7 @@ git commit -m "feat(api): auth.ts e auth.server.ts como ponto unico do Supabase,
 
 ```ts
 import { describe, it, expect, vi } from "vitest"
-import { criarCliente } from "@/lib/api/client"
+import { criarCliente } from "@/lib/api/core"
 import { ApiError } from "@/lib/api/errors"
 
 function clienteDeTeste(resposta: Response, token: string | undefined = "tok123") {
@@ -878,13 +889,14 @@ describe("criarCliente", () => {
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `cd ArchSmart-web && npx vitest run src/__tests__/api-client.test.ts`
-Expected: FAIL — `Failed to resolve import "@/lib/api/client"`
+Expected: FAIL — `Failed to resolve import "@/lib/api/core"`
 
-- [ ] **Step 3: Implementar `client.ts`**
+- [ ] **Step 3: Implementar `core.ts`, e depois as duas instâncias**
+
+`core.ts` — a fábrica. Note o que ela **não** importa: nada de `auth.ts`.
 
 ```ts
 import { erroDaResposta } from "@/lib/api/errors"
-import { getAccessToken } from "@/lib/api/auth"
 import { getApiUrl } from "@/lib/api-url"
 
 /**
@@ -963,6 +975,16 @@ export function criarCliente(opts: OpcoesDoCliente): ClienteApi {
     }
 }
 
+```
+
+`client.ts` — a instância do browser, três linhas:
+
+```ts
+"use client"
+
+import { criarCliente, type ClienteApi } from "@/lib/api/core"
+import { getAccessToken } from "@/lib/api/auth"
+
 /** Cliente do browser. Toda tela usa este. */
 export const api: ClienteApi = criarCliente({ resolverToken: getAccessToken })
 ```
@@ -970,7 +992,7 @@ export const api: ClienteApi = criarCliente({ resolverToken: getAccessToken })
 - [ ] **Step 4: Implementar `server.ts`**
 
 ```ts
-import { criarCliente, type ClienteApi } from "@/lib/api/client"
+import { criarCliente, type ClienteApi } from "@/lib/api/core"
 import { getServerAccessToken } from "@/lib/api/auth.server"
 
 /**
@@ -991,7 +1013,7 @@ Expected: PASS — 8 testes.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add ArchSmart-web/src/lib/api/client.ts ArchSmart-web/src/lib/api/server.ts ArchSmart-web/src/__tests__/api-client.test.ts
+git add ArchSmart-web/src/lib/api/core.ts ArchSmart-web/src/lib/api/client.ts ArchSmart-web/src/lib/api/server.ts ArchSmart-web/src/__tests__/api-client.test.ts
 git commit -m "feat(api): cliente HTTP unico com header, query, abort e erro tipado"
 ```
 
