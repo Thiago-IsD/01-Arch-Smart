@@ -1,12 +1,23 @@
 """
 Catraca dos portoes graduais do CI.
 
-Tres medidas que hoje estao vermelhas e nao podem piorar enquanto as secoes
+Medidas que hoje estao vermelhas e nao podem piorar enquanto as secoes
 que as consertam nao chegam (ver ADR 0006):
 
   - eslint_erros     93 hoje; as Secoes 5 e 6 derrubam
   - cores_literais   521 hoje; a Secao 6 zera, quando os tokens existirem
   - modulos_sem_doc  os 4 services de hoje; a Secao 8 documenta
+
+A Secao 5 acrescentou duas medidas, para telas que ainda usam o padrao
+manual (`fetch` cru, cliente Supabase direto) fora de `src/lib/api/`:
+
+  - fetch_fora_de_lib_api       nasce no numero medido nesta secao; a
+                                 Secao 8 zera, quando as ~30 telas migrarem
+  - supabase_fora_de_lib_api    nasceu em 0 nesta secao — depois das Tarefas
+                                 3 e 9, nenhuma chamada de `createBrowserClient`/
+                                 `createServerClient` sobrou fora de
+                                 src/lib/api/ e src/proxy.ts. Ja e catraca no
+                                 piso: qualquer reintroducao reprova.
 
 Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
@@ -38,6 +49,14 @@ SERVICES_API = RAIZ / "ArchSmart-api" / "app" / "services"
 FEATURES_WEB = RAIZ / "ArchSmart-web" / "src" / "features"
 DOCS_MODULOS = RAIZ / "docs" / "dev" / "modulos"
 
+LIB_API_WEB = RAIZ / "ArchSmart-web" / "src" / "lib" / "api"
+PROXY_WEB = RAIZ / "ArchSmart-web" / "src" / "proxy.ts"
+
+# `\bfetch\s*\(` nao casa "prefetch(": entre "pre" e "fetch" nao ha fronteira
+# de palavra. Casa `fetch(` e `client.fetch(`, que e o que queremos contar.
+RE_FETCH = re.compile(r"\bfetch\s*\(")
+RE_SUPABASE = re.compile(r"\bcreate(Browser|Server)Client\s*\(")
+
 _PREFIXOS = ("bg|text|border|ring|from|to|via|fill|stroke|outline|decoration"
              "|shadow|accent|caret|divide|placeholder")
 _PALETAS = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green"
@@ -49,6 +68,8 @@ CRITERIOS = {
     "eslint_erros": "soma de errorCount no `npx eslint . --format json`",
     "cores_literais": "regex de classe de paleta e de cor arbitraria em ArchSmart-web/src/**/*.{ts,tsx}",
     "modulos_sem_doc": "arquivo em app/services/ ou diretorio em src/features/ sem .md de mesmo nome em docs/dev/modulos/",
+    "fetch_fora_de_lib_api": "ocorrencias de `fetch(` em ArchSmart-web/src/**/*.{ts,tsx}, fora de src/lib/api/",
+    "supabase_fora_de_lib_api": "ocorrencias de `create{Browser,Server}Client(` fora de src/lib/api/ e src/proxy.ts",
 }
 
 
@@ -77,6 +98,23 @@ def contar_cores(raiz: Path) -> int:
     return total
 
 
+def contar_ocorrencias(raiz: Path, padrao: re.Pattern, isentos: tuple[Path, ...] = ()) -> int:
+    """Ocorrencias de `padrao` em .ts/.tsx sob `raiz`, fora dos caminhos isentos."""
+    if not raiz.exists():
+        raise DiretorioMedidoSumiu(
+            f"{raiz} nao existe. A catraca mede esse caminho; se ele foi renomeado, "
+            "atualize SRC_WEB em tools/catraca.py no mesmo commit do rename."
+        )
+    total = 0
+    for caminho in raiz.rglob("*"):
+        if caminho.suffix not in (".ts", ".tsx") or not caminho.is_file():
+            continue
+        if any(caminho == isento or isento in caminho.parents for isento in isentos):
+            continue
+        total += len(padrao.findall(caminho.read_text(encoding="utf-8", errors="ignore")))
+    return total
+
+
 def modulos_sem_doc(services: Path, features: Path | None, docs: Path) -> list[str]:
     """Modulos sem o .md correspondente em docs/dev/modulos/ (Art. 13)."""
     documentados = {p.stem for p in docs.glob("*.md")} if docs.exists() else set()
@@ -98,6 +136,8 @@ def medir(eslint_json: Path | None) -> dict:
     medido = {
         "cores_literais": contar_cores(SRC_WEB),
         "modulos_sem_doc": modulos_sem_doc(SERVICES_API, FEATURES_WEB, DOCS_MODULOS),
+        "fetch_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_FETCH, (LIB_API_WEB,)),
+        "supabase_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
     }
     if eslint_json is not None:
         relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))
