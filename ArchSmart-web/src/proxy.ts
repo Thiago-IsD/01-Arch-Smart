@@ -1,12 +1,43 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const ROTAS_PUBLICAS = [
+    "/", "/produto", "/precos", "/web-clipper", "/sobre", "/termos",
+    "/privacidade", "/legal", "/beta", "/beta/register", "/portal",
+    "/auth/login", "/auth/register", "/auth/verify", "/auth/recover",
+    "/auth/reset-password", "/auth/callback",
+];
+
+/** Rotas que processam token vindo do fragmento da URL — nao podem redirecionar. */
+const CALLBACKS_DE_AUTH = ["/auth/verify", "/auth/callback", "/auth/reset-password"];
+
+export function ehEstatico(pathname: string): boolean {
+    return (
+        pathname.startsWith("/_next") ||
+        pathname.startsWith("/api") ||
+        pathname.startsWith("/static") ||
+        pathname.startsWith("/assets") ||
+        pathname.includes(".")
+    );
+}
+
+export function ehRotaPublica(pathname: string): boolean {
+    return ROTAS_PUBLICAS.some((rota) =>
+        rota === "/" ? pathname === "/" : pathname === rota || pathname.startsWith(`${rota}/`),
+    );
+}
+
 export async function proxy(request: NextRequest) {
-    let response = NextResponse.next({
-        request: {
-            headers: request.headers,
-        },
-    });
+    const { pathname } = request.nextUrl;
+
+    // ORDEM IMPORTA, e esta e a correcao da Secao 5: o desvio de estatico e de
+    // /api acontece ANTES de montar o cliente Supabase e chamar getUser().
+    // Antes, toda requisicao de imagem, chunk de JS e chamada de API pagava uma
+    // ida ao Supabase para validar token que ela nem usaria.
+    if (ehEstatico(pathname)) return NextResponse.next();
+    if (CALLBACKS_DE_AUTH.includes(pathname)) return NextResponse.next();
+
+    let response = NextResponse.next({ request: { headers: request.headers } });
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,90 +48,26 @@ export async function proxy(request: NextRequest) {
                     return request.cookies.getAll();
                 },
                 setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+                    response = NextResponse.next({ request: { headers: request.headers } });
                     cookiesToSet.forEach(({ name, value, options }) =>
-                        request.cookies.set(name, value)
-                    );
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
+                        response.cookies.set(name, value, options),
                     );
                 },
             },
-        }
+        },
     );
 
-    let user = null;
-    if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "dummy_anon_key") {
-        const mockCookie = request.cookies.get("sb-access-token");
-        console.log("Mock check in middleware. Cookie:", mockCookie);
-        if (mockCookie && mockCookie.value) {
-            user = { id: "00000000-0000-0000-0000-000000000000", email: "email@email.com" };
-        }
-        console.log("Mock user assigned:", user);
-    } else {
-        const { data } = await supabase.auth.getUser();
-        user = data.user;
-    }
+    // getUser() fica: e a verificacao real do token contra o Supabase. Trocar
+    // por getSession() aqui seria trocar seguranca por velocidade — o cookie
+    // sozinho nao prova nada.
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
 
-    console.log(`Middleware path: ${request.nextUrl.pathname}, User:`, user ? "Logged in" : "Not logged in");
-
-    // Public Routes (Allow access without login)
-    const publicRoutes = [
-        "/",
-        "/produto",
-        "/precos",
-        "/web-clipper",
-        "/sobre",
-        "/termos",
-        "/privacidade",
-        "/legal",
-        "/beta",
-        "/beta/register",
-        "/portal", // View pública da apresentação (cliente, sem login)
-        "/auth/login",
-        "/auth/register",
-        "/auth/verify", // <--- CRITICAL: Magic Link lands here
-        "/auth/recover",
-        "/auth/reset-password",
-        "/auth/callback", // Supabase Auth Callback
-    ];
-
-    const isPublicRoute = publicRoutes.some((route) => {
-        if (route === "/") {
-            return request.nextUrl.pathname === "/";
-        }
-        return request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route + "/");
-    });
-
-    // Allow static assets and API routes to pass through
-    if (
-        request.nextUrl.pathname.startsWith("/_next") ||
-        request.nextUrl.pathname.startsWith("/api") ||
-        request.nextUrl.pathname.startsWith("/static") ||
-        request.nextUrl.pathname.includes(".") // Files like favicon.ico, etc.
-    ) {
-        return response;
-    }
-
-    // CRITICAL: Allow auth callback routes to process tokens from URL fragments
-    // These routes handle magic links and password resets with tokens in the hash
-    const authCallbackRoutes = ["/auth/verify", "/auth/callback", "/auth/reset-password"];
-    if (authCallbackRoutes.some(route => request.nextUrl.pathname === route)) {
-        return response;
-    }
-
-    // Redirect Logic
-    if (!user && !isPublicRoute) {
-        // If user is not logged in and tries to access a protected route, redirect to login
+    if (!user && !ehRotaPublica(pathname)) {
         return NextResponse.redirect(new URL("/auth/login", request.url));
     }
-
-    if (user && request.nextUrl.pathname.startsWith("/auth/login")) {
-        // If user IS logged in and tries to access login, send to dashboard
+    if (user && pathname.startsWith("/auth/login")) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
@@ -108,13 +75,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
-        "/((?!_next/static|_next/image|favicon.ico).*)",
-    ],
+    matcher: ["/((?!_next/static|_next/image|assets|favicon.ico).*)"],
 };
