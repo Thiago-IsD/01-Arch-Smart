@@ -578,7 +578,7 @@ export async function erroDaResposta(res: Response, fallback?: string): Promise<
 - [ ] **Step 4: Rodar e ver passar**
 
 Run: `cd ArchSmart-web && npx vitest run src/__tests__/api-errors.test.ts`
-Expected: PASS — 9 testes.
+Expected: PASS — 8 testes.
 
 - [ ] **Step 5: Commit**
 
@@ -1490,7 +1490,8 @@ describe("useInboxCount", () => {
 - [ ] **Step 5: Rodar e ver falhar, depois passar**
 
 Run: `cd ArchSmart-web && npx vitest run src/__tests__/library-hooks.test.tsx`
-Expected: primeiro FAIL (import não resolve), depois PASS — 4 testes.
+Expected: primeiro FAIL (import não resolve), depois PASS — 6 testes (4 dos hooks
+mais os 2 de `filtrosDaUrl` do Step 1B).
 
 - [ ] **Step 6: Reescrever `LibraryContent.tsx` para usar os hooks**
 
@@ -1826,7 +1827,7 @@ export function useAmbientesDoProjeto(projectId: string | undefined) {
 - [ ] **Step 5: Rodar e ver passar**
 
 Run: `cd ArchSmart-web && npx vitest run src/__tests__/library-hooks.test.tsx`
-Expected: PASS — 6 testes.
+Expected: PASS — 8 testes (os 6 da Tarefa 6 mais os 2 desta).
 
 - [ ] **Step 6: Migrar os seis componentes**
 
