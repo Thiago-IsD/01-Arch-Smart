@@ -1,8 +1,11 @@
+import logging
 import os
 import httpx
 from fastapi import HTTPException
 from dotenv import load_dotenv
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Force load .env
 load_dotenv()
@@ -47,14 +50,12 @@ class SupabaseAuthService:
             "Content-Type": "application/json"
         }
         
-        # DEBUG PRINTS
-        print(f"\n🚀 DEBUG ADMIN UPDATE:")
-        print(f"URL: {url}")
-        
+        logger.debug("Admin update: PUT %s", url)
+
         async with httpx.AsyncClient() as client:
             response = await client.put(url, json=attributes, headers=headers)
-            
-            print(f"⬅️ ADMIN RESPONSE: {response.status_code}")
+
+            logger.debug("Admin update respondeu com status %s", response.status_code)
             if response.status_code not in [200, 201]:
                  raise Exception(f"Admin Update Error: {response.text}")
             return response.json()
@@ -93,22 +94,17 @@ class SupabaseAuthService:
         if headers:
             merged_headers.update(headers)
             
-        # DEBUG PRINTS
-        print(f"\n🚀 DEBUG PUT REQUEST:")
-        print(f"URL: {url}")
-        print(f"Headers: {merged_headers}")
-        print(f"Payload: {json_data}")
+        # Sem log de headers nem de payload aqui: headers carrega o Bearer
+        # token (do usuario ou a service role key) e o payload pode conter a
+        # nova senha, quando esta chamada vem de troca de senha.
+        logger.debug("Enviando PUT para %s", url)
 
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(url, json=json_data, headers=merged_headers)
-                
-                print(f"⬅️ DEBUG RESPONSE: {response.status_code}")
-                try:
-                    print(f"Body: {response.json()}")
-                except:
-                    print(f"Text: {response.text}")
-                    
+
+                logger.debug("PUT %s respondeu com status %s", url, response.status_code)
+
                 if response.status_code not in [200, 201]:
                     try:
                         error_data = response.json()
@@ -164,9 +160,10 @@ class SupabaseAuthService:
         
         if redirect_to:
             payload["options"]["email_redirect_to"] = redirect_to
-        
-        print(f"📧 SIGNUP PAYLOAD: {payload}")
-        
+
+        # Sem log do payload: ele carrega a senha temporaria gerada acima.
+        logger.debug("Enviando cadastro com confirmacao por e-mail para %s", email)
+
         return await self._post("/signup", payload)
 
     async def sign_in_with_otp(self, email: str, redirect_to: str = None):
@@ -177,7 +174,7 @@ class SupabaseAuthService:
         Type: "magiclink"
         """
         if settings.DATABASE_URL.startswith("sqlite"):
-            print("[MOCK] OTP ACTIVATED")
+            logger.debug("Modo mock ativo: simulando envio de OTP")
             # Fake successful OTP request
             return {"message": "Mock OTP sent successfully"}
 
@@ -203,7 +200,7 @@ class SupabaseAuthService:
         Endpoint: POST /signup
         """
         if settings.DATABASE_URL.startswith("sqlite"):
-            print("[MOCK] SIGN_UP ACTIVATED")
+            logger.debug("Modo mock ativo: simulando cadastro por senha")
             return {
                 "user": {
                     "id": "00000000-0000-0000-0000-000000000000",
@@ -235,7 +232,7 @@ class SupabaseAuthService:
         Endpoint: POST /token?grant_type=password
         """
         if settings.DATABASE_URL.startswith("sqlite"):
-            print("[MOCK] LOGIN ACTIVATED")
+            logger.debug("Modo mock ativo: simulando login")
             import base64
             import json
             

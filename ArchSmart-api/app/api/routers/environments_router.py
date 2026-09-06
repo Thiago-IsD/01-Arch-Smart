@@ -1,88 +1,72 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, status
 from uuid import UUID
 from typing import List
 
-from app.db.session import get_db
-from app.models.all_models import Environment, EnvironmentDNA, Project, User
+from app.db.repository import ScopedRepository, get_repo
+from app.models.all_models import Environment, EnvironmentDNA, Project
 from app.schemas.environment_schema import EnvironmentCreate, EnvironmentResponse, EnvironmentDNAUpdate, EnvironmentDNAResponse
-from app.api.users import get_current_user
 
 router = APIRouter()
 
 @router.post("/projects/{project_id}/environments", response_model=EnvironmentResponse, status_code=status.HTTP_201_CREATED)
 def create_environment(
-    project_id: UUID, 
+    project_id: UUID,
     data: EnvironmentCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     # Verify if project exists and user has access (simplified for MVP: user -> account -> project)
-    project = db.query(Project).filter(Project.id == project_id, Project.account_id == current_user.account_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = repo.obter(Project, project_id)
 
     # Create Environment
-    new_env = Environment(
+    new_env = repo.create(
+        Environment,
         project_id=project_id,
         name=data.name,
-        type=data.type
+        type=data.type,
     )
-    db.add(new_env)
-    db.flush() # flush to get the new_env.id before committing
+    repo.db.flush() # flush to get the new_env.id before committing
 
     # DNA: usa os valores enviados no cadastro (opcionais) ou inicia zerado.
     floor = data.dna.floor_area if data.dna else 0.0
     wall = data.dna.wall_area if data.dna else 0.0
     ceiling = data.dna.ceiling_area if data.dna else 0.0
 
-    new_dna = EnvironmentDNA(
+    repo.create(
+        EnvironmentDNA,
         environment_id=new_env.id,
         floor_area=floor,
         wall_area=wall,
         ceiling_area=ceiling,
-        is_complete=(floor > 0 and wall > 0 and ceiling > 0)
+        is_complete=(floor > 0 and wall > 0 and ceiling > 0),
     )
-    db.add(new_dna)
-    db.commit()
-    db.refresh(new_env)
+    repo.db.commit()
+    repo.db.refresh(new_env)
 
     return new_env
 
 @router.get("/projects/{project_id}/environments", response_model=List[EnvironmentResponse])
 def get_environments(
     project_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    project = db.query(Project).filter(Project.id == project_id, Project.account_id == current_user.account_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    repo.obter(Project, project_id)
 
-    environments = db.query(Environment).filter(Environment.project_id == project_id).all()
+    environments = repo.query(Environment).filter(Environment.project_id == project_id).all()
     return environments
 
 @router.put("/environments/{env_id}/dna", response_model=EnvironmentDNAResponse)
 def update_environment_dna(
     env_id: UUID,
     data: EnvironmentDNAUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     # Retrieve environment with access check
-    env = db.query(Environment).join(Project).filter(
-        Environment.id == env_id,
-        Project.account_id == current_user.account_id
-    ).first()
-    
-    if not env:
-        raise HTTPException(status_code=404, detail="Environment not found")
+    env = repo.obter(Environment, env_id)
 
-    dna = db.query(EnvironmentDNA).filter(EnvironmentDNA.environment_id == env_id).first()
+    dna = repo.query(EnvironmentDNA).filter(EnvironmentDNA.environment_id == env_id).first()
     if not dna:
         # Should never happen if creation logic was followed, but safe fallback
-        dna = EnvironmentDNA(environment_id=env_id)
-        db.add(dna)
+        dna = repo.create(EnvironmentDNA, environment_id=env_id)
 
     # Update areas
     dna.floor_area = data.floor_area
@@ -95,24 +79,17 @@ def update_environment_dna(
     else:
         dna.is_complete = False
 
-    db.commit()
-    db.refresh(dna)
+    repo.db.commit()
+    repo.db.refresh(dna)
     return dna
 
 @router.delete("/environments/{env_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_environment(
     env_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    env = db.query(Environment).join(Project).filter(
-        Environment.id == env_id,
-        Project.account_id == current_user.account_id
-    ).first()
-    
-    if not env:
-        raise HTTPException(status_code=404, detail="Environment not found")
+    env = repo.obter(Environment, env_id)
 
-    db.delete(env) # Also deletes EnvironmentDNA due to cascade="all, delete-orphan" inside all_models.py
-    db.commit()
+    repo.remover(env) # Also deletes EnvironmentDNA due to cascade="all, delete-orphan" inside all_models.py
+    repo.db.commit()
     return None

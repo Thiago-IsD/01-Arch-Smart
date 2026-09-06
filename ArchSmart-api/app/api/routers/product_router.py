@@ -1,18 +1,18 @@
+import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 import time
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.db.session import get_db
+from app.core.errors import ValidacaoDeDominio
+from app.db.repository import ScopedRepository, get_repo
 from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
-from app.api.users import get_current_user
-from app.models.all_models import User
 from app.core.rate_limit import limiter
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/", response_model=PaginatedProductResponse)
 def get_products(
@@ -23,12 +23,10 @@ def get_products(
     categories: Optional[List[str]] = Query(None, description="Filter by categories"),
     origins: Optional[List[str]] = Query(None, description="Filter by origins"),
     sort_by: Optional[str] = Query("created_at_desc", description="Sort products"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    query = db.query(Product).join(ProductState).filter(
+    query = repo.query(Product).join(ProductState).filter(
         ProductState.status == state,
-        Product.account_id == current_user.account_id
     )
 
     if q:
@@ -77,17 +75,10 @@ def get_products(
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(
-    product_id: UUID, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    product_id: UUID,
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    product = db.query(Product).filter(
-        Product.id == product_id,
-        Product.account_id == current_user.account_id
-    ).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    return repo.obter(Product, product_id)
 
 from app.services.ai_service import (
     AIConfigError,
@@ -126,7 +117,7 @@ AI_ERROR_RESPONSES = {
 async def normalize_product(
     request: Request,
     payload: NormalizeRequest,
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
     try:
         return await extract_product_data(payload.text, payload.source_url)
@@ -136,13 +127,17 @@ async def normalize_product(
 
 @router.post("/", response_model=ProductResponse)
 def create_product(
-    product: ProductCreate, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    product: ProductCreate,
+    repo: ScopedRepository = Depends(get_repo),
 ):
+    db = repo.db
+
     # Verify/Get State ID provided or Default to NORMALIZED
     state_id = product.state_id
     if not state_id:
+        # Catalogo global: product_states nao tem account_id, entao
+        # repo.query() levantaria EscopoImpossivel. Excecao deliberada, nao
+        # esquecimento.
         normalized_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.NORMALIZED).first()
         if not normalized_state:
             # Fallback or initialization if not exists
@@ -155,6 +150,9 @@ def create_product(
     # Verify/Get Origin ID provided or Default to MANUAL
     origin_id = product.origin_id
     if not origin_id:
+        # Catalogo global: product_origins nao tem account_id, entao
+        # repo.query() levantaria EscopoImpossivel. Excecao deliberada, nao
+        # esquecimento.
         manual_origin = db.query(ProductOrigin).filter(ProductOrigin.type == ProductOriginType.MANUAL).first()
         if not manual_origin:
              manual_origin = ProductOrigin(name="Manual", type=ProductOriginType.MANUAL)
@@ -165,54 +163,44 @@ def create_product(
 
     # Ensure we use the latest Pydantic V2 method
     product_data = product.model_dump(exclude={'state_id', 'origin_id', 'account_id'})
-    
-    db_product = Product(
+
+    db_product = repo.create(
+        Product,
         **product_data,
-        account_id=current_user.account_id,
         state_id=state_id,
-        origin_id=origin_id
+        origin_id=origin_id,
     )
-    db.add(db_product)
     db.commit()
     db.refresh(db_product)
     return db_product
 
 @router.put("/{product_id}", response_model=ProductResponse)
 def update_product(
-    product_id: UUID, 
-    product_update: ProductUpdate, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    product_id: UUID,
+    product_update: ProductUpdate,
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    db_product = db.query(Product).filter(
-        Product.id == product_id,
-        Product.account_id == current_user.account_id
-    ).first()
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
+    db_product = repo.obter(Product, product_id)
+
     update_data = product_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_product, key, value)
 
-    db.commit()
-    db.refresh(db_product)
+    repo.db.commit()
+    repo.db.refresh(db_product)
     return db_product
 
 @router.delete("/{product_id}")
 def delete_product(
-    product_id: UUID, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    product_id: UUID,
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    db_product = db.query(Product).filter(
-        Product.id == product_id,
-        Product.account_id == current_user.account_id
-    ).first()
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Product not found")
+    db_product = repo.obter(Product, product_id)
+    db = repo.db
 
     # Soft delete: Set state to INACTIVE
+    # Catalogo global: product_states nao tem account_id, entao repo.query()
+    # levantaria EscopoImpossivel. Excecao deliberada, nao esquecimento.
     inactive_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.INACTIVE).first()
     if not inactive_state:
         inactive_state = ProductState(name="Inactive", status=ProductStateStatus.INACTIVE)
@@ -243,14 +231,16 @@ class BatchApproveResponse(BaseModel):
 @router.patch("/batch-approve", response_model=BatchApproveResponse)
 def batch_approve_products(
     payload: BatchApproveRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Aprova (normaliza) varios produtos capturados de uma vez, em um unico
     round-trip. Aplica os campos editados de cada item e move para NORMALIZED.
     Ignora itens que nao existem/nao pertencem a conta (retornados em not_found).
     """
+    db = repo.db
+    # Catalogo global: product_states nao tem account_id, entao repo.query()
+    # levantaria EscopoImpossivel. Excecao deliberada, nao esquecimento.
     normalized_state = db.query(ProductState).filter(
         ProductState.status == ProductStateStatus.NORMALIZED
     ).first()
@@ -264,10 +254,7 @@ def batch_approve_products(
     not_found: List[UUID] = []
 
     for item in payload.items:
-        db_product = db.query(Product).filter(
-            Product.id == item.id,
-            Product.account_id == current_user.account_id
-        ).first()
+        db_product = repo.get(Product, item.id)
         if not db_product:
             not_found.append(item.id)
             continue
@@ -283,31 +270,28 @@ def batch_approve_products(
 
 @router.patch("/{product_id}/approve", response_model=ProductResponse)
 def approve_product(
-    product_id: UUID, 
-    product_update: ProductUpdate, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    product_id: UUID,
+    product_update: ProductUpdate,
+    repo: ScopedRepository = Depends(get_repo),
 ):
-    db_product = db.query(Product).filter(
-        Product.id == product_id,
-        Product.account_id == current_user.account_id
-    ).first()
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
+    db_product = repo.obter(Product, product_id)
+    db = repo.db
+
     # Update fields
     update_data = product_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_product, key, value)
-        
+
     # Set status to NORMALIZED
+    # Catalogo global: product_states nao tem account_id, entao repo.query()
+    # levantaria EscopoImpossivel. Excecao deliberada, nao esquecimento.
     normalized_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.NORMALIZED).first()
     if not normalized_state:
         normalized_state = ProductState(name="Normalized", status=ProductStateStatus.NORMALIZED)
         db.add(normalized_state)
         db.commit()
         db.refresh(normalized_state)
-        
+
     db_product.state_id = normalized_state.id
     db.commit()
     db.refresh(db_product)
@@ -323,26 +307,32 @@ class ClipperCaptureRequest(BaseModel):
 @router.post("/clipper/capture", status_code=201)
 async def clipper_capture(
     request: ClipperCaptureRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    repo: ScopedRepository = Depends(get_repo),
 ):
+    db = repo.db
     try:
         # Get State
+        # Catalogo global: product_states nao tem account_id, entao
+        # repo.query() levantaria EscopoImpossivel. Excecao deliberada, nao
+        # esquecimento.
         captured_state = db.query(ProductState).filter(ProductState.status == ProductStateStatus.CAPTURED).first()
         if not captured_state:
             captured_state = ProductState(name="Captured", status=ProductStateStatus.CAPTURED)
             db.add(captured_state)
-            
+
         # Get Origin
+        # Catalogo global: product_origins nao tem account_id, entao
+        # repo.query() levantaria EscopoImpossivel. Excecao deliberada, nao
+        # esquecimento.
         clipper_origin = db.query(ProductOrigin).filter(ProductOrigin.type == ProductOriginType.WEB_CLIPPER).first()
         if not clipper_origin:
             clipper_origin = ProductOrigin(name="Web Clipper", type=ProductOriginType.WEB_CLIPPER)
             db.add(clipper_origin)
-            
+
         db.commit()
-        
-        new_product = Product(
-            account_id=current_user.account_id,
+
+        new_product = repo.create(
+            Product,
             name=request.name[:255] if request.name else "Captura sem título",
             store=None,  # Or parse from URL later
             source_url=request.source_url,
@@ -352,10 +342,10 @@ async def clipper_capture(
             state_id=captured_state.id,
             origin_id=clipper_origin.id
         )
-        db.add(new_product)
         db.commit()
         db.refresh(new_product)
         return {"status": "success", "product_id": str(new_product.id)}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Falha ao processar produto capturado", exc_info=e)
+        raise ValidacaoDeDominio("Não foi possível processar o produto.")

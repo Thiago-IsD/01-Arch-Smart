@@ -1,39 +1,42 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
-from sqlalchemy.orm import Session
 from typing import Optional
 import uuid
 from pathlib import Path
 
-from app.db.session import get_db
-from app.models.all_models import User, Account
+from app.core.errors import ValidacaoDeDominio
+from app.db.repository import ScopedRepository, get_repo
+from app.models.all_models import Account
 from app.schemas.account import AccountBrandingUpdate, AccountBrandingResponse
 from app.services.auth_service import auth_service
 from app.utils.supabase_client import get_storage_client
 
 
-from app.api.users import get_current_user
-
-
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.put("/branding", response_model=AccountBrandingResponse)
 async def update_account_branding(
     company_name: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Update account branding (company name and/or logo).
     Uploads logo to Supabase Storage bucket 'secure.files'.
     """
-    # Get account
-    account = db.query(Account).filter(Account.id == current_user.account_id).first()
-    
+    db = repo.db
+    # `accounts` e a unica tabela sem account_id — ela E a conta. Chegar nela
+    # pelo ctx.account_id do contexto e o caminho certo; repo.query(Account)
+    # levantaria EscopoImpossivel. Busca por chave primaria (Session.get),
+    # nao por filtro manual — dispensa a excecao de query direta.
+    account = db.get(Account, repo.ctx.account_id)
+
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    
+
     # Update company_name if provided
     if company_name is not None:
         account.company_name = company_name
@@ -56,9 +59,9 @@ async def update_account_branding(
         
         # Read file content
         try:
-            print(f"📂 Uploading file: {unique_filename} to path: {storage_path}")
+            logger.debug("Enviando arquivo %s para %s", unique_filename, storage_path)
             file_bytes = await file.read()
-            
+
             # Upload to Supabase Storage
             storage_client = get_storage_client()
             await storage_client.upload_file(
@@ -67,17 +70,14 @@ async def update_account_branding(
                 file_bytes=file_bytes,
                 content_type=file.content_type or "image/png"
             )
-            print(f"✅ Upload successful. Path: {storage_path}")
-            
+            logger.debug("Upload concluido: %s", storage_path)
+
             # Store PATH in database (not URL)
             account.logo_url = storage_path
-            
+
         except Exception as e:
-            print(f"❌ Upload failed: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to upload file: {str(e)}"
-            )
+            logger.error("Falha ao subir o logo da conta", exc_info=e)
+            raise ValidacaoDeDominio("Não foi possível enviar o arquivo.")
     
     # Commit changes
     db.commit()
@@ -106,18 +106,22 @@ async def update_account_branding(
 
 @router.delete("", status_code=204)
 async def delete_account(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Soft delete account.
     Marks account as inactive.
     """
-    account = db.query(Account).filter(Account.id == current_user.account_id).first()
-    
+    db = repo.db
+    # `accounts` e a unica tabela sem account_id — ela E a conta. Chegar nela
+    # pelo ctx.account_id do contexto e o caminho certo; repo.query(Account)
+    # levantaria EscopoImpossivel. Busca por chave primaria (Session.get),
+    # nao por filtro manual — dispensa a excecao de query direta.
+    account = db.get(Account, repo.ctx.account_id)
+
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-        
+
     account.is_active = False
     db.commit()
     return None

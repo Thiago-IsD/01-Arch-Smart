@@ -1,12 +1,16 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.core.errors import ValidacaoDeDominio
+from app.db.repository import ScopedRepository, get_repo
 from app.db.session import get_db
 from app.models.all_models import User, Account
 from app.schemas.user import ChangePasswordRequest, UserLogin, UserSignup, MagicLinkRequest, RecoverRequest, CompleteRegisterRequest
-from app.api.users import get_current_user
 from app.services.auth_service import auth_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/register-request")
 async def register_request(payload: MagicLinkRequest):
@@ -22,7 +26,8 @@ async def register_request(payload: MagicLinkRequest):
             redirect_to=redirect
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error("Falha ao iniciar cadastro por magic link", exc_info=e)
+        raise ValidacaoDeDominio("Não foi possível iniciar o cadastro.")
 
 @router.post("/recover-request")
 async def recover_request(payload: RecoverRequest):
@@ -32,7 +37,8 @@ async def recover_request(payload: RecoverRequest):
     try:
         return await auth_service.reset_password_email(email=payload.email)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error("Falha ao iniciar recuperacao de senha", exc_info=e)
+        raise ValidacaoDeDominio("Não foi possível iniciar a recuperação de senha.")
 
 @router.post("/complete-register")
 async def complete_register(payload: CompleteRegisterRequest, db: Session = Depends(get_db)):
@@ -59,12 +65,26 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         supabase_id = user_data["id"]
         email = user_data.get("email")
         
-        # Check if user already exists in our database
-        existing_user = db.query(User).filter(User.supabase_id == supabase_id).first()
-        
+        # Cadastro: acontece ANTES de existir sessao, entao nao ha RequestContext
+        # nem repositorio. A protecao aqui e a do Supabase Auth, nao a do escopo
+        # por conta.
+        existing_user = db.query(User).filter(User.supabase_id == supabase_id).first()  # pre-sessao: sem account_id ainda
+
         if not existing_user and email:
-            # Also check by email (for migration cases)
-            existing_user = db.query(User).filter(User.email == email).first()
+            # ATENCAO: isto NAO e a mesma excecao de pre-sessao da linha
+            # acima. A linha 71 resolve por supabase_id (seguro); esta
+            # resolve por E-MAIL e, se achar, sobrescreve o supabase_id e o
+            # full_name da linha encontrada com os dados de quem apresentou
+            # o token — o mesmo padrao que a Tarefa 2 removeu de
+            # security.py. E o unico caminho de resolucao-por-e-mail que
+            # sobra na API; a protecao dele mora fora do repositorio, no
+            # toggle "Confirm email" do painel do Supabase. Pendencia de
+            # seguranca conhecida e registrada, nao um esquecimento desta
+            # conversao — o que fazer com o caminho legado de migracao e
+            # decisao de Thiago, nao de uma rodada de conversao. Ver
+            # docs/dev/arquitetura.md, secao "Resolvido em 05/09/2026: o
+            # auto-link por e-mail em app/api/users.py".
+            existing_user = db.query(User).filter(User.email == email).first()  # pre-sessao: sem account_id ainda
             if existing_user:
                 # Link supabase_id
                 existing_user.supabase_id = supabase_id
@@ -91,9 +111,9 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            print(f"✅ Created new user in database: {new_user.id} ({email})")
-        
-        
+            logger.debug("Novo usuario criado no banco: %s", new_user.id)
+
+
         # Return response with email for auto-login
         return {
             **supabase_response,
@@ -101,8 +121,8 @@ async def complete_register(payload: CompleteRegisterRequest, db: Session = Depe
         }
     except Exception as e:
         db.rollback()
-        print(f"❌ Error in complete-register: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error("Falha ao concluir cadastro", exc_info=e)
+        raise ValidacaoDeDominio("Não foi possível concluir o cadastro.")
 
 @router.post("/login")
 async def login(payload: UserLogin):
@@ -175,24 +195,28 @@ async def signup(payload: UserSignup, db: Session = Depends(get_db)):
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            print(f"✅ Created user in database: {new_user.id} ({email})")
-        
+            logger.debug("Usuario criado no banco: %s", new_user.id)
+
         return supabase_response
     except Exception as e:
         db.rollback()
-        print(f"❌ Error in signup: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error("Falha ao criar conta no cadastro por senha", exc_info=e)
+        # Desvio deliberado da mensagem do brief ("Nao foi possivel entrar.
+        # Verifique e-mail e senha.") — aquela e uma mensagem de LOGIN, e este
+        # bloco e o de signup (cria conta nova). Ver task-5-report.md.
+        raise ValidacaoDeDominio("Não foi possível criar a conta. Tente novamente.")
 
 @router.post("/change-password")
 async def change_password(
     password_data: ChangePasswordRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    repo: ScopedRepository = Depends(get_repo),
 ):
     """
     Change current user's password.
     Verifies old password by attempting a silent login.
     """
+    current_user = repo.obter(User, repo.ctx.user_id)
+
     # 1. Verify old password
     try:
         await auth_service.sign_in_with_password(
@@ -206,7 +230,7 @@ async def change_password(
     try:
         # Strategy: Use Service Role (Admin) to force update
         # We already verified the user knows the old password above.
-        
+
         await auth_service.admin_update_user(
             user_id=str(current_user.supabase_id),
             attributes={"password": password_data.new_password}
@@ -214,5 +238,5 @@ async def change_password(
         
         return {"message": "Senha alterada com sucesso."}
     except Exception as e:
-        print(f"❌ Error changing password: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao alterar senha: {str(e)}")
+        logger.error("Falha ao alterar senha", exc_info=e)
+        raise ValidacaoDeDominio("Não foi possível alterar a senha.")

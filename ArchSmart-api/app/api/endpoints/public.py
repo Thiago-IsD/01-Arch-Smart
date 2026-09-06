@@ -1,7 +1,36 @@
 """
-Endpoint público (sem autenticação) para o Portal do Cliente.
-GET /public/presentations/{uuid}
+Endpoints públicos (sem autenticação) para o Portal do Cliente — 7 rotas,
+todas sob o prefixo /public: GET /presentations/{uuid}, POST
+/presentations/{uuid}/verify-password, POST
+/presentations/{uuid}/options/{option_id}/select, .../approve, .../reject,
+POST /presentations/{uuid}/accept e GET /presentations/{uuid}/comments.
+
+Portal publico da apresentacao — o lado do CLIENTE FINAL.
+
+Este e o unico modulo de endpoint que NAO usa ScopedRepository, e nao e
+esquecimento. Quem chama aqui nao tem conta: e o cliente do arquiteto, que
+entrou com a senha da apresentacao e carrega um token de portal
+(app/core/portal_security.py). Nao existe `account_id` de sessao para filtrar.
+
+O escopo aqui e "esta apresentacao, e o que pende dela", e quem o autoriza e
+`verify_portal_token(token, presentation_id)`. Toda query desce a partir da
+apresentacao ja autorizada — nunca de um id que veio solto do cliente.
+
+Os 10 testes de tests/isolation/test_portal_access.py sao a prova disso, e os
+4 de tests/isolation/test_public_endpoints.py cobrem o rate limit.
+
+**Nao "conserte" isto trocando db.query por repo.query.** Nao ha repo. A
+tentativa levantaria EscopoImpossivel na primeira requisicao.
+
+Isto e permanente, nao transitorio. Diferente do db.query que
+budgets_router.py carregou entre as Tarefas 8 e 12 — que era divida a pagar —,
+aqui nao ha divida nenhuma: nao existe RequestContext para injetar, porque
+nao existe sessao de conta. Por isso este arquivo esta em FORA_DO_LINT
+(tests/test_arquitetura.py) — o lint que pergunta "e query direta sobre model
+com account_id?" nunca deveria alcançar este modulo, porque aqui nunca ha
+conta para filtrar por ela.
 """
+import logging
 import uuid as uuid_module
 from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
@@ -15,11 +44,16 @@ from app.models.all_models import (
     Project, Budget, BudgetItem, ItemOption, Product,
     PresentationAcceptance, Notification, PresentationComment
 )
-from app.services.budget_calculator import calculate_budget_item_quantity
+from app.services.budget_calculator import (
+    calculate_quantity,
+    carregar_orcamento,
+    produto_selecionado,
+)
 from app.utils.supabase_client import get_storage_client
 from app.core.rate_limit import limiter, chave_por_apresentacao
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ==================== Schemas de Resposta Públicos ====================
 
@@ -74,7 +108,7 @@ class PublicEnvironmentInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 class PublicBrandingInfo(BaseModel):
-    office_name: Optional[str] = "Arch Smart"
+    office_name: Optional[str] = "Arq Smart"
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None
     
@@ -203,11 +237,10 @@ async def get_public_presentation(
             if signed_url:
                 logo_url = signed_url
         except Exception as e:
-            # repr() escapa não-ASCII (\uXXXX) para não estourar em consoles cp1252 (Windows).
-            print("[WARN] Erro ao assinar logo no portal:", repr(str(e))[:300])
+            logger.warning("Falha ao assinar logo no portal: %s", e)
 
     branding = PublicBrandingInfo(
-        office_name=office_name or "Arch Smart",
+        office_name=office_name or "Arq Smart",
         logo_url=logo_url,
         cover_url=branding_snapshot.get("cover_url"),
     )
@@ -253,23 +286,22 @@ async def get_public_presentation(
         budget = db.query(Budget).filter(Budget.project_id == presentation.project_id).first()
 
         if budget:
-            items = (
-                db.query(BudgetItem)
-                .options(
-                    joinedload(BudgetItem.options).joinedload(ItemOption.product)
-                )
-                .filter(
+            # O portal nunca tem RequestContext: a query aqui e sempre db.query,
+            # autorizada pelo token de portal, nao por conta.
+            itens, dnas = carregar_orcamento(
+                db.query(BudgetItem).filter(
                     BudgetItem.budget_id == budget.id,
                     BudgetItem.environment_id.in_(visible_env_real_ids)
                 )
-                .all()
             )
 
-            for item in items:
+            for item in itens:
                 # Calcular quantidade de forma segura
                 try:
-                    calc = calculate_budget_item_quantity(db, item)
-                    calculated_qty = calc.get("calculated_quantity")
+                    calculo = calculate_quantity(
+                        item, dnas.get(item.environment_id), produto_selecionado(item)
+                    )
+                    calculated_qty = calculo.calculated_quantity
                 except Exception:
                     calculated_qty = 0
 
@@ -474,6 +506,7 @@ async def accept_public_presentation(
     client_ip = request.client.host if request.client else "unknown"
     
     acceptance = PresentationAcceptance(
+        account_id=presentation.account_id,
         presentation_id=presentation.id,
         accepted=payload.accepted,
         feedback=payload.feedback,
@@ -481,10 +514,11 @@ async def accept_public_presentation(
         selected_options_snapshot=payload.selected_options
     )
     db.add(acceptance)
-    
+
     # 2.5: Gravar o comentário inicial da Thread (Se houver feedback escrito)
     if payload.feedback and str(payload.feedback).strip():
         first_comment = PresentationComment(
+            account_id=presentation.account_id,
             presentation_id=presentation.id,
             author_type="CLIENT",
             text=str(payload.feedback).strip()

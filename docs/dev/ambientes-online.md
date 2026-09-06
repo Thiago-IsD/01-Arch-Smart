@@ -301,17 +301,29 @@ migrações funciona do zero antes de apostar produção nela.
 
    | Ambiente | Postgres | Como foi obtido |
    |---|---|---|
-   | Banco de teste (`docker-compose.test.yml`) | **16** | imagem `pgvector/pgvector:pg16` |
+   | Banco de teste (`docker-compose.test.yml`) | **17** | imagem `pgvector/pgvector:pg17` |
    | Stack Supabase local (`supabase start`) | **17** | a CLI rejeita 16; ver `supabase/config.toml` |
    | Staging (`ipbhtqzybgdltewwnvnl`) | **17.6** | `SHOW server_version` |
    | Produção (`wokgnojyrpzndtxzvfcz`) | **17.6** | `SHOW server_version` |
 
-   Isso não é burocracia, e a previsão que estava escrita aqui se confirmou:
-   **quem diverge agora é o banco de teste**, sozinho num major mais velho, já
-   que os dois projetos novos nasceram em 17. Vale alinhar o
-   `docker-compose.test.yml` — **numa tarefa dedicada**, não de passagem,
-   porque trocar a imagem do Postgres dos testes é exatamente o tipo de mudança
-   que precisa ser medida sozinha.
+   **A divergência foi fechada em 05/09/2026, na Tarefa 1 da Seção 4**, a tarefa
+   dedicada que este parágrafo pedia. O `docker-compose.test.yml` e o
+   `services.postgres` do `.github/workflows/ci.yml` passaram para
+   `pgvector/pgvector:pg17`. Medido depois da troca:
+   ```bash
+   docker compose -f docker-compose.test.yml exec -T postgres-test psql -U arqsmart -d arqsmart_test -c "select version();"
+   ```
+   retornou `PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit`.
+   A suíte inteira passou contra o 17:
+   ```
+   pytest -q
+   ```
+   retornou `81 passed, 3 warnings in 19.67s`. **O risco que a divergência carregava:**
+   uma migração podia passar no CI em 16 e falhar em 17.6 no deploy — e pela
+   [ADR 0007](decisoes/0007-migracao-no-start-do-container.md) a migração roda
+   no `CMD` do contêiner, então falha de migração derruba o deploy. A imagem `pg17`
+   resolve hoje para 17.11 enquanto staging e produção são 17.6 — mesma *major*,
+   que é o que importa para compatibilidade de migração entre as duas versões.
 
 ## 5. Branch protection nas três branches
 
@@ -382,8 +394,8 @@ Adicionalmente, **só em `main` e `staging`**:
 |---|---|---|
 | 1. Render (staging) | API de staging responde | `curl https://arqsmart-staging.onrender.com/health` → `{"status":"ok"}` |
 | 2. Vercel (preview) | Preview é gerado a partir de PR contra `staging` | Abrir um PR contra `staging` e conferir, na aba *Checks* do PR ou no painel da Vercel, o link do deployment de preview |
-| 3. Supabase (staging) | Projeto novo, **schema correto**, e-mail confirmado | `alembic current` (com a `DATABASE_URL` de staging) devolvendo `b77a9b5656c2`, que é o head único do repositório; em *Authentication → Providers → Email* do painel, "Confirm email" ligada |
-| 4. Banco de produção novo | API de produção servindo o **schema novo** | Duas coisas, nesta ordem: `curl https://arqsmart-prod.onrender.com/health` → `{"status":"ok"}` (prova que a migração passou, porque o `&&` do `CMD` impede o uvicorn de subir se ela falhar — [ADR 0007](decisoes/0007-migracao-no-start-do-container.md)); e `alembic current` com a `DATABASE_URL` de produção devolvendo `b77a9b5656c2`. **Não use `/health/db` para isto** — ver o aviso acima |
+| 3. Supabase (staging) | Projeto novo, **schema correto**, e-mail confirmado | `alembic current` (com a `DATABASE_URL` de staging) batendo com o head do repositório na hora da checagem — `b77a9b5656c2` quando o banco fechou em 30/08/2026, hoje `9b0c34de353b` no repositório (a Seção 4 acrescentou migrações; staging só chega lá no próximo deploy — não repita um dos dois números sem rodar `alembic heads` de novo); em *Authentication → Providers → Email* do painel, "Confirm email" ligada |
+| 4. Banco de produção novo | API de produção servindo o **schema novo** | Duas coisas, nesta ordem: `curl https://arqsmart-prod.onrender.com/health` → `{"status":"ok"}` (prova que a migração passou, porque o `&&` do `CMD` impede o uvicorn de subir se ela falhar — [ADR 0007](decisoes/0007-migracao-no-start-do-container.md)); e `alembic current` com a `DATABASE_URL` de produção batendo com o head do repositório, pelo mesmo raciocínio da linha acima. **Não use `/health/db` para isto** — ver o aviso acima |
 | 5. Branch protection | As três branches exigem PR e os três checks | Em *Settings → Branches* do GitHub, cada uma das três regras lista os três nomes de job como *Required status checks*; tentar um push direto (sem PR) para qualquer uma das três deve ser recusado pelo GitHub |
 
 ## Onde ler mais

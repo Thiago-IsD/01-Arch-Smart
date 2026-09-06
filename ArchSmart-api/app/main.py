@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,7 +8,11 @@ from app.core.logging import setup_logging
 
 setup_logging()
 
-app = FastAPI(title="Arch Smart API", version="1.0.0")
+logger = logging.getLogger(__name__)
+
+# A marca e "Arq Smart" — duas palavras, com Q (Art. 8). O titulo aqui usava
+# a grafia do nome do diretorio, que nao e a grafia da marca.
+app = FastAPI(title="Arq Smart API", version="1.0.0")
 
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -15,6 +21,13 @@ from app.core.rate_limit import limiter
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Precisa vir depois do handler do slowapi acima: um handler para Exception
+# registrado antes capturaria o RateLimitExceeded e devolveria 500 no lugar
+# do 429.
+from app.core.errors import registrar_handlers
+
+registrar_handlers(app)
 
 # CORS Configuration
 # Usamos allow_origin_regex (em vez de allow_origins=["*"]) porque, com
@@ -58,7 +71,7 @@ from app.api.endpoints import dashboard
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Arch Smart API"}
+    return {"message": "API Arq Smart"}
 
 @app.get("/health")
 def health_check():
@@ -76,7 +89,8 @@ def health_check_db():
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok", "db": "up"}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"DB unreachable: {str(e)}")
+    except Exception as erro:
+        logger.error("Health check do banco falhou", exc_info=erro)
+        raise HTTPException(status_code=503, detail="Banco indisponível.")
     finally:
         db.close()

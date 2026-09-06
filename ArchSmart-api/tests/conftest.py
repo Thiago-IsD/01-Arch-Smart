@@ -10,6 +10,8 @@ Sobe com: docker compose -f docker-compose.test.yml up -d --wait
 """
 import os
 import uuid
+from contextlib import contextmanager
+from datetime import date, datetime
 from typing import Generator
 
 import pytest
@@ -86,24 +88,199 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 from app.db.base_class import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models.all_models import Account, Client, Project, User  # noqa: E402
-from app.api.users import get_current_user  # noqa: E402
+from app.models.all_models import (  # noqa: E402
+    Account,
+    Budget,
+    BudgetItem,
+    Client,
+    Environment,
+    Event,
+    FinancialEntry,
+    ItemOption,
+    Notification,
+    Presentation,
+    Product,
+    Project,
+    RuleType,
+    User,
+)
+from app.core.security import RequestContext, get_context  # noqa: E402
+from app.services.entitlements import entitlements_da_conta  # noqa: E402
 
 
-def criar_projeto(db: Session, conta: Account, nome: str = "Projeto Teste") -> Project:
+def _contexto_de(db: Session, usuario: User) -> RequestContext:
+    """
+    Espelha o `get_context` de producao: os entitlements vem de
+    `entitlements_da_conta`, nao de um PADRAO fixo. Antes desta funcao
+    devolvia sempre `PADRAO`, entao nenhum teste que passasse por
+    `client_a`/`client_b` conseguia provar um endpoint que le
+    `repo.ctx.entitlements` — o Plan/Subscription que o teste criasse no
+    banco nunca chegava ao contexto da requisicao.
+    """
+    return RequestContext(
+        user_id=usuario.id,
+        account_id=usuario.account_id,
+        email=usuario.email,
+        entitlements=entitlements_da_conta(db, usuario.account_id),
+    )
+
+
+def criar_projeto(
+    db: Session, conta: Account, nome: str = "Projeto Teste", usuario: User | None = None
+) -> Project:
     """
     Cria um projeto valido para a conta.
 
     Project.client_id e NOT NULL com FK para clients, entao todo projeto
     exige um Client antes. Esquecer isso quebra a fixture com IntegrityError.
+
+    `usuario` e opcional (e o ultimo argumento) para nao quebrar as chamadas
+    das Tarefas 11-15, que passam so `(db, conta, nome)`.
     """
     cliente = Client(account_id=conta.id, name=f"Cliente de {nome}")
     db.add(cliente)
     db.flush()
-    projeto = Project(account_id=conta.id, client_id=cliente.id, name=nome)
+    projeto = Project(
+        account_id=conta.id,
+        client_id=cliente.id,
+        name=nome,
+        created_by=usuario.id if usuario else None,
+    )
     db.add(projeto)
     db.flush()
     return projeto
+
+
+def criar_ambiente(db: Session, conta: Account, usuario: User) -> Environment:
+    projeto = criar_projeto(db, conta, "Projeto do ambiente")
+    ambiente = Environment(
+        account_id=conta.id,
+        created_by=usuario.id,
+        project_id=projeto.id,
+        name="Sala",
+    )
+    db.add(ambiente)
+    db.flush()
+    return ambiente
+
+
+def criar_orcamento(db: Session, conta: Account, usuario: User) -> Budget:
+    projeto = criar_projeto(db, conta, "Projeto do orcamento")
+    orcamento = Budget(
+        account_id=conta.id, created_by=usuario.id, project_id=projeto.id
+    )
+    db.add(orcamento)
+    db.flush()
+    return orcamento
+
+
+def criar_item_de_orcamento(db: Session, conta: Account, usuario: User) -> BudgetItem:
+    ambiente = criar_ambiente(db, conta, usuario)
+    orcamento = Budget(
+        account_id=conta.id, created_by=usuario.id, project_id=ambiente.project_id
+    )
+    db.add(orcamento)
+    db.flush()
+    item = BudgetItem(
+        account_id=conta.id,
+        created_by=usuario.id,
+        budget_id=orcamento.id,
+        environment_id=ambiente.id,
+        rule_type=RuleType.FLOOR,
+    )
+    db.add(item)
+    db.flush()
+    return item
+
+
+def criar_opcao(db: Session, conta: Account, usuario: User) -> ItemOption:
+    item = criar_item_de_orcamento(db, conta, usuario)
+    produto = criar_produto(db, conta, usuario)
+    opcao = ItemOption(
+        account_id=conta.id,
+        created_by=usuario.id,
+        budget_item_id=item.id,
+        product_id=produto.id,
+        is_selected=True,
+    )
+    db.add(opcao)
+    db.flush()
+    return opcao
+
+
+def criar_produto(db: Session, conta: Account, usuario: User) -> Product:
+    produto = Product(
+        account_id=conta.id, created_by=usuario.id, name="Porcelanato", price=100.0
+    )
+    db.add(produto)
+    db.flush()
+    return produto
+
+
+def criar_apresentacao(db: Session, conta: Account, usuario: User) -> Presentation:
+    projeto = criar_projeto(db, conta, "Projeto da apresentacao")
+    apresentacao = Presentation(
+        account_id=conta.id,
+        created_by=usuario.id,
+        project_id=projeto.id,
+        name="Proposta",
+    )
+    db.add(apresentacao)
+    db.flush()
+    return apresentacao
+
+
+def criar_lancamento(db: Session, conta: Account, usuario: User) -> FinancialEntry:
+    """
+    `type`, `status` e `due_date` sao NULLABLE na tabela mas OBRIGATORIOS em
+    `FinancialEntryResponse` (app/schemas/financial_schema.py) — o
+    `POST /api/financial` nunca cria um lancamento sem eles. Uma entrada
+    fabricada sem os tres nao existe em producao, e faz `PUT /api/financial/
+    {entry_id}` estourar 500 na validacao da RESPOSTA em vez de responder.
+    Medido em 05/09/2026, quando o controle positivo de
+    tests/isolation/test_todas_as_rotas.py passou a percorrer o caminho de
+    sucesso desta rota: `ValidationError: 2 validation errors for
+    FinancialEntryResponse` (type=None, due_date=None). A fixture e que
+    estava incompleta.
+    """
+    entrada = FinancialEntry(
+        account_id=conta.id,
+        created_by=usuario.id,
+        description="Honorarios",
+        amount=1000.0,
+        type="INCOME",
+        status="PREDICTED",
+        due_date=date(2026, 9, 5),
+        category="Honorarios",
+    )
+    db.add(entrada)
+    db.flush()
+    return entrada
+
+
+def criar_evento(db: Session, conta: Account, usuario: User) -> Event:
+    evento = Event(
+        account_id=conta.id,
+        created_by=usuario.id,
+        title="Visita",
+        start_time=datetime(2026, 9, 5, 10, 0),
+        end_time=datetime(2026, 9, 5, 11, 0),
+    )
+    db.add(evento)
+    db.flush()
+    return evento
+
+
+def criar_notificacao(db: Session, conta: Account, usuario: User) -> Notification:
+    notificacao = Notification(
+        account_id=conta.id,
+        created_by=usuario.id,
+        title="Aviso",
+        message="Mensagem",
+    )
+    db.add(notificacao)
+    db.flush()
+    return notificacao
 
 
 @pytest.fixture(scope="session")
@@ -179,11 +356,68 @@ def conta_b(db: Session) -> tuple[Account, User]:
     return _criar_conta(db, "ContaB")
 
 
+class _ClienteDeConta(TestClient):
+    """
+    TestClient que RE-ARMA o override de `get_context` a cada requisicao.
+
+    `app.dependency_overrides` e um dict UNICO do app: `client_a` e
+    `client_b` gravam a MESMA chave, entao a fixture montada por ULTIMO
+    vencia as duas. Medido em 05/09/2026, antes desta classe, com a
+    assinatura `(db, client_a, client_b, conta_a, conta_b)`:
+
+        client_a.get(f"/api/projects/{projeto_da_conta_b.id}")  ->  200
+        client_a.get(f"/api/projects/{projeto_da_conta_a.id}")  ->  404
+
+    Nao era vazamento do app: `client_a` estava autenticado como B, e um
+    teste "A nao alcanca B" escrito assim provaria o contrario do que diz.
+    Re-armar no momento da chamada — e nao na montagem da fixture — faz as
+    duas conviverem no mesmo teste, que e o que o controle positivo de
+    tests/isolation/test_todas_as_rotas.py precisa.
+
+    `contexto=None` e o cliente anonimo: ali o override e REMOVIDO, para o
+    `get_context` de verdade rodar (401 sem credencial). Sem a remocao, um
+    client_anon usado ao lado de um client_a herdaria a identidade de A.
+    """
+
+    def __init__(self, *args, contexto=None, **kwargs):
+        self._contexto = contexto
+        self._rearmar = True
+        super().__init__(*args, **kwargs)
+
+    @contextmanager
+    def sem_sobreposicao_de_contexto(self):
+        """
+        Suspende o re-armamento e REMOVE o override, para o `get_context` de
+        verdade rodar (token do header, banco, 401). E o que
+        tests/api/test_identidade.py precisa: sem isto, o re-armamento acima
+        devolveria a identidade sobreposta e o 401 nunca aconteceria.
+        """
+        anterior = self._rearmar
+        sobreposto = app.dependency_overrides.pop(get_context, None)
+        self._rearmar = False
+        try:
+            yield self
+        finally:
+            self._rearmar = anterior
+            if sobreposto is not None:
+                app.dependency_overrides[get_context] = sobreposto
+
+    def request(self, *args, **kwargs):
+        if self._rearmar:
+            if self._contexto is None:
+                app.dependency_overrides.pop(get_context, None)
+            else:
+                app.dependency_overrides[get_context] = self._contexto
+        return super().request(*args, **kwargs)
+
+
 def _cliente(db: Session, usuario: User | None) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_db] = lambda: db
+    contexto = None
     if usuario is not None:
-        app.dependency_overrides[get_current_user] = lambda: usuario
-    with TestClient(app) as c:
+        contexto = lambda: _contexto_de(db, usuario)  # noqa: E731
+        app.dependency_overrides[get_context] = contexto
+    with _ClienteDeConta(app, contexto=contexto) as c:
         yield c
     app.dependency_overrides.clear()
 

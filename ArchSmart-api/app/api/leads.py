@@ -8,8 +8,10 @@ router = APIRouter()
 
 @router.post("/leads", status_code=status.HTTP_201_CREATED)
 def create_lead(lead: LeadCreate, db: Session = Depends(get_db)):
-    # Check if email already exists
-    existing_lead = db.query(Lead).filter(Lead.email == lead.email).first()
+    # Formulario publico: sem Authorization, sem sessao, entao nao ha
+    # RequestContext nem repositorio. account_id fica None (pre-cadastro) —
+    # a mesma excecao de auth.py, so que aqui o lead nunca ganha conta.
+    existing_lead = db.query(Lead).filter(Lead.email == lead.email).first()  # pre-sessao: sem account_id ainda
     if existing_lead:
         # Assuming we just return success or update? 
         # Requirement says: Return 400 ("E-mail já cadastrado")
