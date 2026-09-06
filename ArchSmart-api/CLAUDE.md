@@ -7,9 +7,9 @@ A **Seção 4** entregou a camada de dados do backend — `ScopedRepository`, `R
 - `app/api/` — três estruturas coexistindo: arquivos soltos (`account.py`, `auth.py`, `leads.py`, `users.py`), `api/endpoints/` (`dashboard.py`, `events.py`, `financial.py`, `notifications.py`, `presentations.py`, `projects.py`, `public.py`) e `api/routers/` (`budgets_router.py`, `environments_router.py`, `product_router.py`). Endpoint novo entra na estrutura do endpoint mais parecido que já existe hoje.
 - `app/core/` — configuração (`config.py`) e utilitários transversais.
 - `app/db/` — sessão e conexão com o banco.
-- `app/models/all_models.py` — todos os modelos SQLAlchemy num arquivo único de 467 linhas.
+- `app/models/all_models.py` — todos os modelos SQLAlchemy num arquivo único de 536 linhas (`wc -l`).
 - `app/schemas/` — schemas Pydantic.
-- `app/services/` — lógica de negócio (`ai_service.py`, `auth_service.py`, `budget_calculator.py`, `financial_service.py`).
+- `app/services/` — lógica de negócio (`ai_service.py`, `auth_service.py`, `budget_calculator.py`, `entitlements.py`, `financial_service.py`). São cinco: `entitlements.py` nasceu na Seção 4 e faltava neste mapa, no arquivo cujo trabalho é ser o mapa.
 - `tests/` — suíte ativa.
 - `tools/` — scripts operacionais (seed, reset). Nunca importados por `app/` — ver `tools/README.md`.
 
@@ -86,11 +86,17 @@ docker compose -f docker-compose.test.yml up -d --wait
 pytest
 ```
 
-A suíte roda contra Postgres real em Docker. `app/tests/` era a suíte antiga baseada em `MagicMock` como sessão de banco — foi apagada na Seção 4 (Tarefa 17). A suíte hoje mora só em `tests/` (303 testes coletados, `tests/services/`, `tests/api/`, `tests/isolation/` e um punhado de arquivos de arquitetura/schema/migração na raiz).
+A suíte roda contra Postgres real em Docker. `app/tests/` era a suíte antiga baseada em `MagicMock` como sessão de banco — foi apagada na Seção 4 (Tarefa 17). A suíte hoje mora só em `tests/` (307 testes coletados, `tests/services/`, `tests/api/`, `tests/isolation/` e um punhado de arquivos de arquitetura/schema/migração na raiz).
 
 ## Erros
 
 Mensagem em pt-BR para o usuário; detalhe técnico só no log. Nunca coloque a exceção crua (`detail=str(e)` ou uma f-string com `{e}`) numa resposta — use `app/core/errors.py`: levante `DomainError` (ou uma das subclasses — `NotFound`, `Forbidden`, `QuotaExceeded`, `ValidacaoDeDominio`) com a mensagem em pt-BR, e registre o traço técnico com `logger.error(..., exc_info=erro)`. Esse padrão foi removido do código na Seção 4 (Tarefa 5) — não conte um número de ocorrências vivas aqui, ele fica errado assim que alguém escrever a próxima.
+
+> ⚠️ **`ValidacaoDeDominio` responde 422, e a Tarefa 5 moveu ~10 caminhos de erro para ela — vários que antes eram 400 ou 500.** Quem escreve cliente contra esta API precisa saber disso antes de ramificar por status. A tabela completa, com o antes de cada um, está no `PROGRESS.md` (nota da Seção 4). O resumo: `auth.py` (5 caminhos), `account.py` (1), `presentations.py` (3), `product_router.py` (1).
+>
+> **Dois 422 diferentes chegam pelo mesmo status, e o `detail` os separa.** O 422 do Pydantic/FastAPI (corpo malformado) traz uma **lista** em `detail`; o 422 de `DomainError` traz uma **string**. Medido em 05/09/2026: `POST /api/products/` com `json={}` devolve `{"detail": [{"type": "missing", "loc": ["body", "name"], ...}]}`, e `registrar_handlers` (`app/core/errors.py`) devolve `{"detail": erro.mensagem}`. Um cliente que trate `detail` como string quebra no primeiro; um que trate como lista quebra no segundo.
+>
+> **A taxonomia é decisão em aberto, e não é de um agente.** A maior parte desses caminhos é falha de **infraestrutura** (upload que não subiu, Supabase que não respondeu), e 422 quer dizer "entendi o pedido, mas o conteúdo não é processável" — o que descreve mal um storage fora do ar. 5xx descreveria melhor, e foi o que eles eram. A Seção 4 **não** decidiu isso: ela unificou o mecanismo (nada de exceção crua no `detail`) e herdou o status da classe. Trocar o status de alguma dessas rotas é mudança de contrato e cabe ao dono do repositório.
 
 ## Convenções
 

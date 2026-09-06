@@ -207,17 +207,25 @@ _Última atualização: 2026-09-05_
 > `calculate_quantity(item, dna, produto)`, **pura**, e o carregamento virou 2
 > queries. O número é contado, não estimado:
 > `tests/api/test_orcamento_sem_n_mais_um.py` registra as queries num listener
-> do SQLAlchemy e falha se passarem de 2.
+> do SQLAlchemy. **Os tetos que ele exige são `<= 3` e `<= 5`, não `== 2`** —
+> e o próprio teste argumenta contra o número fixo: um teto exato transforma
+> "alguém trocou a estratégia de carregamento deliberadamente" em falha de
+> isolamento, e a propriedade que importa é a outra, `n_queries_pequeno ==
+> n_queries_grande` (5 itens e 30 itens custando o mesmo). `<= 3` guarda
+> `carregar_orcamento` isolado (2 hoje); `<= 5` guarda o round trip HTTP de
+> `GET /projects/{id}/budget` (5 hoje).
 >
 > **A suíte.** A antiga (`app/tests/`, 83 testes sobre `MagicMock`) foi
-> apagada — o diretório hoje só contém `__pycache__`. A nova tem **303**
+> apagada — o diretório hoje só contém `__pycache__`. A nova tem **307**
 > testes coletados contra Postgres real (`pytest --collect-only -q`; a
-> execução real é **302 passam, 1 skip deliberado** — `pytest -q`). O grosso
-> mora em `tests/services/` (16, função pura), `tests/api/` (68, endpoint
-> com dado semeado) e `tests/isolation/` (74, vazamento entre contas); os
+> execução real é **306 passam, 1 skip deliberado** — `pytest -q`). O grosso
+> mora em `tests/services/` (16, função pura), `tests/api/` (70, endpoint
+> com dado semeado) e `tests/isolation/` (76, vazamento entre contas); os
 > 145 restantes são 8 arquivos de teste de arquitetura, schema e migração na
 > raiz de `tests/` (`test_arquitetura.py`, `test_colunas_de_escopo.py`,
-> `test_guarda_banco.py`, `test_indices.py` e outros quatro).
+> `test_guarda_banco.py`, `test_indices.py` e outros quatro). Os 4 testes
+> acrescentados pela onda final da revisão são `test_join_entre_contas.py`
+> (2, isolamento) e `test_ordem_deterministica.py` (2, API).
 >
 > **Duas coisas mudaram em relação à spec, e as duas estão registradas.** O
 > `/me` ficou em `GET /api/users/me` e não em `/api/v1/me` — não existe
@@ -246,6 +254,47 @@ _Última atualização: 2026-09-05_
 > tomada e registrada no ADR. Não mexi na caixa da Seção 7 — não é desta
 > tarefa.
 >
+> **O contrato de erro mudou em ~10 caminhos, e o registro anterior dizia
+> só "duas mensagens de erro mudaram de idioma".** `ValidacaoDeDominio`
+> (`app/core/errors.py`) tem `status = 422`, e a Tarefa 5 trocou por ela
+> exceções que respondiam 400 ou 500. A lista foi conferida contra
+> `git show 1bcc0f3:<arquivo>`, casando cada `raise` novo com a função que o
+> continha antes:
+>
+> | Onde (hoje) | Função | Antes | Agora |
+> |---|---|---|---|
+> | `app/api/auth.py:30` | `register_request` | 400 | 422 |
+> | `app/api/auth.py:41` | `recover_request` | 400 | 422 |
+> | `app/api/auth.py:125` | `complete_register` | 400 | 422 |
+> | `app/api/auth.py:207` | `signup` | 400 | 422 |
+> | `app/api/auth.py:242` | `change_password` | 500 | 422 |
+> | `app/api/account.py:80` | `update_account_branding` | 500 | 422 |
+> | `app/api/endpoints/presentations.py:262` | `upload_presentation_cover` | 500 | 422 |
+> | `app/api/endpoints/presentations.py:367` | `upload_environment_image` | 500 | 422 |
+> | `app/api/endpoints/presentations.py:388` | `delete_presentation` | 500 | 422 |
+> | `app/api/routers/product_router.py:351` | `clipper_capture` | 500 | 422 |
+>
+> São 10, e são todas
+> (`grep -rn "raise ValidacaoDeDominio" app --include=*.py`).
+>
+> **Por que isso vai no registro e não só no código.** A Seção 5 constrói o
+> cliente contra esta API. Um front que ramifique em 400-vs-422 vai errar
+> aqui — e os dois 422 não têm a mesma forma: o do Pydantic traz uma
+> **lista** em `detail`, o de `DomainError` traz uma **string**. Medido em
+> 05/09/2026: `POST /api/products/` com `json={}` devolve
+> `{"detail": [{"type": "missing", "loc": ["body", "name"], ...}]}`, contra o
+> `{"detail": "Não foi possível enviar a imagem."}` que
+> `registrar_handlers` produz.
+>
+> **A taxonomia continua em aberto — decisão de Thiago, não desta seção.** A
+> maioria desses caminhos é falha de **infraestrutura** (storage fora do ar,
+> Supabase sem responder), e 422 significa "entendi o pedido, mas o conteúdo
+> não é processável", o que descreve mal um serviço indisponível; 5xx
+> descrevia melhor, e era o que eles eram. O que a Tarefa 5 decidiu foi o
+> **mecanismo** — nenhuma exceção crua no `detail` —, e o 422 veio junto por
+> ser o status da classe escolhida. Mudar o status de qualquer uma dessas
+> rotas é mudança de contrato, e não foi feita aqui.
+
 > **Achado extra, corrigido durante a seção:** a marca escrita errada
 > (`"Arch Smart"`, `"ArchSmart"`, `"Ark Smart"`, `"Ecowe"`) em `app/` está
 > hoje em **zero** ocorrências

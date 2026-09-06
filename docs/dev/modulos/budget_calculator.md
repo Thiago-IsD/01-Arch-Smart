@@ -160,9 +160,20 @@ Corrigido em duas peças, as duas em `budget_calculator.py`:
    instrumentado, marca a coleção "dirty" e arrisca reordenar escritas no
    próximo `commit()`.
 
-**Medido depois do fix:** 5 itens e 30 itens custam **4** queries cada —
-Project (1) + Budget (1) + as 2 de `carregar_orcamento`. Genuinamente O(1),
-não só "menor". `GET /budgets/{id}/summary` e os endpoints de item único
+**Medido depois do fix:** 5 itens e 30 itens custam **5** queries cada —
+`entitlements_da_conta` (1) + Project (1) + Budget (1) + as 2 de
+`carregar_orcamento`. Genuinamente O(1), não só "menor".
+
+> A quinta é a de entitlements, e ela não veio desta função. Enquanto este
+> documento dizia **4**, `get_context` passou a resolver os `entitlements`
+> da conta em **toda** requisição autenticada
+> (`app/services/entitlements.py`), e essa consulta entra no round trip de
+> qualquer endpoint, não só deste. Medido em 05/09/2026 registrando o SQL do
+> teste, na ordem: `subscriptions LEFT OUTER JOIN plans`, `projects`,
+> `budgets`, `budget_items`, `environment_dnas`. O que continua sendo **2**
+> é `carregar_orcamento` isolado — as duas últimas —, e é esse o número que
+> o `<= 3` de `test_montar_o_orcamento_nao_cresce_com_o_numero_de_itens`
+> guarda; o round trip inteiro é guardado à parte, com teto `<= 5`. `GET /budgets/{id}/summary` e os endpoints de item único
 (`add_item_to_budget`, `update_budget_item`) não precisavam de
 `popular_relacionamento_de_itens` — eles não devolvem `Budget.items` — mas
 ganharam o `joinedload(environment)` de graça, pela mesma chamada de

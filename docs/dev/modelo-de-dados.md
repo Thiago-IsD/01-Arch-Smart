@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Como as 26 tabelas de `ArchSmart-api/app/models/all_models.py` (467 linhas,
+Como as 26 tabelas de `ArchSmart-api/app/models/all_models.py` (536 linhas,
 um arquivo único) se relacionam e por quê, para quem vai planejar ou revisar
 mudança de schema. Não é um dump de `\d+` — o Postgres já sabe as colunas; o
 que este documento registra é a razão de cada relação e o que quebra se ela
@@ -372,12 +372,28 @@ print(len(com), com)
 
 Antes da Seção 4, nenhuma das 26 tabelas tinha coluna `created_by` — não
 havia, a partir do banco, como saber qual usuário criou uma linha, só a
-conta dona. A Tarefa 4 acrescentou `created_by` (`NOT NULL`, FK para
-`users.id`) às **21 tabelas de dado** — as mesmas 21 que têm `account_id`,
+conta dona. A **Tarefa 3** acrescentou `created_by` (**`NULL` permitido**, FK
+para `users.id`) às **21 tabelas de dado** — as mesmas 21 que têm `account_id`,
 não um subconjunto diferente: `ScopedRepository.create()` injeta as duas
 colunas juntas a partir do `RequestContext`, e dar `created_by` só às 10 que
 ganharam `account_id` nesta seção teria deixado `create()` com uma exceção a
-lembrar para as 11 que já tinham `account_id` antes. `accounts`, `plans`,
+lembrar para as 11 que já tinham `account_id` antes.
+
+> **`created_by` é nullable, e `account_id` não — a assimetria é
+> deliberada.** Medido em 05/09/2026:
+> `SELECT table_name, is_nullable FROM information_schema.columns WHERE
+> column_name = 'created_by'` devolve **21 linhas, todas `YES`**; a migração
+> que a criou é `9a5bde3fc30f_created_by_nas_tabelas_de_dado.py`, da
+> **Tarefa 3** (uma versão anterior deste documento dizia `NOT NULL` e
+> Tarefa 4 — as duas coisas erradas, no arquivo cujo trabalho é ser a
+> verdade sobre o schema). O motivo de ser nullable: as linhas legadas não
+> têm autor recuperável. `account_id` tinha uma FK de onde subir — todo
+> caminho de backfill chega numa conta —, mas não existe coluna nenhuma no
+> banco antigo que diga *qual usuário* criou uma linha, e inventar um
+> (o primeiro usuário da conta, digamos) seria gravar um dado falso numa
+> coluna de auditoria. `ScopedRepository.create()` preenche `created_by`
+> em toda linha nova; o `NULL` marca "veio de antes", que é a informação
+> verdadeira. `accounts`, `plans`,
 `product_origins`, `product_states` e `documents` continuam sem
 `created_by`, pelo mesmo motivo que continuam sem `account_id`.
 

@@ -29,7 +29,15 @@ Cada teste faz duas asserções, dois papeis:
   (`options` -> `options.product`) e 1 SELECT para a arvore inteira do
   orcamento, mais 1 para os `EnvironmentDNA` — 2. O teto da folga de 1 para
   pegar um round-trip acidental a mais sem travar o numero exato; quem
-  troca a estrategia deliberadamente ajusta o teto no mesmo commit.
+  troca a estrategia deliberadamente ajusta o teto no mesmo commit. O teto
+  do OUTRO teste, o do round trip HTTP, e `<= 5`, e mede outra coisa — ver
+  o docstring dele.
+
+**Nenhuma das duas asercoes e `== 2`**, e o PROGRESS.md ja afirmou que era.
+Sao `<= 3` e `<= 5`, com a constancia carregando a garantia — a distincao
+esta no paragrafo acima e nao e detalhe: quem le "falha se passarem de 2" e
+depois ve 5 queries no round trip conclui que o teste esta quebrado, quando
+o que esta errado e a frase.
 
 "~300 para 2" e uma afirmacao de numero, e neste repositorio numero afirmado
 sem medicao e numero errado. O contador abaixo E a medicao.
@@ -215,17 +223,27 @@ def test_endpoint_get_project_budget_nao_cresce_com_o_numero_de_itens(
     sem multiplicar linha — `environment` e many-to-one); e
     `popular_relacionamento_de_itens` poe os itens ja carregados direto em
     `Budget.items` via `set_committed_value`, para a serializacao nao
-    refazer a consulta. **Medido depois:** 4 e 4 — genuinamente O(1).
+    refazer a consulta. **Medido depois:** 5 e 5 — genuinamente O(1).
+
+    **A quinta query nao e deste endpoint.** Medido em 05/09/2026,
+    registrando o SQL na ordem: `subscriptions LEFT OUTER JOIN plans`,
+    `projects`, `budgets`, `budget_items`, `environment_dnas`. A primeira e
+    `entitlements_da_conta`, que `get_context` roda em TODA requisicao
+    autenticada — ela entra no round trip de qualquer endpoint, nao so
+    deste, e por isso o teto e 5 e nao 4. (Uma versao anterior deste
+    docstring dizia "4 e 4" e afirmava que o override de `get_context`
+    devolvia contexto pronto "sem query": as duas coisas deixaram de ser
+    verdade quando a conftest passou a montar o contexto com
+    `entitlements_da_conta`, exatamente como a producao monta. E o certo:
+    um override que nao pagasse essa query mediria menos do que o usuario
+    paga.)
 
     Sem `db.expire_all()` aqui, ao contrario de `_carregar_e_contar`: todo
     `.query(...).first()`/`.all()` deste endpoint emite SQL de qualquer
     jeito, expirado ou nao — so leitura de atributo lazy depende de estado
     de cache, e nada neste teste toca `budget.items`/`item.environment`
     antes da serializacao (é exatamente essa leitura, dentro do proprio
-    FastAPI, que o teste mede). Expirar aqui so importaria o bug do round
-    anterior: o dependency override de `get_context` devolve `conta_a`/
-    `usuario` prontos, sem query — expira-lo mediria o fixture, nao o
-    endpoint.
+    FastAPI, que o teste mede).
     """
     conta = conta_a[0]
 
@@ -264,9 +282,13 @@ def test_endpoint_get_project_budget_nao_cresce_com_o_numero_de_itens(
     )
 
     # O TETO: pina o custo medido de hoje do round trip HTTP completo —
-    # Project (1) + Budget (1) + as 2 de carregar_orcamento = 4 — com 1 de
-    # folga. Ver docs/dev/modulos/budget_calculator.md para o raciocinio
-    # completo (inclui o N+1 medido ANTES do fix: 18 e 68 queries).
+    # entitlements (1) + Project (1) + Budget (1) + as 2 de
+    # carregar_orcamento = 5. Sem folga, ao contrario do teto do outro
+    # teste: a folga de 1 la existe porque `carregar_orcamento` e uma
+    # unidade fechada, enquanto AQUI qualquer dependencia nova que consulte
+    # o banco entra na conta — e e justamente isso que se quer ver, nao
+    # absorver em silencio. Ver docs/dev/modulos/budget_calculator.md para o
+    # raciocinio completo (inclui o N+1 medido ANTES do fix: 18 e 68).
     assert n_grande <= 5, (
         f"esperava no maximo 5 queries no round trip HTTP completo, saiu "
         f"{n_grande}:\n" + "\n".join(contador_grande.sqls)
