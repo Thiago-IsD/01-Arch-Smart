@@ -201,42 +201,117 @@ ganho é que faz sentido religar esse trabalho (`tools/catraca.py --help`).
 
 ### 3. Contagem de padrão manual — esta branch contra `develop`
 
-Comandos (escopo `ArchSmart-web/src`, para não contar `node_modules`):
+**Correção feita nesta revisão:** a primeira versão desta seção usava
+`git grep -c` sobre a string crua, que conta qualquer linha que contenha o
+texto — call site, comentário, docstring ou falso-positivo de substring —
+sem distinguir um do outro. Um revisor rodou os mesmos greps ingênuos e
+mostrou que dois dos quatro números, lidos como estavam, contavam uma coisa
+diferente do que pareciam contar. Refiz os quatro abrindo cada ocorrência,
+não só a contagem.
+
+**`createClient(` — 62 → 0 chamadas, não 62 → 1.**
 
 ```bash
-git grep -c -- "createClient(" HEAD -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-git grep -c -- "createClient(" develop -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-
-git grep -c -- "getSession()" HEAD -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-git grep -c -- "getSession()" develop -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-
-git grep -c -- "Authorization" HEAD -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-git grep -c -- "Authorization" develop -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-
-git grep -c -- "fetch(" HEAD -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
-git grep -c -- "fetch(" develop -- ArchSmart-web/src | awk -F: '{sum+=$NF} END {print sum+0}'
+cd ArchSmart-web
+grep -rn "createClient(" src --include=*.ts --include=*.tsx
 ```
+
+```
+src/lib/api/auth.ts:18: * dois. Eram 62 `createClient()` espalhados antes desta secao.
+```
+
+A única ocorrência restante é a **menção dentro do comentário** de
+`auth.ts:18`, que descreve o número antigo — não é um call site. Contando só
+chamadas de verdade (`createBrowserClient(`/`createServerClient(`, que é o que
+`supabase_fora_de_lib_api` da catraca mede): **0** nesta branch, dentro ou
+fora de `lib/api/`. Em `develop`, as 62 são calls reais, uma por tela —
+confirmado por amostragem dos arquivos que a listagem devolve
+(`billing/page.tsx`, `calendar/page.tsx`, `dashboard/page.tsx`, ...).
+
+**`getSession()` — 56 chamadas espalhadas → 2 chamadas, ambas centralizadas; os outros dois dos "4" são comentário.**
+
+```bash
+grep -rn "getSession()" src --include=*.ts --include=*.tsx
+```
+
+```
+src/lib/api/auth.server.ts:38:    const { data } = await (await supabaseServer()).auth.getSession()
+src/lib/api/auth.ts:30:    const { data } = await supabaseBrowser().auth.getSession()
+src/lib/api/core.ts:9: * `Authorization` a mao e 56 `getSession()` — e um DELETE que esquecia o
+src/proxy.ts:62:    // por getSession() aqui seria trocar seguranca por velocidade — o cookie
+```
+
+Das 4 linhas que a busca crua encontra, 2 são chamadas reais — uma no cliente
+do browser (`auth.ts`), uma no cliente do servidor (`auth.server.ts`), as
+duas dentro de `lib/api/` — e 2 são comentário (`core.ts` cita o número
+antigo; `proxy.ts` explica por que `getUser()` foi escolhido em vez de
+`getSession()` ali). Nenhuma tela fora de `lib/api/` chama `getSession()`
+nesta branch.
+
+**`Authorization` — 74 é maior que o 73 de `develop`, mas o que a medida quer rastrear (tela montando header à mão) caiu.**
+
+```bash
+cd ArchSmart-web/src
+grep -rnoP 'Authorization' . --include=*.ts --include=*.tsx | wc -l                                   # total
+grep -rnoP 'Authorization' ./lib/api ./__tests__ --include=*.ts --include=*.tsx | wc -l               # lib/api + __tests__
+grep -rnoP 'Authorization' . --include=*.ts --include=*.tsx | grep -vP '^\./lib/api/|^\./__tests__/' | wc -l   # resto (telas/componentes)
+```
+
+| | total | `lib/api/` + `__tests__/` | telas e componentes |
+|---|---|---|---|
+| `develop` | 73 | 0 (`lib/api/` não existe em `develop`) | 73 |
+| esta branch | 74 | 11 | 63 |
+
+`lib/api/` e `__tests__/` não existiam com esse conteúdo em `develop` — são
+o único lugar que hoje monta o header de verdade (`lib/api/core.ts`) mais as
+asserções de teste que passaram a existir para ele. Sem esses 11, que
+`develop` não tinha como contar, a contagem que é comparável —
+telas/componentes montando o header à mão — caiu de **73 para 63**. O total
+bruto subiu porque a medida passou a incluir um lugar novo que **é** a
+correção (o cliente centralizado), não porque mais telas passaram a montar o
+header manualmente. Um leitor que rodar o grep ingênuo (`git grep -c
+"Authorization"`) vai achar os mesmos 74 daqui — a diferença para 73 é essa,
+não uma regressão.
+
+**`fetch(` — 76, não 78; a diferença é `tentarPrefetch(`/`prefetchQuery(`, que um grep sem fronteira de palavra conta como `fetch(`.**
+
+A primeira versão usou `git grep -c -- "fetch("`, que casa qualquer
+substring — inclusive o final de `tentarPrefetch(` e `prefetchQuery(`,
+identificadores novos desta seção que não existiam em `develop`. A própria
+catraca já evita isso: `RE_FETCH = re.compile(r"\bfetch\s*\(")` em
+`tools/catraca.py:57`, com fronteira de palavra. Refeito com o mesmo padrão:
+
+```bash
+cd ArchSmart-web/src
+grep -rnoP '\bfetch\s*\(' . --include=*.ts --include=*.tsx | wc -l                              # total, fronteira de palavra
+grep -rnoP '\bfetch\s*\(' . --include=*.ts --include=*.tsx | grep '^\./lib/api/'                # dentro de lib/api/
+grep -rn -P '\bfetch\s*\(' . --include=*.ts --include=*.tsx | grep -P '^\S+:\d+:\s*(//|\*)'      # dentro de comentário
+```
+
+Total: **76**, zero dentro de `lib/api/` (o único ponto que faz `fetch` de
+verdade, `core.ts`, guarda a função numa variável — `const chamar =
+opts.fetchImpl ?? fetch` — e chama `chamar(...)`, não literalmente
+`fetch(...)`), e 1 dentro de comentário
+(`src/__tests__/library-hooks.test.tsx:108`, citando o código antigo de
+`ProductCard.tsx`). **76 é exatamente o `fetch_fora_de_lib_api` que a catraca
+mediu na Seção 2** — os dois números batem porque são a mesma contagem, e
+isso fecha a conta: não sobra nenhum `fetch(` real dentro de `lib/api/` para
+explicar uma diferença entre os dois. Os 75 restantes (76 menos o comentário)
+são chamadas reais nas telas ainda não migradas.
+
+Rodando a mesma fronteira de palavra em `develop`
+(`git archive develop -- ArchSmart-web/src` para uma árvore à parte, já que
+`tentarPrefetch`/`prefetchQuery` não existem lá para distorcer a contagem):
+**87**, igual ao que a busca ingênua já dava — em `develop` não há
+identificador que contenha `fetch(` como sufixo, então as duas formas de
+contar coincidem.
 
 | Padrão | `develop` (antes da seção) | esta branch (`HEAD`) |
 |---|---|---|
-| `createClient(` | 62 | 1 |
-| `getSession()` | 56 | 4 |
-| `Authorization` (string, qualquer contexto) | 73 | 74 |
-| `fetch(` | 87 | 78 |
-
-`createClient(` e `getSession()` caem porque a Seção 5 centralizou o cliente
-Supabase em `src/lib/api/auth.ts` (browser) e `auth.server.ts` (servidor) —
-cada um chama esses métodos uma vez, memoizado, em vez de cada tela montar o
-seu. `Authorization` **não caiu** — o número contado inclui toda menção à
-palavra, e a maioria das 74 ocorrências de hoje está em telas que **ainda
-não foram migradas** (ex.: `ProjectWizard.tsx`, `AppShell.tsx`,
-`projects/[id]/print/page.tsx`), continuando a montar o header à mão; a
-Biblioteca é a exceção — sua única ocorrência é dentro de `features/library/api.ts`
-(um comentário) e o header de verdade é montado uma vez, em
-`lib/api/core.ts`. `fetch(` caiu 87→78, não a zero: o mesmo motivo — só a
-Biblioteca, `lib/api/*` e `proxy.ts`/`account` foram migrados nesta seção; o
-resto do app segue no padrão antigo, como o `fetch_fora_de_lib_api=76` acima
-já mostra.
+| `createClient(` — chamadas reais | 62 | **0** |
+| `getSession()` — chamadas reais | 56 | **2**, ambas em `lib/api/` |
+| `Authorization` — em telas/componentes (exclui `lib/api/`+`__tests__/`) | 73 | **63** |
+| `fetch(` — com fronteira de palavra, igual à catraca | 87 | **76** |
 
 ### 4. `npm test`, `npm run typecheck`, `npm run build`
 
