@@ -5,7 +5,7 @@ import { Chrome, Download, Pin, Sparkles, AlertCircle, CheckCircle2 } from "luci
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 
 export function ClipperOnboarding() {
     const [status, setStatus] = useState<"loading" | "connected" | "disconnected">("loading")
@@ -13,10 +13,9 @@ export function ClipperOnboarding() {
     useEffect(() => {
         const checkConnection = async () => {
             try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
+                const accessToken = await getAccessToken()
 
-                if (session && session.access_token) {
+                if (accessToken) {
                     setStatus("connected")
                 } else {
                     setStatus("disconnected")

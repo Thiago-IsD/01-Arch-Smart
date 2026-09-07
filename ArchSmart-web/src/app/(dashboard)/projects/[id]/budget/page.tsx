@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server"
+import { getServerAccessToken } from "@/lib/api/auth.server"
 import { notFound } from "next/navigation"
 import { SidebarNav } from "@/app/(dashboard)/projects/[id]/budget/components/SidebarNav"
 import { MainBudgetArea } from "@/app/(dashboard)/projects/[id]/budget/components/MainBudgetArea"
@@ -6,9 +6,7 @@ import { ProjectHeader } from "@/components/projects/ProjectHeader"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { apiUrl } from "@/lib/api-url"
 async function getProjectDetails(id: string) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     if (!token) return null
 
@@ -25,9 +23,7 @@ async function getProjectDetails(id: string) {
 }
 
 async function getProjectBudget(id: string) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     if (!token) return null
 
@@ -44,9 +40,7 @@ async function getProjectBudget(id: string) {
 }
 
 async function getProjectEnvironments(id: string) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     if (!token) return []
 

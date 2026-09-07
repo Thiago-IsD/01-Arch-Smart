@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Loader2, ArrowRight, ArrowLeft, Check, Wallet, User, PenTool } from "lucide-react"
 
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { apiUrl } from "@/lib/api-url"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -179,9 +179,7 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
         try {
             setIsSubmitting(true)
 
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const endpoint = mode === "edit" ? apiUrl(`/api/projects/${initialData.id}`) : apiUrl("/api/projects")
 

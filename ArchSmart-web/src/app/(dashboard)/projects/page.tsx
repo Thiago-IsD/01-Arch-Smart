@@ -3,15 +3,15 @@ import { ProjectWizard } from "@/components/projects/ProjectWizard"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@/utils/supabase/server"
+import { getServerAccessToken } from "@/lib/api/auth.server"
 import { UpgradeAlertModal } from "@/components/projects/UpgradeAlertModal"
 import { apiUrl } from "@/lib/api-url"
+import { apiServer } from "@/lib/api/server"
+import type { Me } from "@/features/account/types"
 
 // Function to fetch projects
 async function getProjects(page = 1, size = 20) {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     try {
         const res = await fetch(apiUrl(`/api/projects?page=${page}&size=${size}`), {
@@ -39,11 +39,21 @@ export default async function ProjectsPage(props: {
     const searchParams = await props.searchParams
     const action = typeof searchParams.action === "string" ? searchParams.action : undefined
 
-    const data = await getProjects()
+    // As duas chamadas correm em paralelo: a API hiberna no free tier do
+    // Render (medido: 41,9 s num cold start), e um segundo await sequencial
+    // dobraria essa exposicao no pior caso.
+    const [data, me] = await Promise.all([
+        getProjects(),
+        apiServer<Me>("/api/users/me").catch(() => undefined),
+    ])
     const projects = data.items || []
-    const planLimit: number = data.plan_limit ?? 2
+    // A fonte do limite e `entitlements.project_limit` (Art. 3) — nao o campo
+    // equivalente que `/api/projects` devolve com outro nome (ver
+    // docs/dev/modulos/account.md). Se a chamada a `/me` falhar, `planLimit`
+    // fica `undefined` e a tela nao inventa um numero.
+    const planLimit = me?.entitlements?.project_limit
     const activeProjectsCount = projects.filter((p: any) => p.status === 'ACTIVE').length
-    const isAtLimit = activeProjectsCount >= planLimit
+    const isAtLimit = planLimit !== undefined && activeProjectsCount >= planLimit
 
     const isWizardOpen = action === "new"
 
@@ -54,22 +64,24 @@ export default async function ProjectsPage(props: {
                     <div className="flex items-center space-x-4 mb-1">
                         <h2 className="text-3xl font-bold tracking-tight">Projetos</h2>
 
-                        <div className="flex items-center space-x-3 bg-muted/40 px-3 py-1.5 rounded-full border shadow-sm">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-medium text-muted-foreground hidden sm:inline-block">
-                                    Plano Solo
+                        {planLimit !== undefined && (
+                            <div className="flex items-center space-x-3 bg-muted/40 px-3 py-1.5 rounded-full border shadow-sm">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-medium text-muted-foreground hidden sm:inline-block">
+                                        Plano Solo
+                                    </span>
+                                </div>
+                                <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full ${isAtLimit ? 'bg-destructive' : 'bg-primary'} transition-all duration-500`}
+                                        style={{ width: `${Math.min((activeProjectsCount / planLimit) * 100, 100)}%` }}
+                                    />
+                                </div>
+                                <span className={`text-xs font-bold ${isAtLimit ? 'text-destructive' : 'text-primary'}`}>
+                                    {activeProjectsCount}/{planLimit}
                                 </span>
                             </div>
-                            <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full ${isAtLimit ? 'bg-destructive' : 'bg-primary'} transition-all duration-500`}
-                                    style={{ width: `${Math.min((activeProjectsCount / planLimit) * 100, 100)}%` }}
-                                />
-                            </div>
-                            <span className={`text-xs font-bold ${isAtLimit ? 'text-destructive' : 'text-primary'}`}>
-                                {activeProjectsCount}/{planLimit}
-                            </span>
-                        </div>
+                        )}
                     </div>
 
                     <p className="text-muted-foreground">

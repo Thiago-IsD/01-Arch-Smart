@@ -75,15 +75,14 @@ export default function LoginPage() {
                 }
 
                 // Create Supabase session
-                const { createClient } = await import("@/utils/supabase/client");
-                const supabase = createClient();
+                const { setSession } = await import("@/lib/api/auth");
 
-                const { error: sessionError } = await supabase.auth.setSession({
-                    access_token: resData.access_token,
-                    refresh_token: resData.refresh_token,
-                });
-
-                if (sessionError) {
+                try {
+                    await setSession({
+                        access_token: resData.access_token,
+                        refresh_token: resData.refresh_token,
+                    });
+                } catch (sessionError) {
                     console.error("Session creation error:", sessionError);
                     throw new Error("Erro ao criar sessão");
                 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { useBudget } from "./BudgetProvider"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -58,9 +58,7 @@ export function ProductPickerModal({ isOpen, onOpenChange, targetItemId }: Produ
         const fetchProducts = async () => {
             setIsLoading(true)
             try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
-                const token = session?.access_token || ""
+                const token = (await getAccessToken()) || ""
 
                 const res = await fetch(apiUrl("/api/products"), {
                     headers: { "Authorization": `Bearer ${token}` }
@@ -91,9 +89,7 @@ export function ProductPickerModal({ isOpen, onOpenChange, targetItemId }: Produ
 
         setIsSubmitting(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
             const isOptionMode = !!targetItemId;
             let endpoint = ""
             let payload: any = {}

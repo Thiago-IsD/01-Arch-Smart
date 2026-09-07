@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 28/63 (44%)**
-`█████████░░░░░░░░░░░`
+**Progresso geral: 36/63 (57%)**
+`███████████░░░░░░░░░`
 
-_Última atualização: 2026-09-05_
+_Última atualização: 2026-09-06_
 
 ---
 
@@ -321,16 +321,130 @@ _Última atualização: 2026-09-05_
 > "`downgrade()` funciona".
 
 ## Seção 5 · Camada de dados do frontend
-**0/8 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**8/8 (100%)** `████████████████████`
 
-- [ ] `lib/api/client.ts` (cliente único)
-- [ ] `lib/api/auth.ts` (único ponto que sabe que o Supabase existe)
-- [ ] `lib/query/keys.ts` (chaves padronizadas e política de cache)
-- [ ] Hooks por domínio em `features/<dominio>/hooks.ts`
-- [ ] Prefetch no servidor com hidratação
-- [ ] `proxy.ts` corrigido (desvio antes do `getUser()`, matcher sem `/assets`, sem `console.log`)
-- [ ] Cancelamento automático via `AbortSignal`
-- [ ] Lint que impede a volta (`fetch` fora de `lib/api/`, `createClient()` fora de `lib/api/auth.ts`, `useEffect` com busca de dado)
+- [x] `lib/api/client.ts` (cliente único)
+- [x] `lib/api/auth.ts` (único ponto que sabe do Supabase — para autenticação; ver nota abaixo sobre Storage)
+- [x] `lib/query/keys.ts` (chaves padronizadas e política de cache)
+- [x] Hooks por domínio em `features/<dominio>/hooks.ts`
+- [x] Prefetch no servidor com hidratação
+- [x] `proxy.ts` corrigido (desvio antes do `getUser()`, matcher sem `/assets`, sem `console.log`)
+- [x] Cancelamento automático via `AbortSignal`
+- [x] Lint que impede a volta — `no-restricted-syntax` (`fetch` fora de `lib/api/`, `createClient()`/`createServerClient()` fora de `lib/api/`, `useEffect` com busca de dado) é **erro** em `src/features/**`, `src/lib/**` e na rota da Biblioteca (o território que esta seção migrou, medido em zero ocorrências); nas ~30 telas ainda não migradas continua **aviso**, e a catraca (`fetch_fora_de_lib_api`, `supabase_fora_de_lib_api`) é o que impede esse resto de crescer até a Seção 8 migrar cada uma.
+
+> ## 🚧 O PORTÃO DA SEÇÃO ESTÁ ABERTO — leia isto antes de começar a Seção 6
+>
+> **A Seção 5 fechou as 8 caixas acima, mas a medição que a spec exige como
+> confirmação de "ganho" não foi feita.** A spec é explícita: *"Só com o
+> ganho confirmado ligam-se os lints e migra-se o resto."* Essa comparação de
+> tempo — a única coisa que provaria "mais rápido" — não pôde rodar neste
+> ambiente: faltam credenciais de um usuário real (`E2E_EMAIL`/`E2E_PASSWORD`,
+> vazias) para o teste de Playwright e para a checagem de hidratação ao vivo
+> no navegador. Confirmado, com o comando:
+>
+> ```
+> cd ArchSmart-web
+> npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+> # → 1 failed: "E2E_EMAIL e/ou E2E_PASSWORD não estão definidos no ambiente."
+> ```
+>
+> Isto **não é** "o ganho não apareceu" (medição rodou, número não desceu) —
+> é "a medição não rodou". O que existe em
+> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md)
+> é evidência **estrutural** (leitura de código, contagens estáticas — a
+> arquitetura mudou na direção certa, por construção), nunca medição de
+> tempo. Aquele documento também tem o comando exato que fecha o portão,
+> assim que a credencial existir.
+>
+> **A Seção 6 não deveria começar apoiada nesta seção até esse número
+> existir.** Decisão de Thiago, não de quem executa a Seção 6.
+
+> **A Seção 5 fechou em 06/09/2026, na branch `secao-5-camada-de-dados-frontend`
+> (ainda não mergeada em `develop`).** O que ficou de pé, comparado com
+> `develop`, todo medido nesta tarefa e reproduzido em
+> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md):
+>
+> | Medida | `develop` | esta branch | Comando |
+> |---|---|---|---|
+> | `createClient(`/`createBrowserClient(`/`createServerClient(` reais | 62 | **0** | `grep -rn "createClient(" ArchSmart-web/src --include=*.ts --include=*.tsx` (a única linha restante é comentário em `auth.ts:18`) |
+> | `getSession()` reais | 56 | **2**, ambas em `lib/api/` | `grep -rn "getSession()" ArchSmart-web/src --include=*.ts --include=*.tsx` |
+> | `Authorization` montado à mão em telas/componentes | 73 | **63** | ver metodologia (seção 3) do documento de medição — o total bruto sobe para 74 porque `lib/api/` e `__tests__/` (11 ocorrências, que não existiam em `develop`) entram na contagem |
+> | `fetch(` com fronteira de palavra | 87 | **76** | `grep -rnoP '\bfetch\s*\(' ArchSmart-web/src --include=*.ts --include=*.tsx \| wc -l` — idêntico ao `fetch_fora_de_lib_api` da catraca |
+> | Testes de frontend | 7, 4 arquivos | **62**, 10 arquivos | `cd ArchSmart-web && npm test` |
+> | Catraca | — | `eslint_erros` 85 (era 93), `cores_literais` 521 (igual), `fetch_fora_de_lib_api` 76, `supabase_fora_de_lib_api` 0, `modulos_sem_doc` 2 (igual) | `python tools/catraca.py --eslint-json ArchSmart-web/eslint.json` |
+>
+> **`tools/catraca.py` precisou de `--atualizar --aceitar-piora`** para
+> registrar `fetch_fora_de_lib_api` e `supabase_fora_de_lib_api` — as duas
+> medidas nasceram nesta seção, e uma chave sem baseline é tratada como
+> regressão por padrão (design do script, para ninguém gravar um número novo
+> sem passar pelo olho de quem revisa). Nenhuma medida **existente** piorou;
+> o flag foi por causa das duas chaves novas, não de uma regressão real —
+> registrado aqui para o PR poder citar o motivo.
+>
+> **O que ficou aberto, além do portão de tempo acima:**
+>
+> 1. **~30 telas fora do piloto (Biblioteca) continuam no padrão manual**
+>    (`getSession()`, `createClient()`, header à mão, `useEffect` + `fetch`).
+>    Migrá-las é a **Seção 8**; `fetch_fora_de_lib_api` e
+>    `supabase_fora_de_lib_api=0` são a régua que mede esse trabalho a partir
+>    de agora — o segundo já está no piso, o primeiro só pode descer.
+>    *Correção da revisão final desta seção:* a tabela acima mediu 76 na
+>    Tarefa 12, mas 1 dessas ocorrências era um falso positivo — um `fetch(`
+>    literal dentro de um comentário
+>    (`src/__tests__/library-hooks.test.tsx:108`), não uma chamada real. O
+>    comentário foi reescrito e o número vigente, gravado no baseline com a
+>    própria ferramenta, é **75** — ver a nota em
+>    `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`.
+> 2. **`plan_limit` (em `/api/projects`) e `entitlements.project_limit` (em
+>    `/api/users/me`) continuam dois nomes para o mesmo conceito no
+>    backend.** O front lê só o segundo (`useMe()` em
+>    `ArchSmart-web/src/features/account/hooks.ts`) — a violação do Art. 3 que
+>    dependia do primeiro foi corrigida nesta seção. Unificar o nome de fio no
+>    backend é trabalho de outra seção.
+> 3. **Os arquivos grandes do domínio Biblioteca não foram quebrados — Seção
+>    6.** *Correção a um número que veio do planejamento desta tarefa:* o
+>    plano descrevia "os quatro arquivos de 450–473 linhas"; medido agora
+>    (`wc -l ArchSmart-web/src/components/library/{ProductFormSheet,NormalizationSheet,BatchNormalizeModal,ProductCard,MoveToProjectModal,ClipperOnboarding}.tsx`),
+>    são **três** arquivos nessa faixa, não quatro: `ProductFormSheet.tsx`
+>    (453), `NormalizationSheet.tsx` (437) e `BatchNormalizeModal.tsx` (434).
+>    Os outros três componentes que a Tarefa 7 migrou encolheram bem abaixo
+>    dessa faixa ao perder o código de busca de dado (`ProductCard.tsx` 211,
+>    `MoveToProjectModal.tsx` 161, `ClipperOnboarding.tsx` 143). O fato que
+>    sobrevive — três arquivos de 434 a 453 linhas continuam grandes e quebrar
+>    é Seção 6 — está correto; só o "quatro" e o "450–473" como intervalo
+>    exato não bateram na medição.
+> 4. **`MoveToProjectModal` usa hooks de `features/library`, mas fala de
+>    projetos e orçamento.** `useProjetosParaMover`, `useAmbientesDoProjeto` e
+>    `useMoveToProject` (`features/library/hooks.ts`) resolvem um domínio que
+>    não é biblioteca — ficaram lá porque `features/projects/` ainda não
+>    existe. Quando a Seção 8 criar essa pasta, os três hooks mudam de casa.
+> 5. **`LibraryContent` descarta `error` dos hooks de dado**
+>    (`const { data, isLoading } = useProducts(...)`, sem `error`) — uma falha
+>    de rede hoje é indistinguível de "sem produtos" para quem usa a tela: o
+>    texto mostrado é o mesmo "Nenhum produto encontrado" dos dois casos.
+>    Comportamento pré-existente que a migração preservou, não uma regressão
+>    desta seção; o conserto de verdade é o `QueryBoundary` da Seção 6, que
+>    obriga tratar os 5 estados (incluindo erro) em vez de deixar opcional.
+> 6. **Sem teste no nível de componente para `MoveToProjectModal` nem
+>    `BatchNormalizeModal`** (`ArchSmart-web/src/__tests__/` cobre hooks e
+>    cliente, não esses dois componentes) — duas regressões corrigidas
+>    durante esta seção (invalidação de cache em duas chaves, paginação do
+>    inbox) não estão pinadas por teste nenhum; uma futura mudança pode
+>    reintroduzi-las sem que a suíte acuse.
+> 7. **Mudança de comportamento, deliberada:** `listarProjetos`
+>    (`features/library/api.ts:113`) manda `size: 100`, contra o `size`
+>    default de 20 do backend em `/api/projects` — o dropdown "mover para
+>    projeto" agora lista até 100 projetos, não 20. Ninguém tinha notado que
+>    o dropdown estava truncado em 20 antes desta seção.
+> 8. **Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
+>    propósito.** `grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l`
+>    → **43**. A marca aparece sem o Q em copy de usuário final: landing,
+>    login, cadastro, recuperação de senha, reset de senha, preços, portal do
+>    cliente e `layout.tsx`. **Deliberadamente não corrigido nesta seção**:
+>    27 arquivos de copy dentro de um diff de camada de dados seriam
+>    exatamente o "migrar de passagem" que o `CLAUDE.md` da raiz proíbe, e
+>    misturariam duas mudanças que não têm nada a ver uma com a outra. Fica
+>    para um commit mecânico próprio — decisão de Thiago, não desta seção.
 
 ## Seção 6 · Camada de UI
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`

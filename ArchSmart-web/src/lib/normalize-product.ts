@@ -1,5 +1,4 @@
-import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { api } from "@/lib/api/client"
 
 export interface NormalizedProduct {
     name?: string | null
@@ -20,57 +19,22 @@ const NORMALIZE_TIMEOUT_MS = 45_000
  */
 export const NORMALIZE_CONCURRENCY = 4
 
-export async function getToken(): Promise<string | undefined> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token
-}
-
-/**
- * Extrai a mensagem de erro da API.
- *
- * O backend devolve mensagens específicas em `detail` (quota, timeout, formato inválido).
- * Antes o corpo era descartado e toda falha virava "não foi possível conectar com a IA",
- * o que fez um bug de schema parecer problema de rede por semanas.
- */
-export async function apiErrorMessage(res: Response, fallback: string): Promise<string> {
-    try {
-        const body = await res.json()
-        if (typeof body?.detail === "string") return body.detail
-    } catch {
-        // resposta sem corpo JSON — usa o fallback
-    }
-    return fallback
-}
-
 export async function normalizeProduct(
     input: { text: string; source_url?: string | null },
-    options: { token?: string; signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal } = {},
 ): Promise<NormalizedProduct> {
-    const token = options.token ?? (await getToken())
-
     const timeout = new AbortController()
     const timer = setTimeout(() => timeout.abort(), NORMALIZE_TIMEOUT_MS)
-
-    // Combina o abort do chamador (fechar o modal) com o do timeout.
     const signals = [timeout.signal, options.signal].filter(Boolean) as AbortSignal[]
     const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
 
     try {
-        const res = await fetch(apiUrl("/api/products/normalize"), {
+        return await api<NormalizedProduct>("/api/products/normalize", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({ text: input.text, source_url: input.source_url ?? null }),
+            body: { text: input.text, source_url: input.source_url ?? null },
             signal,
+            fallbackDeErro: "Não foi possível analisar este produto.",
         })
-
-        if (!res.ok) {
-            throw new Error(await apiErrorMessage(res, "Não foi possível analisar este produto."))
-        }
-        return await res.json()
     } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
             throw new Error(

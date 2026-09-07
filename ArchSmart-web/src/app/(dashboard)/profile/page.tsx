@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Building2, User, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken, getUser } from "@/lib/api/auth";
+import { apiUrl } from "@/lib/api-url";
 
 interface ProfileFormData {
     full_name: string;
@@ -55,26 +56,22 @@ export default function ProfilePage() {
     useEffect(() => {
         const loadUserData = async () => {
             try {
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
+                const accessToken = await getAccessToken();
 
-                if (!session) {
+                if (!accessToken) {
                     return;
                 }
 
                 // Load user email
-                const { data: { user } } = await supabase.auth.getUser();
+                const user = await getUser();
                 if (user) {
                     setUserEmail(user.email || "");
                 }
 
                 // Load profile data
-                const apiUrlModule = await import("@/lib/api-url");
-                const apiUrlFn = apiUrlModule.apiUrl;
-
-                const profileResponse = await fetch(apiUrlFn("/api/users/me"), {
+                const profileResponse = await fetch(apiUrl("/api/users/me"), {
                     headers: {
-                        "Authorization": `Bearer ${session.access_token}`,
+                        "Authorization": `Bearer ${accessToken}`,
                     },
                 });
 
@@ -122,18 +119,17 @@ export default function ProfilePage() {
     const onSubmitProfile = async (data: ProfileFormData) => {
         setIsLoadingProfile(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = await getAccessToken();
 
-            if (!session) {
+            if (!accessToken) {
                 throw new Error("No active session");
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
+            const response = await fetch(apiUrl("/api/users/profile"), {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${session.access_token}`,
+                    "Authorization": `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify(data),
             });
@@ -162,10 +158,9 @@ export default function ProfilePage() {
     const onSubmitBranding = async (data: BrandingFormData) => {
         setIsLoadingBranding(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
+            const accessToken = await getAccessToken();
 
-            if (!session) {
+            if (!accessToken) {
                 throw new Error("No active session");
             }
 
@@ -175,10 +170,10 @@ export default function ProfilePage() {
                 formData.append("file", logoFile);
             }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/account/branding`, {
+            const response = await fetch(apiUrl("/api/account/branding"), {
                 method: "PUT",
                 headers: {
-                    "Authorization": `Bearer ${session.access_token}`,
+                    "Authorization": `Bearer ${accessToken}`,
                 },
                 body: formData,
             });

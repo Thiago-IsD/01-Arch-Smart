@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import { apiUrl } from "@/lib/api-url"
@@ -28,9 +28,7 @@ export function ProjectStatusSelect({ projectId, currentStatus }: ProjectStatusS
     const handleStatusChange = async (newStatus: string) => {
         try {
             setIsUpdating(true)
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
                 method: "PUT",

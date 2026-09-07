@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { apiUrl } from "@/lib/api-url";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -63,13 +63,12 @@ export function FinancialTable({ entries, onStatusToggled, onEdit, onDelete }: F
     const handleToggleStatus = async (id: string) => {
         setTogglingId(id);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+            const accessToken = await getAccessToken();
+            if (!accessToken) return;
 
             const res = await fetch(apiUrl(`/api/financial/${id}/status`), {
                 method: "PATCH",
-                headers: { "Authorization": `Bearer ${session.access_token}` }
+                headers: { "Authorization": `Bearer ${accessToken}` }
             });
 
             if (res.ok) {

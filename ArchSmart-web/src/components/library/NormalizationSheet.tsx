@@ -24,8 +24,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2, Sparkles, ExternalLink, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { apiUrl } from "@/lib/api-url"
-import { getToken, normalizeProduct } from "@/lib/normalize-product"
+import { normalizeProduct } from "@/lib/normalize-product"
+import { useApproveProduct } from "@/features/library/hooks"
 import {
     Select,
     SelectContent,
@@ -70,7 +70,8 @@ interface NormalizationSheetProps {
 export function NormalizationSheet({ isOpen, productToNormalize }: NormalizationSheetProps) {
     const router = useRouter()
     const { toast } = useToast()
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const aprovarProdutoMutation = useApproveProduct()
+    const isSubmitting = aprovarProdutoMutation.isPending
     const [isExtracting, setIsExtracting] = useState(false)
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -118,7 +119,6 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         if (!hasDimensions) return
 
-        setIsSubmitting(true)
         try {
             const payload = {
                 name: values.name,
@@ -134,17 +134,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                 yield_factor: values.yield_factor || null
             }
 
-            const token = await getToken()
-            const res = await fetch(apiUrl(`/api/products/${productToNormalize.id}/approve`), {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify(payload),
-            })
-
-            if (!res.ok) throw new Error("Falha ao aprovar produto")
+            await aprovarProdutoMutation.mutateAsync({ id: productToNormalize.id, payload })
 
             toast({
                 title: "Produto Aprovado!",
@@ -152,17 +142,14 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
             })
 
             onClose()
-            router.refresh()
 
         } catch (error) {
             console.error(error)
             toast({
                 title: "Erro",
-                description: "Não foi possível aprovar o produto.",
+                description: error instanceof Error ? error.message : "Não foi possível aprovar o produto.",
                 variant: "destructive",
             })
-        } finally {
-            setIsSubmitting(false)
         }
     }
 

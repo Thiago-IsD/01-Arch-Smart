@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 
 // ---------------------------------------------------------------------------
 // Schema de validação
@@ -104,11 +104,10 @@ function toDatetimeLocal(date: Date): string {
 }
 
 async function getAuthHeaders(): Promise<HeadersInit> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = await getAccessToken()
     return {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${session?.access_token ?? ""}`,
+        "Authorization": `Bearer ${accessToken ?? ""}`,
     }
 }
 

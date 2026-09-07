@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { apiUrl } from "@/lib/api-url";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -119,9 +119,8 @@ export function QuickEntryDialog({ isOpen, onClose, type, onSuccess, initialData
 
     const onSubmit = async (values: FormValues) => {
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            const accessToken = await getAccessToken();
+            if (!accessToken) {
                 toast({ variant: "destructive", title: "Sessão expirada", description: "Faça login novamente." });
                 return;
             }
@@ -151,7 +150,7 @@ export function QuickEntryDialog({ isOpen, onClose, type, onSuccess, initialData
             const res = await fetch(apiUrl(endpoint), {
                 method,
                 headers: {
-                    "Authorization": `Bearer ${session.access_token}`,
+                    "Authorization": `Bearer ${accessToken}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(reqBody),

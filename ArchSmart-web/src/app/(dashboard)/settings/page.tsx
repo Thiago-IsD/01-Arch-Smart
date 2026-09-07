@@ -86,11 +86,10 @@ export default function SettingsPage() {
         setIsLoading(true)
         try {
             // Get token from Supabase session
-            const { createClient } = await import("@/utils/supabase/client")
-            const supabase = createClient()
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            const { getAccessToken } = await import("@/lib/api/auth")
+            const accessToken = await getAccessToken()
 
-            if (sessionError || !session) {
+            if (!accessToken) {
                 throw new Error("Sessão expirada. Faça login novamente.")
             }
 
@@ -98,7 +97,7 @@ export default function SettingsPage() {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${session.access_token}`
+                    "Authorization": `Bearer ${accessToken}`
                 },
                 body: JSON.stringify({
                     current_password: data.currentPassword,
@@ -138,18 +137,17 @@ export default function SettingsPage() {
         setIsDeleting(true)
         try {
             // Get token from Supabase session
-            const { createClient } = await import("@/utils/supabase/client")
-            const supabase = createClient()
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            const { getAccessToken, signOut } = await import("@/lib/api/auth")
+            const accessToken = await getAccessToken()
 
-            if (sessionError || !session) {
+            if (!accessToken) {
                 throw new Error("Sessão expirada. Faça login novamente.")
             }
 
             const response = await fetch(apiUrl("/api/account"), {
                 method: "DELETE",
                 headers: {
-                    "Authorization": `Bearer ${session.access_token}`
+                    "Authorization": `Bearer ${accessToken}`
                 }
             })
 
@@ -163,7 +161,7 @@ export default function SettingsPage() {
             })
 
             // Sign out from Supabase and redirect
-            await supabase.auth.signOut()
+            await signOut()
 
             setTimeout(() => {
                 router.push("/auth/login")
