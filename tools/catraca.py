@@ -1,12 +1,25 @@
 """
 Catraca dos portoes graduais do CI.
 
-Tres medidas que hoje estao vermelhas e nao podem piorar enquanto as secoes
+Medidas que hoje estao vermelhas e nao podem piorar enquanto as secoes
 que as consertam nao chegam (ver ADR 0006):
 
-  - eslint_erros     93 hoje; as Secoes 5 e 6 derrubam
+  - eslint_erros     o `errorCount` somado do `npx eslint . --format json`
+                     (ver tools/catraca.json para o numero medido hoje); as
+                     Secoes 5 e 6 derrubam
   - cores_literais   521 hoje; a Secao 6 zera, quando os tokens existirem
   - modulos_sem_doc  os 4 services de hoje; a Secao 8 documenta
+
+A Secao 5 acrescentou duas medidas, para telas que ainda usam o padrao
+manual (`fetch` cru, cliente Supabase direto) fora de `src/lib/api/`:
+
+  - fetch_fora_de_lib_api       nasce no numero medido nesta secao; a
+                                 Secao 8 zera, quando as ~30 telas migrarem
+  - supabase_fora_de_lib_api    nasceu em 0 nesta secao — depois das Tarefas
+                                 3 e 9, nenhuma chamada de `createBrowserClient`/
+                                 `createServerClient` sobrou fora de
+                                 src/lib/api/ e src/proxy.ts. Ja e catraca no
+                                 piso: qualquer reintroducao reprova.
 
 Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
@@ -38,6 +51,14 @@ SERVICES_API = RAIZ / "ArchSmart-api" / "app" / "services"
 FEATURES_WEB = RAIZ / "ArchSmart-web" / "src" / "features"
 DOCS_MODULOS = RAIZ / "docs" / "dev" / "modulos"
 
+LIB_API_WEB = RAIZ / "ArchSmart-web" / "src" / "lib" / "api"
+PROXY_WEB = RAIZ / "ArchSmart-web" / "src" / "proxy.ts"
+
+# `\bfetch\s*\(` nao casa "prefetch(": entre "pre" e "fetch" nao ha fronteira
+# de palavra. Casa `fetch(` e `client.fetch(`, que e o que queremos contar.
+RE_FETCH = re.compile(r"\bfetch\s*\(")
+RE_SUPABASE = re.compile(r"\bcreate(Browser|Server)Client\s*\(")
+
 _PREFIXOS = ("bg|text|border|ring|from|to|via|fill|stroke|outline|decoration"
              "|shadow|accent|caret|divide|placeholder")
 _PALETAS = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green"
@@ -49,6 +70,8 @@ CRITERIOS = {
     "eslint_erros": "soma de errorCount no `npx eslint . --format json`",
     "cores_literais": "regex de classe de paleta e de cor arbitraria em ArchSmart-web/src/**/*.{ts,tsx}",
     "modulos_sem_doc": "arquivo em app/services/ ou diretorio em src/features/ sem .md de mesmo nome em docs/dev/modulos/",
+    "fetch_fora_de_lib_api": "ocorrencias de `fetch(` em ArchSmart-web/src/**/*.{ts,tsx}, fora de src/lib/api/",
+    "supabase_fora_de_lib_api": "ocorrencias de `create{Browser,Server}Client(` fora de src/lib/api/ e src/proxy.ts",
 }
 
 
@@ -77,6 +100,23 @@ def contar_cores(raiz: Path) -> int:
     return total
 
 
+def contar_ocorrencias(raiz: Path, padrao: re.Pattern, isentos: tuple[Path, ...] = ()) -> int:
+    """Ocorrencias de `padrao` em .ts/.tsx sob `raiz`, fora dos caminhos isentos."""
+    if not raiz.exists():
+        raise DiretorioMedidoSumiu(
+            f"{raiz} nao existe. A catraca mede esse caminho; se ele foi renomeado, "
+            "atualize SRC_WEB em tools/catraca.py no mesmo commit do rename."
+        )
+    total = 0
+    for caminho in raiz.rglob("*"):
+        if caminho.suffix not in (".ts", ".tsx") or not caminho.is_file():
+            continue
+        if any(caminho == isento or isento in caminho.parents for isento in isentos):
+            continue
+        total += len(padrao.findall(caminho.read_text(encoding="utf-8", errors="ignore")))
+    return total
+
+
 def modulos_sem_doc(services: Path, features: Path | None, docs: Path) -> list[str]:
     """Modulos sem o .md correspondente em docs/dev/modulos/ (Art. 13)."""
     documentados = {p.stem for p in docs.glob("*.md")} if docs.exists() else set()
@@ -98,6 +138,8 @@ def medir(eslint_json: Path | None) -> dict:
     medido = {
         "cores_literais": contar_cores(SRC_WEB),
         "modulos_sem_doc": modulos_sem_doc(SERVICES_API, FEATURES_WEB, DOCS_MODULOS),
+        "fetch_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_FETCH, (LIB_API_WEB,)),
+        "supabase_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
     }
     if eslint_json is not None:
         relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))
@@ -146,9 +188,32 @@ def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
     return ok, linhas
 
 
-def medidas_pioradas(baseline: dict, medido: dict) -> list[str]:
-    """Descricoes ('chave: de -> para') de cada medida que piorou de `baseline` para `medido`."""
+def medidas_pioradas(baseline: dict, medido: dict, chave_nova_e_piora: bool = True) -> list[str]:
+    """Descricoes ('chave: de -> para') de cada medida que piorou de `baseline` para `medido`.
+
+    As duas direcoes de "chave so existe de um lado" nao sao o mesmo caso:
+
+    - chave em `baseline` e ausente de `medido`: a chave sumiu do lado atual.
+      Sempre piora, com a mensagem "a chave sumiu do catraca.json" -- pega
+      tanto apagar a chave do catraca.json local quanto apagar a chave do
+      catraca.json desta branch em relacao ao da branch base.
+    - chave em `medido` e ausente de `baseline`: uma medida nova. So conta
+      como piora quando `chave_nova_e_piora` e True (o default).
+      `decidir_atualizacao` usa o default: contra o proprio tools/catraca.json
+      local, uma chave sem baseline fica fail-closed ate `--atualizar` gravar
+      de proposito -- por isso a Tarefa 11 precisou de `--aceitar-piora` para
+      registrar `fetch_fora_de_lib_api`/`supabase_fora_de_lib_api` pela
+      primeira vez. `_auditar_baseline` passa `chave_nova_e_piora=False`:
+      ali `baseline` e `medido` sao dois catraca.json (o da branch base e o
+      desta branch), e uma chave nova e uma medida apertando do nada para um
+      numero real -- nao um afrouxamento. Sem essa distincao, o job
+      `Repositorio` reprova todo PR que introduz uma medida nova, com o
+      diagnostico invertido de que o baseline afrouxou.
+    """
     pioras = []
+    for chave in sorted(set(baseline) - set(medido)):
+        # Chave existia e sumiu do lado atual -- sempre piora, nos dois usos.
+        pioras.append(f"{chave}: {baseline[chave]!r} -> sumiu (a chave sumiu do catraca.json)")
     for chave, valor in sorted(medido.items()):
         base = baseline.get(chave)
         if isinstance(valor, list):
@@ -156,6 +221,8 @@ def medidas_pioradas(baseline: dict, medido: dict) -> list[str]:
             if novos:
                 pioras.append(f"{chave}: novo(s) sem doc: {', '.join(novos)}")
         elif base is None:
+            if not chave_nova_e_piora:
+                continue
             # Chave numerica ausente conta como piora. Sem isto, apagar a chave
             # do catraca.json e rodar --atualizar gravava o numero novo em
             # silencio, saida 0 — o cenario que o ADR 0006 nomeia como prova de
@@ -198,6 +265,12 @@ def _auditar_baseline(referencia: Path) -> int:
 
     Este modo nao mede nada. Compara baseline com baseline, e e por isso que ele
     pega o que a comparacao com o medido nao pega.
+
+    Passa `chave_nova_e_piora=False` para `medidas_pioradas`: uma chave que
+    existe nesta branch e nao existe na base e uma medida nova sendo
+    registrada, nao um afrouxamento. Sem isso, todo PR que acrescenta uma
+    medida (como as duas que a Tarefa 11 da Secao 5 acrescentou) reprovaria
+    aqui com o diagnostico invertido de "o baseline afrouxou".
     """
     atual = json.loads(BASELINE.read_text(encoding="utf-8"))
     try:
@@ -206,7 +279,11 @@ def _auditar_baseline(referencia: Path) -> int:
         print(f"[X] baseline de referencia nao encontrado: {referencia}")
         return 1
 
-    pioras = medidas_pioradas(base, {c: v for c, v in atual.items() if not c.startswith("_")})
+    pioras = medidas_pioradas(
+        {c: v for c, v in base.items() if not c.startswith("_")},
+        {c: v for c, v in atual.items() if not c.startswith("_")},
+        chave_nova_e_piora=False,
+    )
     if not pioras:
         print(f"[v] tools/catraca.json nao afrouxou em relacao a {referencia}")
         return 0
@@ -242,7 +319,16 @@ def main(argv: list[str] | None = None) -> int:
     medido = medir(args.eslint_json)
 
     if args.atualizar:
-        grava, avisos = decidir_atualizacao(baseline, medido, args.aceitar_piora)
+        # `_leia-me` (e qualquer outra chave de documentacao com "_") nao e
+        # medida — `medir()` nunca a devolve, entao compara-la contra o
+        # baseline cru sempre acusa "a chave sumiu" e reprova todo
+        # `--atualizar`, mesmo sem regressao nenhuma. Mesmo filtro que
+        # `_auditar_baseline` ja aplica dos dois lados.
+        grava, avisos = decidir_atualizacao(
+            {c: v for c, v in baseline.items() if not c.startswith("_")},
+            medido,
+            args.aceitar_piora,
+        )
         if avisos:
             print("\n".join(avisos))
         if not grava:

@@ -21,7 +21,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { apiUrl } from "@/lib/api-url"
 
 interface EnvironmentCardProps {
@@ -44,9 +44,7 @@ export function EnvironmentCard({ environment, onClick, onDelete }: EnvironmentC
     const confirmDelete = async () => {
         setIsDeleting(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const res = await fetch(apiUrl(`/api/environments/${environment.id}`), {
                 method: "DELETE",

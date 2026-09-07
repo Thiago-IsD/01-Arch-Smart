@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
-import { apiUrl } from "@/lib/api-url"
+import { useAmbientesDoProjeto, useMoveToProject, useProjetosParaMover } from "@/features/library/hooks"
 import {
     Dialog,
     DialogContent,
@@ -32,110 +31,48 @@ export function MoveToProjectModal({
 }) {
     const { toast } = useToast()
 
-    const [projects, setProjects] = useState<any[]>([])
-    const [environments, setEnvironments] = useState<any[]>([])
-
     const [selectedProjectId, setSelectedProjectId] = useState<string>("")
     const [selectedEnvId, setSelectedEnvId] = useState<string>("")
     const [ruleType, setRuleType] = useState<string>("UNIT")
 
-    const [isLoadingProjects, setIsLoadingProjects] = useState(false)
-    const [isLoadingEnvs, setIsLoadingEnvs] = useState(false)
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const { data: projects = [], isLoading: isLoadingProjects } = useProjetosParaMover(isOpen)
+    const { data: environments = [], isLoading: isLoadingEnvs } = useAmbientesDoProjeto(
+        selectedProjectId || undefined,
+    )
+    const moverParaProjetoMutation = useMoveToProject()
+    const isSubmitting = moverParaProjetoMutation.isPending
 
-    // 1. Fetch Projects on mount
+    // O ambiente efetivo: o que o usuario escolheu, ou o primeiro da lista como
+    // sugestao. Calculado no render, nao guardado em estado — um efeito que so
+    // faz `setState` a partir de `environments` reexecuta a cada troca de
+    // referencia do array (toda vez que a query refaz fetch) e "puxa de volta"
+    // a escolha do usuario para o primeiro item sem ele ter pedido nada.
+    const envIdEfetivo = selectedEnvId || environments[0]?.id || ""
+
+    // Reseta a selecao quando o modal fecha.
     useEffect(() => {
         if (!isOpen) {
             setSelectedProjectId("")
             setSelectedEnvId("")
-            return
         }
-
-        const fetchProjects = async () => {
-            setIsLoadingProjects(true)
-            try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
-                const token = session?.access_token || ""
-
-                const res = await fetch(apiUrl("/api/projects"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                })
-
-                if (res.ok) {
-                    const data = await res.json()
-                    setProjects(data.items || [])
-                }
-            } catch (e) {
-                console.error("Failed to fetch projects", e)
-            } finally {
-                setIsLoadingProjects(false)
-            }
-        }
-        fetchProjects()
-
     }, [isOpen])
 
-    // 2. Fetch Environments when Project changes
-    useEffect(() => {
-        if (!selectedProjectId) {
-            setEnvironments([])
-            setSelectedEnvId("")
-            return
-        }
-
-        const fetchEnvs = async () => {
-            setIsLoadingEnvs(true)
-            try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
-                const token = session?.access_token || ""
-
-                const res = await fetch(apiUrl(`/api/projects/${selectedProjectId}/environments`), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                })
-
-                if (res.ok) {
-                    const data = await res.json()
-                    setEnvironments(data)
-                    // Auto-select first environment if available
-                    if (data.length > 0) setSelectedEnvId(data[0].id)
-                    else setSelectedEnvId("")
-                }
-            } catch (e) {
-                console.error(e)
-            } finally {
-                setIsLoadingEnvs(false)
-            }
-        }
-        fetchEnvs()
-    }, [selectedProjectId])
+    const handleProjectChange = (value: string) => {
+        setSelectedProjectId(value)
+        // O ambiente escolhido pertencia ao projeto anterior.
+        setSelectedEnvId("")
+    }
 
     const handleSubmit = async () => {
-        if (!product || !selectedProjectId || !selectedEnvId) return
+        if (!product || !selectedProjectId || !envIdEfetivo) return
 
-        setIsSubmitting(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
-            const payload = {
+            await moverParaProjetoMutation.mutateAsync({
                 project_id: selectedProjectId,
-                environment_id: selectedEnvId,
+                environment_id: envIdEfetivo,
                 product_id: product.id,
-                rule_type: ruleType
-            }
-
-            const res = await fetch(apiUrl("/api/budgets/items"), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
+                rule_type: ruleType,
             })
-
-            if (!res.ok) throw new Error("Failed to move to project")
 
             toast({
                 title: "Sucesso!",
@@ -147,10 +84,8 @@ export function MoveToProjectModal({
             toast({
                 variant: "destructive",
                 title: "Erro",
-                description: "Não foi possível vincular o produto.",
+                description: error instanceof Error ? error.message : "Não foi possível vincular o produto.",
             })
-        } finally {
-            setIsSubmitting(false)
         }
     }
 
@@ -167,7 +102,7 @@ export function MoveToProjectModal({
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">1. Escolha o Projeto</label>
-                        <Select value={selectedProjectId} onValueChange={setSelectedProjectId} disabled={isLoadingProjects}>
+                        <Select value={selectedProjectId} onValueChange={handleProjectChange} disabled={isLoadingProjects}>
                             <SelectTrigger>
                                 <SelectValue placeholder={isLoadingProjects ? "Carregando projetos..." : "Selecione um projeto"} />
                             </SelectTrigger>
@@ -181,7 +116,7 @@ export function MoveToProjectModal({
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium">2. Escolha o Ambiente</label>
-                        <Select value={selectedEnvId} onValueChange={setSelectedEnvId} disabled={!selectedProjectId || isLoadingEnvs || environments.length === 0}>
+                        <Select value={envIdEfetivo} onValueChange={setSelectedEnvId} disabled={!selectedProjectId || isLoadingEnvs || environments.length === 0}>
                             <SelectTrigger>
                                 <SelectValue placeholder={
                                     !selectedProjectId ? "Selecione o projeto primeiro" :
@@ -215,7 +150,7 @@ export function MoveToProjectModal({
 
                 <div className="flex gap-2 justify-end mt-2">
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
-                    <Button onClick={handleSubmit} disabled={isSubmitting || !selectedProjectId || !selectedEnvId}>
+                    <Button onClick={handleSubmit} disabled={isSubmitting || !selectedProjectId || !envIdEfetivo}>
                         {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Enviar Produto
                     </Button>

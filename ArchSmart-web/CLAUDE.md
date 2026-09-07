@@ -1,6 +1,6 @@
 # ArchSmart-web — regras do frontend
 
-Este arquivo descreve o alvo da **Seção 5** para o frontend. Leia primeiro `../CLAUDE.md` para o estado geral da reestruturação.
+A **Seção 5** (camada de dados do frontend) concluiu em 06/09/2026. Este arquivo descreve o estado atual do frontend, não mais um alvo futuro. Leia primeiro `../CLAUDE.md` para o estado geral da reestruturação.
 
 ## Onde as coisas moram hoje
 
@@ -12,15 +12,27 @@ Este arquivo descreve o alvo da **Seção 5** para o frontend. Leia primeiro `..
 
 ## Onde colocar um arquivo novo
 
-Componente usado só por uma rota fica junto dela, em `<rota>/components/` (ex.: `library/components/LibraryContent.tsx`). Usado por mais de uma rota vai em `src/components/<área>/`. `src/utils/` hoje só tem o cliente Supabase (`@/utils/supabase/client`, `createClient()`) — utilitário novo vai em `src/lib/`, não em `src/utils/`.
+Componente usado só por uma rota fica junto dela, em `<rota>/components/` (ex.: `library/components/LibraryContent.tsx`). Usado por mais de uma rota vai em `src/components/<área>/`. `src/utils/` hoje só tem `get-system-asset.ts` — o cliente Supabase que morava lá (`@/utils/supabase/client`, `createClient()`) foi apagado na Seção 5; utilitário novo vai em `src/lib/`, não em `src/utils/`.
 
-## Onde vão morar
+## Onde moram as coisas da Seção 5
 
-`src/features/<dominio>/` reunindo `api.ts`, `hooks.ts` e `components/` do domínio, mais `lib/api/` (cliente HTTP único que injeta o header de auth) — **Seção 5**. Essas pastas ainda não existem, **não as crie agora**. Diferente: `lib/query/` (TanStack Query) **já está instalado, configurado e montado hoje** — falta só a pasta e a convenção de `queryKeys`; ver "Busca de dados" abaixo.
+`src/features/<dominio>/` (hoje: `library/`, `account/`), cada um com `api.ts`, `hooks.ts`, `types.ts` e, quando o domínio tem filtro próprio, `filters.ts`. `src/lib/api/` é o cliente HTTP único:
+
+- `core.ts` — a fábrica `criarCliente()`. Recebe `resolverToken` por parâmetro, para ser testável sem rede e sem Supabase.
+- `client.ts` — `export const api` (browser), usa `getAccessToken()` de `auth.ts`.
+- `server.ts` — `export const apiServer` (Server Component / Route Handler), usa `getServerAccessToken()` de `auth.server.ts`.
+- `auth.ts` / `auth.server.ts` — os dois arquivos que sabem que o Supabase existe **para autenticação** (ver "Desvio da spec" em "Autenticação da chamada"). Isto não cobre Storage: `src/components/ui/image-upload.tsx:30,38` chama `supabase.storage` (via `supabaseBrowser()` de `auth.ts`) — medido, `grep -rn "\.storage\b" src` → 2 ocorrências, 1 arquivo. Uma frase como "o único arquivo que sabe que Supabase existe" descreve autenticação, não a superfície toda; trocar Supabase por outro provedor de auth reescreveria `auth.ts`/`auth.server.ts`, mas trocar o backend de Storage é trabalho à parte, ainda não mapeado.
+- `errors.ts` — traduz a resposta HTTP em `ApiError` tipado, discriminando por formato de `detail` (ver "O que a Seção 4 mudou na API", abaixo).
+
+`src/lib/query/keys.ts` tem as chaves hierárquicas (`queryKeys.products.*`, `queryKeys.projects.*`, `queryKeys.account.*`) e a política de cache por natureza do dado (`cachePolicy.referencia`/`conta`/`transacional`); `hydration.ts` tem `tentarPrefetch()`, usado pelo prefetch no servidor da Biblioteca.
+
+Essas pastas existem e têm dono — não as recrie, e não monte um segundo cliente HTTP ou uma segunda tabela de chaves em paralelo.
 
 ## Busca de dados
 
-Tela nova no dashboard busca dado com `useQuery`. O `QueryProvider` já está montado em `src/app/(dashboard)/layout.tsx` (`staleTime` 30 s, `gcTime` 5 min) — **não** use `useEffect` + `fetch`. URL base sempre de `getApiUrl()` em `src/lib/api-url.ts`; nunca escreva `http://localhost:8000` ou qualquer host na tela (Art. 4).
+Hook de domínio vem de `features/<dominio>/hooks.ts`, nunca `useQuery` direto na tela nem `useEffect` + `fetch`. Chave de cache nova entra em `lib/query/keys.ts`, dentro da hierarquia de `queryKeys` — nunca uma chave inline no componente: é por prefixo de chave que o React Query invalida, e uma chave criada fora da hierarquia (uma tupla solta dentro do componente) não é alcançada por `invalidateQueries({ queryKey: queryKeys.products.all })` quando outro hook precisar invalidar o mesmo dado.
+
+O `QueryProvider` continua montado em `src/app/(dashboard)/layout.tsx`, com o default global de `staleTime` 30 s / `gcTime` 5 min; cada hook de domínio sobrescreve esse default espalhando `cachePolicy.referencia`/`conta`/`transacional` (`lib/query/keys.ts`) conforme a natureza do dado. URL base sempre de `getApiUrl()` em `src/lib/api-url.ts`; nunca escreva `http://localhost:8000` ou qualquer host na tela (Art. 4).
 
 ## O que a Seção 4 mudou na API que este front consome
 
@@ -34,19 +46,34 @@ A Seção 4 fechou em 06/09/2026 e está implantada em staging. Três coisas mud
 
 É dicionário aberto de propósito (um entitlement novo não deve exigir deploy casado de API e front), então **o front não tem lista de chaves para tipar contra** — vale a Seção 5 declarar o seu próprio tipo parcial. `PUT /api/users/profile` devolve o mesmo schema e também carrega `entitlements`; preencher só um dos dois faz o campo sumir depois que o usuário salva o perfil.
 
-**Isso mata a violação do Art. 3 que está aberta aqui.** `data?.plan_limit ?? 2` continua em `src/app/(dashboard)/dashboard/page.tsx:217` e `src/app/(dashboard)/projects/page.tsx:44` — agora existe fonte no servidor para substituir o número fixo. Cuidado com o nome: a resposta paginada de `/api/projects` devolve o campo como `plan_limit`, e o `/me` devolve como `entitlements.project_limit`. São o mesmo conceito com dois nomes; unificar o nome de fio é trabalho desta seção, não da 4.
+**A violação do Art. 3 que estava aberta aqui foi corrigida nesta seção.** `data?.plan_limit ?? 2` saiu de `src/app/(dashboard)/dashboard/page.tsx` e `src/app/(dashboard)/projects/page.tsx`; as duas telas leem `entitlements.project_limit` do `/me` (via `useMe()` em `features/account/hooks.ts`), nunca mais um número fixo no front. O nome duplo no backend **não** foi unificado: a resposta paginada de `/api/projects` continua devolvendo o campo como `plan_limit`, e o `/me` como `entitlements.project_limit` — dois nomes para o mesmo conceito. O front só lê o segundo; unificar o nome de fio no backend é trabalho de outra seção, registrado em aberto no `PROGRESS.md`.
 
-**Dez rotas mudaram de status: 400→422 e 500→422.** A tabela com arquivo, função e antes/depois está na nota da Seção 4 no `PROGRESS.md`. O que importa para o cliente: **existem duas formas de 422 na mesma API.** A do Pydantic traz `detail` como **lista** de erros de validação; a de domínio (`ValidacaoDeDominio`) traz `detail` como **string** em pt-BR pronta para exibir. Um cliente que ramifica em "400 = mostro a mensagem, 422 = renderizo `detail[].msg`" quebra nessas dez. Se a taxonomia está certa é decisão em aberto — ver `../CLAUDE.md`, "O que a Seção 4 deixou em aberto".
+**Dez rotas mudaram de status: 400→422 e 500→422.** A tabela com arquivo, função e antes/depois está na nota da Seção 4 no `PROGRESS.md`. O que importa para o cliente: **existem duas formas de 422 na mesma API.** A do Pydantic traz `detail` como **lista** de erros de validação; a de domínio (`ValidacaoDeDominio`) traz `detail` como **string** em pt-BR pronta para exibir.
+
+**A taxonomia foi decidida em 06/09/2026, nesta seção** (registrado em `../CLAUDE.md`, "O que a Seção 4 deixou em aberto", item 3): o cliente discrimina o erro pelo **formato** de `detail`, nunca pelo status HTTP — um cliente que ramificasse em "400 = mostro a mensagem, 422 = renderizo `detail[].msg`" quebraria nessas dez, e status sozinho nunca diz qual dos dois formatos veio. `lib/api/errors.ts` implementa a regra: `detail` string é sentença de domínio, pronta para exibir; `detail` array é erro de schema do Pydantic — mensagem genérica para o usuário (`MENSAGEM_GENERICA`), detalhe completo só no `console.error`. Nenhum branch por `status === 422` em lugar nenhum do cliente.
 
 **Erro de domínio tem forma única:** `{"detail": "<frase em pt-BR>"}` com status 404, 403, 402 ou 422. Recurso de outra conta responde **404, nunca 403** — um 403 confirmaria que o recurso existe, e o backend tem teste garantindo isso. Não trate 404 nesses caminhos como "sumiu": pode ser "não é seu".
 
-## Autenticação da chamada — até a Seção 5 existir
+## Autenticação da chamada
 
-Siga exatamente o padrão do arquivo vizinho mais parecido: `getSession()` e header `Authorization: Bearer ${session.access_token}`. **Não crie uma abstração nova** (`apiClient`, hook de fetch genérico, wrapper de sessão): a Seção 5 migra os 70 call sites de uma vez com `lib/api/client.ts`, então repetir o padrão manual custa zero a mais — uma abstração concorrente feita agora só duplicaria trabalho e seria jogada fora nesse dia.
+Toda chamada é `api()` de `@/lib/api/client` — num Server Component, `apiServer()` de `@/lib/api/server`. **Não** monte header à mão, não chame `getSession()`/`getAccessToken()` fora de `lib/api/`, e não crie um segundo cliente HTTP. O padrão manual (`getSession()` + `Authorization: Bearer` montado no call site) é **legado**: sobrevive em ~30 telas fora do piloto migrado (Biblioteca), a Seção 8 é quem as migra, e `tools/catraca.py` (`fetch_fora_de_lib_api`, `supabase_fora_de_lib_api`) impede esse número de crescer enquanto isso não acontece — repetir o padrão manual numa tela nova reprova a catraca no mesmo commit.
+
+**Desvio da spec, registrado por ser deliberado:** a spec pedia um arquivo só sabendo que o Supabase existe; são dois — `auth.ts` (browser) e `auth.server.ts` (servidor) — porque `auth.server.ts` importa `cookies` de `next/headers`, que não pode ser alcançado por um bundle de cliente; juntar os dois quebraria o build do Next, não é questão de estilo. Pelo mesmo motivo, `lib/api/core.ts` (a fábrica `criarCliente()`, sem `"use client"`) existe separado de `client.ts`/`server.ts`: a fábrica não pode arrastar um módulo `"use client"` para dentro de código de servidor.
 
 ## O que está medido — não piore
 
-Do clique até os dados na tela, com sessão real: Projetos 3,0 s · Biblioteca 3,6 s · Financeiro 4,3 s. Cache é quase inexistente: só 3 dos 144 arquivos usam TanStack Query (`LibraryContent.tsx`, `PresentationsTab.tsx`, `BatchNormalizeModal.tsx`) — o resto refaz a chamada a cada navegação. No código hoje: 62 `createClient()`, 56 `getSession()`, 70 headers `Authorization` montados à mão, zero `next/dynamic`/`React.lazy`. Uma tela nova que soma outra chamada de rede redundante ou outro `createClient()` fora do padrão piora esse número — meça antes de assumir que não piorou.
+Comparado com `develop` (antes da Seção 5), medido em 06/09/2026 (`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`):
+
+| Medida | `develop` | esta branch |
+|---|---|---|
+| `createClient(`/`createBrowserClient(`/`createServerClient(` — chamadas reais | 62 | **0** (a única ocorrência restante é comentário em `lib/api/auth.ts:18`) |
+| `getSession()` — chamadas reais | 56 | **2**, ambas dentro de `lib/api/` |
+| `Authorization` montado à mão em telas/componentes (exclui `lib/api/` e `__tests__/`) | 73 | **63** |
+| `fetch(` com fronteira de palavra | 87 | **75** — idêntico ao `fetch_fora_de_lib_api` da catraca (medido em 06/09/2026 como 76; a revisão final da Seção 5 reescreveu um comentário que continha um `fetch(` literal falso-positivo e a medida caiu para 75 — ver a nota de correção em `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`) |
+| Testes de frontend | 7 | **63**, em 11 arquivos |
+| Catraca | — | `eslint_erros` 85 (era 93), `fetch_fora_de_lib_api` 75, `supabase_fora_de_lib_api` 0 |
+
+Uma tela nova que soma outro `createClient()`/`getSession()`/header manual fora de `lib/api/`, ou um `fetch(` fora de `lib/api/` numa tela que a catraca já contava como migrada, piora esses números — meça antes de assumir que não piorou. **O ganho de tempo/latência que a spec exigia como confirmação não foi medido** — falta credencial de usuário real e checagem de hidratação ao vivo; ver `PROGRESS.md`, nota da Seção 5, e `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`.
 
 ## Acessibilidade (Art. 6)
 
@@ -66,7 +93,7 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 `tsc --noEmit`). Os dois são o que o job **Frontend** do CI executa; rode-os
 antes de abrir PR.
 
-A suíte sai limpa: `Test Files 4 passed (4)` e `Tests 7 passed (7)`. **Um
+A suíte sai limpa: `Test Files 11 passed (11)` e `Tests 63 passed (63)` (a Seção 5 acrescentou os testes de `lib/api/`, `lib/query/` e `features/*`; eram 4 arquivos/7 testes antes dela). **Um
 `failed` em qualquer das duas linhas é um teste realmente quebrado.** Até a
 Seção 3, o `vitest.config.ts` não excluía `e2e/` e o Vitest tentava coletar
 dois specs do Playwright, reportando `2 failed` de forma permanente — a

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { apiUrl } from "@/lib/api-url";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 
 interface Project {
@@ -39,9 +39,7 @@ export function CreatePresentationDialog({
             async function loadProjects() {
                 setLoadingProjects(true);
                 try {
-                    const supabase = createClient();
-                    const { data: { session } } = await supabase.auth.getSession();
-                    const token = session?.access_token || "";
+                    const token = (await getAccessToken()) || "";
 
                     // Utilizando o endpoint de listagem de projetos
                     const res = await fetch(apiUrl("/api/projects?page=1&size=100"), {
@@ -73,9 +71,7 @@ export function CreatePresentationDialog({
         setLoading(true);
         const finalProjectId = defaultProjectId || projectId;
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token || "";
+            const token = (await getAccessToken()) || "";
 
             const response = await fetch(
                 apiUrl(`/api/projects/${finalProjectId}/presentations`),

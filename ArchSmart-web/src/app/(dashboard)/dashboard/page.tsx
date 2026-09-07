@@ -27,7 +27,8 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
+import { useEntitlements } from "@/features/account/hooks"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,7 +62,6 @@ interface DashboardLeanResponse {
     recent_projects: RecentProject[]
     recent_products: RecentProduct[]
     active_projects_count: number
-    plan_limit: number
     financial_balance: number
     financial_income: number
     financial_expense: number
@@ -79,6 +79,7 @@ export default function DashboardPage() {
     const [data, setData] = useState<DashboardLeanResponse | null>(null)
     const [loading, setLoading] = useState(true)
     const [currentDate, setCurrentDate] = useState<string>("")
+    const { entitlements } = useEntitlements()
 
     // Set client-side current date
     useEffect(() => {
@@ -100,13 +101,9 @@ export default function DashboardPage() {
         async function fetchDashboard() {
             setLoading(true)
             try {
-                const supabase = createClient()
-                console.log("Supabase client created in dashboard:", supabase)
-                const { data: { session } } = await supabase.auth.getSession()
-                console.log("Session in dashboard:", session)
+                const accessToken = await getAccessToken()
 
-                if (!session) {
-                    console.log("No session found in dashboard, redirecting to login...")
+                if (!accessToken) {
                     router.push("/auth/login")
                     return
                 }
@@ -115,7 +112,7 @@ export default function DashboardPage() {
                 const res = await fetch(apiUrl("/api/dashboard/lean"), {
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${session.access_token}`,
+                        "Authorization": `Bearer ${accessToken}`,
                     },
                 })
 
@@ -214,8 +211,6 @@ export default function DashboardPage() {
 
     const userName = data?.user_first_name || "Usuário"
     const activeProjectsCount = data?.active_projects_count || 0
-    const planLimit = data?.plan_limit ?? 2
-    const projectPercentage = Math.min((activeProjectsCount / planLimit) * 100, 100)
 
     return (
         <div className="flex flex-col gap-8 p-4 md:p-8 w-full max-w-7xl mx-auto">
@@ -303,34 +298,14 @@ export default function DashboardPage() {
                 </Card>
 
                 {/* Metrica 4: Projetos Ativos Limit Solo */}
-                <Card className="bg-card shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-secondary" />
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <span className="text-sm font-medium text-muted-foreground">Projetos Ativos</span>
-                        <Badge variant="secondary" className="text-[10px] font-semibold bg-secondary/10 text-secondary border-secondary/20">
-                            Plano Solo
-                        </Badge>
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                        <div className="flex items-baseline justify-between mb-2">
-                            <span className="text-2xl font-bold tracking-tight">{activeProjectsCount}</span>
-                            <span className="text-xs text-muted-foreground">limite de {planLimit}</span>
-                        </div>
-                        
-                        {/* Custom Progress Bar */}
-                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden mb-1.5">
-                            <div 
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                    projectPercentage >= 100 ? 'bg-secondary' : 'bg-primary'
-                                }`} 
-                                style={{ width: `${projectPercentage}%` }} 
-                            />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                            {projectPercentage >= 100 ? "Limite de projetos atingido" : `${planLimit - activeProjectsCount} espaço(s) livre(s)`}
-                        </p>
-                    </CardContent>
-                </Card>
+                {entitlements?.project_limit !== undefined ? (
+                    <ProjectsLimitCard
+                        activeProjectsCount={activeProjectsCount}
+                        planLimit={entitlements.project_limit}
+                    />
+                ) : (
+                    <ProjectsLimitCardSkeleton />
+                )}
             </div>
 
             {/* Quick Actions (Ações Rápidas) */}
@@ -553,5 +528,66 @@ export default function DashboardPage() {
 
             </div>
         </div>
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Card "Projetos Ativos" — separado para nao renderizar limite nenhum
+// enquanto `entitlements` (Art. 3) nao chegou.
+// ---------------------------------------------------------------------------
+
+function ProjectsLimitCard({
+    activeProjectsCount,
+    planLimit,
+}: {
+    activeProjectsCount: number
+    planLimit: number
+}) {
+    const projectPercentage = Math.min((activeProjectsCount / planLimit) * 100, 100)
+
+    return (
+        <Card className="bg-card shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-secondary" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <span className="text-sm font-medium text-muted-foreground">Projetos Ativos</span>
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-secondary/10 text-secondary border-secondary/20">
+                    Plano Solo
+                </Badge>
+            </CardHeader>
+            <CardContent className="pt-2">
+                <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-2xl font-bold tracking-tight">{activeProjectsCount}</span>
+                    <span className="text-xs text-muted-foreground">limite de {planLimit}</span>
+                </div>
+
+                {/* Custom Progress Bar */}
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden mb-1.5">
+                    <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                            projectPercentage >= 100 ? 'bg-secondary' : 'bg-primary'
+                        }`}
+                        style={{ width: `${projectPercentage}%` }}
+                    />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                    {projectPercentage >= 100 ? "Limite de projetos atingido" : `${planLimit - activeProjectsCount} espaço(s) livre(s)`}
+                </p>
+            </CardContent>
+        </Card>
+    )
+}
+
+function ProjectsLimitCardSkeleton() {
+    return (
+        <Card className="bg-card shadow-sm relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-8 rounded-lg" />
+            </CardHeader>
+            <CardContent className="pt-2 space-y-2">
+                <Skeleton className="h-7 w-28" />
+                <Skeleton className="h-3 w-40" />
+            </CardContent>
+        </Card>
     )
 }

@@ -29,7 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { apiUrl } from "@/lib/api-url"
 
 const environmentSchema = z.object({
@@ -68,9 +68,7 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
     const onSubmit = async (data: EnvironmentFormValues) => {
         try {
             setIsSubmitting(true)
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const body = {
                 name: data.name,

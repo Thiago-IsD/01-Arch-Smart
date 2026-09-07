@@ -2,11 +2,9 @@ import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { LibraryContent } from "./components/LibraryContent"
+import { filtrosDaUrl } from "@/features/library/filters"
+import { LibraryData } from "./components/LibraryData"
 
-// Shell leve: os dados são buscados no cliente via React Query (ver
-// LibraryContent), então esta página não faz round-trip ao backend nem lê
-// cookies no servidor — trocar de aba passa a servir do cache do cliente.
 export default async function LibraryPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
@@ -34,11 +32,11 @@ export default async function LibraryPage(props: {
             </div>
 
             <Suspense fallback={
-                <div className="flex flex-1 items-center justify-center py-20 text-muted-foreground">
+                <div data-testid="library-skeleton" className="flex flex-1 items-center justify-center py-20 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
             }>
-                <LibraryContent />
+                <LibraryData filtros={filtrosDaUrl(searchParams)} />
             </Suspense>
         </div>
     )

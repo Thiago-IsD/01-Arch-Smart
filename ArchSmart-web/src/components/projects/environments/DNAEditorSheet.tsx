@@ -22,7 +22,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { apiUrl } from "@/lib/api-url"
 
 const dnaSchema = z.object({
@@ -68,9 +68,7 @@ export function DNAEditorSheet({ isOpen, onOpenChange, environment, onSuccess }:
 
         try {
             setIsSubmitting(true)
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const res = await fetch(apiUrl(`/api/environments/${environment.id}/dna`), {
                 method: "PUT",

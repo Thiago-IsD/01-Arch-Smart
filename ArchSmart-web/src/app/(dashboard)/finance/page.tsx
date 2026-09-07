@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { apiUrl } from "@/lib/api-url";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, TrendingDown, Plus, Loader2 } from "lucide-react";
@@ -35,11 +35,10 @@ export default function FinancialDashboard() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+            const accessToken = await getAccessToken();
+            if (!accessToken) return;
 
-            const headers = { "Authorization": `Bearer ${session.access_token}` };
+            const headers = { "Authorization": `Bearer ${accessToken}` };
 
             // Fetch Summary
             const summaryRes = await fetch(apiUrl(`/api/financial/summary?month=${month}&year=${year}`), { headers });
@@ -80,13 +79,12 @@ export default function FinancialDashboard() {
 
     const handleDelete = async (id: string, applyTo: "SINGLE" | "NEXT" | "ALL" = "SINGLE") => {
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+            const accessToken = await getAccessToken();
+            if (!accessToken) return;
 
             const res = await fetch(apiUrl(`/api/financial/${id}?apply_to=${applyTo}`), {
                 method: "DELETE",
-                headers: { "Authorization": `Bearer ${session.access_token}` }
+                headers: { "Authorization": `Bearer ${accessToken}` }
             });
 
             if (res.ok) {

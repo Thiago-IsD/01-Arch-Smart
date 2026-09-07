@@ -17,7 +17,7 @@ import Footer from "@/components/landing/Footer";
 import { BRAND_ASSETS } from "@/config/brand";
 import Image from "next/image";
 import { apiUrl } from "@/lib/api-url";
-import { createClient } from "@/utils/supabase/client";
+import { setSession } from "@/lib/api/auth";
 
 // Enhanced Password Validation
 const passwordSchema = z.string()
@@ -134,13 +134,12 @@ export default function VerifyPage() {
                     const loginData = await loginResponse.json();
 
                     // Create Supabase session
-                    const supabase = createClient();
-                    const { error: sessionError } = await supabase.auth.setSession({
-                        access_token: loginData.access_token,
-                        refresh_token: loginData.refresh_token,
-                    });
-
-                    if (sessionError) {
+                    try {
+                        await setSession({
+                            access_token: loginData.access_token,
+                            refresh_token: loginData.refresh_token,
+                        });
+                    } catch (sessionError) {
                         console.error("Session creation error:", sessionError);
                         throw new Error("Erro ao criar sessão");
                     }

@@ -77,8 +77,9 @@ jobs:
         working-directory: ArchSmart-web
         run: npm test
       - name: Medir o lint
-        # O eslint sai !=0 quando ha erro, e hoje ha 93. Quem decide se isso
-        # reprova o PR e a catraca, comparando com o baseline versionado.
+        # O eslint sai !=0 quando ha erro (o numero atual esta no `eslint_erros`
+        # de tools/catraca.json). Quem decide se isso reprova o PR e a
+        # catraca, comparando com o baseline versionado.
         working-directory: ArchSmart-web
         run: npx eslint . --format json -o eslint.json || true
       - name: Catraca — lint, cores literais e doc de modulo

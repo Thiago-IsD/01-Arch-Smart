@@ -165,7 +165,7 @@ function ActiveBudgetWorkspace() {
     )
 }
 
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 
 function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => void }) {
     const [lossFactor, setLossFactor] = useState(item.loss_factor?.toString() || "10")
@@ -194,9 +194,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
     const handleBlur = async () => {
         setIsUpdating(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const payload: any = {}
             if (item.rule_type !== "UNIT") {
@@ -233,9 +231,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
     const handleDelete = async () => {
         setIsDeleting(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
             const res = await fetch(apiUrl(`/api/budgets/items/${item.id}`), {
                 method: "DELETE",
                 headers: {
@@ -259,9 +255,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
         setOptimisticActiveOptionId(optionId) // Optimistic UI jump
         setIsOptionSwitching(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
             const res = await fetch(apiUrl(`/api/budgets/options/${optionId}/select`), {
                 method: "PATCH",
                 headers: {
@@ -286,9 +280,7 @@ function BudgetItemRow({ item, onUpdate }: { item: BudgetItem, onUpdate: () => v
     const handleDeleteOption = async (optionId: string) => {
         setIsOptionSwitching(true)
         try {
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
             const res = await fetch(apiUrl(`/api/budgets/options/${optionId}`), {
                 method: "DELETE",
                 headers: {

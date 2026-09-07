@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { useBudget } from "./BudgetProvider"
 import { apiUrl } from "@/lib/api-url"
 
@@ -17,9 +17,7 @@ export function BudgetSummaryFooter() {
             setIsLoading(true);
 
             try {
-                const supabase = createClient()
-                const { data: { session } } = await supabase.auth.getSession()
-                const token = session?.access_token || ""
+                const token = (await getAccessToken()) || ""
                 const res = await fetch(apiUrl(`/api/projects/${projectId}/budget`), {
                     headers: { "Authorization": `Bearer ${token}` }
                 });

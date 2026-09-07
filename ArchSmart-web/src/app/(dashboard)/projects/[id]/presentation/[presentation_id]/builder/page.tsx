@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server"
+import { getServerAccessToken } from "@/lib/api/auth.server"
 import { notFound } from "next/navigation"
 import { BuilderClient } from "./components/BuilderClient"
 import { apiUrl } from "@/lib/api-url"
@@ -34,9 +34,7 @@ export default async function PresentationBuilderPage(
 ) {
     const params = await props.params
 
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getServerAccessToken()
 
     if (!token) notFound()
 

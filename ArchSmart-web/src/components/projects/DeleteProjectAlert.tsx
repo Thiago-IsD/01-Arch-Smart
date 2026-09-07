@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/utils/supabase/client"
+import { getAccessToken } from "@/lib/api/auth"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,9 +38,7 @@ export function DeleteProjectAlert({ projectId, projectName }: DeleteProjectAler
 
         try {
             setIsDeleting(true)
-            const supabase = createClient()
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token || ""
+            const token = (await getAccessToken()) || ""
 
             const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
                 method: "DELETE",

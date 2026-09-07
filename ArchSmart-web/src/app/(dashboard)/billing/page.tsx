@@ -60,17 +60,16 @@ export default function BillingPage() {
 
     async function fetchBillingData() {
         try {
-            const { createClient } = await import("@/utils/supabase/client")
-            const supabase = createClient()
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            const { getAccessToken } = await import("@/lib/api/auth")
+            const accessToken = await getAccessToken()
 
-            if (sessionError || !session) {
+            if (!accessToken) {
                 throw new Error("Sessão expirada")
             }
 
             const response = await fetch(apiUrl("/api/users/me"), {
                 headers: {
-                    "Authorization": `Bearer ${session.access_token}`
+                    "Authorization": `Bearer ${accessToken}`
                 }
             })
 

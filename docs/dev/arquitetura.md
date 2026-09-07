@@ -28,9 +28,11 @@ Postgres do projeto Supabase do time  (também back-end de Auth)
   `ArchSmart-web`. Regras próprias, inclusive as 4 diretrizes de compliance
   do parecer jurídico (Art. 11), em [`../../extension/CLAUDE.md`](../../extension/CLAUDE.md).
 - **`ArchSmart-web/`** — a aplicação que o arquiteto usa. App Router do
-  Next.js; toda chamada à API é feita do lado do cliente (não há prefetch no
-  servidor hoje — isso é alvo da Seção 5), levando o token da sessão no
-  header.
+  Next.js. A Seção 5 (concluída em 06/09/2026) deu à camada de dados do
+  frontend um cliente HTTP único (`src/lib/api/`) e prefetch no servidor com
+  hidratação para o piloto migrado (Biblioteca) — ver "Busca de dado no
+  frontend", abaixo. O resto das telas ainda chama a API do lado do cliente
+  com o padrão manual anterior; migrar é trabalho da Seção 8.
 - **`ArchSmart-api/`** — FastAPI + SQLAlchemy. Recebe o token, resolve a
   identidade, filtra por conta, fala com o Postgres. Lógica de negócio mora
   em `app/services/` (`ai_service.py`, `auth_service.py`,
@@ -80,9 +82,14 @@ Fluxo de ponta a ponta, hoje:
    JWT.
 2. `ArchSmart-web` guarda a sessão via `@supabase/ssr` e manda o
    `access_token` em todo `fetch()` para a API, como
-   `Authorization: Bearer <token>` — montado à mão em cada call site (62
-   `createClient()`, 56 `getSession()`, 70 headers montados manualmente em
-   `src/`, hoje sem um cliente HTTP único; ver `convencoes.md`).
+   `Authorization: Bearer <token>`. Até a Seção 5 (concluída em 06/09/2026)
+   isso era montado à mão em cada call site (62 `createClient()`, 56
+   `getSession()`, 73 headers montados manualmente em `src/`, sem cliente HTTP
+   único). Hoje o cliente único é `src/lib/api/` (`api()`/`apiServer()`,
+   ver "Busca de dado no frontend" abaixo); o padrão manual caiu para 0
+   `createClient()`/`createBrowserClient()`/`createServerClient()` reais e 2
+   `getSession()` reais (ambas dentro de `lib/api/`), mas sobrevive em ~30
+   telas fora do piloto migrado — a Seção 8 é quem as move.
 3. `ArchSmart-web/src/proxy.ts` roda antes de qualquer rota não-pública: ele
    chama `supabase.auth.getUser()` a cada requisição para decidir se
    redireciona para `/auth/login`. Essa chamada de rede ao Supabase é o que
@@ -211,27 +218,85 @@ módulo), catálogo global ou tabela sem `account_id` (`product_router.py`,
 definição do `ScopedRepository` (`repository.py`). A contagem completa, com
 o motivo de cada grupo, está na nota da Seção 4 em `PROGRESS.md`.
 
-## Busca de dado no frontend — o que existe e o que não existe
+## Busca de dado no frontend — o que a Seção 5 entregou
 
-TanStack Query **está** instalado, configurado e montado — não é um alvo
-futuro. `QueryProvider` (`src/components/providers/QueryProvider.tsx`) fica
-em `src/app/(dashboard)/layout.tsx`, com `staleTime` de 30s e `gcTime` de 5
-min. Hoje 3 dos 144 arquivos `.ts`/`.tsx` de `src/` o usam
-(`LibraryContent.tsx` e `PresentationsTab.tsx` com `useQuery`,
-`BatchNormalizeModal.tsx` com `useQueryClient` para invalidar cache após uma
-mutação). Os outros 141 arquivos de `src/` (componentes, hooks e páginas que
-não usam TanStack Query) buscam dado de outra forma — tipicamente
-`useEffect` + `fetch` manual — e refazem a chamada a cada navegação: cache
-"quase inexistente", não "inexistente".
+A Seção 5 fechou em 06/09/2026 (branch `secao-5-camada-de-dados-frontend`,
+ainda não mergeada em `develop`; ver estado em `../../CLAUDE.md`). Ela deu ao
+frontend a camada de dados que faltava:
 
-O que **não** existe ainda é a pasta `lib/query/` com convenção de
-`queryKeys` padronizada, nem `lib/api/` com um cliente HTTP único — ambos são
-alvo da **Seção 5**. Até lá, tela nova segue o padrão manual do arquivo
-vizinho mais parecido (ver `../../ArchSmart-web/CLAUDE.md`), mas busca dado
-via `useQuery`, nunca `useEffect` + `fetch`.
+- **`ArchSmart-web/src/lib/api/`** — cliente HTTP único. `core.ts` é a
+  fábrica `criarCliente()` (recebe `resolverToken` por parâmetro, testável
+  sem rede e sem Supabase); `client.ts` exporta `api` para o browser,
+  `server.ts` exporta `apiServer` para Server Component/Route Handler.
+  `auth.ts` (browser) e `auth.server.ts` (servidor) são os dois arquivos que
+  sabem que o Supabase existe **para autenticação** — dois, não um: a spec
+  pedia um arquivo só, mas `auth.server.ts` importa `cookies` de
+  `next/headers`, que não pode ser alcançado por um bundle de cliente, e
+  juntar os dois quebraria o build. A mesma razão separa `core.ts` (sem
+  `"use client"`) de `client.ts`/`server.ts`. Isto cobre autenticação, não
+  Storage: `src/components/ui/image-upload.tsx` continua chamando
+  `supabase.storage` via `supabaseBrowser()` (medido:
+  `grep -rn "\.storage\b" src` → 2 ocorrências, 1 arquivo) — trocar o
+  provedor de auth reescreveria `auth.ts`/`auth.server.ts`, mas trocar
+  Storage é trabalho à parte.
+- **`ArchSmart-web/src/lib/query/keys.ts`** — chaves hierárquicas
+  (`queryKeys.products.*`, `.projects.*`, `.account.*`, invalidáveis por
+  prefixo) e `cachePolicy` (`referencia`/`conta`/`transacional`) por natureza
+  do dado, aplicada por cima do default do `QueryProvider` (`staleTime` 30s,
+  `gcTime` 5min, inalterado desde antes da Seção 5).
+- **`ArchSmart-web/src/features/<domínio>/`** (hoje `library/`, `account/`)
+  — `api.ts`, `hooks.ts`, `types.ts` por domínio. Hook de domínio é a única
+  porta de entrada para dado numa tela nova; `useEffect` + `fetch` manual
+  não é mais o padrão a seguir.
+- **Prefetch no servidor com hidratação**, no piloto migrado (Biblioteca):
+  `LibraryData.tsx` (Server Component) roda `queryClient.prefetchQuery` via
+  `apiServer`, com teto de tempo (`tentarPrefetch()`,
+  `lib/query/hydration.ts`), e desidrata num `HydrationBoundary` que envolve
+  o client component. `page.tsx` só renderiza o `<Suspense>` que envolve
+  `LibraryData.tsx` — quem faz o prefetch é o componente de dentro dele. A
+  chave usada nos dois lados vem da mesma função (`filtrosDaUrl()`), para
+  que o cache do cliente reconheça o prefetch como o mesmo dado em vez de
+  refazer a chamada.
+
+O resto do app (~30 telas fora da Biblioteca) continua no padrão manual
+anterior — `useEffect` + `fetch`, `getSession()` e header montados à mão,
+sem cache estruturado — até a Seção 8 migrar. `tools/catraca.py` mede esse
+padrão em duas medidas que só podem descer: `fetch_fora_de_lib_api` (75 hoje)
+e `supabase_fora_de_lib_api` (0 hoje, já no piso). Detalhe completo, número a
+número, em [`ArchSmart-web/CLAUDE.md`](../../ArchSmart-web/CLAUDE.md) e em
+[`medicoes/2026-09-06-biblioteca-depois.md`](medicoes/2026-09-06-biblioteca-depois.md).
+
+**O portão de tempo que a spec da Seção 5 exige como confirmação não foi
+fechado.** A medição de latência "antes vs. depois" com sessão real, e a
+contagem ao vivo de chamadas de rede no DevTools, não puderam rodar neste
+ambiente — falta credencial de usuário de teste (`E2E_EMAIL`/`E2E_PASSWORD`).
+O que existe é evidência estrutural (leitura de código, contagens estáticas),
+não medição de tempo. Ver a nota da Seção 5 em `../../PROGRESS.md` e o
+documento de medição citado acima antes de tratar esta seção como tendo
+provado "mais rápido".
+
+### Erro do cliente: discriminado por formato, não por status
+
+Decidido em 06/09/2026, na Seção 5. Dez rotas da API mudaram de status na
+Seção 4 (400→422 e 500→422, tabela na nota da Seção 4 em `PROGRESS.md`), e
+duas formas de 422 convivem hoje: a do Pydantic traz `detail` como **lista**
+de erros de validação, a de domínio (`ValidacaoDeDominio`) traz `detail`
+como **string** pronta para exibir. Um cliente que ramificasse por status
+(`if (status === 422)`) não saberia qual das duas formas recebeu.
+
+A regra que ficou de pé, em `ArchSmart-web/src/lib/api/errors.ts`: o cliente
+olha o **formato** de `detail`, nunca o status HTTP. `detail` string vira a
+frase exibida ao usuário; `detail` array (schema do Pydantic — defeito do
+próprio cliente, não algo que o usuário corrija) vira mensagem genérica mais
+`console.error` com o array completo, para quem depura. Isto decide o
+**contrato que o cliente lê**; se 422 é o status certo para falha de
+infraestrutura continua em aberto (`../../CLAUDE.md`, "O que a Seção 4
+deixou em aberto").
 
 ## O que está medido e é problema conhecido
 
+**Esta medição é anterior à Seção 5** (baseline pré-migração; ver
+[`medicoes/2026-09-06-biblioteca-baseline.md`](medicoes/2026-09-06-biblioteca-baseline.md)).
 Do clique até os dados na tela, com sessão real, medido em navegador:
 **Projetos 3,0s · Biblioteca 3,6s · Financeiro 4,3s.** Contribuintes
 identificados:
@@ -241,8 +306,15 @@ identificados:
   de dado fresco de sessão.
 - Zero uso de `next/dynamic`/`React.lazy` em `src/` — toda tela carrega o
   bundle inteiro de suas dependências de uma vez.
-- Cache quase inexistente (seção anterior) — a maioria das telas refaz a
-  chamada de rede a cada navegação, mesmo para dado que não mudou.
+- Cache quase inexistente — a maioria das telas refaz a chamada de rede a
+  cada navegação, mesmo para dado que não mudou.
+
+A Seção 5 mudou a arquitetura de busca de dado na Biblioteca (cliente único,
+cache hierárquico, prefetch no servidor — ver "Busca de dado no frontend",
+acima), mas **não confirmou por medição de tempo** que esses três números
+melhoraram: falta credencial de usuário real para repetir esta mesma medição
+"depois". As outras telas (Projetos, Financeiro, e o resto) continuam
+exatamente como descrito aqui até a Seção 8.
 
 No backend, `app/models/all_models.py` (26 tabelas, um arquivo único) tem só
 4 colunas com `index=True` hoje, nenhuma delas `account_id` — a coluna mais

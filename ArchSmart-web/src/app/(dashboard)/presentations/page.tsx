@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Presentation } from "@/types/presentation";
 import { apiUrl } from "@/lib/api-url";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { CreatePresentationDialog } from "./components/CreatePresentationDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,9 +31,7 @@ export default function PresentationsPage() {
     useEffect(() => {
         async function loadPresentations() {
             try {
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
-                const token = session?.access_token || "";
+                const token = (await getAccessToken()) || "";
 
                 const response = await fetch(apiUrl("/api/presentations"), {
                     headers: {
@@ -66,9 +64,7 @@ export default function PresentationsPage() {
         setPresentationToDelete(null);
 
         try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token || "";
+            const token = (await getAccessToken()) || "";
 
             const response = await fetch(apiUrl(`/api/presentations/${idToDelete}`), {
                 method: "DELETE",

@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Check, Link as LinkIcon, Upload, Loader2, Image as ImageIcon, Trash2, Building2, MessageSquare, Lock, AlertTriangle } from "lucide-react";
 import { apiUrl } from "@/lib/api-url";
-import { createClient } from "@/utils/supabase/client";
+import { getAccessToken } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,9 +41,7 @@ interface Presentation {
 // ==================== HELPERS ====================
 
 async function getToken(): Promise<string> {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || "";
+    return (await getAccessToken()) || "";
 }
 
 // ==================== MAIN BUILDER ====================
