@@ -359,8 +359,9 @@ _Última atualização: 2026-09-06_
 > **A Seção 6 não deveria começar apoiada nesta seção até esse número
 > existir.** Decisão de Thiago, não de quem executa a Seção 6.
 
-> **A Seção 5 fechou em 06/09/2026, na branch `secao-5-camada-de-dados-frontend`
-> (ainda não mergeada em `develop`).** O que ficou de pé, comparado com
+> **A Seção 5 fechou em 06/09/2026 e foi mergeada até `staging` em 07/09/2026**
+> (merge `6e94d63` em `develop`, PR #6 `develop` → `staging` com merge `ce1012e`,
+> os três jobs de CI verdes). O que ficou de pé, comparado com
 > `develop`, todo medido nesta tarefa e reproduzido em
 > [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md):
 >

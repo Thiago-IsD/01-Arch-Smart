@@ -220,9 +220,9 @@ o motivo de cada grupo, está na nota da Seção 4 em `PROGRESS.md`.
 
 ## Busca de dado no frontend — o que a Seção 5 entregou
 
-A Seção 5 fechou em 06/09/2026 (branch `secao-5-camada-de-dados-frontend`,
-ainda não mergeada em `develop`; ver estado em `../../CLAUDE.md`). Ela deu ao
-frontend a camada de dados que faltava:
+A Seção 5 fechou em 06/09/2026 e chegou a `staging` em 07/09/2026 (merge
+`6e94d63` em `develop`, PR #6 com merge `ce1012e`; ver estado em
+`../../CLAUDE.md`). Ela deu ao frontend a camada de dados que faltava:
 
 - **`ArchSmart-web/src/lib/api/`** — cliente HTTP único. `core.ts` é a
   fábrica `criarCliente()` (recebe `resolverToken` por parâmetro, testável
