@@ -41,7 +41,7 @@ O `docker-compose.test.yml` e o CI foram alinhados para Postgres 17 em 05/09/202
 
 ## O que a Seção 4 deixou em aberto
 
-Nenhuma destas é para um agente decidir sozinho. Estão aqui porque quem começar a Seção 5 vai esbarrar em pelo menos duas delas.
+Nenhuma destas é para um agente decidir sozinho. Continuam abertas depois da Seção 5 — as de backend (2, 4, 5, 6) esperam a seção que voltar a mexer na API.
 
 1. **Branch protection ligada ou não** — virou possível quando o repositório foi tornado público em 30/08. Anterior à Seção 4; roteiro em [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
 2. **O auto-link por e-mail sobrevive em `POST /api/auth/complete-register`.** A Seção 4 removeu esse padrão do resolvedor de identidade — que cobre toda requisição autenticada —, mas o caminho legado continua resolvendo usuário por e-mail e gravando o `supabase_id` do portador. **O efeito não é vincular: é tomada de conta completa**, porque a partir dali o resolvedor entrega a conta da vítima ao token do atacante. É alcançável por dois fluxos vivos do front (`auth/verify` e `auth/reset-password`), e a única proteção é a opção *Confirm email* do painel do Supabase — fora do controle de versão, e nada neste repositório consegue testá-la. Detalhe em [arquitetura.md](docs/dev/arquitetura.md), seção "Resolvido em 05/09/2026".
@@ -49,6 +49,55 @@ Nenhuma destas é para um agente decidir sozinho. Estão aqui porque quem começ
 4. **Quatro migrações antigas têm `downgrade()` não vazio que estoura em execução** (`op.drop_constraint(None, ...)` sem `naming_convention` em `app/db/base.py`). A regra da casa é "todo `downgrade()` não vazio" — o que se descobriu é que "não vazio" nunca significou "funciona". Medir com `grep -rn "drop_constraint(None" ArchSmart-api/alembic/versions/*.py`.
 5. **`app/services/`, `app/core/` e `app/db/` não têm catraca estática.** O lint de query direta cobre `app/api/` e `financial_service.py`; uma query sem escopo escrita fora daí não é reprovada por nada.
 6. **18 rotas recebem ids no corpo** e não são alcançadas pelo teste genérico de isolamento, que percorre rotas com id na URL. `PATCH /api/products/batch-approve` é uma delas.
+
+## O que a Seção 5 deixou em aberto — **planejar no início da Seção 6**
+
+Diferente da lista acima: **estas duas não são "esbarrar se aparecer". A Seção 6
+começa planejando as duas, e quem escrever o plano dela põe cada uma como
+tarefa ou registra por escrito a decisão de não pôr.** Nenhuma é para um agente
+decidir sozinho.
+
+1. **O portão de validação da Seção 5 nunca foi fechado.** A spec exige provar o
+   ganho antes de escalar — *"Só com o ganho confirmado ligam-se os lints e
+   migra-se o resto"*. A medição de tempo **não rodou**: falta credencial de
+   usuário de teste para o login do Playwright. Não há "antes" nem "depois", e
+   nenhum número foi inventado — o que existe no lugar é evidência
+   **estrutural**, rotulada como tal em
+   [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md).
+   Fecha assim:
+
+   ```
+   cd ArchSmart-web
+   E2E_EMAIL=<usuario> E2E_PASSWORD=<senha> npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+   ```
+
+   O resultado vai nos dois arquivos de medição (`...-baseline.md` e
+   `...-depois.md`). **A Seção 8 não deveria começar apoiada na Seção 5 até esse
+   número existir** — e é a Seção 6 que decide se fecha o portão primeiro ou o
+   carrega adiante assumindo o risco. Isso é decisão de Thiago, não de quem
+   executa.
+
+   > Falta também a verificação viva da hidratação, que depende da mesma sessão:
+   > abrir `/library` com a API quente e confirmar que **nenhuma** requisição a
+   > `/api/products` sai do navegador no primeiro carregamento. Sem ela, "o
+   > prefetch funciona" é inferência estrutural, não observação — e o modo de
+   > falha dessa inferência é silencioso: o prefetch vira custo puro sem emitir
+   > erro nenhum.
+
+2. **A marca aparece sem o Q em 43 lugares, 27 arquivos** (Art. 8), em copy que
+   o usuário final lê: landing, login, cadastro, recuperação de senha, preços,
+   portal do cliente e `layout.tsx`. Medir com:
+
+   ```
+   grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
+   ```
+
+   Não foi corrigido na Seção 5 de propósito: 27 arquivos de copy dentro de um
+   diff de camada de dados é o "migrar de passagem" que este arquivo proíbe.
+   **Faça num commit próprio, e faça antes de a Seção 6 começar a mexer nesses
+   arquivos** — depois que a seção de UI estiver trocando cor literal por token
+   nas mesmas telas, cada correção de marca vira ruído dentro do diff dela, e o
+   erro sobrevive por não ser mais legível separadamente.
 
 ## Portões de CI
 
