@@ -36,7 +36,7 @@ export const Navbar = () => {
                                 className="flex gap-2 items-center">
                                 <Image
                                     src={BRAND_ASSETS.horizontal}
-                                    alt="Arch Smart"
+                                    alt="Arq Smart"
                                     width={140}
                                     height={40}
                                     className="h-8 w-auto object-contain"

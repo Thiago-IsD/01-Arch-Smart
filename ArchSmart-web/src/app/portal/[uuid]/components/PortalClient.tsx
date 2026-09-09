@@ -162,7 +162,7 @@ export function PortalClient({ uuid }: { uuid: string }) {
                 </form>
             </div>
             <p className="text-xs text-slate-400 mt-6">
-                Protegido por <span className="font-semibold text-emerald-600">Arch Smart</span>
+                Protegido por <span className="font-semibold text-emerald-600">Arq Smart</span>
             </p>
         </div>
     )

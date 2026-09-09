@@ -87,7 +87,7 @@ export default function SobrePage() {
                     <TechnicalGridBackground />
                     <div className="container max-w-5xl mx-auto relative z-10 space-y-8">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border bg-background/50 backdrop-blur text-xs font-medium text-muted-foreground uppercase tracking-widest mb-4">
-                            Manifesto Arch Smart
+                            Manifesto Arq Smart
                         </div>
                         <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter text-foreground leading-[1.1]">
                             Arquitetura é arte e técnica.<br />
@@ -171,7 +171,7 @@ export default function SobrePage() {
                             </h2>
                             <p className="text-xl text-muted-foreground leading-relaxed">
                                 Estamos criando a primeira plataforma que une a visão criativa com a inteligência de dados e IA.
-                                O Arch Smart é a fundação para escritórios que querem escalar, não apenas sobreviver.
+                                O Arq Smart é a fundação para escritórios que querem escalar, não apenas sobreviver.
                             </p>
                         </div>
                     </div>

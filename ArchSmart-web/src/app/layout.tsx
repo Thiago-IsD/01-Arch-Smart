@@ -13,7 +13,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Arch Smart",
+  title: "Arq Smart",
   description: "AI-Powered Architecture Platform",
   icons: {
     icon: BRAND_ASSETS.icon,

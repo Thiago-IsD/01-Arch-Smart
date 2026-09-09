@@ -123,7 +123,7 @@ export default function LoginPage() {
                         <div className="relative w-32 h-32">
                             <Image
                                 src={BRAND_ASSETS.vertical}
-                                alt="Arch Smart Logo"
+                                alt="Arq Smart Logo"
                                 fill
                                 className="object-contain"
                                 priority
@@ -134,7 +134,7 @@ export default function LoginPage() {
                     <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold tracking-tight mb-2">Login</h1>
                         <p className="text-muted-foreground">
-                            Acesse sua conta Arch Smart.
+                            Acesse sua conta Arq Smart.
                         </p>
                     </div>
 

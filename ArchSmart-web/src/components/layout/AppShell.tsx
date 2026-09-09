@@ -185,7 +185,7 @@ function Sidebar() {
                     <div className="relative w-10 h-10 shrink-0">
                         <Image
                             src={BRAND_ASSETS.icon}
-                            alt="Arch Smart"
+                            alt="Arq Smart"
                             fill
                             className="object-contain"
                         />
@@ -193,7 +193,7 @@ function Sidebar() {
                     {open && (
                         <div className="transition-opacity duration-200">
                             <span className="block text-sm font-semibold text-foreground">
-                                Arch Smart
+                                Arq Smart
                             </span>
                         </div>
                     )}
@@ -260,14 +260,14 @@ function MobileSidebar({ onNavigate }: { onNavigate: () => void }) {
                     <div className="relative w-10 h-10 shrink-0">
                         <Image
                             src={BRAND_ASSETS.icon}
-                            alt="Arch Smart"
+                            alt="Arq Smart"
                             fill
                             className="object-contain"
                         />
                     </div>
                     <div>
                         <span className="block text-sm font-semibold text-foreground">
-                            Arch Smart
+                            Arq Smart
                         </span>
                     </div>
                 </div>
@@ -344,7 +344,7 @@ function HeaderBreadcrumb() {
     if (crumbs.length === 0) {
         return (
             <span className="font-semibold text-foreground text-sm leading-tight">
-                Bem-vindo à Arch Smart
+                Bem-vindo à Arq Smart
             </span>
         );
     }

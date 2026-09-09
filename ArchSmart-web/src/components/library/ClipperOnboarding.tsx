@@ -38,7 +38,7 @@ export function ClipperOnboarding() {
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Capture produtos em segundos</h1>
                 <p className="text-lg text-muted-foreground max-w-2xl">
-                    Evite copiar e colar dados manualmente. Use nossa extensão para o Google Chrome e salve imagens, preços e nomes de produtos diretamente das lojas para a sua Biblioteca do Arch Smart.
+                    Evite copiar e colar dados manualmente. Use nossa extensão para o Google Chrome e salve imagens, preços e nomes de produtos diretamente das lojas para a sua Biblioteca do Arq Smart.
                 </p>
 
                 <div className="flex items-center gap-2 mt-4 bg-muted/50 px-4 py-2 rounded-full border">
@@ -99,7 +99,7 @@ export function ClipperOnboarding() {
                         </div>
                         <CardTitle>Fixar no Navegador</CardTitle>
                         <CardDescription>
-                            Para acesso rápido, clique no ícone de "Quebra-cabeça" do Chrome e fixe o ícone do Arch Smart.
+                            Para acesso rápido, clique no ícone de "Quebra-cabeça" do Chrome e fixe o ícone do Arq Smart.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 flex justify-center">

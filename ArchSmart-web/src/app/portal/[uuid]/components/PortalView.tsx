@@ -81,7 +81,7 @@ function PortalHeader({ branding }: { branding: PublicBrandingInfo }) {
                 )}
                 <div>
                     <p className="text-sm font-semibold text-slate-800 leading-tight">
-                        {branding.office_name || "Arch Smart"}
+                        {branding.office_name || "Arq Smart"}
                     </p>
                     <p className="text-xs text-slate-500">Apresentação de Projeto</p>
                 </div>
@@ -204,7 +204,7 @@ export function PortalView({ data }: { data: PublicPresentationData }) {
             <footer className="border-t border-slate-200 py-6 text-center">
                 <p className="text-xs text-slate-400">
                     Apresentação gerada por{" "}
-                    <span className="font-semibold text-emerald-600">Arch Smart</span>
+                    <span className="font-semibold text-emerald-600">Arq Smart</span>
                     {data.branding.office_name && ` · ${data.branding.office_name}`}
                 </p>
             </footer>

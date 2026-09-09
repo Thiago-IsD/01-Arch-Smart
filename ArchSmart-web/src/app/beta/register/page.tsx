@@ -86,7 +86,7 @@ export default function BetaRegisterPage() {
                         </div>
                         <h1 className="text-3xl font-bold tracking-tight">Cadastro Recebido!</h1>
                         <p className="text-muted-foreground text-lg">
-                            Obrigado pelo interesse no Arch Smart. Nossa equipe entrará em contato em breve para liberar seu acesso.
+                            Obrigado pelo interesse no Arq Smart. Nossa equipe entrará em contato em breve para liberar seu acesso.
                         </p>
                         <div className="pt-8">
                             <Button className="w-full h-12 text-base" asChild>

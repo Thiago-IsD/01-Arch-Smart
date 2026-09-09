@@ -400,7 +400,7 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground">
-                        Ao utilizar o Arch Smart, você concorda com nossos{" "}
+                        Ao utilizar o Arq Smart, você concorda com nossos{" "}
                         <a href="/termos" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Termos de Uso</a>
                         {" "}e{" "}
                         <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Política de Privacidade</a>.
