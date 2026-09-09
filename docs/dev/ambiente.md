@@ -439,8 +439,8 @@ npx vitest run
 Saída real:
 
 ```
- Test Files  4 passed (4)
-      Tests  7 passed (7)
+ Test Files  11 passed (11)
+      Tests  63 passed (63)
 ```
 
 **Sinal de sucesso:** `Test Files` e `Tests` os dois sem nenhum `failed`.

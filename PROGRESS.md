@@ -437,7 +437,13 @@ _Última atualização: 2026-09-06_
 >    default de 20 do backend em `/api/projects` — o dropdown "mover para
 >    projeto" agora lista até 100 projetos, não 20. Ninguém tinha notado que
 >    o dropdown estava truncado em 20 antes desta seção.
-> 8. **Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
+> 8. ~~**Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
+>    propósito.**~~ **Corrigido em 09/09/2026, no commit `b4fae10`** — commit
+>    próprio e mecânico, antes de a Seção 6 começar, como estava previsto. A
+>    mesma varredura hoje sai **0**. O parágrafo abaixo fica como registro do
+>    que foi medido na Seção 5 e por que ela não corrigiu:
+>
+> 8b. **Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
 >    propósito.** `grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l`
 >    → **43**. A marca aparece sem o Q em copy de usuário final: landing,
 >    login, cadastro, recuperação de senha, reset de senha, preços, portal do

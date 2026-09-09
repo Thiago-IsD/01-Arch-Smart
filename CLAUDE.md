@@ -52,10 +52,13 @@ Nenhuma destas é para um agente decidir sozinho. Continuam abertas depois da Se
 
 ## O que a Seção 5 deixou em aberto — **planejar no início da Seção 6**
 
-Diferente da lista acima: **estas duas não são "esbarrar se aparecer". A Seção 6
-começa planejando as duas, e quem escrever o plano dela põe cada uma como
-tarefa ou registra por escrito a decisão de não pôr.** Nenhuma é para um agente
-decidir sozinho.
+Diferente da lista acima: **isto não é "esbarrar se aparecer". A Seção 6 começa
+planejando, e quem escrever o plano dela põe a pendência como tarefa ou registra
+por escrito a decisão de não pôr.** Não é para um agente decidir sozinho.
+
+> A segunda pendência deste bloco — a marca sem o Q — **foi fechada em
+> 09/09/2026**, no commit próprio `b4fae10`, antes de a Seção 6 começar, como
+> este arquivo mandava. Está registrada abaixo como item 2, resolvido.
 
 1. **O portão de validação da Seção 5 nunca foi fechado.** A spec exige provar o
    ganho antes de escalar — *"Só com o ganho confirmado ligam-se os lints e
@@ -77,6 +80,12 @@ decidir sozinho.
    carrega adiante assumindo o risco. Isso é decisão de Thiago, não de quem
    executa.
 
+   **Decidido em 09/09/2026 por Thiago: criar primeiro um usuário de teste
+   dedicado.** Não se mede com credencial de usuário real emprestada; o E2E
+   precisa de uma conta própria em staging, com dados próprios. Isso vira
+   **tarefa da Seção 6**, e o portão só fecha depois dela — até lá o portão
+   continua aberto e a Seção 8 continua sem poder se apoiar na Seção 5.
+
    > Falta também a verificação viva da hidratação, que depende da mesma sessão:
    > abrir `/library` com a API quente e confirmar que **nenhuma** requisição a
    > `/api/products` sai do navegador no primeiro carregamento. Sem ela, "o
@@ -84,20 +93,23 @@ decidir sozinho.
    > falha dessa inferência é silencioso: o prefetch vira custo puro sem emitir
    > erro nenhum.
 
-2. **A marca aparece sem o Q em 43 lugares, 27 arquivos** (Art. 8), em copy que
-   o usuário final lê: landing, login, cadastro, recuperação de senha, preços,
-   portal do cliente e `layout.tsx`. Medir com:
+2. ~~A marca aparece sem o Q em 43 lugares, 27 arquivos.~~ **Corrigida em
+   09/09/2026, no commit `b4fae10`** — commit próprio, mecânico, antes de a
+   Seção 6 tocar essas telas, exatamente como este arquivo mandava. Eram 43
+   ocorrências em 27 arquivos de copy que o usuário final lê (landing, login,
+   cadastro, recuperação e reset de senha, preços, produto, sobre, web-clipper,
+   beta, portal do cliente, `AppShell`, chat e o `title` do `layout.tsx`);
+   viraram 43 de "Arq Smart", num diff de 43 inserções e 43 remoções. Confere
+   com:
 
    ```
-   grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
+   grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l   # 0
    ```
 
-   Não foi corrigido na Seção 5 de propósito: 27 arquivos de copy dentro de um
-   diff de camada de dados é o "migrar de passagem" que este arquivo proíbe.
-   **Faça num commit próprio, e faça antes de a Seção 6 começar a mexer nesses
-   arquivos** — depois que a seção de UI estiver trocando cor literal por token
-   nas mesmas telas, cada correção de marca vira ruído dentro do diff dela, e o
-   erro sobrevive por não ser mais legível separadamente.
+   As 2 ocorrências de `ArchSmart` **sem espaço** que restam em `src/` são
+   referência a nome de diretório em comentário de doc, permitidas pelo Art. 8.
+   `Ark Smart` e `Ecowe`: zero. O que a Seção 6 herda daqui é só a regra de não
+   reintroduzir a grafia errada nas telas que ela vai reescrever.
 
 ## Portões de CI
 
@@ -155,7 +167,7 @@ Duas consequências práticas:
 - **Meça no diretório em que o CI mede.** Durante a Seção 3, `python tools/checa_links.py` saía 0 a partir de `tools/` e **1** a partir da raiz — o CI roda da raiz, e medir no cwd errado fez reportar como verde um portão que o runner já reprovava (run 32804191634). Aquele link foi corrigido, então esse comando hoje sai 0 dos dois lados; o exemplo que **continua** reproduzindo é outro, no mesmo espírito:
 
   ```
-  cd tools; python -m unittest discover -p "test_*.py"   # OK, 44 testes
+  cd tools; python -m unittest discover -p "test_*.py"   # OK, 54 testes (09/09/2026)
   cd ..;    python -m unittest discover -s tools -p "test_*.py"   # FAILED (failures=1)
   ```
 
@@ -205,7 +217,7 @@ npm run typecheck
 npm test
 ```
 
-Sai limpo: `Test Files 4 passed (4)`, `Tests 7 passed (7)`. Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
+Sai limpo: `Test Files 11 passed (11)`, `Tests 63 passed (63)` (medido em 09/09/2026; a Seção 5 acrescentou testes, e o número sobe quando uma seção acrescenta mais — meça, não copie daqui). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
 
 Repositório, sem venv e sem instalar nada (os scripts de `tools/` usam só a biblioteca padrão):
 
