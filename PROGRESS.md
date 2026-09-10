@@ -456,6 +456,13 @@ _Última atualização: 2026-09-06_
 ## Seção 6 · Camada de UI
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
+> Plano de execução:
+> [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
+> A ordem das caixas acima é a do plano, que inverte duas em relação ao
+> desenho: o **validador de contraste vem antes dos tokens** (senão os tokens
+> nascem sem guarda e o baseline é escrito depois do fato), e a **galeria vem
+> antes da acessibilidade** (o axe roda sobre a galeria).
+>
 > Desenho aprovado em 09/09/2026:
 > [`docs/superpowers/specs/2026-09-09-secao-6-camada-de-ui-design.md`](docs/superpowers/specs/2026-09-09-secao-6-camada-de-ui-design.md).
 > Duas caixas mudaram de dono em relação à spec de 23/08: **imagens** saiu daqui
@@ -464,12 +471,12 @@ _Última atualização: 2026-09-06_
 > validação da Seção 5. O total de 63 tarefas não muda.
 
 - [ ] Usuário de teste E2E e fechamento do portão da Seção 5 (medição de tempo + verificação viva da hidratação)
+- [ ] Validador de contraste (catraca com os 4 pares reprovados hoje; token novo que nasça reprovado não está no baseline e reprova)
 - [ ] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
-- [ ] Validador de contraste (catraca em 4 pares reprovados hoje; token novo que nasça reprovado sobe a medida e reprova)
 - [ ] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
 - [ ] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
-- [ ] Acessibilidade por ferramenta (lint de `tabIndex`/`focus-within`, catracas em 5 e 9 + axe na galeria, zero violação)
 - [ ] Galeria `/dev/componentes`
+- [ ] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
 - [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 

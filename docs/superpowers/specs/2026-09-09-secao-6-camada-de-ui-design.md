@@ -21,7 +21,7 @@ da casa — o que segue é o resultado de medir.
 | A spec (23/08) | Medido em 09/09/2026 | Comando |
 |---|---|---|
 | `<img>`: 14 | **25** | `grep -rn "<img" src --include=*.tsx \| wc -l` |
-| `opacity-0 group-hover` sem `focus-within`: 9 | **9** (10 ocorrências, 1 já tem) | `grep -rn "opacity-0" src --include=*.tsx \| grep group-hover` |
+| `opacity-0 group-hover` sem `focus-within`: 9 | **8** — ver a correção adiante | `grep -rn "opacity-0" src --include=*.tsx \| grep "group-hover" \| grep -v "focus-within:" \| grep -vc "focus:"` |
 | `tabIndex={-1}`: 5 | **5** | `grep -rn "tabIndex={-1}" src --include=*.tsx \| wc -l` |
 | `next/dynamic`: 0 | **0** | `grep -rn "next/dynamic" src --include=*.tsx --include=*.ts \| wc -l` |
 | `MainBudgetArea` 642 | **634** | `wc -l` |
@@ -170,7 +170,15 @@ produziu dois erros registrados no `CLAUDE.md`. Uma medida que conta substitui
 uma lista que precisa ser mantida.
 
 **Mesmo tratamento para acessibilidade:** `tabindex_negativo` entra em **5** e
-`hover_sem_focus` em **9**.
+`hover_sem_focus` em **8**.
+
+> **Corrigido em 09/09/2026, ao escrever o plano: são 8, não 9.** A spec de
+> agosto e a primeira versão deste desenho diziam 9, contando toda linha com
+> `opacity-0` + `group-hover:` e sem `focus-within:`. Uma delas —
+> `src/components/ui/toast.tsx:80` — revela o elemento com `focus:opacity-100`,
+> e portanto **já é acessível por teclado**: `focus-within:` é para o foco cair
+> num filho, `focus:` para o próprio elemento. A régua passa a aceitar as duas
+> formas. Baseline com falso positivo dentro é baseline que ninguém zera.
 
 **O axe na galeria nasce portão fechado**, com zero violação. A galeria é código
 novo — não tem dívida para herdar, então não há nada para nascer vermelho.
