@@ -6,10 +6,24 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { FormField } from "@/components/ui/form-field"
 import { ErrorBoundary, registrarReportadorDeErro } from "@/components/ui/error-boundary"
+import { DataTable } from "@/components/ui/data-table"
 
 function Explode(): never {
     throw new Error("estourou")
 }
+
+type Linha = { nome: string; valor: number }
+
+const COLUNAS = [
+    { chave: "nome" as const, rotulo: "Nome" },
+    { chave: "valor" as const, rotulo: "Valor" },
+]
+
+const LINHAS: Linha[] = [
+    { nome: "Cadeira", valor: 300 },
+    { nome: "Abajur", valor: 100 },
+    { nome: "Mesa", valor: 200 },
+]
 
 describe("EmptyState", () => {
     it("mostra titulo, descricao e a acao de saida", async () => {
@@ -105,5 +119,33 @@ describe("ErrorBoundary", () => {
         expect(reportador).toHaveBeenCalledOnce()
         registrarReportadorDeErro(() => {})
         silencio.mockRestore()
+    })
+})
+
+describe("DataTable", () => {
+    it("ordena ao clicar no cabecalho, e inverte no segundo clique", async () => {
+        render(<DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} />)
+        await userEvent.click(screen.getByRole("button", { name: /Nome/ }))
+        let celulas = screen.getAllByRole("cell").map((c) => c.textContent)
+        expect(celulas.slice(0, 2)).toEqual(["Abajur", "100"])
+
+        await userEvent.click(screen.getByRole("button", { name: /Nome/ }))
+        celulas = screen.getAllByRole("cell").map((c) => c.textContent)
+        expect(celulas.slice(0, 2)).toEqual(["Mesa", "200"])
+    })
+
+    it("pagina, e nao mostra a pagina seguinte antes do clique", async () => {
+        render(
+            <DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} porPagina={2} />,
+        )
+        expect(screen.queryByText("Mesa")).not.toBeInTheDocument()
+        await userEvent.click(screen.getByRole("button", { name: /proxima/i }))
+        expect(screen.getByText("Mesa")).toBeInTheDocument()
+    })
+
+    it("anuncia a ordenacao por aria-sort, nao so por seta", async () => {
+        render(<DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} />)
+        await userEvent.click(screen.getByRole("button", { name: /Nome/ }))
+        expect(screen.getByRole("columnheader", { name: /Nome/ })).toHaveAttribute("aria-sort", "ascending")
     })
 })
