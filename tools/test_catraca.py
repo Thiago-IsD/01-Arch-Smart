@@ -15,6 +15,7 @@ from unittest import mock
 import catraca
 from catraca import (
     DiretorioMedidoSumiu,
+    arquivos_grandes,
     comparar,
     contar_cores,
     decidir_atualizacao,
@@ -308,6 +309,143 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
             ),
             0,
         )
+
+
+class TestArquivosGrandes(unittest.TestCase):
+    """A medida de tamanho de arquivo que a Tarefa 9 da Secao 6 acrescentou.
+
+    `arquivos_grandes` devolve caminho relativo a `catraca.RAIZ`, entao todo
+    teste daqui aponta a RAIZ para o diretorio temporario -- senao
+    `relative_to` estoura.
+    """
+
+    def _raiz(self):
+        return Path(tempfile.mkdtemp())
+
+    def _arquivo(self, raiz, nome, linhas):
+        caminho = raiz / nome
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        caminho.write_text("\n".join("x" for _ in range(linhas)), encoding="utf-8")
+        return caminho
+
+    def _medir(self, raiz):
+        with mock.patch.object(catraca, "RAIZ", raiz):
+            return arquivos_grandes(raiz)
+
+    def test_arquivo_com_exatamente_400_linhas_nao_entra(self):
+        # O criterio e "acima de", nao "a partir de": 400 esta no limite e
+        # passa. Um `>=` aqui poria arquivos no baseline sem que nenhum
+        # tivesse crescido.
+        raiz = self._raiz()
+        self._arquivo(raiz, "NoLimite.tsx", catraca.LIMITE_DE_LINHAS)
+        self.assertEqual(self._medir(raiz), [])
+
+    def test_arquivo_com_401_linhas_entra(self):
+        raiz = self._raiz()
+        self._arquivo(raiz, "UmaLinhaAcima.tsx", catraca.LIMITE_DE_LINHAS + 1)
+        self.assertEqual(self._medir(raiz), ["UmaLinhaAcima.tsx"])
+
+    def test_ignora_extensao_que_nao_e_ts_nem_tsx(self):
+        # A medida existe para o codigo que a Secao 8 vai editar. Um .md ou um
+        # .json enorme nao e o defeito que ela mede.
+        raiz = self._raiz()
+        self._arquivo(raiz, "LEIAME.md", 900)
+        self._arquivo(raiz, "dados.json", 900)
+        self.assertEqual(self._medir(raiz), [])
+
+    def test_conta_ts_e_tsx(self):
+        raiz = self._raiz()
+        self._arquivo(raiz, "a.ts", 401)
+        self._arquivo(raiz, "b.tsx", 401)
+        self.assertEqual(self._medir(raiz), ["a.ts", "b.tsx"])
+
+    def test_caminho_e_relativo_a_raiz_e_com_barra_posix(self):
+        # O baseline versionado tem que ser igual no Windows e no runner do CI:
+        # `as_posix()` e o que garante isso. Sem ele o mesmo arquivo entraria
+        # com separador de Windows numa maquina e com barra na outra, e o job
+        # `Repositorio` acusaria um arquivo "novo" a cada troca de sistema.
+        raiz = self._raiz()
+        self._arquivo(raiz, "src/telas/Grande.tsx", 500)
+        self.assertEqual(self._medir(raiz), ["src/telas/Grande.tsx"])
+
+    def test_lista_sai_ordenada(self):
+        raiz = self._raiz()
+        for nome in ("zebra.tsx", "abacate.tsx", "melancia.tsx"):
+            self._arquivo(raiz, nome, 401)
+        self.assertEqual(
+            self._medir(raiz), ["abacate.tsx", "melancia.tsx", "zebra.tsx"]
+        )
+
+    def test_diretorio_sumido_falha_em_vez_de_medir_vazio(self):
+        # Mesmo motivo de contar_cores: devolver [] quando o diretorio sumiu
+        # faria a catraca anunciar "baixou -- agora abaixo do limite: <todos>"
+        # e convidar a gravar a medida vazia. A Secao 9 renomeia
+        # ArchSmart-web/ para web/; e nesse dia que isto vale.
+        raiz = self._raiz()
+        with self.assertRaises(DiretorioMedidoSumiu):
+            arquivos_grandes(raiz / "nao_existe")
+
+    def test_medida_real_bate_com_o_baseline(self):
+        # Os 8 que restam depois da Tarefa 9: BuilderClient e PortalBudget
+        # (fora do escopo da Secao 6) mais seis que nunca estiveram nela.
+        self.assertEqual(len(medir(None)["arquivos_acima_de_400"]), 8)
+
+
+class TestRotulosDeMedidaEmLista(unittest.TestCase):
+    """O ramo de lista de `comparar` tem que dizer o que a medida quer dizer.
+
+    Antes destes testes o ramo afirmava so "SUBIU"/"baixou", nunca o rotulo:
+    uma chave errada em ROTULOS_DE_LISTA fazia a catraca imprimir a frase de
+    OUTRA medida, em silencio.
+    """
+
+    def test_arquivos_acima_de_400_ao_subir_fala_de_limite_nao_de_doc(self):
+        ok, linhas = comparar(
+            {"arquivos_acima_de_400": ["a.tsx"]},
+            {"arquivos_acima_de_400": ["a.tsx", "b.tsx"]},
+        )
+        texto = "\n".join(linhas)
+        self.assertFalse(ok)
+        self.assertIn("agora acima do limite: b.tsx", texto)
+        self.assertNotIn("sem doc", texto)
+
+    def test_arquivos_acima_de_400_ao_baixar_fala_de_limite(self):
+        ok, linhas = comparar(
+            {"arquivos_acima_de_400": ["a.tsx", "b.tsx"]},
+            {"arquivos_acima_de_400": ["a.tsx"]},
+        )
+        texto = "\n".join(linhas)
+        self.assertTrue(ok)
+        self.assertIn("agora abaixo do limite: b.tsx", texto)
+        self.assertNotIn("documentados", texto)
+
+    def test_modulos_sem_doc_continua_com_o_rotulo_dele(self):
+        _, linhas = comparar(
+            {"modulos_sem_doc": ["ai_service"]},
+            {"modulos_sem_doc": ["ai_service", "cobranca_service"]},
+        )
+        self.assertIn("sem doc e fora do baseline", "\n".join(linhas))
+
+        _, linhas = comparar(
+            {"modulos_sem_doc": ["ai_service", "cobranca_service"]},
+            {"modulos_sem_doc": ["ai_service"]},
+        )
+        self.assertIn("agora documentados", "\n".join(linhas))
+
+    def test_medida_de_lista_sem_rotulo_proprio_usa_o_padrao(self):
+        # Uma medida em lista futura que ninguem lembrou de por no mapa nao
+        # pode herdar a frase de modulos_sem_doc.
+        _, linhas = comparar({"medida_nova": []}, {"medida_nova": ["x"]})
+        texto = "\n".join(linhas)
+        self.assertIn("entrou no baseline: x", texto)
+        self.assertNotIn("sem doc", texto)
+
+    def test_medidas_pioradas_usa_o_mesmo_rotulo(self):
+        pioras = medidas_pioradas(
+            {"arquivos_acima_de_400": ["a.tsx"]},
+            {"arquivos_acima_de_400": ["a.tsx", "b.tsx"]},
+        )
+        self.assertEqual(pioras, ["arquivos_acima_de_400: agora acima do limite: b.tsx"])
 
 
 if __name__ == "__main__":

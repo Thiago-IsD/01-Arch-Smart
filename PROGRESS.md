@@ -628,7 +628,17 @@ _Última atualização: 2026-09-10_
 > escrito *antes* da quebra, que precisava passar na primeira execução, e que
 > passou de novo depois **sem edição de assertiva**: 10 (AppShell), 13
 > (dashboard), 12 (ProjectWizard) e 15 (MainBudgetArea) casos — a suíte foi de
-> 103 para **143 testes em 19 arquivos**. Para provar que a quebra foi mesmo só
+> **93 testes em 15 arquivos** para **143 em 19**.
+>
+> > Correção da Rodada 1 (10/09/2026): a primeira versão desta nota dizia "de
+> > 103 em 16", que é o estado **depois** do primeiro commit desta tarefa, não
+> > o ponto de partida. Número afirmado sem medição. Os dois medidos:
+> > `git ls-tree -r --name-only c8d2ae2 -- ArchSmart-web/src | grep -E "\.(test|spec)\.(ts|tsx)$" | wc -l`
+> > → 15 arquivos, e a suíte rodada sem os quatro arquivos de caracterização
+> > desta tarefa (`npx vitest run --exclude` para cada um) → `Test Files 15
+> > passed (15)`, `Tests 93 passed (93)`.
+>
+> Para provar que a quebra foi mesmo só
 > mudança de endereço, cada arquivo teve a comparação linha a linha entre o
 > antigo e os novos: `AppShell`, `dashboard/page` e `ProjectWizard` **não
 > perderam nenhuma linha**; `MainBudgetArea` perdeu exatamente duas —
@@ -668,6 +678,24 @@ _Última atualização: 2026-09-10_
 > dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
 > não duas. São 521 cores em 39 arquivos e 25 `<img>` (medido em 09/09/2026).
 > Não são caixas próprias; são parte da migração de cada tela.
+
+> **Pendência de Art. 8 que a Tarefa 9 da Seção 6 encontrou e não corrigiu de
+> passagem (10/09/2026):** o Orçamento usa um evento de janela com a marca
+> grafada errada, `archsmart:budget_updated`. Não é copy que o usuário lê, mas é
+> `archsmart` em código, o que o Art. 8 proíbe. Ficou de fora da Tarefa 9 porque
+> nome de evento é **contrato entre emissor e ouvinte**: renomear exige mexer nos
+> dois lados no mesmo commit, e a tarefa era mover, não reescrever. Quem migrar o
+> Orçamento renomeia — e mede antes, em vez de confiar numa lista fixa aqui, que
+> envelhece:
+>
+> ```
+> grep -rn "archsmart:" ArchSmart-web/src
+> ```
+>
+> Em 10/09/2026 isso saía **4 ocorrências em 3 arquivos** (o ouvinte em
+> `BudgetSummaryFooter`, e dois emissores — `BudgetItemsList` e
+> `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
+> silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
 - [ ] Biblioteca
 - [ ] Dashboard
