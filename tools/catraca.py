@@ -7,7 +7,10 @@ que as consertam nao chegam (ver ADR 0006):
   - eslint_erros     o `errorCount` somado do `npx eslint . --format json`
                      (ver tools/catraca.json para o numero medido hoje); as
                      Secoes 5 e 6 derrubam
-  - cores_literais   521 hoje; a Secao 6 zera, quando os tokens existirem
+  - cores_literais   521 hoje em 39 arquivos; a Secao 6 acrescenta os tokens e
+                     converte so o que ela mesma toca (3 em components/ui/); quem
+                     zera e a Secao 8, convertendo cada tela na migracao dela --
+                     73% das ocorrencias estao em telas que a Secao 8 reescreve
   - modulos_sem_doc  os 4 services de hoje; a Secao 8 documenta
 
 A Secao 5 acrescentou duas medidas, para telas que ainda usam o padrao

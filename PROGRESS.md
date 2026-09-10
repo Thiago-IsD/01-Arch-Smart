@@ -456,15 +456,22 @@ _Última atualização: 2026-09-06_
 ## Seção 6 · Camada de UI
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
+> Desenho aprovado em 09/09/2026:
+> [`docs/superpowers/specs/2026-09-09-secao-6-camada-de-ui-design.md`](docs/superpowers/specs/2026-09-09-secao-6-camada-de-ui-design.md).
+> Duas caixas mudaram de dono em relação à spec de 23/08: **imagens** saiu daqui
+> para a Seção 8 (é mudança linha a linha dentro da tela, mesma natureza das
+> cores), e no lugar entrou o **usuário de teste** que fecha o portão de
+> validação da Seção 5. O total de 63 tarefas não muda.
+
+- [ ] Usuário de teste E2E e fechamento do portão da Seção 5 (medição de tempo + verificação viva da hidratação)
 - [ ] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
-- [ ] Validador de contraste no CI (4.5:1 nos dois temas)
-- [ ] `QueryBoundary` com os 5 estados como parâmetros obrigatórios
-- [ ] Componentes que carregam decisão de produto (`FormField`, `CurrencyInput`, `EmptyState`, `Skeleton`, `AlertDialog`, `DropdownMenu`, `DataTable`, `ErrorBoundary`)
-- [ ] Acessibilidade por ferramenta (lint de `tabIndex`/`focus-within` + axe na galeria, zero violação)
+- [ ] Validador de contraste (catraca em 4 pares reprovados hoje; token novo que nasça reprovado sobe a medida e reprova)
+- [ ] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
+- [ ] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
+- [ ] Acessibilidade por ferramenta (lint de `tabIndex`/`focus-within`, catracas em 5 e 9 + axe na galeria, zero violação)
 - [ ] Galeria `/dev/componentes`
-- [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das dependências não usadas)
-- [ ] Imagens padronizadas em `next/image` com `sizes`
-- [ ] Quebra dos arquivos grandes (`MainBudgetArea`, `AppShell`, `dashboard/page`, `ProjectWizard`)
+- [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
+- [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
@@ -476,6 +483,11 @@ _Última atualização: 2026-09-06_
 
 ## Seção 8 · Migração das telas
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+
+> Cada tela migrada aqui converte também as **cores literais** e as **imagens**
+> dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
+> não duas. São 521 cores em 39 arquivos e 25 `<img>` (medido em 09/09/2026).
+> Não são caixas próprias; são parte da migração de cada tela.
 
 - [ ] Biblioteca
 - [ ] Dashboard
