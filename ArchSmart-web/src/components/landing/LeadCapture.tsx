@@ -28,7 +28,7 @@ interface LeadCaptureProps {
 
 const LeadCapture = ({
   title = "Entre na Lista de Espera",
-  description = "Receba novidades exclusivas e solicite acesso antecipado ao Arch Smart.",
+  description = "Receba novidades exclusivas e solicite acesso antecipado ao Arq Smart.",
   sourcePage = "SITE"
 }: LeadCaptureProps) => {
   const { toast } = useToast();

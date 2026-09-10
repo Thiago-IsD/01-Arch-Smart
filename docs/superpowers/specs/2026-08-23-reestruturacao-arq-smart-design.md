@@ -261,6 +261,18 @@ Supabase local em vez de Postgres puro porque a aplicação depende de Auth (`us
 
 ### Seção 6 — Camada de UI
 
+> ⚠️ **Corrigida e detalhada em 09/09/2026** por
+> [`2026-09-09-secao-6-camada-de-ui-design.md`](2026-09-09-secao-6-camada-de-ui-design.md),
+> aprovado por Thiago. Onde os dois discordarem, vale o de 09/09. O que mudou:
+> as **cores literais** e as **imagens** passam para a Seção 8 (convertidas junto
+> com a migração de cada tela, uma passada por tela); o validador de contraste
+> nasce **catraca em 4 pares reprovados**, não portão fechado; `AlertDialog`,
+> `DropdownMenu` e `Skeleton` **já existem** e são endurecidos, não criados; o
+> `QueryBoundary` obriga **três** dos 5 estados, não os cinco; e entra uma tarefa
+> nova — o usuário de teste que fecha o portão de validação da Seção 5. Vários
+> números do texto abaixo são de 23/08 e envelheceram; os medidos estão no
+> documento novo.
+
 **Tokens primeiro, proibição depois.** Acrescentar `--success`, `--warning`, `--info` (e `-foreground`), escala tipográfica, espaçamento e raio. A base semântica existente está correta e permanece. Só então: lint contra cor literal e **validador de contraste no CI** percorrendo todos os pares (fundo, texto) nos dois temas, falhando abaixo de 4.5:1.
 
 Isso também prepara a identidade visual nova: quando sair, muda um arquivo.

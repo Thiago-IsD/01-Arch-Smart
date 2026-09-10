@@ -12,7 +12,7 @@ export function Header() {
                 <div className="flex items-center gap-2">
                     <Image
                         src={BRAND_ASSETS.horizontal}
-                        alt="Arch Smart Logo"
+                        alt="Arq Smart Logo"
                         width={150}
                         height={40}
                         className="h-10 w-auto object-contain"

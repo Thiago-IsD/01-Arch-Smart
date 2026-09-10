@@ -20,7 +20,7 @@ const AuthWrapper = ({
         <Link href="/" className="mb-2">
           <Image
             src={BRAND_ASSETS.horizontal}
-            alt="Arch Smart"
+            alt="Arq Smart"
             width={180}
             height={50}
             className="h-10 w-auto object-contain dark:invert"

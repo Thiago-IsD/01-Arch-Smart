@@ -215,7 +215,7 @@ export default async function ProjectPrintPage(
 
                 {/* Footer disclaimer */}
                 <div className="border-t pt-8 mt-12 text-center text-[10px] text-slate-400 print:mt-24">
-                    <p>Documento gerado eletronicamente pela plataforma Arch Smart.</p>
+                    <p>Documento gerado eletronicamente pela plataforma Arq Smart.</p>
                 </div>
             </div>
             

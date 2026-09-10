@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Apresentação | Arch Smart",
+    title: "Apresentação | Arq Smart",
     description: "Visualização interativa da sua apresentação de projeto.",
 }
 

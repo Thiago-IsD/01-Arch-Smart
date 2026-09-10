@@ -285,7 +285,7 @@ export default function PricingPage() {
                             <AccordionItem value="item-4">
                                 <AccordionTrigger>A IA substitui o meu trabalho?</AccordionTrigger>
                                 <AccordionContent>
-                                    Nunca. A IA do Arch Smart atua como um assistente júnior super eficiente, cuidando das tarefas repetitivas (levantamento, orçamento, especificações) para que você foque no conceito e no design.
+                                    Nunca. A IA do Arq Smart atua como um assistente júnior super eficiente, cuidando das tarefas repetitivas (levantamento, orçamento, especificações) para que você foque no conceito e no design.
                                 </AccordionContent>
                             </AccordionItem>
                         </Accordion>

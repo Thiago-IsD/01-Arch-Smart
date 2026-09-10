@@ -163,7 +163,7 @@ const AbstractBrowserWindow = () => (
       <div className="absolute top-4 right-4 w-48 bg-card rounded-lg border shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 duration-700">
         <div className="flex items-center gap-2 mb-3">
           <Chrome className="w-4 h-4 text-primary" aria-hidden="true" focusable="false" />
-          <span className="text-xs font-bold">Arch Smart Clipper</span>
+          <span className="text-xs font-bold">Arq Smart Clipper</span>
         </div>
         <div className="space-y-2">
           <div className="h-20 bg-muted/30 rounded border border-dashed flex items-center justify-center text-[10px] text-muted-foreground">
@@ -239,7 +239,7 @@ export default function Home() {
               <div className="order-1 lg:order-2 space-y-6">
                 <h2 id="dashboard-teaser-title" className="text-3xl font-bold tracking-tight">Tudo o que você precisa em um só lugar</h2>
                 <p className="text-lg text-muted-foreground">
-                  Abandone as planilhas desconexas. O Arch Smart centraliza seus projetos, orçamentos, cronogramas e comunicação com clientes em uma interface intuitiva e poderosa.
+                  Abandone as planilhas desconexas. O Arq Smart centraliza seus projetos, orçamentos, cronogramas e comunicação com clientes em uma interface intuitiva e poderosa.
                 </p>
                 <ul className="space-y-3 pt-4">
                   {[

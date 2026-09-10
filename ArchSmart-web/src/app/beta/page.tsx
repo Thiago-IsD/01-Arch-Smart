@@ -55,7 +55,7 @@ export default function BetaPage() {
                         </h1>
 
                         <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-                            Seja um dos primeiros escritórios a testar o Arch Smart. Tenha acesso gratuito durante o período de validação e influencie diretamente nosso roadmap.
+                            Seja um dos primeiros escritórios a testar o Arq Smart. Tenha acesso gratuito durante o período de validação e influencie diretamente nosso roadmap.
                         </p>
 
                         <div className="flex flex-col items-center gap-4 w-full">

@@ -209,7 +209,7 @@ export default function VerifyPage() {
                         <div className="relative w-32 h-32">
                             <Image
                                 src={BRAND_ASSETS.vertical}
-                                alt="Arch Smart Logo"
+                                alt="Arq Smart Logo"
                                 fill
                                 className="object-contain"
                                 priority

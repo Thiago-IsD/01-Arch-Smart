@@ -86,7 +86,7 @@ export default function ProductPage() {
                         <span className="text-primary">Controle total.</span>
                     </h1>
                     <p className="mx-auto mb-10 max-w-2xl text-xl text-muted-foreground text-balance">
-                        Do Web Clipper ao Aceite do Cliente, o Arch Smart conecta a lógica técnica à visual de forma fluida.
+                        Do Web Clipper ao Aceite do Cliente, o Arq Smart conecta a lógica técnica à visual de forma fluida.
                     </p>
 
                     {/* Visual Abstract Connection */}
@@ -153,7 +153,7 @@ export default function ProductPage() {
                                         <div className="mb-3 flex items-center justify-between">
                                             <div className="flex items-center gap-2 text-primary font-semibold text-sm">
                                                 <Sparkles className="h-4 w-4" />
-                                                Arch Smart AI
+                                                Arq Smart AI
                                             </div>
                                             <Badge variant="secondary" className="text-[10px] h-5">Web Clipper</Badge>
                                         </div>
@@ -201,7 +201,7 @@ export default function ProductPage() {
                                 </div>
                                 <h2 className="text-3xl font-bold tracking-tight md:text-4xl">A internet é o seu catálogo.</h2>
                                 <p className="text-lg text-muted-foreground leading-relaxed">
-                                    Esqueça o copia-e-cola manual. Com o Web Clipper do Arch Smart, você captura produtos de qualquer site e nossa IA normaliza automaticamente as especificações técnicas, preços e imagens.
+                                    Esqueça o copia-e-cola manual. Com o Web Clipper do Arq Smart, você captura produtos de qualquer site e nossa IA normaliza automaticamente as especificações técnicas, preços e imagens.
                                 </p>
                                 <ul className="space-y-2 text-muted-foreground mt-4">
                                     <li className="flex items-center gap-2"><CheckCircle2 className="text-primary h-4 w-4" /> Preenchimento automático de campos</li>

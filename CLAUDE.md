@@ -11,7 +11,9 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 06/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída na branch `secao-5-camada-de-dados-frontend`** — camada de dados do frontend, 8/8 — **ainda não mergeada em `develop`, e com o portão de tempo que a spec exige aberto**: a medição que confirmaria "mais rápido" não pôde ser feita (falta credencial de usuário real); ver a nota da Seção 5 em `PROGRESS.md`, que registra o que fecha o portão, **antes de começar a Seção 6 com base nela**. Seções 6 a 9 pendentes; **a próxima é a Seção 6** (camada de UI), depois do merge. Produção ainda não recebeu: `main` está na Seção 3.
+Estado em 10/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída** — camada de UI, 9/9, na branch `secao-6-camada-de-ui`, **ainda não mergeada em `develop`** na data desta linha; o que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md). Seções 7 a 9 pendentes; **a próxima é a Seção 7** (telemetria). Produção ainda não recebeu: `main` está na Seção 3.
+
+> Sobre "implantada em staging" na Seção 5, e a diferença para a Seção 4: no caso do backend deu para medir o contêiner servindo o código novo. Aqui não. O frontend de staging responde `302` para `vercel.com/sso-api` (medido em 08/09/2026), o que prova que **o deployment existe** — em contraste com `DEPLOYMENT_NOT_FOUND` —, mas a Deployment Protection esconde o conteúdo, então **ninguém verificou de fora que o build servido é o da Seção 5**. A API de staging não foi tocada por esta seção (`/health` → `200`, com 41,4 s de cold start na primeira chamada, o mesmo fenômeno da [ADR 0009](docs/dev/decisoes/0009-prefetch-dentro-de-suspense.md)).
 
 Os ambientes online existem e estão medidos:
 
@@ -39,7 +41,7 @@ O `docker-compose.test.yml` e o CI foram alinhados para Postgres 17 em 05/09/202
 
 ## O que a Seção 4 deixou em aberto
 
-Nenhuma destas é para um agente decidir sozinho. Estão aqui porque quem começar a Seção 5 vai esbarrar em pelo menos duas delas.
+Nenhuma destas é para um agente decidir sozinho. Continuam abertas depois da Seção 5 — as de backend (2, 4, 5, 6) esperam a seção que voltar a mexer na API.
 
 1. **Branch protection ligada ou não** — virou possível quando o repositório foi tornado público em 30/08. Anterior à Seção 4; roteiro em [ambientes-online.md](docs/dev/ambientes-online.md), seção 5.
 2. **O auto-link por e-mail sobrevive em `POST /api/auth/complete-register`.** A Seção 4 removeu esse padrão do resolvedor de identidade — que cobre toda requisição autenticada —, mas o caminho legado continua resolvendo usuário por e-mail e gravando o `supabase_id` do portador. **O efeito não é vincular: é tomada de conta completa**, porque a partir dali o resolvedor entrega a conta da vítima ao token do atacante. É alcançável por dois fluxos vivos do front (`auth/verify` e `auth/reset-password`), e a única proteção é a opção *Confirm email* do painel do Supabase — fora do controle de versão, e nada neste repositório consegue testá-la. Detalhe em [arquitetura.md](docs/dev/arquitetura.md), seção "Resolvido em 05/09/2026".
@@ -47,6 +49,76 @@ Nenhuma destas é para um agente decidir sozinho. Estão aqui porque quem começ
 4. **Quatro migrações antigas têm `downgrade()` não vazio que estoura em execução** (`op.drop_constraint(None, ...)` sem `naming_convention` em `app/db/base.py`). A regra da casa é "todo `downgrade()` não vazio" — o que se descobriu é que "não vazio" nunca significou "funciona". Medir com `grep -rn "drop_constraint(None" ArchSmart-api/alembic/versions/*.py`.
 5. **`app/services/`, `app/core/` e `app/db/` não têm catraca estática.** O lint de query direta cobre `app/api/` e `financial_service.py`; uma query sem escopo escrita fora daí não é reprovada por nada.
 6. **18 rotas recebem ids no corpo** e não são alcançadas pelo teste genérico de isolamento, que percorre rotas com id na URL. `PATCH /api/products/batch-approve` é uma delas.
+
+## O que a Seção 5 deixou em aberto — **as duas fecharam na Seção 6**
+
+Diferente da lista acima: isto não era "esbarrar se aparecer". A Seção 6 devia
+começar planejando as duas, pondo cada uma como tarefa ou registrando por
+escrito a decisão de não pôr — e **as duas foram fechadas**, cada uma no seu
+commit próprio. Ficam aqui, riscadas, com o que fechou cada uma: o histórico
+de uma pendência é o que impede que ela volte pelo mesmo caminho.
+
+> A segunda pendência deste bloco — a marca sem o Q — **foi fechada em
+> 09/09/2026**, no commit próprio `b4fae10`, antes de a Seção 6 começar, como
+> este arquivo mandava. Está registrada abaixo como item 2, resolvido.
+
+1. ~~O portão de validação da Seção 5 nunca foi fechado.~~ **Fechado em
+   10/09/2026, na Tarefa 1 da Seção 6.** A decisão registrada mais abaixo
+   (criar primeiro um usuário de teste dedicado) foi executada: o usuário
+   existe em staging, o Playwright rodou, e o número existe — mediana de
+   **1454 ms**. A verificação viva da hidratação rodou junto e passou. O texto
+   original fica abaixo porque a **forma** dele continua valendo: a spec exige
+   provar o ganho antes de escalar — *"Só com o ganho confirmado ligam-se os
+   lints e migra-se o resto"*. Enquanto a medição não tinha rodado, não havia
+   "antes" nem "depois", nenhum número foi inventado, e o que existia no lugar
+   era evidência **estrutural**, rotulada como tal em
+   [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md).
+   Fecha assim:
+
+   ```
+   cd ArchSmart-web
+   E2E_EMAIL=<usuario> E2E_PASSWORD=<senha> npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+   ```
+
+   O resultado vai nos dois arquivos de medição (`...-baseline.md` e
+   `...-depois.md`). **A Seção 8 não deveria começar apoiada na Seção 5 até esse
+   número existir** — e é a Seção 6 que decide se fecha o portão primeiro ou o
+   carrega adiante assumindo o risco. Isso é decisão de Thiago, não de quem
+   executa.
+
+   **Decidido em 09/09/2026 por Thiago: criar primeiro um usuário de teste
+   dedicado.** Não se mede com credencial de usuário real emprestada; o E2E
+   precisa de uma conta própria em staging, com dados próprios. Isso virou a
+   **Tarefa 1 da Seção 6**, executada em 10/09/2026 — ver
+   [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md).
+   **A Seção 8 já pode se apoiar na Seção 5.**
+
+   > A verificação viva da hidratação — abrir `/library` com a API quente e
+   > confirmar que **nenhuma** requisição da lista sai do navegador no primeiro
+   > carregamento — **rodou na mesma tarefa, e passou**. Ela existia porque "o
+   > prefetch funciona" era inferência estrutural, não observação, e o modo de
+   > falha dessa inferência é silencioso: o prefetch vira custo puro sem emitir
+   > erro nenhum. A asserção discrimina por `state=NORMALIZED`, que é a chave
+   > da lista; o badge do inbox continua fora do prefetch, pendência aberta da
+   > Seção 5.
+
+2. ~~A marca aparece sem o Q em 43 lugares, 27 arquivos.~~ **Corrigida em
+   09/09/2026, no commit `b4fae10`** — commit próprio, mecânico, antes de a
+   Seção 6 tocar essas telas, exatamente como este arquivo mandava. Eram 43
+   ocorrências em 27 arquivos de copy que o usuário final lê (landing, login,
+   cadastro, recuperação e reset de senha, preços, produto, sobre, web-clipper,
+   beta, portal do cliente, `AppShell`, chat e o `title` do `layout.tsx`);
+   viraram 43 de "Arq Smart", num diff de 43 inserções e 43 remoções. Confere
+   com:
+
+   ```
+   grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l   # 0
+   ```
+
+   As 2 ocorrências de `ArchSmart` **sem espaço** que restam em `src/` são
+   referência a nome de diretório em comentário de doc, permitidas pelo Art. 8.
+   `Ark Smart` e `Ecowe`: zero. O que a Seção 6 herda daqui é só a regra de não
+   reintroduzir a grafia errada nas telas que ela vai reescrever.
 
 ## Portões de CI
 
@@ -104,7 +176,7 @@ Duas consequências práticas:
 - **Meça no diretório em que o CI mede.** Durante a Seção 3, `python tools/checa_links.py` saía 0 a partir de `tools/` e **1** a partir da raiz — o CI roda da raiz, e medir no cwd errado fez reportar como verde um portão que o runner já reprovava (run 32804191634). Aquele link foi corrigido, então esse comando hoje sai 0 dos dois lados; o exemplo que **continua** reproduzindo é outro, no mesmo espírito:
 
   ```
-  cd tools; python -m unittest discover -p "test_*.py"   # OK, 44 testes
+  cd tools; python -m unittest discover -p "test_*.py"   # OK, 54 testes (09/09/2026)
   cd ..;    python -m unittest discover -s tools -p "test_*.py"   # FAILED (failures=1)
   ```
 
@@ -154,7 +226,7 @@ npm run typecheck
 npm test
 ```
 
-Sai limpo: `Test Files 4 passed (4)`, `Tests 7 passed (7)`. Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
+Sai limpo: `Test Files 11 passed (11)`, `Tests 63 passed (63)` (medido em 09/09/2026; a Seção 5 acrescentou testes, e o número sobe quando uma seção acrescenta mais — meça, não copie daqui). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
 
 Repositório, sem venv e sem instalar nada (os scripts de `tools/` usam só a biblioteca padrão):
 

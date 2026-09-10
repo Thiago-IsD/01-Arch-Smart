@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 36/63 (57%)**
-`███████████░░░░░░░░░`
+**Progresso geral: 45/63 (71%)**
+`██████████████░░░░░░`
 
-_Última atualização: 2026-09-06_
+_Última atualização: 2026-09-10_
 
 ---
 
@@ -332,35 +332,45 @@ _Última atualização: 2026-09-06_
 - [x] Cancelamento automático via `AbortSignal`
 - [x] Lint que impede a volta — `no-restricted-syntax` (`fetch` fora de `lib/api/`, `createClient()`/`createServerClient()` fora de `lib/api/`, `useEffect` com busca de dado) é **erro** em `src/features/**`, `src/lib/**` e na rota da Biblioteca (o território que esta seção migrou, medido em zero ocorrências); nas ~30 telas ainda não migradas continua **aviso**, e a catraca (`fetch_fora_de_lib_api`, `supabase_fora_de_lib_api`) é o que impede esse resto de crescer até a Seção 8 migrar cada uma.
 
-> ## 🚧 O PORTÃO DA SEÇÃO ESTÁ ABERTO — leia isto antes de começar a Seção 6
+> ## ✅ O PORTÃO DA SEÇÃO FOI FECHADO em 10/09/2026 — Tarefa 1 da Seção 6
 >
 > **A Seção 5 fechou as 8 caixas acima, mas a medição que a spec exige como
-> confirmação de "ganho" não foi feita.** A spec é explícita: *"Só com o
-> ganho confirmado ligam-se os lints e migra-se o resto."* Essa comparação de
-> tempo — a única coisa que provaria "mais rápido" — não pôde rodar neste
-> ambiente: faltam credenciais de um usuário real (`E2E_EMAIL`/`E2E_PASSWORD`,
-> vazias) para o teste de Playwright e para a checagem de hidratação ao vivo
-> no navegador. Confirmado, com o comando:
+> confirmação de "ganho" não tinha sido feita.** A spec é explícita: *"Só com
+> o ganho confirmado ligam-se os lints e migra-se o resto."* Essa comparação
+> de tempo não pôde rodar enquanto não existia credencial de um usuário real
+> (`E2E_EMAIL`/`E2E_PASSWORD`). A Tarefa 1 da Seção 6 criou esse usuário
+> (`ana.arquiteta@seed.arqsmart.local`, em staging — ver
+> [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md))
+> e rodou a medição:
 >
 > ```
 > cd ArchSmart-web
-> npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
-> # → 1 failed: "E2E_EMAIL e/ou E2E_PASSWORD não estão definidos no ambiente."
+> E2E_EMAIL=ana.arquiteta@seed.arqsmart.local E2E_PASSWORD=<não versionada> \
+>   npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+> # → AMOSTRAS=1434,1445,1454,1469,1948 · MEDIANA_MS=1454 · 1 passed
 > ```
 >
-> Isto **não é** "o ganho não apareceu" (medição rodou, número não desceu) —
-> é "a medição não rodou". O que existe em
-> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md)
-> é evidência **estrutural** (leitura de código, contagens estáticas — a
-> arquitetura mudou na direção certa, por construção), nunca medição de
-> tempo. Aquele documento também tem o comando exato que fecha o portão,
-> assim que a credencial existir.
+> Detalhe completo, inclusive uma tentativa anterior que deu timeout por
+> causa do `next dev` compilando rotas pela primeira vez (não um defeito da
+> Seção 5), em
+> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md),
+> seção "✅ PORTÃO FECHADO". O "antes" (baseline) **continua não medido** — o
+> código de antes da Seção 5 não existe mais em nenhuma branch viva; a
+> comparação que existe é contra a referência de agosto de 2026 da spec
+> (3,6 s), rotulada como referência externa, não como baseline medido aqui —
+> ver [`docs/dev/medicoes/2026-09-06-biblioteca-baseline.md`](docs/dev/medicoes/2026-09-06-biblioteca-baseline.md).
 >
-> **A Seção 6 não deveria começar apoiada nesta seção até esse número
-> existir.** Decisão de Thiago, não de quem executa a Seção 6.
+> **A checagem viva de hidratação (item 9 abaixo) rodou e confirmou que a
+> lista principal da Biblioteca hidrata de fato.** Uma primeira versão do
+> teste falhava sem discriminar (qualquer `/api/products`, incluindo o badge
+> do inbox, derrubava a asserção) — corrigido em rodada de revisão para
+> filtrar por `state=NORMALIZED`, a chave da lista, e passou. O badge do
+> inbox continua fora do prefetch — pendência aberta da Seção 5, não
+> corrigida nesta tarefa; ver item 9.
 
-> **A Seção 5 fechou em 06/09/2026, na branch `secao-5-camada-de-dados-frontend`
-> (ainda não mergeada em `develop`).** O que ficou de pé, comparado com
+> **A Seção 5 fechou em 06/09/2026 e foi mergeada até `staging` em 07/09/2026**
+> (merge `6e94d63` em `develop`, PR #6 `develop` → `staging` com merge `ce1012e`,
+> os três jobs de CI verdes). O que ficou de pé, comparado com
 > `develop`, todo medido nesta tarefa e reproduzido em
 > [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md):
 >
@@ -436,7 +446,13 @@ _Última atualização: 2026-09-06_
 >    default de 20 do backend em `/api/projects` — o dropdown "mover para
 >    projeto" agora lista até 100 projetos, não 20. Ninguém tinha notado que
 >    o dropdown estava truncado em 20 antes desta seção.
-> 8. **Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
+> 8. ~~**Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
+>    propósito.**~~ **Corrigido em 09/09/2026, no commit `b4fae10`** — commit
+>    próprio e mecânico, antes de a Seção 6 começar, como estava previsto. A
+>    mesma varredura hoje sai **0**. O parágrafo abaixo fica como registro do
+>    que foi medido na Seção 5 e por que ela não corrigiu:
+>
+> 8b. **Art. 8 violado em 43 ocorrências, 27 arquivos, e não corrigido de
 >    propósito.** `grep -rn 'Arch Smart' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l`
 >    → **43**. A marca aparece sem o Q em copy de usuário final: landing,
 >    login, cadastro, recuperação de senha, reset de senha, preços, portal do
@@ -445,19 +461,279 @@ _Última atualização: 2026-09-06_
 >    exatamente o "migrar de passagem" que o `CLAUDE.md` da raiz proíbe, e
 >    misturariam duas mudanças que não têm nada a ver uma com a outra. Fica
 >    para um commit mecânico próprio — decisão de Thiago, não desta seção.
+> 9. **A checagem viva de hidratação confirmou, em 10/09/2026 na Tarefa 1 da
+>    Seção 6, que a lista principal da Biblioteca hidrata de fato — e que o
+>    badge de contagem do inbox continua fora do prefetch, pendência já
+>    conhecida e ainda em aberto.**
+>    `ArchSmart-web/e2e/hidratacao-biblioteca.spec.ts` rodou contra staging,
+>    com sessão real. Uma primeira versão da asserção (revisada e corrigida
+>    na mesma tarefa) não discriminava por `state`, então falhava para
+>    **qualquer** `/api/products` — incluindo o badge do inbox, que já se
+>    sabia fora do prefetch. Essa primeira execução deu:
+>
+>    ```
+>    Error: o navegador pediu /api/products: http://localhost:8000/api/products?page=1&size=1&state=CAPTURED,
+>    http://localhost:8000/api/products/?page=1&size=1&state=CAPTURED
+>    ```
+>
+>    As duas ocorrências são a **mesma chamada** (uma é o redirect 307 de
+>    barra final da própria API), e as duas são `state=CAPTURED` — a
+>    contagem do inbox (`useInboxCount()`, `features/library/hooks.ts`), não
+>    a lista principal (`state=NORMALIZED`). **Nenhuma requisição a
+>    `state=NORMALIZED` apareceu**, já naquela execução — sinal de que a
+>    lista hidratava; a asserção sem filtro só não sabia distinguir isso de
+>    uma falha real, e um teste que ficaria vermelho para sempre pelo mesmo
+>    motivo já conhecido é o anti-padrão "é esperado que falhe" que a Seção 3
+>    já removeu deste repositório. Corrigido: a asserção passou a filtrar por
+>    `state=NORMALIZED` (a chave que o servidor prefetcha), e **rodou de novo
+>    e passou**:
+>
+>    ```
+>    1 passed (26.5s)
+>    ```
+>
+>    Isso é a confirmação ao vivo, pela primeira vez, de algo que só existia
+>    como leitura de código desde a Tarefa 12 da Seção 5: o prefetch da lista
+>    principal hidrata de verdade em tempo de execução. **O que continua em
+>    aberto, sem mudança:** o badge do inbox é uma chamada separada
+>    (`state=CAPTURED`), **nunca prefetchada pelo servidor** — já documentado
+>    por leitura de código na Tarefa 12 da Seção 5
+>    (`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, tabela da seção
+>    1: *"`useInboxCount()` → chave diferente (…) e nunca prefetchada pelo
+>    servidor. Este fetch acontece no browser sempre"*), e o teste corrigido
+>    deliberadamente não cobre essa chamada, para não recriar o mesmo
+>    anti-padrão. Consertar isso (prefetchar `inboxCount` também, ou mover o
+>    badge para dentro do mesmo `HydrationBoundary`) é camada de dados —
+>    trabalho de outra seção, não desta. Detalhe completo, com os dois
+>    comandos e as duas saídas, em
+>    `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, seção "Verificação
+>    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**9/9 (100%)** `████████████████████`
 
-- [ ] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
-- [ ] Validador de contraste no CI (4.5:1 nos dois temas)
-- [ ] `QueryBoundary` com os 5 estados como parâmetros obrigatórios
-- [ ] Componentes que carregam decisão de produto (`FormField`, `CurrencyInput`, `EmptyState`, `Skeleton`, `AlertDialog`, `DropdownMenu`, `DataTable`, `ErrorBoundary`)
-- [ ] Acessibilidade por ferramenta (lint de `tabIndex`/`focus-within` + axe na galeria, zero violação)
-- [ ] Galeria `/dev/componentes`
-- [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das dependências não usadas)
-- [ ] Imagens padronizadas em `next/image` com `sizes`
-- [ ] Quebra dos arquivos grandes (`MainBudgetArea`, `AppShell`, `dashboard/page`, `ProjectWizard`)
+> Plano de execução:
+> [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
+> A ordem das caixas acima é a do plano, que inverte duas em relação ao
+> desenho: o **validador de contraste vem antes dos tokens** (senão os tokens
+> nascem sem guarda e o baseline é escrito depois do fato), e a **galeria vem
+> antes da acessibilidade** (o axe roda sobre a galeria).
+>
+> Desenho aprovado em 09/09/2026:
+> [`docs/superpowers/specs/2026-09-09-secao-6-camada-de-ui-design.md`](docs/superpowers/specs/2026-09-09-secao-6-camada-de-ui-design.md).
+> Duas caixas mudaram de dono em relação à spec de 23/08: **imagens** saiu daqui
+> para a Seção 8 (é mudança linha a linha dentro da tela, mesma natureza das
+> cores), e no lugar entrou o **usuário de teste** que fecha o portão de
+> validação da Seção 5. O total de 63 tarefas não muda.
+
+- [x] Usuário de teste E2E e fechamento do portão da Seção 5 (medição de tempo + verificação viva da hidratação)
+- [x] Validador de contraste (catraca com os 4 pares reprovados hoje; token novo que nasça reprovado não está no baseline e reprova)
+- [x] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
+- [x] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
+- [x] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
+- [x] Galeria `/dev/componentes`
+- [x] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
+- [x] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
+- [x] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
+
+> Nota da Tarefa 5 (10/09/2026, **reescrita na revisão final da seção** — ver a
+> correção ao final): os cinco componentes novos (`EmptyState`,
+> `CurrencyInput`, `FormField`, `ErrorBoundary`, `DataTable`) e os três
+> endurecimentos saíram como o brief previa. Dois cenários de teste expuseram
+> comportamento de biblioteca que ninguém conhecia, e a investigação dos dois
+> terminou concluindo que **o defeito estava no teste, não no componente**:
+>
+> 1. **`Intl` formata moeda em pt-BR com espaço não-quebrável (U+00A0), não
+>    com espaço comum.** `Intl.NumberFormat("pt-BR", { style: "currency",
+>    currency: "BRL" })` separa `R$` do número com ` `, então `"R$ 123,45"`
+>    escrito com espaço comum **nunca** bate com o formatado, apesar de os dois
+>    serem idênticos na tela. Isso é o formato tipograficamente correto — evita
+>    que símbolo e valor quebrem em linhas diferentes —, e
+>    `dashboard/components/format.ts` já exibe o mesmo caractere hoje via
+>    `toLocaleString` (a Tarefa 9 desta mesma seção moveu o formatador para lá;
+>    `dashboard/page.tsx` hoje tem zero ocorrências —
+>    `grep -c toLocaleString ArchSmart-web/src/app/\(dashboard\)/dashboard/page.tsx`
+>    sai `0`). **`currency-input.tsx`
+>    não normaliza nada**: o `Intl` é a fonte de verdade, e quem compara a
+>    string exibida compara com o U+00A0 de fato emitido (o teste usa um escape
+>    `\u00A0` explícito, com o porquê em comentário). O JSDoc do componente diz
+>    isso em voz alta, para o próximo não "consertar" de novo.
+> 2. **`AlertDialogContent` sem `AlertDialogCancel` não foca nada.** O default
+>    do Radix (`@radix-ui/react-alert-dialog@1.1.15`) previne o autofoco do
+>    `FocusScope` e tenta focar a ref interna do `Cancel` — sem um
+>    `AlertDialogCancel` na árvore essa ref é `null`, e como o
+>    `preventDefault()` já rodou, o fallback do próprio `FocusScope` (focar o
+>    primeiro elemento focável) nunca dispara. **Nenhuma linha de
+>    `alert-dialog.tsx` mudou nesta seção** (`git diff 24f4eb5..dafe1b3 --
+>    ArchSmart-web/src/components/ui/alert-dialog.tsx` sai vazio): os 10 usos
+>    reais de `AlertDialogContent` em `src/` têm `Cancel` — a galeria era a
+>    única exceção, corrigida na revisão que fechou esta seção
+>    (`grep -rl "AlertDialogContent" ArchSmart-web/src --include=*.tsx | grep -v
+>    "components/ui/alert-dialog.tsx" | grep -v "__tests__" | xargs grep -L
+>    "AlertDialogCancel"` sai vazio, ou seja, nenhum dos 10 fica sem `Cancel`)
+>    —, então o cenário não ocorre em produção, e o fixture do teste passou a
+>    refletir o uso real. O
+>    achado do Radix ficou preservado em comentário no teste.
+>
+> Os outros dois hardenings (`min-h-11` no `DropdownMenuItem`,
+> `aria-hidden="true"` no `Skeleton`) foram só o que o brief já previa.
+> `cores_literais` continua em **518** (`python tools/catraca.py`).
+>
+> > **Correção da revisão final (10/09/2026): esta nota descrevia código que
+> > não existe.** A primeira versão dela afirmava que o U+00A0 fora "corrigido
+> > normalizando para espaço comum dentro do próprio componente" e que houvera
+> > uma "correção em `alert-dialog.tsx`". As duas coisas chegaram a existir na
+> > Rodada 1 da Tarefa 5 e foram **revertidas** no mesmo dia, no commit
+> > `ad94040` ("revert maquiagem de teste na Tarefa 5"), porque nenhuma das
+> > duas era conserto de defeito real: eram produção alterada para satisfazer
+> > teste que descrevia cenário irreal (moeda comparada com espaço comum;
+> > diálogo sem `Cancel`). O revert não tocou o `PROGRESS.md`, e a nota
+> > sobreviveu descrevendo o mundo anterior a ele por 29 commits. Fica aqui
+> > como erro visível e corrigido, não apagado — é o modo de falha que este
+> > repositório mais repete: **texto que descreve a intenção, não a medição**,
+> > e que só cai quando alguém tenta usar o que ele afirma.
+
+> Nota da Tarefa 7 (10/09/2026): a primeira medição de `hover_sem_focus` saiu
+> **5**, não 8 como a spec/brief previa. `RE_GROUP_HOVER = r"\bgroup-hover:"`
+> só casava o grupo "anônimo" do Tailwind, não o grupo nomeado
+> (`group-hover/nome:`), e três das oito linhas do grep de substring do brief
+> usam grupo nomeado (`MainBudgetArea.tsx:363,408,502` — `group-hover/opt:`,
+> `group-hover/prod:`, `group-hover/edit:`). Registrado como medido (5), não
+> forçado para 8, e trazido para revisão em vez de decidido sozinho.
+>
+> **Rodada 1 de correção (10/09/2026): a régua foi ampliada, e o baseline
+> passou de 5 para 8.** Gravar 5 seria gravar uma régua cega — as três linhas
+> que escapavam são o mesmo defeito de acessibilidade das outras cinco, e
+> ficariam invisíveis para sempre, além de uma violação nova escrita com grupo
+> nomeado não ser pega. `RE_GROUP_HOVER` passou a aceitar `group-hover/<nome>:`
+> e, por simetria, `RE_FOCUS` passou a aceitar as formas nomeadas do escape de
+> foco (`group-focus/<nome>:`, `focus-within/<nome>:` etc.) — sem isso, o
+> conserto de uma linha usando grupo nomeado viraria falso positivo, o mesmo
+> problema que `toast.tsx:80` já tinha ensinado. Nenhuma forma nomeada de foco
+> existe hoje no código (`grep -rnE "(group|peer)-focus(-within)?/[A-Za-z0-9_-]+:"
+> ArchSmart-web/src --include=*.tsx` sai vazio) — a régua só previne o
+> problema antes de existir. **O `hover_sem_focus` subiu de 5 para 8 porque a
+> régua passou a enxergar mais, não porque o código piorou** — registrado com
+> `--aceitar-piora`, com o aviso impresso na saída do comando; não é
+> regressão. Detalhe e comandos em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-7-report.md`.
+>
+> O axe rodou sobre a `Galeria` e **nasceu com zero violações** — nenhum
+> conserto de componente foi necessário; a única regra desligada foi `region`,
+> exatamente como o brief já prescrevia (fragmento, não documento), e a sanity
+> check confirmou que o axe reporta violação de verdade quando existe (`<img>`
+> sem `alt` no mesmo ambiente jsdom).
+
+> Nota da Tarefa 8 (10/09/2026): `react-icons`, `embla-carousel-react`,
+> `react-easy-crop` e `vaul` saíram de `package.json` — 0 imports em
+> `src/**/*.{ts,tsx}` (grep medido) para as quatro, e nenhum `drawer.tsx`/
+> `carousel.tsx` do shadcn que dependesse delas. `@types/react-big-calendar`
+> foi para `devDependencies`. `next/dynamic` entrou em três arquivos
+> (calendário, construtor de apresentação e os dois modais pesados da
+> Biblioteca) — `grep -rn "next/dynamic" src --include=*.tsx | wc -l` sai 3.
+> **O calendário não precisou de `ssr: false`**: o brief previa como
+> candidato mais provável, mas `npm run build` prerenderizou `/calendar`
+> como estático (`○`) sem erro tanto com quanto sem essa opção — sem um erro
+> real para justificar, a opção ficou de fora, e o ganho de code splitting já
+> aparece: o CSS de `react-big-calendar` (antes embutido na rota) saiu num
+> chunk assíncrono próprio, carregado só quando o componente monta. Detalhe
+> completo em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-8-report.md`.
+> `cores_literais` continua em **518** (`python tools/catraca.py`).
+
+> Nota da Tarefa 9 (10/09/2026): os quatro maiores arquivos do front foram
+> quebrados em 29 arquivos novos, e nenhum dos quatro passa de 273 linhas:
+> `MainBudgetArea` 634 → **45**, `dashboard/page` 593 → **142**, `AppShell`
+> 569 → **128**, `ProjectWizard` 551 → **273**. A catraca ganhou a medida
+> `arquivos_acima_de_400` — **lista**, não contagem, para dizer *qual* arquivo
+> cresceu — registrada em 12 e fechada em **8**. Os oito que restam são de
+> propósito: `BuilderClient` (529) e `PortalBudget` (517) estão fora do escopo
+> desta seção, e os outros seis (464 a 434) nunca estiveram nela.
+>
+> **A regra desta tarefa foi mover, nunca reescrever, e a defesa foi
+> caracterizar antes.** Cada um dos quatro ganhou um teste de caracterização
+> escrito *antes* da quebra, que precisava passar na primeira execução, e que
+> passou de novo depois **sem edição de assertiva**: 10 (AppShell), 13
+> (dashboard), 12 (ProjectWizard) e 15 (MainBudgetArea) casos — a suíte foi de
+> **93 testes em 15 arquivos** para **143 em 19**.
+>
+> > Correção da Rodada 1 (10/09/2026): a primeira versão desta nota dizia "de
+> > 103 em 16", que é o estado **depois** do primeiro commit desta tarefa, não
+> > o ponto de partida. Número afirmado sem medição. Os dois medidos:
+> > `git ls-tree -r --name-only c8d2ae2 -- ArchSmart-web/src | grep -E "\.(test|spec)\.(ts|tsx)$" | wc -l`
+> > → 15 arquivos, e a suíte rodada sem os quatro arquivos de caracterização
+> > desta tarefa (`npx vitest run --exclude` para cada um) → `Test Files 15
+> > passed (15)`, `Tests 93 passed (93)`.
+>
+> Para provar que a quebra foi mesmo só
+> mudança de endereço, cada arquivo teve a comparação linha a linha entre o
+> antigo e os novos: `AppShell`, `dashboard/page` e `ProjectWizard` **não
+> perderam nenhuma linha**; `MainBudgetArea` perdeu exatamente duas —
+> `{item.options.length > 1 && (() => {` e `})()}` —, a IIFE que virou
+> `<BudgetItemOptionToggles />` com a mesma guarda.
+>
+> **As três medidas-detector ficaram onde estavam**, que era o combinado:
+> `hover_sem_focus` **8** (as três linhas de `group-hover/<nome>:` de
+> `MainBudgetArea` foram para três arquivos diferentes, intactas),
+> `cores_literais` **518** e `eslint_erros` **85**. O eslint chegou a subir para
+> 86 numa versão intermediária, porque a prop nova `product` de
+> `BudgetItemProductCell` tinha sido anotada `any`; passou a reusar
+> `ItemOption["product"]` do `BudgetProvider` e voltou a 85 — a catraca pegou
+> antes do commit.
+>
+> Dois achados que **não** foram corrigidos de passagem, por serem mudança de
+> comportamento: `BudgetItemsList` pega o roteador com
+> `require("next/navigation")` em vez de import (o teste precisa entregar o
+> roteador pelo `AppRouterContext`, porque `require` não passa por `vi.mock`), e
+> as três etapas do `ProjectWizard` ficam **todas** no DOM o tempo todo — o que
+> muda por etapa é a classe `hidden`. Os dois são da Seção 8. Detalhe completo
+> em `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-9-report.md`.
+
+> **Revisão final da branch (10/09/2026) — onda única de correção, antes do
+> merge.** Não é tarefa nova: é o que a revisão por tarefa não podia ver,
+> porque só aparece olhando a branch inteira. O que mudou:
+>
+> - **`PROGRESS.md` descrevia código revertido.** A nota da Tarefa 5 acima
+>   afirmava uma normalização do U+00A0 e uma correção em `alert-dialog.tsx`
+>   que o commit `ad94040` tinha revertido no mesmo dia. Reescrita, com a
+>   reversão registrada como reversão.
+> - **O `empty` do `QueryBoundary` era letra morta para o formato deste
+>   repositório.** O critério padrão só reconhecia array; a camada de dados da
+>   Seção 5 devolve `{items, total, page, size, pages}`. Toda tela paginada da
+>   Seção 8 que esquecesse o `isEmpty` (opcional) renderizaria a lista vazia em
+>   vez do estado vazio, sem erro de tipo, sem lint e sem teste.
+> - **A única mudança visual não intencional da branch.** `LibraryContent`
+>   renderiza o `BatchNormalizeModal` incondicionalmente, e a Tarefa 8 o tornou
+>   `dynamic()` com `loading: () => <Skeleton className="h-64 w-full" />` — um
+>   bloco cinza de 256px no fluxo da página, com o modal fechado. O `loading`
+>   de modal e de sheet passou a ser `() => null`.
+> - **A terceira cegueira da catraca, na mesma função das duas anteriores.**
+>   `comparar()` percorre `medido`: uma chave que existisse no baseline e
+>   sumisse da medição nunca era visitada — portão verde e **mudo**. Agora
+>   reprova, e `eslint_erros` sem `--eslint-json` aparece como `PULADA`, com o
+>   motivo, em vez de sumir da saída.
+> - **A seção não tinha deixado documentação.** `git diff --name-only
+>   24f4eb5..dafe1b3 -- docs/` devolvia só os três arquivos de medição. Nasceu
+>   [`docs/dev/componentes.md`](docs/dev/componentes.md), escrito para quem vai
+>   **usar** a biblioteca — incluindo o ponto cego de cada catraca de UI.
+> - Menores: `FormField` passou a injetar o `id` no campo (rótulo órfão em
+>   silêncio era o modo de falha); `DataTable` volta à primeira página quando a
+>   lista ou a ordem mudam, e ganhou acento em "Página"/"Próxima"; o teste de
+>   `arquivos_acima_de_400` deixou de afirmar `len(...) == 8`, que reprovaria
+>   por **melhoria**; e a asserção de marca em `app-shell.test.tsx` passou a
+>   montar a grafia errada em vez de escrevê-la — era a última ocorrência dela
+>   no repositório, e fazia o comando documentado no `CLAUDE.md` devolver 1.
+>
+> **Uma instrução da revisão não se confirmou, e foi medida em vez de
+> repetida:** ela dizia que o teste do `DataTable` usa `/proxima/i` e
+> "continua passando" com a copy acentuada. Não continua — regex compara
+> codepoint a codepoint, e `i` ignora caixa, não diacrítico. Visto vermelho,
+> a regex ganhou o acento e o que o teste verifica não mudou.
+>
+> As 9 medidas da catraca ficaram **iguais ao baseline** (nenhuma piorou,
+> nenhuma melhorou). Relatório completo em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/final-fix-report.md`.
+
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
@@ -469,6 +745,29 @@ _Última atualização: 2026-09-06_
 
 ## Seção 8 · Migração das telas
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+
+> Cada tela migrada aqui converte também as **cores literais** e as **imagens**
+> dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
+> não duas. São 521 cores em 39 arquivos e 25 `<img>` (medido em 09/09/2026).
+> Não são caixas próprias; são parte da migração de cada tela.
+
+> **Pendência de Art. 8 que a Tarefa 9 da Seção 6 encontrou e não corrigiu de
+> passagem (10/09/2026):** o Orçamento usa um evento de janela com a marca
+> grafada errada, `archsmart:budget_updated`. Não é copy que o usuário lê, mas é
+> `archsmart` em código, o que o Art. 8 proíbe. Ficou de fora da Tarefa 9 porque
+> nome de evento é **contrato entre emissor e ouvinte**: renomear exige mexer nos
+> dois lados no mesmo commit, e a tarefa era mover, não reescrever. Quem migrar o
+> Orçamento renomeia — e mede antes, em vez de confiar numa lista fixa aqui, que
+> envelhece:
+>
+> ```
+> grep -rn "archsmart:" ArchSmart-web/src
+> ```
+>
+> Em 10/09/2026 isso saía **4 ocorrências em 3 arquivos** (o ouvinte em
+> `BudgetSummaryFooter`, e dois emissores — `BudgetItemsList` e
+> `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
+> silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
 - [ ] Biblioteca
 - [ ] Dashboard

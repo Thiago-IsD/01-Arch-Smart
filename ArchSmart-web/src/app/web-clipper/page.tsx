@@ -67,7 +67,7 @@ const ExtensionPopup = () => (
     <div className="absolute top-4 right-4 w-[300px] rounded-lg border bg-background shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="p-4 border-b flex items-center justify-between bg-primary/5">
             <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                <Scissors className="h-4 w-4" /> Arch Smart
+                <Scissors className="h-4 w-4" /> Arq Smart
             </div>
             <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
         </div>
@@ -127,7 +127,7 @@ export default function WebClipperPage() {
                                 </h1>
                                 <p className="text-lg text-muted-foreground max-w-lg mx-auto lg:mx-0 leading-relaxed">
                                     Capture produtos técnicos de qualquer loja online com um clique.
-                                    A IA do Arch Smart organiza nome, preço e dimensões automaticamente.
+                                    A IA do Arq Smart organiza nome, preço e dimensões automaticamente.
                                 </p>
                                 <div className="flex flex-col sm:flex-row gap-3 pt-4 justify-center lg:justify-start">
                                     <Button size="lg" className="gap-2 h-12 text-base px-8 shadow-lg shadow-primary/20">
@@ -198,13 +198,13 @@ export default function WebClipperPage() {
                                 </div>
                             </div>
 
-                            {/* The Arch Smart Way (Order) */}
+                            {/* The Arq Smart Way (Order) */}
                             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-8 space-y-6 relative overflow-hidden ring-1 ring-primary/20 shadow-xl shadow-primary/5">
                                 <div className="absolute top-0 right-0 p-4 opacity-10">
                                     <CheckCircle2 size={100} className="text-primary" />
                                 </div>
                                 <h3 className="text-xl font-bold text-primary flex items-center gap-2">
-                                    <CheckCircle2 size={20} /> A Solução Arch Smart
+                                    <CheckCircle2 size={20} /> A Solução Arq Smart
                                 </h3>
 
                                 {/* Abstract Card */}

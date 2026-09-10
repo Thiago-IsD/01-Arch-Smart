@@ -40,6 +40,44 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
+    /* Estado. Medidos com tools/contraste.py em 09/09/2026: 5,07:1, 4,91:1 e
+       6,63:1 — os tres passam 4.5:1 com folga. */
+    --success: 142 72% 29%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 200 18% 26%;
+
+    --info: 217 91% 42%;
+    --info-foreground: 0 0% 100%;
+
+    /* Raio: os vars descrevem a escala que o shadcn ja computava a partir de
+       --radius (0.375rem), sem mudar nenhum valor renderizado. --radius-xl e
+       0.75rem porque era o que o default do Tailwind ja dava para rounded-xl
+       (extend nao tinha essa chave antes). Corrigido na Rodada 1 de revisao
+       da Tarefa 3 -- ver a nota da secao. */
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: 0.75rem;
+
+    /* Escala tipografica. */
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --text-3xl: 1.875rem;
+
+    /* Espacamento. */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 180 100% 25.1%;
@@ -73,6 +111,16 @@
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+
+    /* Medidos em 09/09/2026: 10,17:1, 10,83:1 e 6,67:1. */
+    --success: 142 60% 55%;
+    --success-foreground: 222.2 84% 4.9%;
+
+    --warning: 38 92% 60%;
+    --warning-foreground: 222.2 84% 4.9%;
+
+    --info: 217 80% 65%;
+    --info-foreground: 222.2 84% 4.9%;
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;

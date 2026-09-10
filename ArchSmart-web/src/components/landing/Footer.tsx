@@ -10,7 +10,7 @@ export default function Footer() {
                 {/* Logo & Slogan */}
                 <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-4">
                     <Image
-                        alt="Arch Smart"
+                        alt="Arq Smart"
                         className="h-8 w-auto object-contain"
                         src={BRAND_ASSETS.horizontal}
                         width={140}
@@ -36,7 +36,7 @@ export default function Footer() {
             <div className="border-t border-border w-full">
                 <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between text-xs text-muted-foreground gap-4">
                     <div>
-                        Arch Smart © 2026. Todos os direitos reservados.
+                        Arq Smart © 2026. Todos os direitos reservados.
                     </div>
                     <div className="flex gap-6">
                         <Link href="/legal/termos" className="hover:text-foreground transition-colors">Termos de Uso</Link>

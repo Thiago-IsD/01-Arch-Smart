@@ -22,7 +22,7 @@ export async function generateMetadata({
     const { uuid } = await params
     const data = await fetchMeta(uuid)
     return {
-        title: data ? `${data.name} | ${data.branding?.office_name || "Arch Smart"}` : "Apresentação | Arch Smart",
+        title: data ? `${data.name} | ${data.branding?.office_name || "Arq Smart"}` : "Apresentação | Arq Smart",
         description: data?.description || "Visualize sua apresentação de projeto.",
     }
 }
