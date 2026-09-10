@@ -73,19 +73,18 @@ const config = {
     		},
     		borderRadius: {
     			sm: 'var(--radius-sm)',
-    			DEFAULT: 'var(--radius)',
-    			md: 'calc(var(--radius) - 2px)',
+    			md: 'var(--radius-md)',
     			lg: 'var(--radius-lg)',
     			xl: 'var(--radius-xl)'
     		},
     		fontSize: {
-    			xs: 'var(--text-xs)',
-    			sm: 'var(--text-sm)',
-    			base: 'var(--text-base)',
-    			lg: 'var(--text-lg)',
-    			xl: 'var(--text-xl)',
-    			'2xl': 'var(--text-2xl)',
-    			'3xl': 'var(--text-3xl)'
+    			xs: ['var(--text-xs)', { lineHeight: '1rem' }],
+    			sm: ['var(--text-sm)', { lineHeight: '1.25rem' }],
+    			base: ['var(--text-base)', { lineHeight: '1.5rem' }],
+    			lg: ['var(--text-lg)', { lineHeight: '1.75rem' }],
+    			xl: ['var(--text-xl)', { lineHeight: '1.75rem' }],
+    			'2xl': ['var(--text-2xl)', { lineHeight: '2rem' }],
+    			'3xl': ['var(--text-3xl)', { lineHeight: '2.25rem' }]
     		},
     		spacing: {
     			1: 'var(--space-1)',
