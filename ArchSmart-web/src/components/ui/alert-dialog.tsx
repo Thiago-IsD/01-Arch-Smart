@@ -27,35 +27,14 @@ const AlertDialogOverlay = React.forwardRef<
 ))
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 
-const SELETOR_FOCAVEL =
-  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, onOpenAutoFocus, ...props }, ref) => (
+>(({ className, ...props }, ref) => (
   <AlertDialogPortal>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
       ref={ref}
-      onOpenAutoFocus={(evento) => {
-        onOpenAutoFocus?.(evento)
-        // O Radix so foca automaticamente o AlertDialogCancel (o padrao
-        // certo: leva o foco para a acao menos destrutiva). Sem Cancel na
-        // arvore, ninguem recebe foco e o teclado escapa do dialogo. A
-        // fila de microtarefas roda depois do handler do Radix (que ja
-        // rodou de forma sincrona) — so garante o fallback quando o foco
-        // realmente ficou de fora. `currentTarget` precisa ser lido AGORA:
-        // e um evento DOM nativo, e o navegador zera `currentTarget` assim
-        // que o dispatch termina, antes da microtarefa rodar.
-        const raiz = evento.currentTarget
-        queueMicrotask(() => {
-          if (raiz instanceof HTMLElement && !raiz.contains(document.activeElement)) {
-            const focavel = raiz.querySelector<HTMLElement>(SELETOR_FOCAVEL)
-            ;(focavel ?? raiz).focus()
-          }
-        })
-      }}
       className={cn(
         "fixed left-[50%] top-[50%] z-[150] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
         className

@@ -7,7 +7,12 @@ import { CurrencyInput } from "@/components/ui/currency-input"
 import { FormField } from "@/components/ui/form-field"
 import { ErrorBoundary, registrarReportadorDeErro } from "@/components/ui/error-boundary"
 import { DataTable } from "@/components/ui/data-table"
-import { AlertDialog, AlertDialogContent, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -50,6 +55,16 @@ describe("EmptyState", () => {
     })
 })
 
+// O Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }) separa
+// "R$" do valor com espaco NAO separavel (U+00A0), nao espaco comum — e esse
+// e o formato tipograficamente correto em pt-BR (evita que o simbolo e o
+// numero quebrem em linhas diferentes), nao um defeito do componente.
+// `dashboard/page.tsx` ja exibe esse mesmo caractere hoje via `toLocaleString`,
+// entao o `Intl` e a fonte de verdade e o `CurrencyInput` nao normaliza.
+// `ESPACO` abaixo e o U+00A0 explicito — comparar com espaco comum (" ")
+// nunca bate, mesmo as duas strings parecendo identicas ao olho.
+const ESPACO = "\u00A0"
+
 describe("CurrencyInput", () => {
     it("trabalha em centavos: digitar 12345 vira R$ 123,45 e emite 12345", async () => {
         const aoMudar = vi.fn()
@@ -57,7 +72,7 @@ describe("CurrencyInput", () => {
         const campo = screen.getByLabelText("Valor")
         await userEvent.type(campo, "12345")
         expect(aoMudar).toHaveBeenLastCalledWith(12345)
-        expect(campo).toHaveValue("R$ 123,45")
+        expect(campo).toHaveValue(`R$${ESPACO}123,45`)
     })
 
     it("ignora o que nao e digito", async () => {
@@ -69,7 +84,7 @@ describe("CurrencyInput", () => {
 
     it("formata o valor que recebe de fora", () => {
         render(<CurrencyInput value={987654} onChange={vi.fn()} aria-label="Valor" />)
-        expect(screen.getByLabelText("Valor")).toHaveValue("R$ 9.876,54")
+        expect(screen.getByLabelText("Valor")).toHaveValue(`R$${ESPACO}9.876,54`)
     })
 })
 
@@ -155,11 +170,26 @@ describe("DataTable", () => {
 
 describe("componentes endurecidos", () => {
     it("AlertDialog prende o foco dentro do dialogo", async () => {
+        // Todo `AlertDialogContent` real no produto tem um `AlertDialogCancel`
+        // (confirmado por grep nos 10 usos em src/) — este fixture reflete
+        // isso, em vez de um conteudo so com um botao qualquer.
+        //
+        // Achado do Radix, preservado aqui porque motivou (e depois derrubou)
+        // uma correcao em `alert-dialog.tsx`: o `onOpenAutoFocus` padrao do
+        // `AlertDialogContent` compoe o handler que a gente passa (se houver)
+        // ANTES do handler interno do Radix, que sempre chama
+        // `event.preventDefault()` e so entao tenta focar a ref interna do
+        // `AlertDialogCancel`. Sem um `Cancel` na arvore essa ref e `null`, o
+        // `preventDefault()` ja rodou e o fallback do proprio `FocusScope`
+        // (focar o primeiro elemento focavel) nunca dispara — ninguem recebe
+        // foco. Como todo uso real tem `Cancel`, esse caminho nunca ocorre em
+        // producao, e o componente ficou como o Radix entrega, sem fallback.
         render(
             <AlertDialog>
                 <AlertDialogTrigger>abrir</AlertDialogTrigger>
                 <AlertDialogContent>
                     <button>dentro</button>
+                    <AlertDialogCancel>cancelar</AlertDialogCancel>
                 </AlertDialogContent>
             </AlertDialog>,
         )
