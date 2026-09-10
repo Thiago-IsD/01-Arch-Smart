@@ -532,7 +532,7 @@ _Última atualização: 2026-09-10_
 - [x] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
 - [x] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
 - [x] Galeria `/dev/componentes`
-- [x] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 5 + axe na galeria, zero violação)
+- [x] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
 - [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 
@@ -566,22 +566,36 @@ _Última atualização: 2026-09-10_
 > `aria-hidden="true"` no `Skeleton`) foram só o que o brief já previa.
 > `cores_literais` continua em **518** (`python tools/catraca.py`).
 
-> Nota da Tarefa 7 (10/09/2026): o baseline de `hover_sem_focus` saiu **5**,
-> não 8 como a spec/brief previa. O brief já havia achatado 9→8 por causa de
-> `toast.tsx:80` (`focus:` em vez de `focus-within:`); a segunda diferença é
-> nova, e é da própria medida: `RE_GROUP_HOVER = r"\bgroup-hover:"` só casa o
-> grupo "anônimo" do Tailwind, não o grupo nomeado (`group-hover/nome:`), e
-> três das oito linhas do grep de substring do brief usam grupo nomeado
-> (`MainBudgetArea.tsx:363,408,502` — `group-hover/opt:`, `group-hover/prod:`,
-> `group-hover/edit:`). É o mesmo defeito de acessibilidade nos dois formatos;
-> a medida atual só cobre o primeiro. Registrado como medido (**5**), não
-> forçado para 8 — comando e detalhe em
-> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-7-report.md`. O axe
-> rodou sobre a `Galeria` e **nasceu com zero violações** — nenhum conserto
-> de componente foi necessário; a única regra desligada foi `region`, exatamente
-> como o brief já prescrevia (fragmento, não documento), e a sanity check
-> confirmou que o axe reporta violação de verdade quando existe (`<img>` sem
-> `alt` no mesmo ambiente jsdom).
+> Nota da Tarefa 7 (10/09/2026): a primeira medição de `hover_sem_focus` saiu
+> **5**, não 8 como a spec/brief previa. `RE_GROUP_HOVER = r"\bgroup-hover:"`
+> só casava o grupo "anônimo" do Tailwind, não o grupo nomeado
+> (`group-hover/nome:`), e três das oito linhas do grep de substring do brief
+> usam grupo nomeado (`MainBudgetArea.tsx:363,408,502` — `group-hover/opt:`,
+> `group-hover/prod:`, `group-hover/edit:`). Registrado como medido (5), não
+> forçado para 8, e trazido para revisão em vez de decidido sozinho.
+>
+> **Rodada 1 de correção (10/09/2026): a régua foi ampliada, e o baseline
+> passou de 5 para 8.** Gravar 5 seria gravar uma régua cega — as três linhas
+> que escapavam são o mesmo defeito de acessibilidade das outras cinco, e
+> ficariam invisíveis para sempre, além de uma violação nova escrita com grupo
+> nomeado não ser pega. `RE_GROUP_HOVER` passou a aceitar `group-hover/<nome>:`
+> e, por simetria, `RE_FOCUS` passou a aceitar as formas nomeadas do escape de
+> foco (`group-focus/<nome>:`, `focus-within/<nome>:` etc.) — sem isso, o
+> conserto de uma linha usando grupo nomeado viraria falso positivo, o mesmo
+> problema que `toast.tsx:80` já tinha ensinado. Nenhuma forma nomeada de foco
+> existe hoje no código (`grep -rnE "(group|peer)-focus(-within)?/[A-Za-z0-9_-]+:"
+> ArchSmart-web/src --include=*.tsx` sai vazio) — a régua só previne o
+> problema antes de existir. **O `hover_sem_focus` subiu de 5 para 8 porque a
+> régua passou a enxergar mais, não porque o código piorou** — registrado com
+> `--aceitar-piora`, com o aviso impresso na saída do comando; não é
+> regressão. Detalhe e comandos em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-7-report.md`.
+>
+> O axe rodou sobre a `Galeria` e **nasceu com zero violações** — nenhum
+> conserto de componente foi necessário; a única regra desligada foi `region`,
+> exatamente como o brief já prescrevia (fragmento, não documento), e a sanity
+> check confirmou que o axe reporta violação de verdade quando existe (`<img>`
+> sem `alt` no mesmo ambiente jsdom).
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`

@@ -248,12 +248,10 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
         self.assertEqual(catraca.medir(None)["tabindex_negativo"], 5)
 
     def test_conta_hover_sem_focus(self):
-        # O brief da Tarefa 7 previa 8, medido com grep de substring simples.
-        # O regex real so casa `group-hover:` literal, nao o grupo nomeado do
-        # Tailwind (`group-hover/nome:`); 3 das 8 linhas usam grupo nomeado
-        # (MainBudgetArea.tsx), entao o medido e 5. Ver tools/catraca.py e
-        # task-7-report.md.
-        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 5)
+        # Rodada 1 de revisao: a regua ampliada (grupo nomeado dos dois lados)
+        # mede 8, batendo o numero do brief -- mas medido, nao suposto. Ver
+        # tools/catraca.py (RE_GROUP_HOVER/RE_FOCUS) e task-7-report.md.
+        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 8)
 
     def test_linha_com_focus_within_nao_conta(self):
         self.assertEqual(
@@ -279,6 +277,36 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
                 'className="opacity-0 group-hover:opacity-100"'
             ),
             1,
+        )
+
+    def test_grupo_nomeado_sem_foco_conta(self):
+        # `group-hover/opt:` e o mesmo defeito que `group-hover:` -- e a forma
+        # que escapava da regua antes da Rodada 1 de revisao (MainBudgetArea.tsx).
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="opacity-0 group-hover/opt:opacity-100"'
+            ),
+            1,
+        )
+
+    def test_grupo_nomeado_com_conserto_nomeado_nao_conta(self):
+        # O conserto tambem pode usar a forma nomeada do Tailwind
+        # (`group-focus/opt:`). Sem RE_FOCUS aceitar isso, esta linha ja
+        # acessivel por teclado viraria falso positivo -- o mesmo problema que
+        # toast.tsx:80 tinha antes de RE_FOCUS aceitar `focus:` puro.
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="opacity-0 group-hover/opt:opacity-100 group-focus/opt:opacity-100"'
+            ),
+            0,
+        )
+
+    def test_grupo_nomeado_com_focus_within_nomeado_nao_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="opacity-0 group-hover/opt:opacity-100 focus-within/opt:opacity-100"'
+            ),
+            0,
         )
 
 

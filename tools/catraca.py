@@ -33,21 +33,30 @@ A Tarefa 7 da Secao 6 acrescentou duas medidas de acessibilidade:
 
   - tabindex_negativo    5 hoje (`tabIndex={-1}` em ArchSmart-web/src/**/*.tsx);
                          a Secao 8 zera, ao migrar as telas onde vivem
-  - hover_sem_focus      5 hoje (nao 8, o numero da spec/brief -- ver nota
-                         abaixo): linhas com `opacity-0` + `group-hover:` e sem
-                         `focus:` nem `focus-within:` em
+  - hover_sem_focus      8 hoje: linhas com `opacity-0` + `group-hover:` (ou a
+                         forma nomeada do Tailwind, `group-hover/nome:`) e sem
+                         escape de foco (`focus:`, `focus-within:`, ou as
+                         formas nomeadas `group-focus/nome:`,
+                         `focus-within/nome:` etc.) em
                          ArchSmart-web/src/**/*.tsx -- conteudo so visivel no
                          hover do mouse fica inacessivel por teclado. A Secao
                          8 zera, ao migrar as telas onde vivem
 
-    O brief da Tarefa 7 mediu 8 com um grep de substring simples (que casa
-    tanto `group-hover:` quanto `group-hover/nome:`, o grupo nomeado do
-    Tailwind). O regex desta medida so casa `group-hover:` literal, e 3 das 8
-    linhas do grep usam grupo nomeado (`group-hover/opt:`,
-    `group-hover/prod:`, `group-hover/edit:`, todas em MainBudgetArea.tsx) --
-    entao a medida real sai 5. E o mesmo defeito de acessibilidade nos dois
-    casos; a medida so nao o cobre. Registrado como medido (5), nao forcado
-    para 8 -- ver task-7-report.md.
+    Rodada 1 de correcao (10/09/2026): a primeira versao desta medida so
+    casava `group-hover:` literal, sem a forma nomeada do Tailwind
+    (`group-hover/nome:`, usada em 3 linhas de MainBudgetArea.tsx), e saiu
+    registrada em 5. Regua cega: as 3 linhas que escapavam sao o MESMO
+    defeito das outras 5, so que invisiveis para sempre, e uma violacao nova
+    escrita com grupo nomeado nao seria pega. Corrigido ampliando
+    RE_GROUP_HOVER para aceitar a forma nomeada -- e, por simetria, RE_FOCUS
+    tambem, senao a versao nomeada do CONSERTO (`group-focus/nome:` etc.)
+    viraria falso positivo, o mesmo problema que `toast.tsx:80` ja tinha
+    ensinado (ver `RE_FOCUS` abaixo). Medido de novo com a regua ampliada:
+    8 -- bate o numero do brief original, mas foi medido, nao suposto (nenhuma
+    forma nomeada de foco existe hoje no codigo; `grep -rnE
+    "(group|peer)-focus(-within)?/[A-Za-z0-9_-]+:" ArchSmart-web/src
+    --include=*.tsx` sai vazio). O baseline subiu de 5 para 8 porque a regua
+    passou a enxergar mais, nao porque o codigo piorou -- ver task-7-report.md.
 
 Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
@@ -91,18 +100,31 @@ RE_SUPABASE = re.compile(r"\bcreate(Browser|Server)Client\s*\(")
 
 RE_TABINDEX_NEGATIVO = re.compile(r"tabIndex=\{\s*-\s*1\s*\}")
 RE_OPACITY_ZERO = re.compile(r"\bopacity-0\b")
-# So casa o grupo "anonimo" (`group-hover:`), nao o grupo nomeado do Tailwind
-# (`group-hover/nome:`, usado em tres linhas de MainBudgetArea.tsx). E o mesmo
-# defeito nos dois casos -- revelar em opacity-0 so no hover, sem equivalente
-# de foco --, mas widen isso e decisao de medida que nao foi pedida aqui; por
-# isso o baseline registrado (5) e MENOR que a contagem por substring simples
-# (8, ver task-7-report.md), e a diferenca fica documentada em vez de forcada.
-RE_GROUP_HOVER = re.compile(r"\bgroup-hover:")
+# Casa `group-hover:` E a forma nomeada do Tailwind, `group-hover/<nome>:`
+# (letras, digitos, `_` ou `-` no nome) -- usada em tres linhas de
+# MainBudgetArea.tsx (`group-hover/opt:`, `group-hover/prod:`,
+# `group-hover/edit:`). E o MESMO defeito nos dois formatos: opacity-0 que so
+# revela no hover do grupo, sem equivalente de foco. A primeira versao desta
+# regua so casava a forma anonima e saia em 5, nao 8 -- regua cega, que
+# deixava as tres linhas nomeadas invisiveis para sempre. Corrigido na
+# Rodada 1 de revisao da Tarefa 7; ver nota no docstring do modulo.
+RE_GROUP_HOVER = re.compile(r"\bgroup-hover(/[A-Za-z0-9_-]+)?:")
 # `focus-within:` revela quando o foco cai num filho; `focus:` revela quando o
 # proprio elemento recebe foco. Os dois resolvem o defeito -- aceitar so o
 # primeiro punia toast.tsx:80, que ja e acessivel por teclado, e um baseline com
 # falso positivo dentro e um baseline que ninguem consegue zerar.
-RE_FOCUS = re.compile(r"\bfocus(-within)?:")
+#
+# Tambem aceita a forma nomeada de qualquer um dos dois -- `group-focus/nome:`,
+# `focus-within/nome:`, `peer-focus/nome:` etc. -- pelo mesmo motivo que
+# RE_GROUP_HOVER aceita `group-hover/nome:`: por simetria. Sem isso, o
+# CONSERTO de uma linha usando grupo nomeado (`group-hover/opt:opacity-100
+# group-focus/opt:opacity-100`) continuaria contando como defeito -- um falso
+# positivo dentro do baseline, o mesmo problema que a definicao ingenua tinha
+# com `toast.tsx:80` antes desta medida existir. Nenhuma forma nomeada de foco
+# ocorre no codigo hoje (`grep -rnE "(group|peer)-focus(-within)?/[A-Za-z0-9_-]+:"
+# ArchSmart-web/src --include=*.tsx` sai vazio) -- a regua so previne o
+# problema antes de existir, nao esta consertando nada agora.
+RE_FOCUS = re.compile(r"\bfocus(-within)?(/[A-Za-z0-9_-]+)?:")
 
 _PREFIXOS = ("bg|text|border|ring|from|to|via|fill|stroke|outline|decoration"
              "|shadow|accent|caret|divide|placeholder")
@@ -119,7 +141,7 @@ CRITERIOS = {
     "supabase_fora_de_lib_api": "ocorrencias de `create{Browser,Server}Client(` fora de src/lib/api/ e src/proxy.ts",
     "contraste_reprovado": "pares (cor, cor-foreground) de globals.css abaixo de 4.5:1, nos dois temas",
     "tabindex_negativo": "ocorrencias de tabIndex={-1} em ArchSmart-web/src/**/*.tsx",
-    "hover_sem_focus": "linhas com opacity-0 + group-hover: e sem focus: nem focus-within: em ArchSmart-web/src/**/*.tsx",
+    "hover_sem_focus": "linhas com opacity-0 + group-hover: (ou group-hover/nome:) e sem escape de foco (focus:, focus-within:, ou as formas nomeadas) em ArchSmart-web/src/**/*.tsx",
 }
 
 
