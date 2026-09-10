@@ -7,8 +7,8 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 39/63 (62%)**
-`████████████░░░░░░░░`
+**Progresso geral: 40/63 (63%)**
+`█████████████░░░░░░░`
 
 _Última atualização: 2026-09-10_
 
@@ -510,7 +510,7 @@ _Última atualização: 2026-09-10_
 >    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**3/9 (33%)** `███████░░░░░░░░░░░░░`
+**4/9 (44%)** `█████████░░░░░░░░░░░`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
