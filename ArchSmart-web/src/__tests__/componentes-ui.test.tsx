@@ -105,6 +105,25 @@ describe("FormField", () => {
         expect(campo).toHaveAccessibleDescription("E-mail invalido")
     })
 
+    it("injeta o id no campo — o chamador nao precisa repetir", () => {
+        // O componente existe justamente para ligar rotulo e campo. Ele ja
+        // injetava aria-invalid e aria-describedby, mas nao o `id`: esquecer
+        // de repeti-lo no filho produzia rotulo orfao EM SILENCIO, sem erro
+        // de tipo e sem lint. Note o <input> sem id nenhum.
+        render(<FormField id="cidade" rotulo="Cidade"><input /></FormField>)
+        expect(screen.getByLabelText("Cidade")).toHaveAttribute("id", "cidade")
+    })
+
+    it("nao sobrescreve um id que o chamador passou de proposito", () => {
+        // Caso divergente: quando os dois ids existem e sao diferentes, quem
+        // manda e o filho — ele pode estar ligado a outra coisa (um
+        // aria-controls, um form externo). O rotulo segue o `id` da prop, e a
+        // divergencia fica visivel em vez de ser silenciosamente "consertada".
+        render(<FormField id="rotulo-cep" rotulo="CEP"><input id="campo-cep" /></FormField>)
+        expect(screen.getByRole("textbox")).toHaveAttribute("id", "campo-cep")
+        expect(screen.queryByLabelText("CEP")).toBeNull()
+    })
+
     it("marca data-private quando o dado e sensivel", () => {
         const { container } = render(
             <FormField id="cpf" rotulo="CPF" sensivel><input id="cpf" /></FormField>,
