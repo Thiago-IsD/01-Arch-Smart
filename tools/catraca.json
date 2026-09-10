@@ -13,5 +13,7 @@
     "claro:muted",
     "claro:secondary",
     "escuro:secondary"
-  ]
+  ],
+  "tabindex_negativo": 5,
+  "hover_sem_focus": 5
 }

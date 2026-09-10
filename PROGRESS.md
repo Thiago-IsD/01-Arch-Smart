@@ -7,8 +7,8 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 42/63 (67%)**
-`█████████████░░░░░░░`
+**Progresso geral: 43/63 (68%)**
+`██████████████░░░░░░`
 
 _Última atualização: 2026-09-10_
 
@@ -510,7 +510,7 @@ _Última atualização: 2026-09-10_
 >    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**6/9 (67%)** `█████████████░░░░░░░`
+**7/9 (78%)** `████████████████░░░░`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
@@ -532,7 +532,7 @@ _Última atualização: 2026-09-10_
 - [x] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
 - [x] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
 - [x] Galeria `/dev/componentes`
-- [ ] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
+- [x] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 5 + axe na galeria, zero violação)
 - [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 
@@ -565,6 +565,23 @@ _Última atualização: 2026-09-10_
 > Os outros dois hardenings (`min-h-11` no `DropdownMenuItem`,
 > `aria-hidden="true"` no `Skeleton`) foram só o que o brief já previa.
 > `cores_literais` continua em **518** (`python tools/catraca.py`).
+
+> Nota da Tarefa 7 (10/09/2026): o baseline de `hover_sem_focus` saiu **5**,
+> não 8 como a spec/brief previa. O brief já havia achatado 9→8 por causa de
+> `toast.tsx:80` (`focus:` em vez de `focus-within:`); a segunda diferença é
+> nova, e é da própria medida: `RE_GROUP_HOVER = r"\bgroup-hover:"` só casa o
+> grupo "anônimo" do Tailwind, não o grupo nomeado (`group-hover/nome:`), e
+> três das oito linhas do grep de substring do brief usam grupo nomeado
+> (`MainBudgetArea.tsx:363,408,502` — `group-hover/opt:`, `group-hover/prod:`,
+> `group-hover/edit:`). É o mesmo defeito de acessibilidade nos dois formatos;
+> a medida atual só cobre o primeiro. Registrado como medido (**5**), não
+> forçado para 8 — comando e detalhe em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-7-report.md`. O axe
+> rodou sobre a `Galeria` e **nasceu com zero violações** — nenhum conserto
+> de componente foi necessário; a única regra desligada foi `region`, exatamente
+> como o brief já prescrevia (fragmento, não documento), e a sanity check
+> confirmou que o axe reporta violação de verdade quando existe (`<img>` sem
+> `alt` no mesmo ambiente jsdom).
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`

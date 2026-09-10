@@ -29,6 +29,26 @@ manual (`fetch` cru, cliente Supabase direto) fora de `src/lib/api/`:
                          e assim que "portao fechado para o que a Secao 6 cria"
                          sai de graca, sem lista de excecao para envelhecer
 
+A Tarefa 7 da Secao 6 acrescentou duas medidas de acessibilidade:
+
+  - tabindex_negativo    5 hoje (`tabIndex={-1}` em ArchSmart-web/src/**/*.tsx);
+                         a Secao 8 zera, ao migrar as telas onde vivem
+  - hover_sem_focus      5 hoje (nao 8, o numero da spec/brief -- ver nota
+                         abaixo): linhas com `opacity-0` + `group-hover:` e sem
+                         `focus:` nem `focus-within:` em
+                         ArchSmart-web/src/**/*.tsx -- conteudo so visivel no
+                         hover do mouse fica inacessivel por teclado. A Secao
+                         8 zera, ao migrar as telas onde vivem
+
+    O brief da Tarefa 7 mediu 8 com um grep de substring simples (que casa
+    tanto `group-hover:` quanto `group-hover/nome:`, o grupo nomeado do
+    Tailwind). O regex desta medida so casa `group-hover:` literal, e 3 das 8
+    linhas do grep usam grupo nomeado (`group-hover/opt:`,
+    `group-hover/prod:`, `group-hover/edit:`, todas em MainBudgetArea.tsx) --
+    entao a medida real sai 5. E o mesmo defeito de acessibilidade nos dois
+    casos; a medida so nao o cobre. Registrado como medido (5), nao forcado
+    para 8 -- ver task-7-report.md.
+
 Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
 Uso:
@@ -69,6 +89,21 @@ PROXY_WEB = RAIZ / "ArchSmart-web" / "src" / "proxy.ts"
 RE_FETCH = re.compile(r"\bfetch\s*\(")
 RE_SUPABASE = re.compile(r"\bcreate(Browser|Server)Client\s*\(")
 
+RE_TABINDEX_NEGATIVO = re.compile(r"tabIndex=\{\s*-\s*1\s*\}")
+RE_OPACITY_ZERO = re.compile(r"\bopacity-0\b")
+# So casa o grupo "anonimo" (`group-hover:`), nao o grupo nomeado do Tailwind
+# (`group-hover/nome:`, usado em tres linhas de MainBudgetArea.tsx). E o mesmo
+# defeito nos dois casos -- revelar em opacity-0 so no hover, sem equivalente
+# de foco --, mas widen isso e decisao de medida que nao foi pedida aqui; por
+# isso o baseline registrado (5) e MENOR que a contagem por substring simples
+# (8, ver task-7-report.md), e a diferenca fica documentada em vez de forcada.
+RE_GROUP_HOVER = re.compile(r"\bgroup-hover:")
+# `focus-within:` revela quando o foco cai num filho; `focus:` revela quando o
+# proprio elemento recebe foco. Os dois resolvem o defeito -- aceitar so o
+# primeiro punia toast.tsx:80, que ja e acessivel por teclado, e um baseline com
+# falso positivo dentro e um baseline que ninguem consegue zerar.
+RE_FOCUS = re.compile(r"\bfocus(-within)?:")
+
 _PREFIXOS = ("bg|text|border|ring|from|to|via|fill|stroke|outline|decoration"
              "|shadow|accent|caret|divide|placeholder")
 _PALETAS = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green"
@@ -83,6 +118,8 @@ CRITERIOS = {
     "fetch_fora_de_lib_api": "ocorrencias de `fetch(` em ArchSmart-web/src/**/*.{ts,tsx}, fora de src/lib/api/",
     "supabase_fora_de_lib_api": "ocorrencias de `create{Browser,Server}Client(` fora de src/lib/api/ e src/proxy.ts",
     "contraste_reprovado": "pares (cor, cor-foreground) de globals.css abaixo de 4.5:1, nos dois temas",
+    "tabindex_negativo": "ocorrencias de tabIndex={-1} em ArchSmart-web/src/**/*.tsx",
+    "hover_sem_focus": "linhas com opacity-0 + group-hover: e sem focus: nem focus-within: em ArchSmart-web/src/**/*.tsx",
 }
 
 
@@ -128,6 +165,38 @@ def contar_ocorrencias(raiz: Path, padrao: re.Pattern, isentos: tuple[Path, ...]
     return total
 
 
+def contar_hover_sem_focus_no_texto(texto: str) -> int:
+    """Linhas que escondem em opacity-0 e so revelam no hover do grupo.
+
+    Conta por LINHA, nao por arquivo: o par (opacity-0, group-hover:) tem que
+    estar na mesma className para ser o defeito. Uma linha que ja revele por
+    foco esta consertada e nao conta -- e assim que a medida desce quando
+    alguem conserta, em vez de exigir que o arquivo inteiro suma.
+    """
+    total = 0
+    for linha in texto.splitlines():
+        if (RE_OPACITY_ZERO.search(linha) and RE_GROUP_HOVER.search(linha)
+                and not RE_FOCUS.search(linha)):
+            total += 1
+    return total
+
+
+def contar_hover_sem_focus(raiz: Path) -> int:
+    if not raiz.exists():
+        raise DiretorioMedidoSumiu(
+            f"{raiz} nao existe. A catraca mede esse caminho; se ele foi renomeado, "
+            "atualize SRC_WEB em tools/catraca.py no mesmo commit do rename."
+        )
+    total = 0
+    for caminho in raiz.rglob("*"):
+        if caminho.suffix != ".tsx" or not caminho.is_file():
+            continue
+        total += contar_hover_sem_focus_no_texto(
+            caminho.read_text(encoding="utf-8", errors="ignore")
+        )
+    return total
+
+
 def modulos_sem_doc(services: Path, features: Path | None, docs: Path) -> list[str]:
     """Modulos sem o .md correspondente em docs/dev/modulos/ (Art. 13)."""
     documentados = {p.stem for p in docs.glob("*.md")} if docs.exists() else set()
@@ -152,6 +221,8 @@ def medir(eslint_json: Path | None) -> dict:
         "fetch_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_FETCH, (LIB_API_WEB,)),
         "supabase_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
         "contraste_reprovado": contraste.reprovados(),
+        "tabindex_negativo": contar_ocorrencias(SRC_WEB, RE_TABINDEX_NEGATIVO),
+        "hover_sem_focus": contar_hover_sem_focus(SRC_WEB),
     }
     if eslint_json is not None:
         relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))

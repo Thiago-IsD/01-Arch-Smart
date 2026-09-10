@@ -243,5 +243,44 @@ class TestMainAtualizarIgnoraChaveDeDocumentacao(unittest.TestCase):
             self.assertEqual(gravado["_leia-me"], "comentario, nao e medida")
 
 
+class TestMedidasDeAcessibilidade(unittest.TestCase):
+    def test_conta_tabindex_negativo(self):
+        self.assertEqual(catraca.medir(None)["tabindex_negativo"], 5)
+
+    def test_conta_hover_sem_focus(self):
+        # O brief da Tarefa 7 previa 8, medido com grep de substring simples.
+        # O regex real so casa `group-hover:` literal, nao o grupo nomeado do
+        # Tailwind (`group-hover/nome:`); 3 das 8 linhas usam grupo nomeado
+        # (MainBudgetArea.tsx), entao o medido e 5. Ver tools/catraca.py e
+        # task-7-report.md.
+        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 5)
+
+    def test_linha_com_focus_within_nao_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="opacity-0 group-hover:opacity-100 focus-within:opacity-100"'
+            ),
+            0,
+        )
+
+    def test_linha_com_focus_proprio_tambem_nao_conta(self):
+        # O elemento aparece quando ELE recebe foco. E acessivel por teclado —
+        # contar isso seria medir um defeito que nao existe (ver toast.tsx:80).
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="opacity-0 group-hover:opacity-100 focus:opacity-100"'
+            ),
+            0,
+        )
+
+    def test_linha_sem_nenhum_foco_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="opacity-0 group-hover:opacity-100"'
+            ),
+            1,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

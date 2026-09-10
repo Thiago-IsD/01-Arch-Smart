@@ -1,3 +1,4 @@
+import axe from "axe-core"
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
@@ -28,4 +29,20 @@ describe("galeria de componentes", () => {
         expect(screen.getByTestId("qb-erro")).toBeInTheDocument()
         expect(screen.getByTestId("qb-dados")).toBeInTheDocument()
     })
+
+    it("a galeria nao tem violacao de acessibilidade", async () => {
+        const { container } = render(<Galeria />)
+        const resultado = await axe.run(container, {
+            rules: {
+                // A galeria e um fragmento, nao um documento: as regras de
+                // estrutura de pagina (landmark, region, ordem de heading) nao se
+                // aplicam a ela e produziriam violacao falsa.
+                region: { enabled: false },
+            },
+        })
+        const resumo = resultado.violations
+            .map((v) => `${v.id}: ${v.nodes.length} no(s) — ${v.help}`)
+            .join("\n")
+        expect(resultado.violations, `violacoes:\n${resumo}`).toHaveLength(0)
+    }, 20_000)
 })
