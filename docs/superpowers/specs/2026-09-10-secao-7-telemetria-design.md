@@ -139,9 +139,23 @@ diferente:
   (`query-boundary.tsx:65`). Onde não houver boundary, `is_empty` é **nulo**.
   Nulo, não `false`: "não sei" e "não está vazia" são coisas diferentes.
 
-Tela sem query nenhuma (landing, páginas legais) emite depois da pintura. Para
-não misturar duas medições na mesma coluna, o evento carrega
+Tela autenticada sem query nenhuma emite depois da pintura. Para não misturar
+duas medições na mesma coluna, o evento carrega
 **`medido_ate: "dados" | "pintura"`** dizendo qual das duas o `load_ms` é.
+
+> **Corrigido em 10/09/2026, ao mapear os arquivos do plano.** Uma versão
+> anterior deste parágrafo dizia que landing e páginas legais emitiriam depois
+> da pintura. **Não emitem, e não dá para emitirem:** o endpoint tira
+> `account_id` do contexto da sessão, e essas páginas são anônimas — inventar
+> uma conta para elas violaria o Art. 1. A telemetria desta seção cobre as **15
+> telas autenticadas** de `app/(dashboard)/`; as outras **19** ficam de fora.
+> Medido com `find ArchSmart-web/src/app/"(dashboard)" -name page.tsx | wc -l`
+> e o complemento com `-not -path`.
+>
+> Isso encaixa com onde o `QueryProvider` já mora — `(dashboard)/layout.tsx` —,
+> que é onde a telemetria se monta. Medir visitante anônimo é outro problema,
+> com outro desenho (sem conta, provavelmente sem nosso banco), e não é desta
+> seção.
 
 Os dois crescem sozinhos: cada tela que a Seção 8 migrar passa a medir de
 verdade sem tocar em código de telemetria. É por isso que a telemetria vem
@@ -200,6 +214,20 @@ Duas tabelas em `app/models/all_models.py`, junto das outras 26, numa migração
 Alembic com `downgrade()` de `drop_table` — que funciona de verdade, ao
 contrário das quatro migrações antigas com `op.drop_constraint(None, ...)`.
 
+**A coluna de usuário chama `created_by`, não `user_id`.** É a convenção que a
+Seção 4 estabeleceu nas 21 tabelas de dado, é o que `ScopedRepository.create()`
+preenche sozinho a partir do contexto, e é o que `test_colunas_de_escopo.py`
+exige de toda tabela nova — nullable, porque portal público e formulário de
+leads gravam sem sessão. Ter `user_id` **e** `created_by` seriam duas colunas
+com o mesmo significado. Onde a spec de 23/08 diz "`account_id`/`user_id` do
+contexto", leia `account_id`/`created_by`: o que importa é a origem, e a origem
+é o contexto do servidor nos dois casos.
+
+> Esse mesmo teste **trava a contagem de tabelas de dado em 21**, de propósito,
+> para que tabela nova não nasça sem escopo. Com estas duas ele passa a 23, e o
+> número é atualizado no mesmo commit que cria as tabelas — depois de decidir o
+> escopo delas, nunca antes.
+
 O `arquivos_acima_de_400` da catraca só mede `ArchSmart-web`, então as 536
 linhas de `all_models.py` não são portão de nada e o arquivo não precisa ser
 quebrado nesta seção.
@@ -210,7 +238,7 @@ quebrado nesta seção.
 |---|---|---|
 | `id` | UUID pk | |
 | `account_id` | UUID FK `accounts` NOT NULL | do contexto |
-| `user_id` | UUID FK `users` NULL | nulo em evento de sistema |
+| `created_by` | UUID FK `users` NULL | do contexto; nulo em evento de sistema |
 | `name` | String NOT NULL | `screen_viewed`, etc. |
 | `properties` | JSONB NOT NULL default `{}` | |
 | `created_at` | DateTime NOT NULL, `server_default=func.now()` | |
@@ -223,7 +251,7 @@ quebrado nesta seção.
 |---|---|---|
 | `id` | UUID pk | |
 | `account_id` | UUID FK NOT NULL | do contexto |
-| `user_id` | UUID FK NULL | |
+| `created_by` | UUID FK `users` NULL | do contexto |
 | `model_name` | String NOT NULL | |
 | `input_tokens` / `output_tokens` | Integer NOT NULL | o que a spec não previa |
 | `token_count` | Integer NOT NULL | a soma; é a coluna que a spec pede |
@@ -267,6 +295,17 @@ do `AppShell` é Seção 8.
 
 Branch `secao-7-telemetria`, merge em `develop` no fim, como as anteriores.
 
+### Uma armadilha da catraca, que esta seção arma sozinha se não olhar
+
+`modulos_sem_doc` conta **arquivo em `app/services/` ou diretório em
+`src/features/` sem `.md` de mesmo nome em `docs/dev/modulos/`**. Esta seção
+cria os dois: `app/services/telemetry_service.py` e `src/features/telemetry/`.
+
+Sem doc, a medida sai de 2 para **4** e a seção precisaria de
+`--atualizar --aceitar-piora` para fechar. Com as três docs — `ai_service.md`,
+`telemetry_service.md` e `telemetry.md` — ela **cai para 1**. São três arquivos
+de documentação, não uma reforma: o custo é pequeno e o sinal é o oposto.
+
 ---
 
 ## O que esta seção não faz
@@ -277,6 +316,9 @@ Branch `secao-7-telemetria`, merge em `develop` no fim, como as anteriores.
   evento de negócio é emitido. Cada tela migrada na Seção 8 traz os seus.
 - **Não migra o `AppShell`** nem nenhuma das 75 ocorrências de `fetch` fora de
   `lib/api/`.
+- **Não mede visitante anônimo.** Landing, páginas legais, `auth/`, portal e as
+  demais 19 telas fora de `app/(dashboard)/` não emitem evento: sem sessão não
+  há `account_id`, e o Art. 1 não admite um inventado.
 - **Não rotaciona a credencial E2E** — risco aceito por escrito, ver acima.
 - **Não põe `e2e/` em portão nenhum.** Continua pendência herdada para a Seção 8.
 - **Não retém nem expira evento.** `product_events` cresce sem política de
@@ -303,5 +345,7 @@ Branch `secao-7-telemetria`, merge em `develop` no fim, como as anteriores.
    caso do StrictMode.
 
 4. **A cobertura real de `load_ms` é pequena nesta seção** — 3 arquivos usam
-   react-query, de 34 telas. É esperado e está registrado aqui para não virar
-   surpresa: o número cresce tela a tela na Seção 8, sem tocar em telemetria.
+   react-query, e o alvo desta seção são as 15 telas autenticadas (das 34 no
+   total). É esperado e está registrado aqui para não virar surpresa: o número
+   cresce tela a tela na Seção 8, sem tocar em telemetria. O que a Seção 7
+   entrega é o encanamento e a primeira medição de verdade, na Biblioteca.

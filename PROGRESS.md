@@ -759,7 +759,9 @@ _Última atualização: 2026-09-10_
 **0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
 > **Desenho aprovado em 10/09/2026**, antes de existir plano de execução:
-> [`docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md`](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md).
+> [`docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md`](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md);
+> o plano das cinco tarefas está em
+> [`docs/superpowers/plans/2026-09-10-secao-7-telemetria.md`](docs/superpowers/plans/2026-09-10-secao-7-telemetria.md).
 > Ele corrige três pontos da spec de 23/08 que não sobrevivem ao código de hoje
 > — a rota, as colunas de token e a suposição de que o `screen_viewed`
 > automático cobriria alguma tela — e a spec original foi corrigida no mesmo
