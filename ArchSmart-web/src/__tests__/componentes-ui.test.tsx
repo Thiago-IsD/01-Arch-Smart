@@ -176,8 +176,46 @@ describe("DataTable", () => {
             <DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} porPagina={2} />,
         )
         expect(screen.queryByText("Mesa")).not.toBeInTheDocument()
-        await userEvent.click(screen.getByRole("button", { name: /proxima/i }))
+        // A regex precisou do acento junto com a copy: /proxima/i compara
+        // codepoint a codepoint e nao casa "Próxima" — "o" e "ó" sao
+        // caracteres diferentes, e `i` so ignora caixa, nao diacritico.
+        await userEvent.click(screen.getByRole("button", { name: /próxima/i }))
         expect(screen.getByText("Mesa")).toBeInTheDocument()
+    })
+
+    it("volta para a primeira pagina quando as linhas mudam", async () => {
+        // Filtrar para uma lista menor deixava o usuario fora do intervalo:
+        // "Pagina 3 de 1", tabela vazia e nenhum jeito de voltar a nao ser
+        // clicando em Anterior duas vezes. O indice de pagina e estado da
+        // tabela; a lista e da tela — quando a lista troca, o indice antigo
+        // nao quer dizer mais nada.
+        const { rerender } = render(
+            <DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} porPagina={2} />,
+        )
+        await userEvent.click(screen.getByRole("button", { name: /próxima/i }))
+        expect(screen.getByText(/Página 2 de 2/)).toBeInTheDocument()
+
+        rerender(
+            <DataTable
+                colunas={COLUNAS}
+                linhas={[LINHAS[0]]}
+                chaveDaLinha={(l) => l.nome}
+                porPagina={2}
+            />,
+        )
+        expect(screen.getByText(/Página 1 de 1/)).toBeInTheDocument()
+        expect(screen.getByText("Cadeira")).toBeInTheDocument()
+    })
+
+    it("volta para a primeira pagina quando a ordenacao muda", async () => {
+        render(
+            <DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} porPagina={2} />,
+        )
+        await userEvent.click(screen.getByRole("button", { name: /próxima/i }))
+        expect(screen.getByText(/Página 2 de 2/)).toBeInTheDocument()
+
+        await userEvent.click(screen.getByRole("button", { name: /Nome/ }))
+        expect(screen.getByText(/Página 1 de 2/)).toBeInTheDocument()
     })
 
     it("anuncia a ordenacao por aria-sort, nao so por seta", async () => {

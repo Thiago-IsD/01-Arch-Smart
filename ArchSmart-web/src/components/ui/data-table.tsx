@@ -35,6 +35,23 @@ export function DataTable<T>({
     const [ordem, setOrdem] = React.useState<{ chave: keyof T & string; asc: boolean } | null>(null)
     const [pagina, setPagina] = React.useState(0)
 
+    // Filtrar para uma lista menor deixava o usuario FORA do intervalo:
+    // "Pagina 3 de 1", tabela vazia, e nenhuma pista do que aconteceu. O
+    // indice de pagina e estado desta tabela; a lista e da tela — quando a
+    // lista troca, o indice antigo nao quer dizer mais nada.
+    //
+    // A troca e detectada pelo CONTEUDO (as chaves das linhas), nao pela
+    // identidade do array: a tela quase sempre passa `linhas` de um `.filter()`
+    // inline, que e um array novo a cada render — comparar identidade zeraria a
+    // pagina toda vez e deixaria o botao "Proxima" sem efeito, que e um defeito
+    // pior que o que se esta consertando.
+    const assinatura = JSON.stringify(linhas.map(chaveDaLinha))
+    const [assinaturaAnterior, setAssinaturaAnterior] = React.useState(assinatura)
+    if (assinatura !== assinaturaAnterior) {
+        setAssinaturaAnterior(assinatura)
+        setPagina(0)
+    }
+
     const ordenadas = React.useMemo(() => {
         if (!ordem) return [...linhas]
         return [...linhas].sort((a, b) => {
@@ -67,13 +84,17 @@ export function DataTable<T>({
                                 <button
                                     type="button"
                                     className="font-medium underline-offset-4 hover:underline focus-visible:underline"
-                                    onClick={() =>
+                                    onClick={() => {
+                                        // Reordenar muda o que esta no topo;
+                                        // ficar na pagina 3 do criterio antigo
+                                        // nao quer dizer nada.
+                                        setPagina(0)
                                         setOrdem((atual) =>
                                             atual?.chave === coluna.chave
                                                 ? { chave: coluna.chave, asc: !atual.asc }
                                                 : { chave: coluna.chave, asc: true },
                                         )
-                                    }
+                                    }}
                                 >
                                     {coluna.rotulo}
                                 </button>
@@ -94,7 +115,7 @@ export function DataTable<T>({
 
             <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
                 <span>
-                    Pagina {pagina + 1} de {totalDePaginas}
+                    Página {pagina + 1} de {totalDePaginas}
                 </span>
                 <Button
                     variant="outline"
@@ -110,7 +131,7 @@ export function DataTable<T>({
                     disabled={pagina + 1 >= totalDePaginas}
                     onClick={() => setPagina((p) => p + 1)}
                 >
-                    Proxima
+                    Próxima
                 </Button>
             </div>
         </div>
