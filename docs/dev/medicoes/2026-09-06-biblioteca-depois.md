@@ -78,11 +78,45 @@ rodando contra o Render de staging/produção, onde o processo já está quente
 e não recompila por request. Registrado aqui para quem repetir esta medição
 não gastar tempo re-descobrindo a mesma causa.
 
-## Verificação viva da hidratação — rodou, e falhou (achado novo, não corrigido aqui)
+## Verificação viva da hidratação — a lista está confirmada; o inbox é lacuna separada, em aberto
 
 `ArchSmart-web/e2e/hidratacao-biblioteca.spec.ts`, criado nesta tarefa, abre
 `/library` duas vezes (a segunda com listener de rede já ligado) e falha se
-qualquer requisição do navegador tocar `/api/products` na segunda.
+o navegador pedir a **lista principal** de produtos
+(`/api/products?...&state=NORMALIZED`, a chave que o servidor prefetcha) na
+segunda.
+
+### Primeira versão do teste (revisão da Tarefa 1) — assertava sobre qualquer `/api/products`
+
+A primeira versão da asserção não filtrava por `state`: falhava para
+**qualquer** requisição a `/api/products`, sem distinguir "a lista parou de
+hidratar" de "o badge do inbox pediu, como já é sabido". Rodada assim:
+
+```
+Error: o navegador pediu /api/products: http://localhost:8000/api/products?page=1&size=1&state=CAPTURED,
+http://localhost:8000/api/products/?page=1&size=1&state=CAPTURED
+
+Expected length: 0
+Received length: 2
+1 failed
+```
+
+As duas URLs recebidas não eram duas chamadas diferentes: a segunda é o
+redirect 307 de barra final que a própria API emite para a primeira
+(`/api/products?...` → `/api/products/?...`), e as duas carregavam
+`state=CAPTURED` — a contagem do inbox (`useInboxCount()` em
+`features/library/hooks.ts`), não a lista principal. **Nenhuma URL com
+`state=NORMALIZED` apareceu** nessa execução — sinal de que a lista já
+hidratava; só a asserção não sabia distinguir isso de uma falha real.
+
+Revisão da tarefa apontou o problema corretamente: um teste que fica vermelho
+para sempre pelo mesmo motivo já conhecido, sem nenhum documento afirmando
+isso de forma prospectiva, é exatamente o anti-padrão que a Seção 3 removeu
+deste repositório (a orientação de ignorar dois arquivos vermelhos no
+vitest) — "nada de 'é esperado que falhe'". A correção certa não é
+documentar a exceção; é tornar a asserção discriminante.
+
+### Versão corrigida — filtra por `state=NORMALIZED`, e passa
 
 ```bash
 cd ArchSmart-web
@@ -93,49 +127,40 @@ E2E_EMAIL=ana.arquiteta@seed.arqsmart.local E2E_PASSWORD=<senha, não versionada
 Saída:
 
 ```
-Error: o navegador pediu /api/products: http://localhost:8000/api/products?page=1&size=1&state=CAPTURED,
-http://localhost:8000/api/products/?page=1&size=1&state=CAPTURED
-
-Expected length: 0
-Received length: 2
-
-1 failed
+Running 1 test using 1 worker
+[1/1] [chromium] › e2e\hidratacao-biblioteca.spec.ts:28:5 › a lista da Biblioteca nao busca /api/products no navegador no primeiro carregamento
+1 passed (26.5s)
 ```
 
-**Leitura do resultado, sem suavizar:** o teste falhou — a promessa "zero
-`/api/products` do navegador no primeiro load" é falsa hoje. Mas as duas
-URLs recebidas não são duas chamadas diferentes: a segunda é o redirect 307
-de barra final que a própria API emite para a primeira
-(`/api/products?...` → `/api/products/?...`), e as duas carregam
-`state=CAPTURED` — a contagem do inbox (`useInboxCount()` em
-`features/library/hooks.ts`), não a lista principal
-(`state=NORMALIZED`, a que o prefetch do servidor cobre).
+O teste agora captura todo `/api/products` (para diagnóstico, se um dia
+falhar) mas só falha a asserção se alguma dessas URLs contiver
+`state=NORMALIZED` — a chave da lista principal, produzida por
+`filtrosDaUrl()`/`queryDeProdutos()` dos dois lados
+(`queryKeys.products.list(filtros)`). **Passou.** Isto é a confirmação ao
+vivo, pela primeira vez, de algo que até aqui só existia como leitura de
+código (a ressalva que a seção "O que a evidência estrutural mostra — e o
+que não mostra", abaixo, registrava como pendente): **a hidratação da lista
+principal da Biblioteca funciona de fato em tempo de execução**, não só "por
+construção".
 
-**Nenhuma URL com `state=NORMALIZED` apareceu na lista.** Isso é o sinal
-positivo que faltava: a chave de hidratação da lista principal
-(`queryKeys.products.list(filtros)`, produzida por `filtrosDaUrl()` dos dois
-lados) bate de fato em tempo de execução — não é mais só "deveria bater, pela
-leitura do código" (a ressalva que a seção "O que a evidência estrutural
-mostra — e o que não mostra", abaixo, registrava como pendente). O prefetch
-da lista principal está hidratando de verdade.
+### O que continua em aberto, e não foi corrigido aqui
 
-O que falha é uma lacuna que a própria Tarefa 12 da Seção 5 **já tinha
-documentado por leitura de código**, na seção "1. Chamadas de rede do
-primeiro carregamento, por construção" acima: *"`useInboxCount()` → chave
-diferente (…) e **nunca prefetchada pelo servidor**. Este fetch acontece no
-browser sempre, com uma resolução de sessão (`getAccessToken()`),
-independente de qualquer coisa ter casado."* Esta tarefa não descobriu uma
-lacuna nova — **confirmou ao vivo, pela primeira vez, uma lacuna que já
-estava escrita como previsão**. A diferença entre "previsto por leitura" e
-"confirmado ao vivo" importa porque é exatamente a checagem que faltava para
-a Seção 5 poder dizer "hidrata" em vez de "deveria hidratar".
+A lacuna do badge do inbox (`useInboxCount()`, `state=CAPTURED`) é real e
+**não fechada**: ela é a mesma que a Tarefa 12 da Seção 5 já tinha
+documentado por leitura de código, na seção "1. Chamadas de rede do primeiro
+carregamento, por construção" acima — *"`useInboxCount()` → chave diferente
+(…) e **nunca prefetchada pelo servidor**. Este fetch acontece no browser
+sempre, com uma resolução de sessão (`getAccessToken()`), independente de
+qualquer coisa ter casado."* O teste corrigido deliberadamente não cobre essa
+chamada — cobri-la faria o teste falhar por um motivo já conhecido e ainda
+não corrigido, que é exatamente o padrão que a correção evitou.
 
-**Não corrigido aqui, de propósito:** consertar isto (prefetchar
-`inboxCount` também, ou juntá-lo à mesma chave/`HydrationBoundary` da lista)
-é mudança na camada de dados do frontend (Seção 5), não na camada de UI
-(Seção 6, a tarefa que escreveu este teste). Registrado como achado novo em
-`PROGRESS.md`, nota da Seção 5, item 9 — para alguém decidir quando
-consertar, não para ficar perdido dentro de uma medição.
+**Não corrigir isto é intencional, não uma omissão desta tarefa:**
+prefetchar `inboxCount` (ou juntá-lo à mesma chave/`HydrationBoundary` da
+lista) é mudança na camada de dados do frontend (Seção 5), não na camada de
+UI (Seção 6, a tarefa que escreveu este teste). Registrado em
+`PROGRESS.md`, nota da Seção 5, item 9, como pendência aberta explícita —
+não como "achado novo que quebrou o teste".
 
 ---
 

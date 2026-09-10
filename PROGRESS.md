@@ -360,8 +360,13 @@ _Última atualização: 2026-09-10_
 > (3,6 s), rotulada como referência externa, não como baseline medido aqui —
 > ver [`docs/dev/medicoes/2026-09-06-biblioteca-baseline.md`](docs/dev/medicoes/2026-09-06-biblioteca-baseline.md).
 >
-> **A checagem viva de hidratação (item 9 abaixo) rodou e falhou** — achado
-> novo, registrado como defeito da Seção 5, não corrigido nesta tarefa.
+> **A checagem viva de hidratação (item 9 abaixo) rodou e confirmou que a
+> lista principal da Biblioteca hidrata de fato.** Uma primeira versão do
+> teste falhava sem discriminar (qualquer `/api/products`, incluindo o badge
+> do inbox, derrubava a asserção) — corrigido em rodada de revisão para
+> filtrar por `state=NORMALIZED`, a chave da lista, e passou. O badge do
+> inbox continua fora do prefetch — pendência aberta da Seção 5, não
+> corrigida nesta tarefa; ver item 9.
 
 > **A Seção 5 fechou em 06/09/2026 e foi mergeada até `staging` em 07/09/2026**
 > (merge `6e94d63` em `develop`, PR #6 `develop` → `staging` com merge `ce1012e`,
@@ -456,37 +461,51 @@ _Última atualização: 2026-09-10_
 >    exatamente o "migrar de passagem" que o `CLAUDE.md` da raiz proíbe, e
 >    misturariam duas mudanças que não têm nada a ver uma com a outra. Fica
 >    para um commit mecânico próprio — decisão de Thiago, não desta seção.
-> 9. **Achado novo, medido em 10/09/2026 na Tarefa 1 da Seção 6: o badge de
->    contagem do inbox faz o navegador pedir `/api/products` no primeiro
->    carregamento da Biblioteca, mesmo com o prefetch do servidor
->    funcionando.** A checagem viva de hidratação
->    (`ArchSmart-web/e2e/hidratacao-biblioteca.spec.ts`) rodou contra staging,
->    com sessão real, e falhou:
+> 9. **A checagem viva de hidratação confirmou, em 10/09/2026 na Tarefa 1 da
+>    Seção 6, que a lista principal da Biblioteca hidrata de fato — e que o
+>    badge de contagem do inbox continua fora do prefetch, pendência já
+>    conhecida e ainda em aberto.**
+>    `ArchSmart-web/e2e/hidratacao-biblioteca.spec.ts` rodou contra staging,
+>    com sessão real. Uma primeira versão da asserção (revisada e corrigida
+>    na mesma tarefa) não discriminava por `state`, então falhava para
+>    **qualquer** `/api/products` — incluindo o badge do inbox, que já se
+>    sabia fora do prefetch. Essa primeira execução deu:
 >
 >    ```
 >    Error: o navegador pediu /api/products: http://localhost:8000/api/products?page=1&size=1&state=CAPTURED,
 >    http://localhost:8000/api/products/?page=1&size=1&state=CAPTURED
 >    ```
 >
->    As duas ocorrências são a **mesma chamada** (uma delas é o redirect
->    307 de barra final da própria API — `/api/products?...` → `/api/products/?...`),
->    e as duas são `state=CAPTURED` — a contagem do inbox
->    (`useInboxCount()`, `features/library/hooks.ts`), não a lista principal
->    (`state=NORMALIZED`). **Nenhuma requisição a `state=NORMALIZED` apareceu no
->    navegador** — evidência de que a chave de hidratação da lista principal
->    bate de fato em tempo de execução, não só por leitura de código. O que
->    falha é uma lacuna já **documentada, mas não fechada**, na Tarefa 12 da
->    Seção 5 (`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, tabela da
->    seção 1): *"`useInboxCount()` → chave diferente (…) e nunca prefetchada
->    pelo servidor. Este fetch acontece no browser sempre"*. Ou seja: a
->    Seção 5 já sabia, por leitura de código, que essa chamada nunca seria
->    coberta pelo prefetch — o que faltava era confirmar ao vivo, e agora
->    está confirmado: o prefetch da lista principal hidrata, mas o app **não**
->    é livre de chamadas a `/api/products` no primeiro load, porque o badge do
->    inbox é uma chamada separada, sempre feita pelo navegador. Consertar isso
->    (prefetchar `inboxCount` também, ou mover o badge para dentro do mesmo
->    `HydrationBoundary`) é camada de dados — trabalho de outra seção, não
->    desta. Detalhe completo, com o comando, em
+>    As duas ocorrências são a **mesma chamada** (uma é o redirect 307 de
+>    barra final da própria API), e as duas são `state=CAPTURED` — a
+>    contagem do inbox (`useInboxCount()`, `features/library/hooks.ts`), não
+>    a lista principal (`state=NORMALIZED`). **Nenhuma requisição a
+>    `state=NORMALIZED` apareceu**, já naquela execução — sinal de que a
+>    lista hidratava; a asserção sem filtro só não sabia distinguir isso de
+>    uma falha real, e um teste que ficaria vermelho para sempre pelo mesmo
+>    motivo já conhecido é o anti-padrão "é esperado que falhe" que a Seção 3
+>    já removeu deste repositório. Corrigido: a asserção passou a filtrar por
+>    `state=NORMALIZED` (a chave que o servidor prefetcha), e **rodou de novo
+>    e passou**:
+>
+>    ```
+>    1 passed (26.5s)
+>    ```
+>
+>    Isso é a confirmação ao vivo, pela primeira vez, de algo que só existia
+>    como leitura de código desde a Tarefa 12 da Seção 5: o prefetch da lista
+>    principal hidrata de verdade em tempo de execução. **O que continua em
+>    aberto, sem mudança:** o badge do inbox é uma chamada separada
+>    (`state=CAPTURED`), **nunca prefetchada pelo servidor** — já documentado
+>    por leitura de código na Tarefa 12 da Seção 5
+>    (`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, tabela da seção
+>    1: *"`useInboxCount()` → chave diferente (…) e nunca prefetchada pelo
+>    servidor. Este fetch acontece no browser sempre"*), e o teste corrigido
+>    deliberadamente não cobre essa chamada, para não recriar o mesmo
+>    anti-padrão. Consertar isso (prefetchar `inboxCount` também, ou mover o
+>    badge para dentro do mesmo `HydrationBoundary`) é camada de dados —
+>    trabalho de outra seção, não desta. Detalhe completo, com os dois
+>    comandos e as duas saídas, em
 >    `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, seção "Verificação
 >    viva da hidratação".
 
