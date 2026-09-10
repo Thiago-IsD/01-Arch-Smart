@@ -300,6 +300,24 @@ Esqueleto, não a spec 003 inteira. Sem session replay, sem funil, sem escolher 
 - `useTrack()` e `screen_viewed` automático no shell, com `screen`, `load_ms`, `is_empty`, sem a tela precisar lembrar
 - `POST /api/v1/events` com `account_id`/`user_id` do contexto, nunca do payload
 
+> **Corrigido em 10/09/2026, no desenho da Seção 7.** Três pontos acima não
+> sobrevivem ao código de hoje, e o
+> [desenho da Seção 7](2026-09-10-secao-7-telemetria-design.md) vale sobre este
+> texto onde os dois discordarem:
+>
+> - **A rota é `POST /api/telemetry/events`**, não `/api/v1/events`. O prefixo
+>   `/api/v1` já tinha sido descartado na Seção 4 pelo
+>   [ADR 0008](../../dev/decisoes/0008-me-em-api-users-me.md), que vale para a
+>   reestruturação inteira; e `events` sozinho não serve porque `/api/events` já
+>   é a Agenda.
+> - **`ai_usage_logs` separa `input_tokens` e `output_tokens`**, além do
+>   `token_count` agregado. O Gemini cobra entrada e saída a preços diferentes;
+>   com só o total, `cost_usd` seria estimativa gravada como se fosse medição.
+> - **"Sem a tela precisar lembrar" não cobre nada hoje.** O `QueryBoundary` da
+>   Seção 6 não é consumido por nenhuma das 34 telas. O `load_ms` sai do
+>   `QueryClient` e o `is_empty` do `QueryBoundary`, e a cobertura cresce tela a
+>   tela na Seção 8.
+
 ### Seção 8 — Migração das telas
 
 Ordem por dor medida e valor de prova, não pela do playbook (que assumia reescrita do zero; aqui a sessão já está resolvida pelas Seções 4 e 5, então as telas de login viram casca fina e esperam):

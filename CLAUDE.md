@@ -120,20 +120,28 @@ de uma pendência é o que impede que ela volte pelo mesmo caminho.
    `Ark Smart` e `Ecowe`: zero. O que a Seção 6 herda daqui é só a regra de não
    reintroduzir a grafia errada nas telas que ela vai reescrever.
 
-## O que a Seção 6 deixou em aberto — **planejar no início da Seção 7**
+## O que a Seção 6 deixou em aberto — **as duas foram decididas em 10/09/2026**
 
-Como o bloco anterior: **estas duas não são "esbarrar se aparecer". Quem
-escrever o plano da Seção 7 põe cada uma como tarefa ou registra por escrito a
-decisão de não pôr.** Nenhuma é para um agente decidir sozinho.
+Como o bloco anterior: **estas duas não eram "esbarrar se aparecer". Quem
+escrevesse o plano da Seção 7 punha cada uma como tarefa ou registrava por
+escrito a decisão de não pôr.** Nenhuma era para um agente decidir sozinho — e
+**Thiago decidiu as duas em 10/09/2026**, no desenho da Seção 7
+([spec](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md)): a
+primeira virou **Tarefa 1 da Seção 7**; a segunda virou **risco aceito por
+escrito, sem rotação**. Ficam aqui com o que decidiu cada uma, porque o
+histórico de uma pendência é o que impede que ela volte pelo mesmo caminho.
 
-1. **Três mudanças visuais entraram e ninguém as viu.** Não há teste visual
+1. **Três mudanças visuais entraram e ninguém as viu.** → **Virou a Tarefa 1 da
+   Seção 7** (decidido em 10/09/2026): olhar agora, antes que a Seção 8
+   reescreva essas telas por cima. O texto abaixo continua valendo como
+   descrição do que precisa ser olhado. Não há teste visual
    neste repositório: `tsc`, `vitest` e a catraca ficam verdes enquanto uma tela
    muda de aparência. A Seção 6 mudou três coisas de propósito, todas
    verificadas por CSS compilado e por diff — **nenhuma por olho humano**:
 
    | O quê | Onde aparece |
    |---|---|
-   | `DropdownMenuItem` ganhou `min-h-11` (alvo de toque de 44px) | 34 itens em 6 telas: cabeçalho, card de produto, tabela financeira, card de ambiente, alternador de tema |
+   | `DropdownMenuItem` ganhou `min-h-11` (alvo de toque de 44px) | **14 itens em 6 arquivos** — 5 telas mais a galeria: cabeçalho, card de produto, tabela financeira, card de ambiente, alternador de tema |
    | botão de fechar do toast destrutivo trocou `text-red-*` por token | todo toast de erro |
    | `Skeleton` ganhou `aria-hidden="true"` | todo estado de carregamento |
 
@@ -142,14 +150,29 @@ decisão de não pôr.** Nenhuma é para um agente decidir sozinho.
    possível**, e quanto mais camadas entrarem por cima, mais caro fica saber o
    que causou o quê. Decisão de Thiago: olhar agora, ou carregar adiante.
 
+   > **O "34 itens" desta tabela estava errado, e foi corrigido em 10/09/2026**,
+   > no desenho da Seção 7 — pego por quem tentou usar o número, que é como
+   > todos os outros foram pegos aqui. 34 é a contagem de **menções**: 14 tags
+   > de abertura, 14 de fechamento e 6 imports. Itens de menu são **14**, em 6
+   > arquivos, um deles a própria galeria. Os dois comandos, para não repetir o
+   > erro:
+   >
+   > ```
+   > grep -rno "DropdownMenu\(Checkbox\|Radio\)\?Item" ArchSmart-web/src --include=*.tsx | grep -v __tests__ | grep -v "components/ui/" | wc -l   # 34 — mencoes
+   > grep -rc  "<DropdownMenu\(Checkbox\|Radio\)\?Item" ArchSmart-web/src --include=*.tsx | grep -v ":0" | grep -v __tests__                      # 14 — itens, por arquivo
+   > ```
+
    > O mesmo vale para a galeria `/dev/componentes`: ela existe justamente para
    > ser olhada, e ainda não foi. Ela some em produção (`notFound()`), então só
    > dá para vê-la em desenvolvimento.
 
-2. **A credencial do usuário de teste E2E circulou fora do controle de versão** —
-   relatório de execução e transcrição de sessão. Dá acesso à conta de seed em
+2. ~~**A credencial do usuário de teste E2E circulou fora do controle de
+   versão.**~~ → **Risco aceito por escrito em 10/09/2026: não será
+   rotacionada.** Decisão de Thiago, tomada no desenho da Seção 7. Quem
+   reencontrar isso não precisa reabrir a pergunta — só relê a razão: circulou
+   em relatório de execução e transcrição de sessão. Dá acesso à conta de seed em
    staging (`ana.arquiteta@seed.arqsmart.local`), não a dado de cliente, mas é
-   credencial viva num ambiente real. Rotacionar é decisão de Thiago;
+   credencial viva num ambiente real. Se um dia a decisão mudar,
    [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md)
    documenta como recriar o usuário do zero.
 

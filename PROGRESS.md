@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 45/63 (71%)**
+**Progresso geral: 45/64 (70%)**
 `██████████████░░░░░░`
 
 _Última atualização: 2026-09-10_
@@ -756,12 +756,40 @@ _Última atualização: 2026-09-10_
 
 
 ## Seção 7 · Telemetria
-**0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
+> **Desenho aprovado em 10/09/2026**, antes de existir plano de execução:
+> [`docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md`](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md).
+> Ele corrige três pontos da spec de 23/08 que não sobrevivem ao código de hoje
+> — a rota, as colunas de token e a suposição de que o `screen_viewed`
+> automático cobriria alguma tela — e a spec original foi corrigida no mesmo
+> commit, com o texto antigo preservado e a correção logo abaixo dele.
+>
+> **A caixa da rota mudou de nome, e o motivo já estava escrito aqui.** Ela
+> dizia `POST /api/v1/events`, copiado da spec. A nota da Seção 4, mais acima,
+> avisava que a Seção 7 carregava a mesma suposição de um prefixo `/api/v1` que
+> não existe, e que o [ADR 0008](docs/dev/decisoes/0008-me-em-api-users-me.md)
+> já tinha decidido isso para a reestruturação inteira. O que faltava decidir
+> era só o resto do nome: `telemetry`, porque `/api/events` já é a Agenda.
+>
+> **As duas pendências herdadas da Seção 6 foram decididas por Thiago em
+> 10/09/2026**, como o [`CLAUDE.md`](CLAUDE.md) exige de quem escreve este
+> plano — uma virou tarefa, a outra virou decisão registrada:
+>
+> - **As três mudanças visuais que ninguém viu** entram como a Tarefa 1. Depois
+>   que a Seção 8 reescrever essas telas por cima, fica impossível saber o que
+>   causou o quê.
+> - **A credencial do usuário E2E** (`ana.arquiteta@seed.arqsmart.local`) **não
+>   será rotacionada — risco aceito por escrito.** É conta de seed em staging,
+>   sem dado de cliente, e
+>   [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md)
+>   ensina a recriar o usuário do zero se um dia for preciso.
+
+- [ ] Verificação visual do que a Seção 6 mudou e ninguém olhou
 - [ ] Tabela `product_events` e serviço `track(ctx, evento, propriedades)`
-- [ ] Tabela `ai_usage_logs` (`account_id`, `model_name`, `token_count`, `cost_usd`, `latency_ms`, `feature`)
+- [ ] Tabela `ai_usage_logs` (`account_id`, `model_name`, `input_tokens`/`output_tokens`/`token_count`, `cost_usd`, `latency_ms`, `feature`)
+- [ ] `POST /api/telemetry/events` com `account_id`/`user_id` do contexto
 - [ ] `useTrack()` e `screen_viewed` automático no shell
-- [ ] `POST /api/v1/events` com `account_id`/`user_id` do contexto
 
 ## Seção 8 · Migração das telas
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
