@@ -548,8 +548,12 @@ _Última atualização: 2026-09-10_
 >    currency: "BRL" })` separa `R$` do número com ` `, então `"R$ 123,45"`
 >    escrito com espaço comum **nunca** bate com o formatado, apesar de os dois
 >    serem idênticos na tela. Isso é o formato tipograficamente correto — evita
->    que símbolo e valor quebrem em linhas diferentes —, e `dashboard/page.tsx`
->    já exibe o mesmo caractere hoje via `toLocaleString`. **`currency-input.tsx`
+>    que símbolo e valor quebrem em linhas diferentes —, e
+>    `dashboard/components/format.ts` já exibe o mesmo caractere hoje via
+>    `toLocaleString` (a Tarefa 9 desta mesma seção moveu o formatador para lá;
+>    `dashboard/page.tsx` hoje tem zero ocorrências —
+>    `grep -c toLocaleString ArchSmart-web/src/app/\(dashboard\)/dashboard/page.tsx`
+>    sai `0`). **`currency-input.tsx`
 >    não normaliza nada**: o `Intl` é a fonte de verdade, e quem compara a
 >    string exibida compara com o U+00A0 de fato emitido (o teste usa um escape
 >    `\u00A0` explícito, com o porquê em comentário). O JSDoc do componente diz
@@ -562,8 +566,13 @@ _Última atualização: 2026-09-10_
 >    primeiro elemento focável) nunca dispara. **Nenhuma linha de
 >    `alert-dialog.tsx` mudou nesta seção** (`git diff 24f4eb5..dafe1b3 --
 >    ArchSmart-web/src/components/ui/alert-dialog.tsx` sai vazio): os 10 usos
->    reais de `AlertDialogContent` em `src/` têm `Cancel`, então o cenário não
->    ocorre em produção, e o fixture do teste passou a refletir o uso real. O
+>    reais de `AlertDialogContent` em `src/` têm `Cancel` — a galeria era a
+>    única exceção, corrigida na revisão que fechou esta seção
+>    (`grep -rl "AlertDialogContent" ArchSmart-web/src --include=*.tsx | grep -v
+>    "components/ui/alert-dialog.tsx" | grep -v "__tests__" | xargs grep -L
+>    "AlertDialogCancel"` sai vazio, ou seja, nenhum dos 10 fica sem `Cancel`)
+>    —, então o cenário não ocorre em produção, e o fixture do teste passou a
+>    refletir o uso real. O
 >    achado do Radix ficou preservado em comentário no teste.
 >
 > Os outros dois hardenings (`min-h-11` no `DropdownMenuItem`,
@@ -583,7 +592,6 @@ _Última atualização: 2026-09-10_
 > > como erro visível e corrigido, não apagado — é o modo de falha que este
 > > repositório mais repete: **texto que descreve a intenção, não a medição**,
 > > e que só cai quando alguém tenta usar o que ele afirma.
-> `cores_literais` continua em **518** (`python tools/catraca.py`).
 
 > Nota da Tarefa 7 (10/09/2026): a primeira medição de `hover_sem_focus` saiu
 > **5**, não 8 como a spec/brief previa. `RE_GROUP_HOVER = r"\bgroup-hover:"`

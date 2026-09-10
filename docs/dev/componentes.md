@@ -147,6 +147,25 @@ não só pintado de vermelho. `sensivel` marca `data-private`, para telemetria e
 session replay nunca capturarem o valor — e mora **aqui**, não na tela, porque
 "este campo é sensível" é decisão de produto: deixá-la na tela é como ela some.
 
+> ⚠️ **Existem dois `FormField` no repositório — não são o mesmo componente.**
+> O de cima é `@/components/ui/form-field` (`{ id, rotulo, erro, sensivel,
+> children }`), criado nesta seção. O outro é `@/components/ui/form.tsx`, do
+> `react-hook-form` (API `{ control, name, render }`), e é o que a maioria das
+> telas já usa hoje. Meça antes de importar:
+>
+> ```
+> grep -rl '@/components/ui/form"' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
+> grep -rl '@/components/ui/form-field"' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
+> ```
+>
+> Hoje sai **11** para o `FormField` do `react-hook-form` (entre outras,
+> `ProductFormSheet`, `NormalizationSheet`, `EventDialog`, `settings/page`,
+> `QuickEntryDialog`) e **2** para o desta seção — `galeria.tsx` e o teste
+> desta seção, nenhuma tela de produto ainda. Quem for migrar uma dessas 11
+> telas já tem `FormField` importado, e é do outro. Qual dos dois vira o
+> padrão (ou se os dois convivem) é decisão da **Seção 8**, não desta — este
+> arquivo só registra que a colisão existe.
+
 ### `ErrorBoundary`
 
 ```tsx
@@ -228,8 +247,11 @@ espaço comum **nunca** bate com o formatado, apesar de os dois serem idênticos
 na tela.
 
 Isso é o formato tipograficamente correto — evita que símbolo e valor quebrem
-em linhas diferentes —, e `dashboard/page.tsx` já exibe o mesmo caractere via
-`toLocaleString`. **`CurrencyInput` não normaliza**: o `Intl` é a fonte de
+em linhas diferentes —, e `dashboard/components/format.ts` já exibe o mesmo
+caractere via `toLocaleString` (a Tarefa 9 desta seção moveu o formatador para
+lá; `dashboard/page.tsx` hoje tem zero ocorrências —
+`grep -c toLocaleString "ArchSmart-web/src/app/(dashboard)/dashboard/page.tsx"`
+sai `0`). **`CurrencyInput` não normaliza**: o `Intl` é a fonte de
 verdade. Quem comparar a string exibida (teste, ou outro código) escreve o
 separador como escape explícito (` `), nunca como espaço comum:
 `` `R$${ESPACO}123,45` `` no teste, com `const ESPACO = " "`.
@@ -243,10 +265,19 @@ essa ref é `null`, o `preventDefault()` já rodou, e o fallback do próprio
 `FocusScope` (focar o primeiro elemento focável) nunca dispara: **ninguém
 recebe foco**.
 
-Todo uso real no produto tem `Cancel` (conferido nos 10 usos em `src/`), então
-o caminho não ocorre em produção e `alert-dialog.tsx` ficou como o Radix
-entrega. Se você escrever um `AlertDialogContent` sem `Cancel`, o foco é seu
-problema — e o sintoma é silencioso.
+Todo uso real no produto tem `Cancel`. Confira com:
+
+```
+grep -rl "AlertDialogContent" ArchSmart-web/src --include=*.tsx \
+  | grep -v "components/ui/alert-dialog.tsx" | grep -v "__tests__" \
+  | xargs grep -L "AlertDialogCancel"
+```
+
+Sai vazio: nenhum dos 10 usos reais fica sem `AlertDialogCancel` (a galeria em
+`app/dev/componentes/galeria.tsx` era a exceção até a revisão final desta
+seção). O caminho não ocorre em produção e `alert-dialog.tsx` ficou como o
+Radix entrega. Se você escrever um `AlertDialogContent` sem `Cancel`, o foco é
+seu problema — e o sintoma é silencioso.
 
 ---
 
