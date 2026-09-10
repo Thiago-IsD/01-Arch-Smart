@@ -7,6 +7,9 @@ import { CurrencyInput } from "@/components/ui/currency-input"
 import { FormField } from "@/components/ui/form-field"
 import { ErrorBoundary, registrarReportadorDeErro } from "@/components/ui/error-boundary"
 import { DataTable } from "@/components/ui/data-table"
+import { AlertDialog, AlertDialogContent, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
 
 function Explode(): never {
     throw new Error("estourou")
@@ -147,5 +150,42 @@ describe("DataTable", () => {
         render(<DataTable colunas={COLUNAS} linhas={LINHAS} chaveDaLinha={(l) => l.nome} />)
         await userEvent.click(screen.getByRole("button", { name: /Nome/ }))
         expect(screen.getByRole("columnheader", { name: /Nome/ })).toHaveAttribute("aria-sort", "ascending")
+    })
+})
+
+describe("componentes endurecidos", () => {
+    it("AlertDialog prende o foco dentro do dialogo", async () => {
+        render(
+            <AlertDialog>
+                <AlertDialogTrigger>abrir</AlertDialogTrigger>
+                <AlertDialogContent>
+                    <button>dentro</button>
+                </AlertDialogContent>
+            </AlertDialog>,
+        )
+        await userEvent.click(screen.getByText("abrir"))
+        // toContainElement so aceita HTMLElement | SVGElement | null; document.activeElement
+        // e tipado como Element | null — o cast nao muda o valor em runtime.
+        expect(screen.getByRole("alertdialog")).toContainElement(
+            document.activeElement as HTMLElement | null,
+        )
+    })
+
+    it("DropdownMenuItem tem alvo de toque de no minimo 44px", async () => {
+        render(
+            <DropdownMenu>
+                <DropdownMenuTrigger>menu</DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem>opcao</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>,
+        )
+        await userEvent.click(screen.getByText("menu"))
+        expect(screen.getByRole("menuitem")).toHaveClass("min-h-11")
+    })
+
+    it("Skeleton nao e lido por leitor de tela", () => {
+        const { container } = render(<Skeleton className="h-4 w-20" />)
+        expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true")
     })
 })

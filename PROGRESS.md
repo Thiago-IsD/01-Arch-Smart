@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 40/63 (63%)**
+**Progresso geral: 41/63 (65%)**
 `█████████████░░░░░░░`
 
 _Última atualização: 2026-09-10_
@@ -510,7 +510,7 @@ _Última atualização: 2026-09-10_
 >    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**4/9 (44%)** `█████████░░░░░░░░░░░`
+**5/9 (56%)** `███████████░░░░░░░░░`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
@@ -530,11 +530,41 @@ _Última atualização: 2026-09-10_
 - [x] Validador de contraste (catraca com os 4 pares reprovados hoje; token novo que nasça reprovado não está no baseline e reprova)
 - [x] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
 - [x] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
-- [ ] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
+- [x] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
 - [ ] Galeria `/dev/componentes`
 - [ ] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
 - [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
+
+> Nota da Tarefa 5 (10/09/2026): os cinco componentes novos e os três
+> endurecimentos saíram como o brief previa, mas dois deles só passaram depois
+> de corrigir um defeito real que o teste (não o ambiente) expôs — nenhum dos
+> dois é jsdom-only, os dois reproduzem em navegador de verdade:
+>
+> 1. **`CurrencyInput` formatava com espaço duro (U+00A0), não espaço comum.**
+>    `Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" })` nesta
+>    ICU separa `R$` do número com ` `, então `"R$ 123,45"` (com espaço
+>    comum) nunca batia com o formatado, apesar de idênticos na tela. Corrigido
+>    normalizando o ` ` para espaço comum dentro do próprio componente —
+>    então qualquer copy que compare a string exibida (teste, ou outro código)
+>    não precisa saber desse detalhe de ICU.
+> 2. **`AlertDialogContent` sem `AlertDialogCancel` não focava nada.** O
+>    default do Radix (`@radix-ui/react-alert-dialog@1.1.15`) previne o
+>    autofoco do `FocusScope` e tenta focar a ref interna do `Cancel` — sem um
+>    `AlertDialogCancel` na árvore essa ref é `null`, e como o
+>    `preventDefault()` já rodou, o fallback do próprio `FocusScope` (focar o
+>    primeiro elemento focável) nunca dispara. O teste do brief usa
+>    `AlertDialogContent` só com um `<button>`, sem `Cancel` — exatamente o
+>    caso que expõe isso. Corrigido em `alert-dialog.tsx`: um `onOpenAutoFocus`
+>    que, numa microtarefa (lendo `currentTarget` antes de agendá-la — o
+>    evento é nativo e o navegador zera `currentTarget` assim que o dispatch
+>    termina), confere se o foco realmente entrou no diálogo e, se não,
+>    foca o primeiro elemento focável. Quando existe `AlertDialogCancel`, o
+>    comportamento padrão do Radix continua valendo sem mudança.
+>
+> Os outros dois hardenings (`min-h-11` no `DropdownMenuItem`,
+> `aria-hidden="true"` no `Skeleton`) foram só o que o brief já previa.
+> `cores_literais` continua em **518** (`python tools/catraca.py`).
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
