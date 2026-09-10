@@ -77,7 +77,13 @@ Uso:
     python tools/catraca.py --atualizar --aceitar-piora     # regrava mesmo com regressao, com aviso
 
 Sem --eslint-json a medida de lint e pulada, e nao falha: quem tem Node
-instalado e o job `frontend` do CI, e e la que ela roda.
+instalado e o job `frontend` do CI, e e la que ela roda. A saida imprime uma
+linha `[-] eslint_erros: PULADA` com o motivo -- pular em silencio fazia oito
+linhas verdes parecerem um relatorio completo.
+
+Qualquer OUTRA medida do baseline que nao apareca no medido REPROVA
+(`SUMIU DA MEDICAO`): uma medida que some do `medir()` esta desligada, e
+desligar em silencio e o que uma catraca existe para impedir.
 
 --atualizar so grava o baseline se nenhuma medida piorou. Se alguma piorou
 (numero subiu, ou modulo novo ficou sem doc) e --aceitar-piora nao foi
@@ -166,6 +172,14 @@ ROTULOS_DE_LISTA = {
     "arquivos_acima_de_400": ("agora acima do limite", "agora abaixo do limite"),
 }
 ROTULOS_PADRAO = ("entrou no baseline", "saiu do baseline")
+
+# Medida que pode legitimamente NAO ser coletada numa execucao, com o motivo
+# que a saida imprime. Nao e lista de excecao da catraca: e o unico jeito de
+# distinguir "esta medida nao rodou aqui" de "alguem apagou a chave", que sao
+# a mesma coisa vista de dentro de `comparar()`.
+MOTIVOS_DE_PULADA = {
+    "eslint_erros": "--eslint-json nao foi passado; quem mede o lint e o job `frontend` do CI",
+}
 
 
 class DiretorioMedidoSumiu(Exception):
@@ -298,10 +312,38 @@ def medir(eslint_json: Path | None) -> dict:
     return medido
 
 
-def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
-    """(passou, linhas para imprimir). Falha so quando a medida piora."""
+def comparar(baseline: dict, medido: dict,
+             puladas: tuple[str, ...] = ()) -> tuple[bool, list[str]]:
+    """(passou, linhas para imprimir). Falha so quando a medida piora.
+
+    `puladas` nomeia as medidas que esta execucao deliberadamente nao coletou
+    (hoje so `eslint_erros`, sem `--eslint-json`). Elas nao reprovam -- mas
+    tambem nao somem: a saida diz que foram puladas, e por que.
+    """
     ok = True
     linhas = []
+    # Uma chave que existe no baseline e some do medido NAO era visitada por
+    # este laco, porque ele percorre `medido`. Resultado: nenhuma linha
+    # impressa e `ok` continuando True -- o portao saindo verde e MUDO, que e
+    # pior que o portao saindo errado. `medidas_pioradas()` ja tratava esta
+    # direcao, mas so e alcancada por `--atualizar`; o comando que o CI roda
+    # como portao nunca passa por la. Terceira cegueira encontrada nesta mesma
+    # funcao, e as tres tem a mesma forma: um caminho que nao imprime nada.
+    for chave in sorted(set(baseline) - set(medido)):
+        if chave.startswith("_"):
+            # `_leia-me` e documentacao do arquivo, nao medida: `medir()` nunca
+            # a devolve. Mesmo filtro que --atualizar e _auditar_baseline usam.
+            continue
+        if chave in puladas:
+            motivo = MOTIVOS_DE_PULADA.get(chave, "medida nao coletada nesta execucao")
+            linhas.append(f"[-] {chave}: PULADA nesta execucao"
+                          f" (baseline: {baseline[chave]!r})")
+            linhas.append(f"    motivo: {motivo}")
+            continue
+        ok = False
+        linhas.append(f"[X] {chave}: SUMIU DA MEDICAO (baseline: {baseline[chave]!r})")
+        linhas.append("    A medida existe no baseline e nao foi produzida por medir().")
+        linhas.append("    Uma medida que some esta desligada — restaure-a em tools/catraca.py.")
     for chave, valor in sorted(medido.items()):
         criterio = CRITERIOS.get(chave, "")
         if chave not in baseline:
@@ -504,7 +546,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"catraca.json atualizado: {json.dumps(medido, ensure_ascii=False)}")
         return 0
 
-    ok, linhas = comparar(baseline, medido)
+    # Sem --eslint-json a medida de lint nao e coletada. Isso e legitimo (quem
+    # tem Node e o job `frontend` do CI) e nao pode reprovar -- mas ate agora
+    # ela sumia da saida sem UMA linha dizendo isso, e oito linhas verdes
+    # pareciam um relatorio completo.
+    puladas = () if args.eslint_json is not None else ("eslint_erros",)
+    ok, linhas = comparar(baseline, medido, puladas)
     print("\n".join(linhas))
     if not ok:
         print("\nA catraca so gira para baixo. Se o numero subiu de proposito,"

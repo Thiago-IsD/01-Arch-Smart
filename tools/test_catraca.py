@@ -6,9 +6,11 @@ Rode com: cd tools; python -m unittest test_catraca -v
 Usa `unittest` da biblioteca padrao pelo mesmo motivo de test_progresso.py: o
 script nao tem dependencia externa, e o teste dele nao deve introduzir uma.
 """
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -139,6 +141,78 @@ class TestBaselineAusente(unittest.TestCase):
         ok, linhas = comparar({"modulos_sem_doc": []}, {"modulos_sem_doc": []})
         self.assertTrue(ok)
         self.assertNotIn("SEM BASELINE", "\n".join(linhas))
+
+
+class TestMedidaQueSomeDaMedicao(unittest.TestCase):
+    """
+    A terceira cegueira de `comparar()`, na mesma funcao das duas anteriores.
+
+    O loop era `for chave, valor in sorted(medido.items())`: uma chave que
+    existe no BASELINE e some do MEDIDO nunca era visitada -- nenhuma linha
+    impressa e `ok` continuava True. O portao saia verde e MUDO.
+    `medidas_pioradas()` ja tratava essa direcao, mas so e alcancada por
+    `--atualizar`, nao pelo comando que o CI roda como portao.
+    """
+
+    def test_chave_do_baseline_ausente_do_medido_reprova(self):
+        ok, linhas = comparar({"cores_literais": 518}, {})
+        self.assertFalse(ok)
+        self.assertIn("cores_literais", " ".join(linhas))
+        self.assertIn("SUMIU DA MEDICAO", " ".join(linhas))
+
+    def test_a_mensagem_diz_o_valor_que_o_baseline_guardava(self):
+        _, linhas = comparar({"tabindex_negativo": 5}, {})
+        self.assertIn("5", " ".join(linhas))
+
+    def test_chave_em_lista_ausente_do_medido_tambem_reprova(self):
+        ok, linhas = comparar({"modulos_sem_doc": ["ai_service"]}, {})
+        self.assertFalse(ok)
+        self.assertIn("SUMIU DA MEDICAO", " ".join(linhas))
+
+    def test_chave_de_documentacao_nao_e_medida_e_nao_reprova(self):
+        # `_leia-me` nunca vem de medir(); acusa-la de sumida reprovaria todo
+        # comando. Mesmo filtro que _auditar_baseline e --atualizar aplicam.
+        ok, linhas = comparar({"_leia-me": "texto", "cores_literais": 518},
+                              {"cores_literais": 518})
+        self.assertTrue(ok)
+        self.assertNotIn("_leia-me", " ".join(linhas))
+
+    def test_medida_pulada_de_proposito_nao_reprova_mas_aparece(self):
+        # eslint_erros NAO e medida sem --eslint-json, e isso e legitimo. Nao
+        # pode virar falha -- mas tambem nao pode sumir da saida em silencio.
+        ok, linhas = comparar({"eslint_erros": 85}, {}, puladas=("eslint_erros",))
+        self.assertTrue(ok)
+        texto = " ".join(linhas)
+        self.assertIn("eslint_erros", texto)
+        self.assertIn("PULADA", texto)
+        self.assertNotIn("SUMIU DA MEDICAO", texto)
+
+    def test_a_linha_de_pulada_diz_o_motivo(self):
+        _, linhas = comparar({"eslint_erros": 85}, {}, puladas=("eslint_erros",))
+        self.assertIn("--eslint-json", " ".join(linhas))
+
+    def test_pular_uma_medida_nao_pula_as_outras(self):
+        ok, linhas = comparar(
+            {"eslint_erros": 85, "cores_literais": 518},
+            {},
+            puladas=("eslint_erros",),
+        )
+        self.assertFalse(ok)
+        self.assertIn("cores_literais", " ".join(linhas))
+        self.assertIn("SUMIU DA MEDICAO", " ".join(linhas))
+
+
+class TestMainDizQueOEslintFoiPulado(unittest.TestCase):
+    """Sem --eslint-json a medida some da saida, e oito linhas verdes parecem
+    um relatorio completo. A saida tem que dizer que foi pulada, e por que."""
+
+    def test_sem_eslint_json_a_saida_anuncia_a_medida_pulada(self):
+        saida = io.StringIO()
+        with redirect_stdout(saida):
+            codigo = catraca.main([])
+        self.assertEqual(codigo, 0, saida.getvalue())
+        self.assertIn("eslint_erros", saida.getvalue())
+        self.assertIn("PULADA", saida.getvalue())
 
 
 class TestComparacao(unittest.TestCase):
