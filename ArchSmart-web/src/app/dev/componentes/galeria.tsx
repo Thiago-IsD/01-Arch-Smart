@@ -3,7 +3,13 @@
 import * as React from "react"
 import type { UseQueryResult } from "@tanstack/react-query"
 
-import { AlertDialog, AlertDialogContent, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogFooter,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { DataTable } from "@/components/ui/data-table"
 import {
@@ -151,6 +157,9 @@ export function Galeria() {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                         <p>Esta acao nao pode ser desfeita.</p>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
             </Secao>

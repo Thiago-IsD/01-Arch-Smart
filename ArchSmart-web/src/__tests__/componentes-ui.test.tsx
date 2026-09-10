@@ -228,8 +228,12 @@ describe("DataTable", () => {
 describe("componentes endurecidos", () => {
     it("AlertDialog prende o foco dentro do dialogo", async () => {
         // Todo `AlertDialogContent` real no produto tem um `AlertDialogCancel`
-        // (confirmado por grep nos 10 usos em src/) — este fixture reflete
-        // isso, em vez de um conteudo so com um botao qualquer.
+        // — este fixture reflete isso, em vez de um conteudo so com um botao
+        // qualquer. Confirmado nos 10 usos reais em src/ com:
+        //   grep -rl "AlertDialogContent" ArchSmart-web/src --include=*.tsx \
+        //     | grep -v "components/ui/alert-dialog.tsx" | grep -v "__tests__" \
+        //     | xargs grep -L "AlertDialogCancel"
+        // (sai vazio: nenhum dos 10 fica sem Cancel).
         //
         // Achado do Radix, preservado aqui porque motivou (e depois derrubou)
         // uma correcao em `alert-dialog.tsx`: o `onOpenAutoFocus` padrao do
