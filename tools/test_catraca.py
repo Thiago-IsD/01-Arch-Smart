@@ -459,10 +459,19 @@ class TestArquivosGrandes(unittest.TestCase):
         with self.assertRaises(DiretorioMedidoSumiu):
             arquivos_grandes(raiz / "nao_existe")
 
-    def test_medida_real_bate_com_o_baseline(self):
-        # Os 8 que restam depois da Tarefa 9: BuilderClient e PortalBudget
-        # (fora do escopo da Secao 6) mais seis que nunca estiveram nela.
-        self.assertEqual(len(medir(None)["arquivos_acima_de_400"]), 8)
+    def test_medida_real_nao_ultrapassa_o_baseline_versionado(self):
+        # Propriedade, nao contagem. `len(...) == 8` ficava vermelho no dia em
+        # que a Secao 8 ENCOLHESSE um arquivo — um teste que reprova por
+        # MELHORIA e um teste que sera apagado no primeiro conserto, e a
+        # catraca perde a cobertura junto.
+        #
+        # O que importa e o mesmo que a catraca cobra: nenhum arquivo acima do
+        # limite fora do baseline versionado. Isso passa quando a lista
+        # encolhe, e so falha quando algo piora — e amarra o teste ao
+        # tools/catraca.json, em vez de a um numero copiado para ca.
+        baseline = json.loads(catraca.BASELINE.read_text(encoding="utf-8"))
+        medida = set(medir(None)["arquivos_acima_de_400"])
+        self.assertLessEqual(medida, set(baseline["arquivos_acima_de_400"]))
 
 
 class TestRotulosDeMedidaEmLista(unittest.TestCase):
