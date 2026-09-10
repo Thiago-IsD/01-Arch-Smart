@@ -58,5 +58,29 @@ class TestReprovados(unittest.TestCase):
         self.assertNotIn("claro:zzz", contraste.reprovados(css))
 
 
+class TestTokensDeEstado(unittest.TestCase):
+    ESTADOS = ("success", "warning", "info")
+
+    def test_existem_nos_dois_temas_com_foreground(self):
+        claro, escuro = contraste.tokens_dos_temas()
+        for tema, nome in ((claro, "claro"), (escuro, "escuro")):
+            for estado in self.ESTADOS:
+                self.assertIn(estado, tema, f"--{estado} ausente no tema {nome}")
+                self.assertIn(f"{estado}-foreground", tema,
+                              f"--{estado}-foreground ausente no tema {nome}")
+
+    def test_nascem_aprovados(self):
+        fora = contraste.reprovados()
+        for estado in self.ESTADOS:
+            self.assertNotIn(f"claro:{estado}", fora)
+            self.assertNotIn(f"escuro:{estado}", fora)
+
+    def test_nao_pioram_o_que_ja_existia(self):
+        self.assertEqual(
+            contraste.reprovados(),
+            ["claro:destructive", "claro:muted", "claro:secondary", "escuro:secondary"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

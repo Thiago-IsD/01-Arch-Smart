@@ -1,7 +1,7 @@
 {
   "_leia-me": "Baselines medidos em 24/08/2026. Cada numero so pode descer. Ao baixar, rode `python tools/catraca.py --atualizar` e commite o resultado junto com a mudanca que o fez baixar. Se algo piorou, --atualizar recusa gravar sozinho; para subir de proposito, use `python tools/catraca.py --atualizar --aceitar-piora` e justifique no PR.",
   "eslint_erros": 85,
-  "cores_literais": 521,
+  "cores_literais": 518,
   "modulos_sem_doc": [
     "ai_service",
     "auth_service"

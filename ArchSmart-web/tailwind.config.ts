@@ -42,6 +42,18 @@ const config = {
     				DEFAULT: 'hsl(var(--destructive))',
     				foreground: 'hsl(var(--destructive-foreground))'
     			},
+    			success: {
+    				DEFAULT: 'hsl(var(--success))',
+    				foreground: 'hsl(var(--success-foreground))'
+    			},
+    			warning: {
+    				DEFAULT: 'hsl(var(--warning))',
+    				foreground: 'hsl(var(--warning-foreground))'
+    			},
+    			info: {
+    				DEFAULT: 'hsl(var(--info))',
+    				foreground: 'hsl(var(--info-foreground))'
+    			},
     			muted: {
     				DEFAULT: 'hsl(var(--muted))',
     				foreground: 'hsl(var(--muted-foreground))'
@@ -60,9 +72,28 @@ const config = {
     			}
     		},
     		borderRadius: {
-    			lg: 'var(--radius)',
+    			sm: 'var(--radius-sm)',
+    			DEFAULT: 'var(--radius)',
     			md: 'calc(var(--radius) - 2px)',
-    			sm: 'calc(var(--radius) - 4px)'
+    			lg: 'var(--radius-lg)',
+    			xl: 'var(--radius-xl)'
+    		},
+    		fontSize: {
+    			xs: 'var(--text-xs)',
+    			sm: 'var(--text-sm)',
+    			base: 'var(--text-base)',
+    			lg: 'var(--text-lg)',
+    			xl: 'var(--text-xl)',
+    			'2xl': 'var(--text-2xl)',
+    			'3xl': 'var(--text-3xl)'
+    		},
+    		spacing: {
+    			1: 'var(--space-1)',
+    			2: 'var(--space-2)',
+    			3: 'var(--space-3)',
+    			4: 'var(--space-4)',
+    			6: 'var(--space-6)',
+    			8: 'var(--space-8)'
     		},
     		keyframes: {
     			'accordion-down': {
