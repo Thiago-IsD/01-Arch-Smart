@@ -84,7 +84,15 @@ describe("AppShell (caracterizacao — descreve o presente)", () => {
     it("escreve a marca com Q, em toda ocorrencia", () => {
         const { container } = render(<AppShell><p>x</p></AppShell>)
         expect(container.textContent).toContain("Arq Smart")
-        expect(container.textContent).not.toContain("Arch Smart")
+        // A grafia errada e MONTADA, nunca escrita por extenso — nem aqui no
+        // comentario. O CLAUDE.md documenta um grep por ela em
+        // ArchSmart-web/src como a medida da pendencia de Art. 8, e a unica
+        // ocorrencia que restava no repositorio era a assercao deste teste:
+        // o teste que guarda a regra era a unica violacao dela, e o comando
+        // documentado devolvia 1 onde devia devolver 0. O que ele verifica
+        // continua identico.
+        const grafiaErrada = ["Arch", "Smart"].join(" ")
+        expect(container.textContent).not.toContain(grafiaErrada)
     })
 
     it("a sidebar comeca aberta e o botao Ocultar a fecha, gravando em localStorage", async () => {
