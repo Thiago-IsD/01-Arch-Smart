@@ -1,7 +1,14 @@
+import dynamic from "next/dynamic"
+
 import { getServerAccessToken } from "@/lib/api/auth.server"
 import { notFound } from "next/navigation"
-import { BuilderClient } from "./components/BuilderClient"
 import { apiUrl } from "@/lib/api-url"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const BuilderClient = dynamic(
+    () => import("./components/BuilderClient").then((m) => m.BuilderClient),
+    { loading: () => <Skeleton className="h-[600px] w-full" /> },
+)
 
 async function getPresentationData(presentationId: string, token: string) {
     try {

@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 08/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **Mas o portão de tempo que a spec exige continua ABERTO**: a medição que confirmaria "mais rápido" não pôde ser feita (falta credencial de usuário real para o login do Playwright), então o ganho desta seção é **evidência estrutural, não medição**. A nota da Seção 5 em `PROGRESS.md` registra o comando que fecha o portão — **a Seção 8 não deveria começar apoiada nesta seção até esse número existir**. Seções 6 a 9 pendentes; **a próxima é a Seção 6** (camada de UI). Produção ainda não recebeu: `main` está na Seção 3.
+Estado em 10/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída** — camada de UI, 9/9, na branch `secao-6-camada-de-ui`, **ainda não mergeada em `develop`** na data desta linha; o que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md). Seções 7 a 9 pendentes; **a próxima é a Seção 7** (telemetria). Produção ainda não recebeu: `main` está na Seção 3.
 
 > Sobre "implantada em staging" na Seção 5, e a diferença para a Seção 4: no caso do backend deu para medir o contêiner servindo o código novo. Aqui não. O frontend de staging responde `302` para `vercel.com/sso-api` (medido em 08/09/2026), o que prova que **o deployment existe** — em contraste com `DEPLOYMENT_NOT_FOUND` —, mas a Deployment Protection esconde o conteúdo, então **ninguém verificou de fora que o build servido é o da Seção 5**. A API de staging não foi tocada por esta seção (`/health` → `200`, com 41,4 s de cold start na primeira chamada, o mesmo fenômeno da [ADR 0009](docs/dev/decisoes/0009-prefetch-dentro-de-suspense.md)).
 
@@ -50,22 +50,28 @@ Nenhuma destas é para um agente decidir sozinho. Continuam abertas depois da Se
 5. **`app/services/`, `app/core/` e `app/db/` não têm catraca estática.** O lint de query direta cobre `app/api/` e `financial_service.py`; uma query sem escopo escrita fora daí não é reprovada por nada.
 6. **18 rotas recebem ids no corpo** e não são alcançadas pelo teste genérico de isolamento, que percorre rotas com id na URL. `PATCH /api/products/batch-approve` é uma delas.
 
-## O que a Seção 5 deixou em aberto — **planejar no início da Seção 6**
+## O que a Seção 5 deixou em aberto — **as duas fecharam na Seção 6**
 
-Diferente da lista acima: **isto não é "esbarrar se aparecer". A Seção 6 começa
-planejando, e quem escrever o plano dela põe a pendência como tarefa ou registra
-por escrito a decisão de não pôr.** Não é para um agente decidir sozinho.
+Diferente da lista acima: isto não era "esbarrar se aparecer". A Seção 6 devia
+começar planejando as duas, pondo cada uma como tarefa ou registrando por
+escrito a decisão de não pôr — e **as duas foram fechadas**, cada uma no seu
+commit próprio. Ficam aqui, riscadas, com o que fechou cada uma: o histórico
+de uma pendência é o que impede que ela volte pelo mesmo caminho.
 
 > A segunda pendência deste bloco — a marca sem o Q — **foi fechada em
 > 09/09/2026**, no commit próprio `b4fae10`, antes de a Seção 6 começar, como
 > este arquivo mandava. Está registrada abaixo como item 2, resolvido.
 
-1. **O portão de validação da Seção 5 nunca foi fechado.** A spec exige provar o
-   ganho antes de escalar — *"Só com o ganho confirmado ligam-se os lints e
-   migra-se o resto"*. A medição de tempo **não rodou**: falta credencial de
-   usuário de teste para o login do Playwright. Não há "antes" nem "depois", e
-   nenhum número foi inventado — o que existe no lugar é evidência
-   **estrutural**, rotulada como tal em
+1. ~~O portão de validação da Seção 5 nunca foi fechado.~~ **Fechado em
+   10/09/2026, na Tarefa 1 da Seção 6.** A decisão registrada mais abaixo
+   (criar primeiro um usuário de teste dedicado) foi executada: o usuário
+   existe em staging, o Playwright rodou, e o número existe — mediana de
+   **1454 ms**. A verificação viva da hidratação rodou junto e passou. O texto
+   original fica abaixo porque a **forma** dele continua valendo: a spec exige
+   provar o ganho antes de escalar — *"Só com o ganho confirmado ligam-se os
+   lints e migra-se o resto"*. Enquanto a medição não tinha rodado, não havia
+   "antes" nem "depois", nenhum número foi inventado, e o que existia no lugar
+   era evidência **estrutural**, rotulada como tal em
    [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md).
    Fecha assim:
 
@@ -82,16 +88,19 @@ por escrito a decisão de não pôr.** Não é para um agente decidir sozinho.
 
    **Decidido em 09/09/2026 por Thiago: criar primeiro um usuário de teste
    dedicado.** Não se mede com credencial de usuário real emprestada; o E2E
-   precisa de uma conta própria em staging, com dados próprios. Isso vira
-   **tarefa da Seção 6**, e o portão só fecha depois dela — até lá o portão
-   continua aberto e a Seção 8 continua sem poder se apoiar na Seção 5.
+   precisa de uma conta própria em staging, com dados próprios. Isso virou a
+   **Tarefa 1 da Seção 6**, executada em 10/09/2026 — ver
+   [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md).
+   **A Seção 8 já pode se apoiar na Seção 5.**
 
-   > Falta também a verificação viva da hidratação, que depende da mesma sessão:
-   > abrir `/library` com a API quente e confirmar que **nenhuma** requisição a
-   > `/api/products` sai do navegador no primeiro carregamento. Sem ela, "o
-   > prefetch funciona" é inferência estrutural, não observação — e o modo de
+   > A verificação viva da hidratação — abrir `/library` com a API quente e
+   > confirmar que **nenhuma** requisição da lista sai do navegador no primeiro
+   > carregamento — **rodou na mesma tarefa, e passou**. Ela existia porque "o
+   > prefetch funciona" era inferência estrutural, não observação, e o modo de
    > falha dessa inferência é silencioso: o prefetch vira custo puro sem emitir
-   > erro nenhum.
+   > erro nenhum. A asserção discrimina por `state=NORMALIZED`, que é a chave
+   > da lista; o badge do inbox continua fora do prefetch, pendência aberta da
+   > Seção 5.
 
 2. ~~A marca aparece sem o Q em 43 lugares, 27 arquivos.~~ **Corrigida em
    09/09/2026, no commit `b4fae10`** — commit próprio, mecânico, antes de a

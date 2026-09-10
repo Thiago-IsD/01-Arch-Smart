@@ -1,18 +1,32 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { Loader2, Sparkles } from "lucide-react"
 import { ProductCard } from "@/components/library/ProductCard"
 import { LibraryToolbar } from "@/components/library/LibraryToolbar"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { ProductFormSheet } from "@/components/library/ProductFormSheet"
-import { NormalizationSheet } from "@/components/library/NormalizationSheet"
-import { BatchNormalizeModal } from "@/components/library/BatchNormalizeModal"
 import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import { Button } from "@/components/ui/button"
 import { useProducts, useProduct, useInboxCount, RESPOSTA_VAZIA } from "@/features/library/hooks"
 import { filtrosDaUrl } from "@/features/library/filters"
+
+// `loading: () => null` porque estes dois sao overlay (sheet e modal). Um
+// modal fechado nao ocupa espaco no fluxo da pagina, entao o fallback dele
+// tambem nao pode ocupar: `next/dynamic` e lazy + Suspense, e um Skeleton
+// aqui desenhava um bloco cinza de 256px embaixo da grade enquanto o chunk
+// nao chegava — com o modal fechado. Quem espera ver algo carregando e quem
+// abriu o overlay, e ai o proprio overlay ja tem o estado dele.
+const NormalizationSheet = dynamic(
+    () => import("@/components/library/NormalizationSheet").then((m) => m.NormalizationSheet),
+    { loading: () => null },
+)
+const BatchNormalizeModal = dynamic(
+    () => import("@/components/library/BatchNormalizeModal").then((m) => m.BatchNormalizeModal),
+    { loading: () => null },
+)
 
 export function LibraryContent() {
     const searchParams = useSearchParams()

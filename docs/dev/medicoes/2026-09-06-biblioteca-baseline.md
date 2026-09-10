@@ -50,3 +50,27 @@ Cascata de rede observada por navegação, hoje:
 `createClient()` → `getSession()` → `fetch /api/products` → render.
 Duas queries em paralelo (`products` e `inbox-count`), cada uma repetindo a
 resolução de sessão.
+
+## Atualização de 10/09/2026 (Tarefa 1 da Seção 6) — este baseline permanece não medido, por construção
+
+O usuário de teste E2E foi criado nesta tarefa (ver
+[`2026-09-09-usuario-de-teste-e2e.md`](2026-09-09-usuario-de-teste-e2e.md)), e
+a leitura real do **"depois"** foi feita — ver
+[`2026-09-06-biblioteca-depois.md`](2026-09-06-biblioteca-depois.md), seção
+"✅ PORTÃO FECHADO". Mas o **"antes"** deste arquivo não pôde ser medido nem
+agora: o código de antes da Seção 5 (a versão de `LibraryContent` com três
+`useQuery` e `fetch` cru descrita acima) não existe mais em nenhuma branch
+viva — foi substituído pelo desenho atual no merge da Seção 5
+(`6e94d63`/`ce1012e`). Medir o "antes" exigiria fazer checkout do commit
+anterior à Seção 5, uma árvore de trabalho separada, `npm install` e um
+segundo servidor — fora do escopo desta tarefa (Tarefa 1 da Seção 6), que é
+fechar a medição do "depois", não reconstruir o "antes".
+
+`mediana_ms=pendente` continua sendo o valor vigente **para este arquivo**.
+A linha permanece assim de propósito — não substitua por um número: nenhuma
+medição de "antes" foi feita, nesta tarefa ou em qualquer outra, na branch
+atual. A comparação que existe é contra a referência de agosto de 2026 da
+spec (`3,6 s` para a Biblioteca,
+`docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md:37`),
+rotulada como referência externa, não como baseline medido neste
+repositório — ver o detalhe em `2026-09-06-biblioteca-depois.md`.

@@ -1,11 +1,29 @@
 {
   "_leia-me": "Baselines medidos em 24/08/2026. Cada numero so pode descer. Ao baixar, rode `python tools/catraca.py --atualizar` e commite o resultado junto com a mudanca que o fez baixar. Se algo piorou, --atualizar recusa gravar sozinho; para subir de proposito, use `python tools/catraca.py --atualizar --aceitar-piora` e justifique no PR.",
   "eslint_erros": 85,
-  "cores_literais": 521,
+  "cores_literais": 518,
   "modulos_sem_doc": [
     "ai_service",
     "auth_service"
   ],
   "fetch_fora_de_lib_api": 75,
-  "supabase_fora_de_lib_api": 0
+  "supabase_fora_de_lib_api": 0,
+  "contraste_reprovado": [
+    "claro:destructive",
+    "claro:muted",
+    "claro:secondary",
+    "escuro:secondary"
+  ],
+  "tabindex_negativo": 5,
+  "hover_sem_focus": 8,
+  "arquivos_acima_de_400": [
+    "ArchSmart-web/src/app/(dashboard)/projects/[id]/presentation/[presentation_id]/builder/components/BuilderClient.tsx",
+    "ArchSmart-web/src/app/(dashboard)/settings/page.tsx",
+    "ArchSmart-web/src/app/portal/[uuid]/components/PortalBudget.tsx",
+    "ArchSmart-web/src/app/produto/page.tsx",
+    "ArchSmart-web/src/components/calendar/EventDialog.tsx",
+    "ArchSmart-web/src/components/library/BatchNormalizeModal.tsx",
+    "ArchSmart-web/src/components/library/NormalizationSheet.tsx",
+    "ArchSmart-web/src/components/library/ProductFormSheet.tsx"
+  ]
 }
