@@ -7,6 +7,7 @@
 | [`ambiente.md`](ambiente.md) | subir o projeto do zero: dependências, variáveis de ambiente, banco local |
 | [`convencoes.md`](convencoes.md) | o que é obrigatório e o que é proibido no código, com o artigo da constitution que sustenta cada regra |
 | [`arquitetura.md`](arquitetura.md) | como API, web e extensão se encaixam, e por onde os dados fluem |
+| [`componentes.md`](componentes.md) | a camada de UI da Seção 6: tokens, `QueryBoundary`, os componentes novos e o ponto cego de cada catraca |
 | [`modelo-de-dados.md`](modelo-de-dados.md) | schema do banco comentado, com o porquê de cada relação |
 | [`deploy.md`](deploy.md) | ambientes, esteira de deploy e como reverter |
 | [`decisoes/`](decisoes/README.md) | ADRs — por que o projeto está do jeito que está |
