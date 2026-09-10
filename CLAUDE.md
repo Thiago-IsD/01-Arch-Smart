@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 10/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída** — camada de UI, 9/9, na branch `secao-6-camada-de-ui`, **ainda não mergeada em `develop`** na data desta linha; o que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md). Seções 7 a 9 pendentes; **a próxima é a Seção 7** (telemetria). Produção ainda não recebeu: `main` está na Seção 3.
+Estado em 10/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. Seções 7 a 9 pendentes; **a próxima é a Seção 7** (telemetria). Produção ainda não recebeu: `main` está na Seção 3.
 
 > Sobre "implantada em staging" na Seção 5, e a diferença para a Seção 4: no caso do backend deu para medir o contêiner servindo o código novo. Aqui não. O frontend de staging responde `302` para `vercel.com/sso-api` (medido em 08/09/2026), o que prova que **o deployment existe** — em contraste com `DEPLOYMENT_NOT_FOUND` —, mas a Deployment Protection esconde o conteúdo, então **ninguém verificou de fora que o build servido é o da Seção 5**. A API de staging não foi tocada por esta seção (`/health` → `200`, com 41,4 s de cold start na primeira chamada, o mesmo fenômeno da [ADR 0009](docs/dev/decisoes/0009-prefetch-dentro-de-suspense.md)).
 
@@ -120,6 +120,70 @@ de uma pendência é o que impede que ela volte pelo mesmo caminho.
    `Ark Smart` e `Ecowe`: zero. O que a Seção 6 herda daqui é só a regra de não
    reintroduzir a grafia errada nas telas que ela vai reescrever.
 
+## O que a Seção 6 deixou em aberto — **planejar no início da Seção 7**
+
+Como o bloco anterior: **estas duas não são "esbarrar se aparecer". Quem
+escrever o plano da Seção 7 põe cada uma como tarefa ou registra por escrito a
+decisão de não pôr.** Nenhuma é para um agente decidir sozinho.
+
+1. **Três mudanças visuais entraram e ninguém as viu.** Não há teste visual
+   neste repositório: `tsc`, `vitest` e a catraca ficam verdes enquanto uma tela
+   muda de aparência. A Seção 6 mudou três coisas de propósito, todas
+   verificadas por CSS compilado e por diff — **nenhuma por olho humano**:
+
+   | O quê | Onde aparece |
+   |---|---|
+   | `DropdownMenuItem` ganhou `min-h-11` (alvo de toque de 44px) | 34 itens em 6 telas: cabeçalho, card de produto, tabela financeira, card de ambiente, alternador de tema |
+   | botão de fechar do toast destrutivo trocou `text-red-*` por token | todo toast de erro |
+   | `Skeleton` ganhou `aria-hidden="true"` | todo estado de carregamento |
+
+   A do alvo de toque é a maior — 44px é bem mais alto que os ~30px de antes, e
+   menu comprido cresce junto. **Abrir as telas e olhar é a única verificação
+   possível**, e quanto mais camadas entrarem por cima, mais caro fica saber o
+   que causou o quê. Decisão de Thiago: olhar agora, ou carregar adiante.
+
+   > O mesmo vale para a galeria `/dev/componentes`: ela existe justamente para
+   > ser olhada, e ainda não foi. Ela some em produção (`notFound()`), então só
+   > dá para vê-la em desenvolvimento.
+
+2. **A credencial do usuário de teste E2E circulou fora do controle de versão** —
+   relatório de execução e transcrição de sessão. Dá acesso à conta de seed em
+   staging (`ana.arquiteta@seed.arqsmart.local`), não a dado de cliente, mas é
+   credencial viva num ambiente real. Rotacionar é decisão de Thiago;
+   [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md)
+   documenta como recriar o usuário do zero.
+
+### O que a Seção 8 herda, e que **não** é da Seção 7
+
+Registrado aqui para não se perder, mas não é pauta de agora:
+
+- **Existem dois `FormField` diferentes.** O da Seção 6
+  (`@/components/ui/form-field`, com `id`/`rotulo`/`erro`/`sensivel`) e o do
+  react-hook-form (`@/components/ui/form.tsx`, com `control`/`name`/`render`),
+  este usado por **11 arquivos de tela** (medido:
+  `grep -rl "from \"@/components/ui/form\"" ArchSmart-web/src --include=*.tsx | wc -l`).
+  Quem migrar uma dessas telas já tem `FormField` importado — do outro. Escolher
+  entre os dois é decisão da Seção 8.
+- **Catraca em zero não quer dizer defeito em zero.** `cores_literais` chegando
+  a 0 não significa zero cor literal: a régua não vê `bg-white`/`text-white`
+  (67 hoje), hex fora de `bg|text|border`, nem `ring-offset-<paleta>-<n>`. E
+  `hover_sem_focus` em 0 não significa zero: `invisible group-hover:visible` e
+  `hidden group-hover:block` são o mesmo defeito e passam batido. Os furos e o
+  grep de cada um estão em [`docs/dev/componentes.md`](docs/dev/componentes.md).
+- **`DataTable` provavelmente não serve às telas como está** — não tem
+  renderizador de célula (faz `String(valor)`), e ordena e pagina no cliente
+  sobre o array inteiro, enquanto as listagens reais são paginadas no servidor.
+- **Art. 8 violado em nome de evento interno:** `archsmart:budget_updated`, 4
+  ocorrências em 3 arquivos (`grep -rn "archsmart:" ArchSmart-web/src`).
+  Renomear é mudança de contrato entre emissor e ouvinte — mexer só nos
+  emissores quebra o rodapé de totais **em silêncio**.
+- **`e2e/` não roda em portão nenhum.** O `vitest.config.ts` exclui `e2e/**` e
+  não há job de Playwright no CI. `hidratacao-biblioteca.spec.ts` — a única
+  prova viva de que o prefetch da Seção 5 funciona — é instrumento de medição,
+  não guarda permanente, e a Seção 8 vai editar exatamente a tela que ele cobre.
+- **O badge do inbox (`useInboxCount()`) nunca é prefetchado** — pendência da
+  Seção 5, confirmada ao vivo na Seção 6.
+
 ## Portões de CI
 
 Desde a Seção 3, `.github/workflows/ci.yml` roda três jobs em todo PR:
@@ -156,6 +220,10 @@ Repositorio — progresso, links e sincronia
 
 A Seção 5 acrescentou duas medidas de frontend, para o padrão manual que ainda não migrou: `fetch_fora_de_lib_api` (ocorrências de `fetch(` em `ArchSmart-web/src/**/*.{ts,tsx}` fora de `src/lib/api/`; nasceu em 76 quando a Seção 5 registrou a medida, corrigido para 75 na revisão final da mesma seção — 1 das 76 era `fetch(` dentro de um comentário, não uma chamada real —, e é a Seção 8 quem zera, migrando as telas que restam) e `supabase_fora_de_lib_api` (ocorrências de `createBrowserClient(`/`createServerClient(` fora de `src/lib/api/` e `src/proxy.ts`; nasce em 0 — já é catraca no piso, qualquer reintrodução reprova). Registrar uma medida nova exige `--atualizar --aceitar-piora`, porque uma chave sem baseline é tratada como regressão por padrão; a Seção 5 usou o flag por isso, não porque algum número existente piorou — justificado no PR daquela seção.
 
+A Seção 6 acrescentou quatro medidas, pelo mesmo caminho e com a mesma justificativa no PR #7: `contraste_reprovado` (pares (cor, cor-foreground) abaixo de 4.5:1 nos dois temas; nasce em **4** — `secondary` nos dois temas, que é o coral da marca, mais `destructive` e `muted` no claro. É catraca e portão ao mesmo tempo: token novo que nasça reprovado não está no baseline e reprova, sem precisar de lista de exceção), `tabindex_negativo` (**5**) e `hover_sem_focus` (**8**), que a Seção 8 zera ao migrar as telas, e `arquivos_acima_de_400` (lista nominal, **8** hoje — a Seção 6 tirou quatro dela; `BuilderClient` e `PortalBudget` continuam lá por decisão registrada).
+
+> A Seção 6 também consertou **três cegueiras** em `comparar()`, todas do mesmo tipo — a régua dizendo verde sem olhar: medida do tipo lista sem baseline passava em silêncio; `hover_sem_focus` não via a sintaxe de grupo nomeado do Tailwind (`group-hover/opt:`) e media 5 onde eram 8; e chave que existe no baseline e **some da medição** nunca era visitada, então apagar uma linha de `medir()` desligava a medida sem um aviso. As três têm teste agora. Se você acrescentar medida, **escreva o teste dela no mesmo commit** — foi assim que as três apareceram.
+
 Subir um número é possível e deliberadamente incômodo: exige `--atualizar --aceitar-piora`, que grava imprimindo um aviso destacado com cada medida que piorou, para o aumento ficar registrado na saída do comando e justificado no PR. E o job `Repositorio` compara o `tools/catraca.json` do PR com o da branch base — editar o número à mão, sem passar pela ferramenta, reprova ali.
 
 A ideia está no [ADR 0006](docs/dev/decisoes/0006-portoes-de-ci-com-catraca.md): um portão que nasce vermelho é desligado na primeira semana, e aí não existe portão nenhum. Por isso o portão só barra o que já passa hoje, e o resto entra como catraca.
@@ -176,7 +244,7 @@ Duas consequências práticas:
 - **Meça no diretório em que o CI mede.** Durante a Seção 3, `python tools/checa_links.py` saía 0 a partir de `tools/` e **1** a partir da raiz — o CI roda da raiz, e medir no cwd errado fez reportar como verde um portão que o runner já reprovava (run 32804191634). Aquele link foi corrigido, então esse comando hoje sai 0 dos dois lados; o exemplo que **continua** reproduzindo é outro, no mesmo espírito:
 
   ```
-  cd tools; python -m unittest discover -p "test_*.py"   # OK, 54 testes (09/09/2026)
+  cd tools; python -m unittest discover -p "test_*.py"   # OK, 96 testes (10/09/2026)
   cd ..;    python -m unittest discover -s tools -p "test_*.py"   # FAILED (failures=1)
   ```
 
@@ -226,7 +294,7 @@ npm run typecheck
 npm test
 ```
 
-Sai limpo: `Test Files 11 passed (11)`, `Tests 63 passed (63)` (medido em 09/09/2026; a Seção 5 acrescentou testes, e o número sobe quando uma seção acrescenta mais — meça, não copie daqui). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
+Sai limpo: `Test Files 19 passed (19)`, `Tests 151 passed (151)` (medido em 10/09/2026, depois da Seção 6; o número sobe quando uma seção acrescenta testes — **meça, não copie daqui**). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
 
 Repositório, sem venv e sem instalar nada (os scripts de `tools/` usam só a biblioteca padrão):
 

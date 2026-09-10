@@ -512,6 +512,26 @@ _Última atualização: 2026-09-10_
 ## Seção 6 · Camada de UI
 **9/9 (100%)** `████████████████████`
 
+> **A Seção 6 fechou em 10/09/2026 e foi mergeada até `staging` no mesmo dia**
+> (merge `0ac71d9` em `develop`, PR #7 `develop` → `staging` com merge `5dbd13f`).
+> As nove tarefas passaram por revisão independente e rodada de correção, mais
+> uma revisão da branch inteira antes do merge. O que ela entregou, para quem
+> vai **usar**, está em [`docs/dev/componentes.md`](docs/dev/componentes.md).
+>
+> **Não verificado, e registrado como tal:** ninguém abriu as telas. Não há teste
+> visual neste repositório, e três mudanças de aparência entraram de propósito —
+> `min-h-11` no `DropdownMenuItem` (34 itens em 6 telas), a cor do botão de
+> fechar do toast destrutivo, e `aria-hidden` no `Skeleton`. Todas conferidas por
+> CSS compilado e por diff, nenhuma por olho humano. É a pauta 1 da Seção 7 no
+> [`CLAUDE.md`](CLAUDE.md).
+>
+> **O que esta seção provou que não sabia:** três medidas da catraca diziam verde
+> sem olhar. Medida do tipo lista sem baseline passava em silêncio;
+> `hover_sem_focus` não via `group-hover/<nome>:` e media 5 onde eram 8; e chave
+> que existe no baseline e some da medição nunca era visitada — apagar uma linha
+> de `medir()` desligava a medida sem aviso. As três têm teste agora, e a lição
+> virou regra no `CLAUDE.md`: medida nova entra com o teste dela no mesmo commit.
+
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
 > A ordem das caixas acima é a do plano, que inverte duas em relação ao
