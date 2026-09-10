@@ -5,6 +5,11 @@ import { describe, expect, it, vi } from "vitest"
 import { EmptyState } from "@/components/ui/empty-state"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { FormField } from "@/components/ui/form-field"
+import { ErrorBoundary, registrarReportadorDeErro } from "@/components/ui/error-boundary"
+
+function Explode(): never {
+    throw new Error("estourou")
+}
 
 describe("EmptyState", () => {
     it("mostra titulo, descricao e a acao de saida", async () => {
@@ -73,5 +78,32 @@ describe("FormField", () => {
             <FormField id="cpf" rotulo="CPF" sensivel><input id="cpf" /></FormField>,
         )
         expect(container.querySelector("[data-private='true']")).not.toBeNull()
+    })
+})
+
+describe("ErrorBoundary", () => {
+    it("mostra o fallback em vez de derrubar a arvore", () => {
+        const silencio = vi.spyOn(console, "error").mockImplementation(() => {})
+        render(
+            <ErrorBoundary fallback={(erro) => <p>peguei: {erro.message}</p>}>
+                <Explode />
+            </ErrorBoundary>,
+        )
+        expect(screen.getByText("peguei: estourou")).toBeInTheDocument()
+        silencio.mockRestore()
+    })
+
+    it("chama o reportador registrado — o plugue que a Secao 7 liga", () => {
+        const silencio = vi.spyOn(console, "error").mockImplementation(() => {})
+        const reportador = vi.fn()
+        registrarReportadorDeErro(reportador)
+        render(
+            <ErrorBoundary fallback={() => <p>fallback</p>}>
+                <Explode />
+            </ErrorBoundary>,
+        )
+        expect(reportador).toHaveBeenCalledOnce()
+        registrarReportadorDeErro(() => {})
+        silencio.mockRestore()
     })
 })
