@@ -536,34 +536,53 @@ _Última atualização: 2026-09-10_
 - [x] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [x] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 
-> Nota da Tarefa 5 (10/09/2026): os cinco componentes novos e os três
-> endurecimentos saíram como o brief previa, mas dois deles só passaram depois
-> de corrigir um defeito real que o teste (não o ambiente) expôs — nenhum dos
-> dois é jsdom-only, os dois reproduzem em navegador de verdade:
+> Nota da Tarefa 5 (10/09/2026, **reescrita na revisão final da seção** — ver a
+> correção ao final): os cinco componentes novos (`EmptyState`,
+> `CurrencyInput`, `FormField`, `ErrorBoundary`, `DataTable`) e os três
+> endurecimentos saíram como o brief previa. Dois cenários de teste expuseram
+> comportamento de biblioteca que ninguém conhecia, e a investigação dos dois
+> terminou concluindo que **o defeito estava no teste, não no componente**:
 >
-> 1. **`CurrencyInput` formatava com espaço duro (U+00A0), não espaço comum.**
->    `Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" })` nesta
->    ICU separa `R$` do número com ` `, então `"R$ 123,45"` (com espaço
->    comum) nunca batia com o formatado, apesar de idênticos na tela. Corrigido
->    normalizando o ` ` para espaço comum dentro do próprio componente —
->    então qualquer copy que compare a string exibida (teste, ou outro código)
->    não precisa saber desse detalhe de ICU.
-> 2. **`AlertDialogContent` sem `AlertDialogCancel` não focava nada.** O
->    default do Radix (`@radix-ui/react-alert-dialog@1.1.15`) previne o
->    autofoco do `FocusScope` e tenta focar a ref interna do `Cancel` — sem um
+> 1. **`Intl` formata moeda em pt-BR com espaço não-quebrável (U+00A0), não
+>    com espaço comum.** `Intl.NumberFormat("pt-BR", { style: "currency",
+>    currency: "BRL" })` separa `R$` do número com ` `, então `"R$ 123,45"`
+>    escrito com espaço comum **nunca** bate com o formatado, apesar de os dois
+>    serem idênticos na tela. Isso é o formato tipograficamente correto — evita
+>    que símbolo e valor quebrem em linhas diferentes —, e `dashboard/page.tsx`
+>    já exibe o mesmo caractere hoje via `toLocaleString`. **`currency-input.tsx`
+>    não normaliza nada**: o `Intl` é a fonte de verdade, e quem compara a
+>    string exibida compara com o U+00A0 de fato emitido (o teste usa um escape
+>    `\u00A0` explícito, com o porquê em comentário). O JSDoc do componente diz
+>    isso em voz alta, para o próximo não "consertar" de novo.
+> 2. **`AlertDialogContent` sem `AlertDialogCancel` não foca nada.** O default
+>    do Radix (`@radix-ui/react-alert-dialog@1.1.15`) previne o autofoco do
+>    `FocusScope` e tenta focar a ref interna do `Cancel` — sem um
 >    `AlertDialogCancel` na árvore essa ref é `null`, e como o
 >    `preventDefault()` já rodou, o fallback do próprio `FocusScope` (focar o
->    primeiro elemento focável) nunca dispara. O teste do brief usa
->    `AlertDialogContent` só com um `<button>`, sem `Cancel` — exatamente o
->    caso que expõe isso. Corrigido em `alert-dialog.tsx`: um `onOpenAutoFocus`
->    que, numa microtarefa (lendo `currentTarget` antes de agendá-la — o
->    evento é nativo e o navegador zera `currentTarget` assim que o dispatch
->    termina), confere se o foco realmente entrou no diálogo e, se não,
->    foca o primeiro elemento focável. Quando existe `AlertDialogCancel`, o
->    comportamento padrão do Radix continua valendo sem mudança.
+>    primeiro elemento focável) nunca dispara. **Nenhuma linha de
+>    `alert-dialog.tsx` mudou nesta seção** (`git diff 24f4eb5..dafe1b3 --
+>    ArchSmart-web/src/components/ui/alert-dialog.tsx` sai vazio): os 10 usos
+>    reais de `AlertDialogContent` em `src/` têm `Cancel`, então o cenário não
+>    ocorre em produção, e o fixture do teste passou a refletir o uso real. O
+>    achado do Radix ficou preservado em comentário no teste.
 >
 > Os outros dois hardenings (`min-h-11` no `DropdownMenuItem`,
 > `aria-hidden="true"` no `Skeleton`) foram só o que o brief já previa.
+> `cores_literais` continua em **518** (`python tools/catraca.py`).
+>
+> > **Correção da revisão final (10/09/2026): esta nota descrevia código que
+> > não existe.** A primeira versão dela afirmava que o U+00A0 fora "corrigido
+> > normalizando para espaço comum dentro do próprio componente" e que houvera
+> > uma "correção em `alert-dialog.tsx`". As duas coisas chegaram a existir na
+> > Rodada 1 da Tarefa 5 e foram **revertidas** no mesmo dia, no commit
+> > `ad94040` ("revert maquiagem de teste na Tarefa 5"), porque nenhuma das
+> > duas era conserto de defeito real: eram produção alterada para satisfazer
+> > teste que descrevia cenário irreal (moeda comparada com espaço comum;
+> > diálogo sem `Cancel`). O revert não tocou o `PROGRESS.md`, e a nota
+> > sobreviveu descrevendo o mundo anterior a ele por 29 commits. Fica aqui
+> > como erro visível e corrigido, não apagado — é o modo de falha que este
+> > repositório mais repete: **texto que descreve a intenção, não a medição**,
+> > e que só cai quando alguém tenta usar o que ele afirma.
 > `cores_literais` continua em **518** (`python tools/catraca.py`).
 
 > Nota da Tarefa 7 (10/09/2026): a primeira medição de `hover_sem_focus` saiu
