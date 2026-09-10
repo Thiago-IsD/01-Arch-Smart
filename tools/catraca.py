@@ -23,6 +23,11 @@ manual (`fetch` cru, cliente Supabase direto) fora de `src/lib/api/`:
                                  `createServerClient` sobrou fora de
                                  src/lib/api/ e src/proxy.ts. Ja e catraca no
                                  piso: qualquer reintroducao reprova.
+  - contraste_reprovado  4 pares hoje: secondary nos dois temas (e a cor da
+                         marca), destructive e muted no tema claro. Token novo
+                         que nasca reprovado nao esta no baseline e reprova --
+                         e assim que "portao fechado para o que a Secao 6 cria"
+                         sai de graca, sem lista de excecao para envelhecer
 
 Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
@@ -45,6 +50,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+import contraste
 
 RAIZ = Path(__file__).resolve().parent.parent
 BASELINE = Path(__file__).resolve().parent / "catraca.json"
@@ -75,6 +82,7 @@ CRITERIOS = {
     "modulos_sem_doc": "arquivo em app/services/ ou diretorio em src/features/ sem .md de mesmo nome em docs/dev/modulos/",
     "fetch_fora_de_lib_api": "ocorrencias de `fetch(` em ArchSmart-web/src/**/*.{ts,tsx}, fora de src/lib/api/",
     "supabase_fora_de_lib_api": "ocorrencias de `create{Browser,Server}Client(` fora de src/lib/api/ e src/proxy.ts",
+    "contraste_reprovado": "pares (cor, cor-foreground) de globals.css abaixo de 4.5:1, nos dois temas",
 }
 
 
@@ -143,6 +151,7 @@ def medir(eslint_json: Path | None) -> dict:
         "modulos_sem_doc": modulos_sem_doc(SERVICES_API, FEATURES_WEB, DOCS_MODULOS),
         "fetch_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_FETCH, (LIB_API_WEB,)),
         "supabase_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
+        "contraste_reprovado": contraste.reprovados(),
     }
     if eslint_json is not None:
         relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))

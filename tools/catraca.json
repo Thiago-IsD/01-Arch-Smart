@@ -7,5 +7,11 @@
     "auth_service"
   ],
   "fetch_fora_de_lib_api": 75,
-  "supabase_fora_de_lib_api": 0
+  "supabase_fora_de_lib_api": 0,
+  "contraste_reprovado": [
+    "claro:destructive",
+    "claro:muted",
+    "claro:secondary",
+    "escuro:secondary"
+  ]
 }
