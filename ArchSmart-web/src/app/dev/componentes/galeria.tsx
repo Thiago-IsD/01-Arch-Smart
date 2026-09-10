@@ -18,7 +18,16 @@ import { FormField } from "@/components/ui/form-field"
 import { QueryBoundary } from "@/components/ui/query-boundary"
 import { Skeleton } from "@/components/ui/skeleton"
 
-/** Query falsa, só para a galeria mostrar cada estado sem rede. */
+/**
+ * Query falsa, só para a galeria mostrar cada estado sem rede.
+ *
+ * AVISO: o cast `as unknown as UseQueryResult<T>` esconde um risco. O objeto
+ * falso não satisfaz o shape real do `UseQueryResult` — hoje funciona porque
+ * `QueryBoundary` lê só `isPending`, `isError`, `data`, `error` e `refetch`.
+ * Se `QueryBoundary` passar a ler outro campo no futuro, a galeria continua
+ * compilando e passa a mostrar o estado errado, **sem erro de tipo**. Quem
+ * mexer em `QueryBoundary` precisa confirmar se este `fake` segue válido.
+ */
 function fake<T>(parcial: Partial<UseQueryResult<T>>): UseQueryResult<T> {
     return {
         isPending: false,

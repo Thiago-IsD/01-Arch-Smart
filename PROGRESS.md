@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 41/63 (65%)**
+**Progresso geral: 42/63 (67%)**
 `█████████████░░░░░░░`
 
 _Última atualização: 2026-09-10_
@@ -510,7 +510,7 @@ _Última atualização: 2026-09-10_
 >    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**5/9 (56%)** `███████████░░░░░░░░░`
+**6/9 (67%)** `█████████████░░░░░░░`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
@@ -531,7 +531,7 @@ _Última atualização: 2026-09-10_
 - [x] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
 - [x] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
 - [x] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
-- [ ] Galeria `/dev/componentes`
+- [x] Galeria `/dev/componentes`
 - [ ] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
 - [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
