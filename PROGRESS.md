@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 44/63 (70%)**
+**Progresso geral: 45/63 (71%)**
 `██████████████░░░░░░`
 
 _Última atualização: 2026-09-10_
@@ -510,7 +510,7 @@ _Última atualização: 2026-09-10_
 >    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**8/9 (89%)** `██████████████████░░`
+**9/9 (100%)** `████████████████████`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
@@ -534,7 +534,7 @@ _Última atualização: 2026-09-10_
 - [x] Galeria `/dev/componentes`
 - [x] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
 - [x] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
-- [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
+- [x] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 
 > Nota da Tarefa 5 (10/09/2026): os cinco componentes novos e os três
 > endurecimentos saíram como o brief previa, mas dois deles só passaram depois
@@ -613,6 +613,45 @@ _Última atualização: 2026-09-10_
 > completo em
 > `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-8-report.md`.
 > `cores_literais` continua em **518** (`python tools/catraca.py`).
+
+> Nota da Tarefa 9 (10/09/2026): os quatro maiores arquivos do front foram
+> quebrados em 29 arquivos novos, e nenhum dos quatro passa de 273 linhas:
+> `MainBudgetArea` 634 → **45**, `dashboard/page` 593 → **142**, `AppShell`
+> 569 → **128**, `ProjectWizard` 551 → **273**. A catraca ganhou a medida
+> `arquivos_acima_de_400` — **lista**, não contagem, para dizer *qual* arquivo
+> cresceu — registrada em 12 e fechada em **8**. Os oito que restam são de
+> propósito: `BuilderClient` (529) e `PortalBudget` (517) estão fora do escopo
+> desta seção, e os outros seis (464 a 434) nunca estiveram nela.
+>
+> **A regra desta tarefa foi mover, nunca reescrever, e a defesa foi
+> caracterizar antes.** Cada um dos quatro ganhou um teste de caracterização
+> escrito *antes* da quebra, que precisava passar na primeira execução, e que
+> passou de novo depois **sem edição de assertiva**: 10 (AppShell), 13
+> (dashboard), 12 (ProjectWizard) e 15 (MainBudgetArea) casos — a suíte foi de
+> 103 para **143 testes em 19 arquivos**. Para provar que a quebra foi mesmo só
+> mudança de endereço, cada arquivo teve a comparação linha a linha entre o
+> antigo e os novos: `AppShell`, `dashboard/page` e `ProjectWizard` **não
+> perderam nenhuma linha**; `MainBudgetArea` perdeu exatamente duas —
+> `{item.options.length > 1 && (() => {` e `})()}` —, a IIFE que virou
+> `<BudgetItemOptionToggles />` com a mesma guarda.
+>
+> **As três medidas-detector ficaram onde estavam**, que era o combinado:
+> `hover_sem_focus` **8** (as três linhas de `group-hover/<nome>:` de
+> `MainBudgetArea` foram para três arquivos diferentes, intactas),
+> `cores_literais` **518** e `eslint_erros` **85**. O eslint chegou a subir para
+> 86 numa versão intermediária, porque a prop nova `product` de
+> `BudgetItemProductCell` tinha sido anotada `any`; passou a reusar
+> `ItemOption["product"]` do `BudgetProvider` e voltou a 85 — a catraca pegou
+> antes do commit.
+>
+> Dois achados que **não** foram corrigidos de passagem, por serem mudança de
+> comportamento: `BudgetItemsList` pega o roteador com
+> `require("next/navigation")` em vez de import (o teste precisa entregar o
+> roteador pelo `AppRouterContext`, porque `require` não passa por `vi.mock`), e
+> as três etapas do `ProjectWizard` ficam **todas** no DOM o tempo todo — o que
+> muda por etapa é a classe `hidden`. Os dois são da Seção 8. Detalhe completo
+> em `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-9-report.md`.
+
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
