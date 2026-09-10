@@ -681,6 +681,51 @@ _Última atualização: 2026-09-10_
 > muda por etapa é a classe `hidden`. Os dois são da Seção 8. Detalhe completo
 > em `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-9-report.md`.
 
+> **Revisão final da branch (10/09/2026) — onda única de correção, antes do
+> merge.** Não é tarefa nova: é o que a revisão por tarefa não podia ver,
+> porque só aparece olhando a branch inteira. O que mudou:
+>
+> - **`PROGRESS.md` descrevia código revertido.** A nota da Tarefa 5 acima
+>   afirmava uma normalização do U+00A0 e uma correção em `alert-dialog.tsx`
+>   que o commit `ad94040` tinha revertido no mesmo dia. Reescrita, com a
+>   reversão registrada como reversão.
+> - **O `empty` do `QueryBoundary` era letra morta para o formato deste
+>   repositório.** O critério padrão só reconhecia array; a camada de dados da
+>   Seção 5 devolve `{items, total, page, size, pages}`. Toda tela paginada da
+>   Seção 8 que esquecesse o `isEmpty` (opcional) renderizaria a lista vazia em
+>   vez do estado vazio, sem erro de tipo, sem lint e sem teste.
+> - **A única mudança visual não intencional da branch.** `LibraryContent`
+>   renderiza o `BatchNormalizeModal` incondicionalmente, e a Tarefa 8 o tornou
+>   `dynamic()` com `loading: () => <Skeleton className="h-64 w-full" />` — um
+>   bloco cinza de 256px no fluxo da página, com o modal fechado. O `loading`
+>   de modal e de sheet passou a ser `() => null`.
+> - **A terceira cegueira da catraca, na mesma função das duas anteriores.**
+>   `comparar()` percorre `medido`: uma chave que existisse no baseline e
+>   sumisse da medição nunca era visitada — portão verde e **mudo**. Agora
+>   reprova, e `eslint_erros` sem `--eslint-json` aparece como `PULADA`, com o
+>   motivo, em vez de sumir da saída.
+> - **A seção não tinha deixado documentação.** `git diff --name-only
+>   24f4eb5..dafe1b3 -- docs/` devolvia só os três arquivos de medição. Nasceu
+>   [`docs/dev/componentes.md`](docs/dev/componentes.md), escrito para quem vai
+>   **usar** a biblioteca — incluindo o ponto cego de cada catraca de UI.
+> - Menores: `FormField` passou a injetar o `id` no campo (rótulo órfão em
+>   silêncio era o modo de falha); `DataTable` volta à primeira página quando a
+>   lista ou a ordem mudam, e ganhou acento em "Página"/"Próxima"; o teste de
+>   `arquivos_acima_de_400` deixou de afirmar `len(...) == 8`, que reprovaria
+>   por **melhoria**; e a asserção de marca em `app-shell.test.tsx` passou a
+>   montar a grafia errada em vez de escrevê-la — era a última ocorrência dela
+>   no repositório, e fazia o comando documentado no `CLAUDE.md` devolver 1.
+>
+> **Uma instrução da revisão não se confirmou, e foi medida em vez de
+> repetida:** ela dizia que o teste do `DataTable` usa `/proxima/i` e
+> "continua passando" com a copy acentuada. Não continua — regex compara
+> codepoint a codepoint, e `i` ignora caixa, não diacrítico. Visto vermelho,
+> a regex ganhou o acento e o que o teste verifica não mudou.
+>
+> As 9 medidas da catraca ficaram **iguais ao baseline** (nenhuma piorou,
+> nenhuma melhorou). Relatório completo em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/final-fix-report.md`.
+
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
