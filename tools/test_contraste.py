@@ -22,7 +22,11 @@ class TestMatematica(unittest.TestCase):
 class TestLeituraDoTema(unittest.TestCase):
     def test_o_tema_escuro_herda_o_que_nao_sobrescreve(self):
         claro, escuro = contraste.tokens_dos_temas()
-        # `.dark` nao redefine --radius; o tema escuro tem que herda-lo de :root.
+        # `secondary` tem o mesmo valor HSL em `:root` e em `.dark` (e a cor
+        # da marca, nao muda entre temas) -- o teste confirma que
+        # tokens_dos_temas() devolve os dois iguais. (`--radius` nao serviria
+        # de exemplo aqui: seu valor, "0.375rem", nao bate no formato
+        # "H S% L%" que RE_TOKEN espera, entao nunca chega a ser um token.)
         self.assertIn("secondary", escuro)
         self.assertEqual(claro["secondary"], escuro["secondary"])
 

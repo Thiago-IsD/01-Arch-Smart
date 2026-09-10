@@ -121,6 +121,24 @@ class TestBaselineAusente(unittest.TestCase):
         self.assertFalse(gravar)
         self.assertIn("recusou", "\n".join(avisos))
 
+    def test_chave_em_lista_ausente_falha_mesmo_medindo_vazio(self):
+        # `set(valor) - set(base or [])` da vazio quando os dois lados sao
+        # vazios, e o ramo de lista nunca passava pelo "SEM BASELINE" (que so
+        # existia para escalar) -- uma medida em lista nova que meca zero
+        # itens hoje passava em silencio. `contraste_reprovado` escapou disso
+        # por sorte: nasceu com 4 itens, nao com 0.
+        ok, linhas = comparar({}, {"modulos_sem_doc": []})
+        self.assertFalse(ok)
+        self.assertIn("SEM BASELINE", "\n".join(linhas))
+
+    def test_chave_em_lista_presente_e_vazia_e_legitima(self):
+        # Distinto do caso acima: chave presente no baseline com lista vazia
+        # e uma catraca no piso (como supabase_fora_de_lib_api) e tem que
+        # continuar passando.
+        ok, linhas = comparar({"modulos_sem_doc": []}, {"modulos_sem_doc": []})
+        self.assertTrue(ok)
+        self.assertNotIn("SEM BASELINE", "\n".join(linhas))
+
 
 class TestComparacao(unittest.TestCase):
     def test_subir_falha(self):

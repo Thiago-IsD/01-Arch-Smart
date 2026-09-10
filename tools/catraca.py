@@ -164,11 +164,33 @@ def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
     ok = True
     linhas = []
     for chave, valor in sorted(medido.items()):
-        base = baseline.get(chave)
         criterio = CRITERIOS.get(chave, "")
+        if chave not in baseline:
+            # Fail-closed, para lista e para escalar igualmente. Antes isto era
+            # "[v] ... (sem baseline; nada a comparar)" com saida 0: apagar a
+            # chave do catraca.json desligava a medida, e um --atualizar
+            # seguinte gravava o numero novo sem UM aviso sequer. A recusa do
+            # --atualizar guarda a ferramenta, nao o arquivo; esta linha guarda
+            # o arquivo.
+            #
+            # O teste e `chave not in baseline`, nao a falsidade de `valor`
+            # nem de `base`: uma medida em lista que meca `[]` hoje e uma
+            # chave *ausente* do baseline sao coisas diferentes -- a segunda
+            # tem que reprovar mesmo com `valor` vazio, e a primeira (chave
+            # presente com lista vazia, como `supabase_fora_de_lib_api`) e
+            # legitima e tem que continuar passando. Antes deste conserto, o
+            # ramo de lista abaixo comparava `set(valor) - set(base or [])`
+            # direto: com os dois lados vazios isso da conjunto vazio, "sem
+            # baseline" nunca aparecia, e a chave nova entrava em silencio.
+            ok = False
+            linhas.append(f"[X] {chave}: SEM BASELINE em tools/catraca.json (medido: {valor})")
+            linhas.append("    Uma medida sem baseline esta desligada. Se a chave foi apagada,")
+            linhas.append("    restaure-a; se a medida e nova, grave o valor inicial com --atualizar.")
+            continue
+        base = baseline[chave]
         if isinstance(valor, list):
-            novos = sorted(set(valor) - set(base or []))
-            sumidos = sorted(set(base or []) - set(valor))
+            novos = sorted(set(valor) - set(base))
+            sumidos = sorted(set(base) - set(valor))
             if novos:
                 ok = False
                 linhas.append(f"[X] {chave}: SUBIU — sem doc e fora do baseline: {', '.join(novos)}")
@@ -178,16 +200,6 @@ def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
                               " Rode `python tools/catraca.py --atualizar`.")
             else:
                 linhas.append(f"[v] {chave}: {len(valor)}, igual ao baseline")
-        elif base is None:
-            # Fail-closed. Antes isto era "[v] ... (sem baseline; nada a comparar)"
-            # com saida 0: apagar a chave do catraca.json desligava a medida, e
-            # um --atualizar seguinte gravava o numero novo sem UM aviso sequer.
-            # A recusa do --atualizar guarda a ferramenta, nao o arquivo; esta
-            # linha guarda o arquivo.
-            ok = False
-            linhas.append(f"[X] {chave}: SEM BASELINE em tools/catraca.json (medido: {valor})")
-            linhas.append("    Uma medida sem baseline esta desligada. Se a chave foi apagada,")
-            linhas.append("    restaure-a; se a medida e nova, grave o valor inicial com --atualizar.")
         elif valor > base:
             ok = False
             linhas.append(f"[X] {chave}: SUBIU de {base} para {valor}")
