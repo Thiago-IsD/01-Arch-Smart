@@ -529,7 +529,7 @@ _Última atualização: 2026-09-10_
 - [x] Usuário de teste E2E e fechamento do portão da Seção 5 (medição de tempo + verificação viva da hidratação)
 - [x] Validador de contraste (catraca com os 4 pares reprovados hoje; token novo que nasça reprovado não está no baseline e reprova)
 - [x] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
-- [ ] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
+- [x] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
 - [ ] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
 - [ ] Galeria `/dev/componentes`
 - [ ] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
