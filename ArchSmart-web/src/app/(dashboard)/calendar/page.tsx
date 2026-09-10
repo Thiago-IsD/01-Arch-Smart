@@ -7,12 +7,18 @@ import type { SlotInfo, View } from "react-big-calendar"
 import { Views } from "react-big-calendar"
 import { Plus, Loader2 } from "lucide-react"
 
+import dynamic from "next/dynamic"
+
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { apiUrl } from "@/lib/api-url"
 import { getAccessToken } from "@/lib/api/auth"
-import CalendarView from "@/components/calendar/CalendarView"
 import EventDialog, { type CalendarEvent } from "@/components/calendar/EventDialog"
+
+const CalendarView = dynamic(() => import("@/components/calendar/CalendarView"), {
+    loading: () => <Skeleton className="h-[600px] w-full" />,
+})
 
 // ---------------------------------------------------------------------------
 // Helpers

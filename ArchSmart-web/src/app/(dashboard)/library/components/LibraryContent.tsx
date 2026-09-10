@@ -1,18 +1,27 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { Loader2, Sparkles } from "lucide-react"
 import { ProductCard } from "@/components/library/ProductCard"
 import { LibraryToolbar } from "@/components/library/LibraryToolbar"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { ProductFormSheet } from "@/components/library/ProductFormSheet"
-import { NormalizationSheet } from "@/components/library/NormalizationSheet"
-import { BatchNormalizeModal } from "@/components/library/BatchNormalizeModal"
 import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useProducts, useProduct, useInboxCount, RESPOSTA_VAZIA } from "@/features/library/hooks"
 import { filtrosDaUrl } from "@/features/library/filters"
+
+const NormalizationSheet = dynamic(
+    () => import("@/components/library/NormalizationSheet").then((m) => m.NormalizationSheet),
+    { loading: () => <Skeleton className="h-64 w-full" /> },
+)
+const BatchNormalizeModal = dynamic(
+    () => import("@/components/library/BatchNormalizeModal").then((m) => m.BatchNormalizeModal),
+    { loading: () => <Skeleton className="h-64 w-full" /> },
+)
 
 export function LibraryContent() {
     const searchParams = useSearchParams()

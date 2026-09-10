@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 43/63 (68%)**
+**Progresso geral: 44/63 (70%)**
 `██████████████░░░░░░`
 
 _Última atualização: 2026-09-10_
@@ -510,7 +510,7 @@ _Última atualização: 2026-09-10_
 >    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**7/9 (78%)** `████████████████░░░░`
+**8/9 (89%)** `██████████████████░░`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
@@ -533,7 +533,7 @@ _Última atualização: 2026-09-10_
 - [x] Componentes que carregam decisão de produto (novos: `EmptyState`, `CurrencyInput`, `ErrorBoundary`, `DataTable`, `FormField`; endurecidos: `AlertDialog`, `DropdownMenu`, `Skeleton`)
 - [x] Galeria `/dev/componentes`
 - [x] Acessibilidade por ferramenta (catracas `tabindex_negativo` em 5 e `hover_sem_focus` em 8 + axe na galeria, zero violação)
-- [ ] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
+- [x] Code splitting (`next/dynamic` nas telas pesadas; remoção das 4 dependências não usadas; `@types/react-big-calendar` para `devDependencies`)
 - [ ] Quebra dos arquivos grandes (`MainBudgetArea` 634, `dashboard/page` 593, `AppShell` 569, `ProjectWizard` 551 — alvo ~250, nenhum acima de 400)
 
 > Nota da Tarefa 5 (10/09/2026): os cinco componentes novos e os três
@@ -596,6 +596,23 @@ _Última atualização: 2026-09-10_
 > exatamente como o brief já prescrevia (fragmento, não documento), e a sanity
 > check confirmou que o axe reporta violação de verdade quando existe (`<img>`
 > sem `alt` no mesmo ambiente jsdom).
+
+> Nota da Tarefa 8 (10/09/2026): `react-icons`, `embla-carousel-react`,
+> `react-easy-crop` e `vaul` saíram de `package.json` — 0 imports em
+> `src/**/*.{ts,tsx}` (grep medido) para as quatro, e nenhum `drawer.tsx`/
+> `carousel.tsx` do shadcn que dependesse delas. `@types/react-big-calendar`
+> foi para `devDependencies`. `next/dynamic` entrou em três arquivos
+> (calendário, construtor de apresentação e os dois modais pesados da
+> Biblioteca) — `grep -rn "next/dynamic" src --include=*.tsx | wc -l` sai 3.
+> **O calendário não precisou de `ssr: false`**: o brief previa como
+> candidato mais provável, mas `npm run build` prerenderizou `/calendar`
+> como estático (`○`) sem erro tanto com quanto sem essa opção — sem um erro
+> real para justificar, a opção ficou de fora, e o ganho de code splitting já
+> aparece: o CSS de `react-big-calendar` (antes embutido na rota) saiu num
+> chunk assíncrono próprio, carregado só quando o componente monta. Detalhe
+> completo em
+> `.superpowers/sdd/2026-09-09-secao-6-camada-de-ui/task-8-report.md`.
+> `cores_literais` continua em **518** (`python tools/catraca.py`).
 
 ## Seção 7 · Telemetria
 **0/4 (0%)** `░░░░░░░░░░░░░░░░░░░░`
