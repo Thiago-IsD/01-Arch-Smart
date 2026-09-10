@@ -3,88 +3,139 @@
 Medido em 06/09/2026, na branch `secao-5-camada-de-dados-frontend`, na Tarefa
 12 (a medição final da seção).
 
-## 🚧 PORTÃO ABERTO — a comparação de tempo exigida pela spec não foi feita
+## ✅ PORTÃO FECHADO em 10/09/2026 — Tarefa 1 da Seção 6
 
-A spec da Seção 5 é explícita: *"Só com o ganho confirmado ligam-se os lints
-e migra-se o resto."* Este documento **não confirma o ganho**, porque a
-medição de tempo — a única coisa que provaria "mais rápido" — não pôde ser
-executada neste ambiente, pelo mesmo motivo que impediu o "antes" na
-[`2026-09-06-biblioteca-baseline.md`](2026-09-06-biblioteca-baseline.md):
-faltam credenciais de um usuário real.
+A medição de tempo que faltava foi executada em 10/09/2026, na Tarefa 1 da
+Seção 6, depois de criado um usuário de teste E2E em staging — ver
+[`2026-09-09-usuario-de-teste-e2e.md`](2026-09-09-usuario-de-teste-e2e.md).
+Topologia: Playwright → `localhost:3000` (`npm run dev`) → API local em
+`localhost:8000` (`uvicorn app.main:app --port 8000`) → banco de **staging**
+→ Supabase de **staging**.
 
-Isto **não é** o caso "ganho não apareceu" que a Tarefa 12 prevê como saída
-possível — esse caso pressupõe que a medição rodou e o número não desceu.
-Aqui a medição não rodou. Os dois casos pedem decisões diferentes de quem lê,
-e por isso a distinção importa: este documento não deve ser lido como "a
-Seção 5 falhou o portão", e sim como "o portão não pôde ser fechado, nesta
-máquina, hoje".
-
-**Confirmado nesta tarefa, não herdado da Tarefa 1:**
-
-    env | grep -i E2E_
-
-saída vazia — `E2E_EMAIL`/`E2E_PASSWORD` continuam indefinidas. Rodei o
-mesmo comando da Tarefa 1 de novo, sem tocar no spec, para confirmar que a
-falha ainda é a mesma (e não uma quebra nova):
-
-    cd ArchSmart-web
-    npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
-
-Saída: `1 failed`, com o mesmo erro da baseline —
-
-    Error: E2E_EMAIL e/ou E2E_PASSWORD não estão definidos no ambiente. ...
-
-— nunca `AMOSTRAS`/`MEDIANA_MS`. O spec não inventou número desta vez também.
-
-**Uma correção à premissa, para o registro ficar preciso:** o Chromium do
-Playwright **está instalado** neste ambiente —
-
-    npx playwright --version
-    → Version 1.61.1
-
-    ls "$LOCALAPPDATA/ms-playwright"
-    → chromium-1228  chromium-1234  chromium_headless_shell-1228  chromium_headless_shell-1234  ffmpeg-1011  winldd-1007
-
-— então "não há navegador" não é a causa raiz; o teste falha antes de abrir
-qualquer página, na checagem de credenciais (`e2e/medicao-biblioteca.spec.ts:23`).
-E mesmo dirigindo um navegador manualmente (fora do spec), o resultado seria
-o mesmo: `/library` não está em `ROTAS_PUBLICAS` (`src/proxy.ts`), então
-`proxy()` chama `supabase.auth.getUser()`, não encontra sessão e redireciona
-para `/auth/login` antes de a página renderizar qualquer coisa — não há como
-contar as chamadas de rede de uma tela que nunca carrega. O bloqueio real, nos
-dois passos (Passo 1 e Passo 2 da Tarefa 12), é a falta de uma sessão válida
-de um usuário real — não a ausência de ferramenta de navegador.
-
-Não existe hoje, neste repositório ou ambiente, uma forma de fabricar essa
-sessão sem uma conta real: o token é assinado pelo Supabase depois de um
-login de verdade, e não há usuário de teste documentado (a baseline já
-confirmou isso: `grep -rln "E2E_EMAIL\|E2E_PASSWORD" ... .` não encontra
-credencial nenhuma, só os próprios arquivos de medição).
-
-### O que fecha o portão
-
-Quando `E2E_EMAIL`/`E2E_PASSWORD` existirem (credenciais de um usuário real,
-de preferência em staging):
+Comando (idêntico ao do brief, sem flag extra):
 
 ```bash
 cd ArchSmart-web
-E2E_EMAIL=<usuario> E2E_PASSWORD=<senha> npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+E2E_EMAIL=ana.arquiteta@seed.arqsmart.local E2E_PASSWORD=<senha, não versionada> \
+  npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
 ```
 
-Colar a saída (`AMOSTRAS=...` e `MEDIANA_MS=...`) em **dois** lugares:
+Saída:
 
-1. Nesta seção, substituindo o parágrafo acima.
-2. Em [`2026-09-06-biblioteca-baseline.md`](2026-09-06-biblioteca-baseline.md),
-   na linha `mediana_ms=pendente` (ver a correção feita nesta tarefa, abaixo).
+```
+AMOSTRAS=1434,1445,1454,1469,1948
+MEDIANA_MS=1454
 
-Depois, comparar as duas medianas. Separadamente, repetir o Passo 2 da
-Tarefa 12 (`npm run build && npm start`, abrir `/library` com DevTools e
-sessão real, contar quantas requisições a `/api/*` partem do browser) e
-registrar o número ao lado do esperado por construção (seção seguinte).
-**Ganho confirmado** = mediana desceu e/ou as chamadas do browser caíram;
-qualquer outro resultado é o caso "ganho não apareceu" do Passo 4 da Tarefa
-12, que pede parar e levar a Thiago, com suspeita prioritária na chave de
-hidratação (Tarefa 8, Passo 5) não casar.
+1 passed (35.2s)
+```
+
+**Comparação:** o "antes" real (código de antes da Seção 5) não existe mais
+nesta branch — `2026-09-06-biblioteca-baseline.md` permanece **não medido**,
+por construção, não por falta de tentativa (ver correção nesse arquivo,
+abaixo). A única referência disponível é o número da spec de agosto de 2026
+(evidência estrutural/audit, não medição deste repositório): **3,6 s** para a
+Biblioteca (`docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md:37`).
+`1454 ms` é bem menor que os `3600 ms` de referência — uma leitura favorável,
+mas contra um número de origem diferente (outra máquina, outro método,
+agosto de 2026), não contra um "antes" medido nesta mesma tarefa. Rotulado
+como tal: **ganho por comparação com a referência da spec**, não "X% mais
+rápido que o develop anterior à Seção 5".
+
+**Achado durante a execução, registrado por honestidade:** a primeira
+tentativa de rodar exatamente este comando (antes de qualquer `--timeout`)
+deu timeout em `page.waitForLoadState("networkidle")`, na primeira iteração
+do laço de medição — não no login. Investigado antes de tentar de novo (não
+"tentei de novo e deu certo" sem explicação):
+
+- O log do uvicorn local mostrava, em todo request autenticado,
+  `Validacao local do JWT falhou (The specified alg value is not allowed);
+  tentando remota` seguido de uma chamada real a
+  `https://ipbhtqzybgdltewwnvnl.supabase.co/auth/v1/user`. A API local usa
+  `SUPABASE_JWT_SECRET` (HS256) para validar localmente
+  (`ArchSmart-api/app/core/security.py`), e o projeto de staging aparenta
+  assinar com uma chave que HS256 não decodifica — cada request paga uma
+  ida e volta a Supabase em vez de validar em memória. Isso é lento, mas não
+  destrava sozinho um timeout de 30 s.
+- A causa provável do timeout foi outra, e mais simples: `playwright.config.ts`
+  usa `reuseExistingServer: !process.env.CI` com `npm run dev` — no Next.js
+  em modo dev, cada rota compila sob demanda na primeira requisição. A
+  primeira chamada desta sessão a `/auth/login`, `/dashboard` e `/library`
+  pagou essa compilação (mais a latência de JWT acima) dentro do mesmo
+  orçamento de 30 s do teste, e não sobrou tempo para as 5 amostras do
+  laço.
+- Confirmação: rodando de novo o **mesmo comando exato**, com o mesmo
+  `npm run dev` já quente (rotas já compiladas da tentativa anterior), o
+  teste passou dentro do timeout padrão, produzindo os números acima. Uma
+  repetição anterior com `--timeout=90000` (só para diagnóstico, não é o
+  número oficial) deu `AMOSTRAS=1439,1457,1486,1554,1963`,
+  `MEDIANA_MS=1486` — consistente com a run oficial, confirmando que não foi
+  sorte de uma única execução.
+
+Isto não é um defeito da Seção 5: é uma característica do `next dev` (compila
+sob demanda) combinada com a latência real de validação remota de JWT contra
+o Supabase de staging a partir de uma API local — nenhuma das duas aparece
+rodando contra o Render de staging/produção, onde o processo já está quente
+e não recompila por request. Registrado aqui para quem repetir esta medição
+não gastar tempo re-descobrindo a mesma causa.
+
+## Verificação viva da hidratação — rodou, e falhou (achado novo, não corrigido aqui)
+
+`ArchSmart-web/e2e/hidratacao-biblioteca.spec.ts`, criado nesta tarefa, abre
+`/library` duas vezes (a segunda com listener de rede já ligado) e falha se
+qualquer requisição do navegador tocar `/api/products` na segunda.
+
+```bash
+cd ArchSmart-web
+E2E_EMAIL=ana.arquiteta@seed.arqsmart.local E2E_PASSWORD=<senha, não versionada> \
+  npx playwright test e2e/hidratacao-biblioteca.spec.ts --reporter=line
+```
+
+Saída:
+
+```
+Error: o navegador pediu /api/products: http://localhost:8000/api/products?page=1&size=1&state=CAPTURED,
+http://localhost:8000/api/products/?page=1&size=1&state=CAPTURED
+
+Expected length: 0
+Received length: 2
+
+1 failed
+```
+
+**Leitura do resultado, sem suavizar:** o teste falhou — a promessa "zero
+`/api/products` do navegador no primeiro load" é falsa hoje. Mas as duas
+URLs recebidas não são duas chamadas diferentes: a segunda é o redirect 307
+de barra final que a própria API emite para a primeira
+(`/api/products?...` → `/api/products/?...`), e as duas carregam
+`state=CAPTURED` — a contagem do inbox (`useInboxCount()` em
+`features/library/hooks.ts`), não a lista principal
+(`state=NORMALIZED`, a que o prefetch do servidor cobre).
+
+**Nenhuma URL com `state=NORMALIZED` apareceu na lista.** Isso é o sinal
+positivo que faltava: a chave de hidratação da lista principal
+(`queryKeys.products.list(filtros)`, produzida por `filtrosDaUrl()` dos dois
+lados) bate de fato em tempo de execução — não é mais só "deveria bater, pela
+leitura do código" (a ressalva que a seção "O que a evidência estrutural
+mostra — e o que não mostra", abaixo, registrava como pendente). O prefetch
+da lista principal está hidratando de verdade.
+
+O que falha é uma lacuna que a própria Tarefa 12 da Seção 5 **já tinha
+documentado por leitura de código**, na seção "1. Chamadas de rede do
+primeiro carregamento, por construção" acima: *"`useInboxCount()` → chave
+diferente (…) e **nunca prefetchada pelo servidor**. Este fetch acontece no
+browser sempre, com uma resolução de sessão (`getAccessToken()`),
+independente de qualquer coisa ter casado."* Esta tarefa não descobriu uma
+lacuna nova — **confirmou ao vivo, pela primeira vez, uma lacuna que já
+estava escrita como previsão**. A diferença entre "previsto por leitura" e
+"confirmado ao vivo" importa porque é exatamente a checagem que faltava para
+a Seção 5 poder dizer "hidrata" em vez de "deveria hidratar".
+
+**Não corrigido aqui, de propósito:** consertar isto (prefetchar
+`inboxCount` também, ou juntá-lo à mesma chave/`HydrationBoundary` da lista)
+é mudança na camada de dados do frontend (Seção 5), não na camada de UI
+(Seção 6, a tarefa que escreveu este teste). Registrado como achado novo em
+`PROGRESS.md`, nota da Seção 5, item 9 — para alguém decidir quando
+consertar, não para ficar perdido dentro de uma medição.
 
 ---
 
@@ -361,6 +412,14 @@ npm run build
   não é o mesmo que "bateu, medido". Isso é exatamente o que o Passo 2 da
   Tarefa 12 (contar requisições no DevTools, com sessão real) provaria, e
   exatamente o que este ambiente não pode rodar.
+
+> **Nota de 10/09/2026 (Tarefa 1 da Seção 6):** os dois pontos acima — número
+> de tempo e checagem viva de hidratação — estavam pendentes quando este
+> parágrafo foi escrito em 06/09/2026. Os dois foram fechados na Tarefa 1 da
+> Seção 6: o número de tempo está na seção "✅ PORTÃO FECHADO" no topo deste
+> arquivo, e o resultado da checagem viva de hidratação está na seção
+> "Verificação viva da hidratação", logo abaixo. Este parágrafo original fica
+> como estava, para registrar o que se sabia em 06/09/2026.
 
 ## Correção na baseline (Tarefa 1)
 

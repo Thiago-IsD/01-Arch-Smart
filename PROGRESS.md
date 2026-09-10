@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 36/63 (57%)**
-`███████████░░░░░░░░░`
+**Progresso geral: 37/63 (59%)**
+`████████████░░░░░░░░`
 
-_Última atualização: 2026-09-06_
+_Última atualização: 2026-09-10_
 
 ---
 
@@ -332,32 +332,36 @@ _Última atualização: 2026-09-06_
 - [x] Cancelamento automático via `AbortSignal`
 - [x] Lint que impede a volta — `no-restricted-syntax` (`fetch` fora de `lib/api/`, `createClient()`/`createServerClient()` fora de `lib/api/`, `useEffect` com busca de dado) é **erro** em `src/features/**`, `src/lib/**` e na rota da Biblioteca (o território que esta seção migrou, medido em zero ocorrências); nas ~30 telas ainda não migradas continua **aviso**, e a catraca (`fetch_fora_de_lib_api`, `supabase_fora_de_lib_api`) é o que impede esse resto de crescer até a Seção 8 migrar cada uma.
 
-> ## 🚧 O PORTÃO DA SEÇÃO ESTÁ ABERTO — leia isto antes de começar a Seção 6
+> ## ✅ O PORTÃO DA SEÇÃO FOI FECHADO em 10/09/2026 — Tarefa 1 da Seção 6
 >
 > **A Seção 5 fechou as 8 caixas acima, mas a medição que a spec exige como
-> confirmação de "ganho" não foi feita.** A spec é explícita: *"Só com o
-> ganho confirmado ligam-se os lints e migra-se o resto."* Essa comparação de
-> tempo — a única coisa que provaria "mais rápido" — não pôde rodar neste
-> ambiente: faltam credenciais de um usuário real (`E2E_EMAIL`/`E2E_PASSWORD`,
-> vazias) para o teste de Playwright e para a checagem de hidratação ao vivo
-> no navegador. Confirmado, com o comando:
+> confirmação de "ganho" não tinha sido feita.** A spec é explícita: *"Só com
+> o ganho confirmado ligam-se os lints e migra-se o resto."* Essa comparação
+> de tempo não pôde rodar enquanto não existia credencial de um usuário real
+> (`E2E_EMAIL`/`E2E_PASSWORD`). A Tarefa 1 da Seção 6 criou esse usuário
+> (`ana.arquiteta@seed.arqsmart.local`, em staging — ver
+> [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md))
+> e rodou a medição:
 >
 > ```
 > cd ArchSmart-web
-> npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
-> # → 1 failed: "E2E_EMAIL e/ou E2E_PASSWORD não estão definidos no ambiente."
+> E2E_EMAIL=ana.arquiteta@seed.arqsmart.local E2E_PASSWORD=<não versionada> \
+>   npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+> # → AMOSTRAS=1434,1445,1454,1469,1948 · MEDIANA_MS=1454 · 1 passed
 > ```
 >
-> Isto **não é** "o ganho não apareceu" (medição rodou, número não desceu) —
-> é "a medição não rodou". O que existe em
-> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md)
-> é evidência **estrutural** (leitura de código, contagens estáticas — a
-> arquitetura mudou na direção certa, por construção), nunca medição de
-> tempo. Aquele documento também tem o comando exato que fecha o portão,
-> assim que a credencial existir.
+> Detalhe completo, inclusive uma tentativa anterior que deu timeout por
+> causa do `next dev` compilando rotas pela primeira vez (não um defeito da
+> Seção 5), em
+> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md),
+> seção "✅ PORTÃO FECHADO". O "antes" (baseline) **continua não medido** — o
+> código de antes da Seção 5 não existe mais em nenhuma branch viva; a
+> comparação que existe é contra a referência de agosto de 2026 da spec
+> (3,6 s), rotulada como referência externa, não como baseline medido aqui —
+> ver [`docs/dev/medicoes/2026-09-06-biblioteca-baseline.md`](docs/dev/medicoes/2026-09-06-biblioteca-baseline.md).
 >
-> **A Seção 6 não deveria começar apoiada nesta seção até esse número
-> existir.** Decisão de Thiago, não de quem executa a Seção 6.
+> **A checagem viva de hidratação (item 9 abaixo) rodou e falhou** — achado
+> novo, registrado como defeito da Seção 5, não corrigido nesta tarefa.
 
 > **A Seção 5 fechou em 06/09/2026 e foi mergeada até `staging` em 07/09/2026**
 > (merge `6e94d63` em `develop`, PR #6 `develop` → `staging` com merge `ce1012e`,
@@ -452,9 +456,42 @@ _Última atualização: 2026-09-06_
 >    exatamente o "migrar de passagem" que o `CLAUDE.md` da raiz proíbe, e
 >    misturariam duas mudanças que não têm nada a ver uma com a outra. Fica
 >    para um commit mecânico próprio — decisão de Thiago, não desta seção.
+> 9. **Achado novo, medido em 10/09/2026 na Tarefa 1 da Seção 6: o badge de
+>    contagem do inbox faz o navegador pedir `/api/products` no primeiro
+>    carregamento da Biblioteca, mesmo com o prefetch do servidor
+>    funcionando.** A checagem viva de hidratação
+>    (`ArchSmart-web/e2e/hidratacao-biblioteca.spec.ts`) rodou contra staging,
+>    com sessão real, e falhou:
+>
+>    ```
+>    Error: o navegador pediu /api/products: http://localhost:8000/api/products?page=1&size=1&state=CAPTURED,
+>    http://localhost:8000/api/products/?page=1&size=1&state=CAPTURED
+>    ```
+>
+>    As duas ocorrências são a **mesma chamada** (uma delas é o redirect
+>    307 de barra final da própria API — `/api/products?...` → `/api/products/?...`),
+>    e as duas são `state=CAPTURED` — a contagem do inbox
+>    (`useInboxCount()`, `features/library/hooks.ts`), não a lista principal
+>    (`state=NORMALIZED`). **Nenhuma requisição a `state=NORMALIZED` apareceu no
+>    navegador** — evidência de que a chave de hidratação da lista principal
+>    bate de fato em tempo de execução, não só por leitura de código. O que
+>    falha é uma lacuna já **documentada, mas não fechada**, na Tarefa 12 da
+>    Seção 5 (`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, tabela da
+>    seção 1): *"`useInboxCount()` → chave diferente (…) e nunca prefetchada
+>    pelo servidor. Este fetch acontece no browser sempre"*. Ou seja: a
+>    Seção 5 já sabia, por leitura de código, que essa chamada nunca seria
+>    coberta pelo prefetch — o que faltava era confirmar ao vivo, e agora
+>    está confirmado: o prefetch da lista principal hidrata, mas o app **não**
+>    é livre de chamadas a `/api/products` no primeiro load, porque o badge do
+>    inbox é uma chamada separada, sempre feita pelo navegador. Consertar isso
+>    (prefetchar `inboxCount` também, ou mover o badge para dentro do mesmo
+>    `HydrationBoundary`) é camada de dados — trabalho de outra seção, não
+>    desta. Detalhe completo, com o comando, em
+>    `docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, seção "Verificação
+>    viva da hidratação".
 
 ## Seção 6 · Camada de UI
-**0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**1/9 (11%)** `██░░░░░░░░░░░░░░░░░░`
 
 > Plano de execução:
 > [`docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md`](docs/superpowers/plans/2026-09-09-secao-6-camada-de-ui.md).
@@ -470,7 +507,7 @@ _Última atualização: 2026-09-06_
 > cores), e no lugar entrou o **usuário de teste** que fecha o portão de
 > validação da Seção 5. O total de 63 tarefas não muda.
 
-- [ ] Usuário de teste E2E e fechamento do portão da Seção 5 (medição de tempo + verificação viva da hidratação)
+- [x] Usuário de teste E2E e fechamento do portão da Seção 5 (medição de tempo + verificação viva da hidratação)
 - [ ] Validador de contraste (catraca com os 4 pares reprovados hoje; token novo que nasça reprovado não está no baseline e reprova)
 - [ ] Tokens completos (`--success`, `--warning`, `--info` e `-foreground`, escala tipográfica, espaçamento, raio)
 - [ ] `QueryBoundary` com skeleton, empty e error obrigatórios (três dos 5 estados; hover/foco é do lint de a11y e da galeria)
