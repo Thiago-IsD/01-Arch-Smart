@@ -58,6 +58,17 @@ A Tarefa 7 da Secao 6 acrescentou duas medidas de acessibilidade:
     --include=*.tsx` sai vazio). O baseline subiu de 5 para 8 porque a regua
     passou a enxergar mais, nao porque o codigo piorou -- ver task-7-report.md.
 
+A Tarefa 9 da Secao 6 acrescentou uma medida de tamanho de arquivo:
+
+  - arquivos_acima_de_400   os arquivos .ts/.tsx de ArchSmart-web/src acima de
+                            400 linhas. Lista, e nao contagem, para a catraca
+                            dizer QUAL arquivo cresceu -- e para os que estao
+                            fora do escopo da Secao 6 (BuilderClient,
+                            PortalBudget e os seis abaixo deles) ficarem
+                            registrados por nome em vez de virarem uma
+                            enumeracao em prosa, que envelhece. Nasce com 12; a
+                            Tarefa 9 quebra os quatro maiores e desce para 8.
+
 Cada medida imprime o criterio que usou. Sai 1 se alguma piorou.
 
 Uso:
@@ -133,6 +144,8 @@ _PALETAS = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green"
 RE_PALETA = re.compile(rf"\b({_PREFIXOS})-({_PALETAS})-[0-9]{{2,3}}\b")
 RE_ARBITRARIA = re.compile(r"\b(bg|text|border)-\[#[0-9a-fA-F]{3,8}\]")
 
+LIMITE_DE_LINHAS = 400
+
 CRITERIOS = {
     "eslint_erros": "soma de errorCount no `npx eslint . --format json`",
     "cores_literais": "regex de classe de paleta e de cor arbitraria em ArchSmart-web/src/**/*.{ts,tsx}",
@@ -142,7 +155,17 @@ CRITERIOS = {
     "contraste_reprovado": "pares (cor, cor-foreground) de globals.css abaixo de 4.5:1, nos dois temas",
     "tabindex_negativo": "ocorrencias de tabIndex={-1} em ArchSmart-web/src/**/*.tsx",
     "hover_sem_focus": "linhas com opacity-0 + group-hover: (ou group-hover/nome:) e sem escape de foco (focus:, focus-within:, ou as formas nomeadas) em ArchSmart-web/src/**/*.tsx",
+    "arquivos_acima_de_400": f"arquivos .ts/.tsx de ArchSmart-web/src com mais de {LIMITE_DE_LINHAS} linhas",
 }
+
+# Como nomear o que entrou e o que saiu, por medida em lista. O default
+# ("entrou no baseline"/"saiu do baseline") serve qualquer medida nova; as duas
+# entradas abaixo existem so para a frase dizer o que a medida quer dizer.
+ROTULOS_DE_LISTA = {
+    "modulos_sem_doc": ("sem doc e fora do baseline", "agora documentados"),
+    "arquivos_acima_de_400": ("agora acima do limite", "agora abaixo do limite"),
+}
+ROTULOS_PADRAO = ("entrou no baseline", "saiu do baseline")
 
 
 class DiretorioMedidoSumiu(Exception):
@@ -219,6 +242,28 @@ def contar_hover_sem_focus(raiz: Path) -> int:
     return total
 
 
+def arquivos_grandes(raiz: Path) -> list[str]:
+    """Arquivos .ts/.tsx acima de LIMITE_DE_LINHAS, em caminho relativo a raiz do repo.
+
+    Lista, e nao contagem, para a catraca dizer QUAL arquivo cresceu -- e para
+    os que estao fora do escopo da Secao 6 ficarem registrados por nome em vez
+    de virarem uma enumeracao em prosa, que envelhece.
+    """
+    if not raiz.exists():
+        raise DiretorioMedidoSumiu(
+            f"{raiz} nao existe. A catraca mede esse caminho; se ele foi renomeado, "
+            "atualize SRC_WEB em tools/catraca.py no mesmo commit do rename."
+        )
+    grandes = []
+    for caminho in raiz.rglob("*"):
+        if caminho.suffix not in (".ts", ".tsx") or not caminho.is_file():
+            continue
+        linhas = len(caminho.read_text(encoding="utf-8", errors="ignore").splitlines())
+        if linhas > LIMITE_DE_LINHAS:
+            grandes.append(caminho.relative_to(RAIZ).as_posix())
+    return sorted(grandes)
+
+
 def modulos_sem_doc(services: Path, features: Path | None, docs: Path) -> list[str]:
     """Modulos sem o .md correspondente em docs/dev/modulos/ (Art. 13)."""
     documentados = {p.stem for p in docs.glob("*.md")} if docs.exists() else set()
@@ -245,6 +290,7 @@ def medir(eslint_json: Path | None) -> dict:
         "contraste_reprovado": contraste.reprovados(),
         "tabindex_negativo": contar_ocorrencias(SRC_WEB, RE_TABINDEX_NEGATIVO),
         "hover_sem_focus": contar_hover_sem_focus(SRC_WEB),
+        "arquivos_acima_de_400": arquivos_grandes(SRC_WEB),
     }
     if eslint_json is not None:
         relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))
@@ -284,12 +330,13 @@ def comparar(baseline: dict, medido: dict) -> tuple[bool, list[str]]:
         if isinstance(valor, list):
             novos = sorted(set(valor) - set(base))
             sumidos = sorted(set(base) - set(valor))
+            rotulo_subiu, rotulo_baixou = ROTULOS_DE_LISTA.get(chave, ROTULOS_PADRAO)
             if novos:
                 ok = False
-                linhas.append(f"[X] {chave}: SUBIU — sem doc e fora do baseline: {', '.join(novos)}")
+                linhas.append(f"[X] {chave}: SUBIU — {rotulo_subiu}: {', '.join(novos)}")
                 linhas.append(f"    criterio: {criterio}")
             elif sumidos:
-                linhas.append(f"[v] {chave}: baixou — agora documentados: {', '.join(sumidos)}."
+                linhas.append(f"[v] {chave}: baixou — {rotulo_baixou}: {', '.join(sumidos)}."
                               " Rode `python tools/catraca.py --atualizar`.")
             else:
                 linhas.append(f"[v] {chave}: {len(valor)}, igual ao baseline")
@@ -336,7 +383,8 @@ def medidas_pioradas(baseline: dict, medido: dict, chave_nova_e_piora: bool = Tr
         if isinstance(valor, list):
             novos = sorted(set(valor) - set(base or []))
             if novos:
-                pioras.append(f"{chave}: novo(s) sem doc: {', '.join(novos)}")
+                rotulo_subiu = ROTULOS_DE_LISTA.get(chave, ROTULOS_PADRAO)[0]
+                pioras.append(f"{chave}: {rotulo_subiu}: {', '.join(novos)}")
         elif base is None:
             if not chave_nova_e_piora:
                 continue
