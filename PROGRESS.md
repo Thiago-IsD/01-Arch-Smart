@@ -7,7 +7,7 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 45/64 (70%)**
+**Progresso geral: 46/64 (72%)**
 `██████████████░░░░░░`
 
 _Última atualização: 2026-09-10_
@@ -756,7 +756,7 @@ _Última atualização: 2026-09-10_
 
 
 ## Seção 7 · Telemetria
-**0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**1/5 (20%)** `████░░░░░░░░░░░░░░░░`
 
 > **Desenho aprovado em 10/09/2026**, antes de existir plano de execução:
 > [`docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md`](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md);
@@ -788,7 +788,7 @@ _Última atualização: 2026-09-10_
 >   ensina a recriar o usuário do zero se um dia for preciso.
 
 - [ ] Verificação visual do que a Seção 6 mudou e ninguém olhou
-- [ ] Tabela `product_events` e serviço `track(ctx, evento, propriedades)`
+- [x] Tabela `product_events` e serviço `track(ctx, evento, propriedades)`
 - [ ] Tabela `ai_usage_logs` (`account_id`, `model_name`, `input_tokens`/`output_tokens`/`token_count`, `cost_usd`, `latency_ms`, `feature`)
 - [ ] `POST /api/telemetry/events` com `account_id`/`user_id` do contexto
 - [ ] `useTrack()` e `screen_viewed` automático no shell
