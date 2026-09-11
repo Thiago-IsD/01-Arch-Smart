@@ -793,6 +793,114 @@ _Última atualização: 2026-09-10_
 - [x] `POST /api/telemetry/events` com `account_id`/`user_id` do contexto
 - [x] `useTrack()` e `screen_viewed` automático no shell
 
+> **A Seção 7 fecha em 10/09/2026, e fecha 4 de 5 — não 5 de 5.** A Tarefa 1
+> não está esquecida, está **bloqueada**: toda rota da aplicação exige sessão.
+> `ArchSmart-web/src/proxy.ts` manda para `/auth/login` qualquer rota fora de
+> `ROTAS_PUBLICAS`, **inclusive a galeria `/dev/componentes`** — confirmado
+> com `curl -s -D - -o /dev/null http://localhost:3000/dev/componentes | grep -i location`
+> → `location: /auth/login`. A senha do usuário de teste E2E
+> (`ana.arquiteta@seed.arqsmart.local`) é **deliberadamente não versionada**
+> (decisão da Seção 6), e não existe outra credencial que este agente possa
+> usar sem autorização explícita para aquela conta específica. Nada foi
+> conferido a olho nas três mudanças visuais da Seção 6 — o que a Tarefa 1
+> produziu foi só verificação **estática** (classe/atributo presente no
+> código-fonte e nos testes), nunca altura renderizada, legibilidade real ou
+> comportamento de leitor de tela. Detalhe em
+> `.superpowers/sdd/2026-09-10-secao-7-telemetria/task-1-report.md`. **Não
+> marque essa caixa** até a credencial existir.
+>
+> **A prova viva da Tarefa 5 (Passo 10) também não rodou, pelo mesmo motivo,
+> e nenhum `load_ms` foi estimado.** A telemetria de `screen_viewed` está
+> montada e testada por vitest, mas ninguém navegou pela Biblioteca de
+> verdade com sessão para confirmar que uma linha real chega a
+> `product_events` com um `load_ms` da mesma ordem de grandeza da mediana de
+> **1454 ms** medida no E2E de 10/09/2026
+> ([`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md)).
+> Isso significa que **a seção entrega o encanamento da telemetria sem a
+> medição de ponta a ponta que o justifica** — o que os testes de vitest
+> provam é *qual* dos dois rótulos (`dados`/`pintura`) sai e *quantas* linhas
+> saem por navegação, nunca a grandeza do número. Nenhum número de `load_ms`
+> foi inventado, estimado ou escrito como aproximação em lugar nenhum deste
+> repositório.
+>
+> **Os preços de IA que entraram em `ArchSmart-api/app/core/precos_ia.py`:**
+> fonte `https://ai.google.dev/gemini-api/docs/pricing`, consultada em
+> 10/09/2026 (a página informa "last update 2026-09-08 UTC"). Tier pago,
+> `gemini-2.5-flash`, por 1 milhão de tokens: entrada **US$ 0,30**, saída
+> **US$ 2,50**. Entrada de áudio é US$ 1,00 por 1M e **não se aplica hoje** —
+> `extract_product_data(raw_text, source_url)` manda só texto; anotado no
+> arquivo para quem um dia mandar áudio.
+>
+> **A catraca:** `modulos_sem_doc` desceu de **2 para 1** (baseline gravado
+> hoje: `["auth_service"]` — `ai_service` e `telemetry_service`/`telemetry`
+> nasceram documentados), as outras oito medidas iguais ao baseline.
+> Confirmado rodando `python tools/catraca.py` da raiz:
+> `arquivos_acima_de_400: 8`, `contraste_reprovado: 4`, `cores_literais: 518`,
+> `fetch_fora_de_lib_api: 75`, `hover_sem_focus: 8`, `modulos_sem_doc: 1`,
+> `supabase_fora_de_lib_api: 0`, `tabindex_negativo: 5` (`eslint_erros` sai
+> `PULADA` sem `--eslint-json`, baseline 85, não medido nesta rodada de
+> fechamento por não ter havido mudança de frontend fora do já coberto pelas
+> tarefas).
+>
+> **Três defeitos que o plano tinha e que a execução encontrou** — registrados
+> aqui para que não voltem pelo mesmo caminho:
+>
+> 1. O gatilho do `screen_viewed` (Tarefa 5) perguntava se o **cache global**
+>    do react-query tinha alguma entrada (`getQueryCache().getAll().length >
+>    0`) em vez de perguntar se **esta navegação** buscou algo. Efeito medido:
+>    da segunda navegação em diante o cache nunca está vazio (queries da tela
+>    anterior sobrevivem até o `gcTime`), então uma tela sem query nenhuma
+>    esperaria o evento de coleta de lixo, minutos depois, e emitiria
+>    `load_ms` de minutos rotulado `dados`; e uma revisita com cache quente
+>    não emitia evento nenhum. Corrigido para uma bandeira própria da
+>    navegação, ligada quando alguma query está em voo — ver
+>    `docs/dev/modulos/telemetry.md`, "O gatilho é escopado à navegação".
+> 2. Sob **StrictMode** — que é o modo em que `npm run dev` roda — o
+>    `screen_viewed` era emitido **zero** vezes por navegação, não duas como
+>    o comentário do código afirmava sem ter sido medido. A guarda de dedupe
+>    ficava na entrada do efeito: o primeiro run gravava a referência,
+>    assinava o cache e agendava o frame; o cleanup do StrictMode cancelava
+>    os dois; o segundo run batia na referência já gravada e voltava sem
+>    assinar nada — os dois caminhos de emissão morriam. Corrigido movendo a
+>    guarda para dentro do `emitir`, com teste que monta em `StrictMode` e
+>    exige exatamente uma linha.
+> 3. O brief da Tarefa 4 apontava o `limiter` para `app.core.limiter` — módulo
+>    que não existe — e esperava 401/403 da chamada anônima. O caminho real,
+>    confirmado contra `product_router.py`, é `app.core.rate_limit`; e a API
+>    devolve **422**, não 401/403, porque `get_context` declara o header
+>    `authorization` como obrigatório e o FastAPI rejeita a requisição na
+>    validação de parâmetros, antes de qualquer `Depends` rodar — o mesmo
+>    comportamento já documentado em
+>    `tests/isolation/test_public_endpoints.py::test_normalize_exige_autenticacao`.
+>
+> **O que a Seção 8 herda desta seção:**
+>
+> - `is_empty` sai `null` em **100%** dos eventos hoje, porque nenhuma tela de
+>   `(dashboard)/` usa `QueryBoundary` ainda — o canal está montado e testado,
+>   mas nada real o alimenta.
+> - O canal do `is_empty` guarda **um** valor só (uma `ref`, não uma lista):
+>   tela com dois `QueryBoundary` grava o que reportar por último, não os
+>   dois — e a saída não é óbvia: precisa de uma definição de produto antes
+>   ("vazia" é nenhuma das duas listas ter dado? só a principal?).
+> - O gatilho ainda pergunta ao cache global, não à navegação — corrigido só
+>   o defeito 1 acima (perder o evento), não o escopo. Uma query **alheia**
+>   ainda em voo no momento da navegação faz uma tela sem query nenhuma
+>   emitir `medido_ate: "dados"` cronometrando a query de outra tela: medido
+>   **~430 ms** para uma query alheia de **400 ms**. Escopar por observadores
+>   montados na navegação é mudança de desenho, adiada para a Seção 8, que
+>   reescreve estas telas de qualquer forma.
+>
+> **A observação do endpoint:** `POST /api/telemetry/events`
+> (`app/api/endpoints/telemetry.py`) chama `track()` para cada evento do lote
+> e nunca confere o retorno; `track()` (`app/services/telemetry_service.py`)
+> nunca levanta — todo erro vira log e o evento é descartado dentro do
+> próprio `try/except`. Consequência: **se todos os eventos de um lote
+> falharem, o endpoint ainda responde `204` sem sinalizar nada.** É
+> consequência intencional de "telemetria nunca derruba a requisição do
+> usuário" (a mesma regra que rege `ai_usage_logs` ao contrário — Art. 9), mas
+> precisa estar escrito para quem for depurar perda silenciosa de evento: um
+> `204` desta rota não é prova de que algo foi gravado.
+
 ## Seção 8 · Migração das telas
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
 
