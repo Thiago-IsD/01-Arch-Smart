@@ -307,11 +307,16 @@ docker exec supabase_db_arqsmart psql -U postgres -tAc "select extname, extversi
 ```
 
 A transcrição acima é de quando o repositório tinha 27 migrações e a Seção 4
-ainda não tinha rodado; hoje são 30 (`ls alembic/versions/*.py | wc -l`),
-com head `9b0c34de353b`, não `b77a9b5656c2` — rode `alembic heads` para
+ainda não tinha rodado; hoje são 31 (`ls alembic/versions/*.py | wc -l`),
+com head `170b12223b9b`, não `b77a9b5656c2` — rode `alembic heads` para
 conferir o de hoje em vez de repetir um destes dois números. O mecanismo não
 mudou: todas aplicam sem erro, e a extensão `vector` é habilitada pela
-migração `9f8a3b2c1d4e`, que continua sendo uma das 30.
+migração `9f8a3b2c1d4e`, que continua sendo uma das 31.
+
+> Este parágrafo já foi reescrito três vezes por seções diferentes, sempre pelo
+> mesmo motivo: alguém tentou usar o número e ele tinha envelhecido. Se você
+> está lendo isto depois da Seção 8, presuma que envelheceu de novo e rode o
+> comando.
 
 ### Apontar a aplicação para a stack local
 

@@ -11,7 +11,9 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 10/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída em 10/09/2026 na branch `secao-7-telemetria`, ainda não mergeada em `develop`** — telemetria de produto e custo de IA, **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco com `load_ms` na ordem de grandeza esperada. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os defeitos que a execução encontrou. Seções 8 e 9 pendentes; **a próxima é a Seção 8** (migração das telas). Produção ainda não recebeu: `main` está na Seção 3.
+Estado em 11/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção grava **não é dado utilizável hoje** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec). Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. Seções 8 e 9 pendentes; **a próxima é a Seção 8** (migração das telas). Produção ainda não recebeu: `main` está na Seção 3.
+
+> **A metade backend da Seção 7 foi verificada de fora, e essa é a primeira vez nesta série que isso dá certo.** Em 11/09/2026, contra `https://arqsmart-staging.onrender.com`: `POST /api/telemetry/events` sem token responde **422** — o mesmo status que o teste da Tarefa 4 fixou, e prova de que a rota existe —, e o `openapi.json` lista **58 rotas** (eram 57 antes desta seção), com `/api/telemetry/events` entre elas. `/health` → `200` e `/health/db` → `{"status":"ok","db":"up"}`. Pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md) o uvicorn só sobe se a receita de migrações passou, então o schema de staging está no head que a branch levou. **A metade frontend continua não verificada de fora**: o preview de staging responde `302` para o SSO da Vercel, como nas Seções 5 e 6.
 
 > Sobre "implantada em staging" na Seção 5, e a diferença para a Seção 4: no caso do backend deu para medir o contêiner servindo o código novo. Aqui não. O frontend de staging responde `302` para `vercel.com/sso-api` (medido em 08/09/2026), o que prova que **o deployment existe** — em contraste com `DEPLOYMENT_NOT_FOUND` —, mas a Deployment Protection esconde o conteúdo, então **ninguém verificou de fora que o build servido é o da Seção 5**. A API de staging não foi tocada por esta seção (`/health` → `200`, com 41,4 s de cold start na primeira chamada, o mesmo fenômeno da [ADR 0009](docs/dev/decisoes/0009-prefetch-dentro-de-suspense.md)).
 
@@ -22,7 +24,7 @@ Os ambientes online existem e estão medidos:
 | staging | `https://arqsmart-staging.onrender.com` | `ipbhtqzybgdltewwnvnl`, Postgres 17.6 |
 | produção | `https://arqsmart-prod.onrender.com` | `wokgnojyrpzndtxzvfcz`, Postgres 17.6 |
 
-Frontend em `https://www.arqsmart.com.br` (Vercel, projeto `arqsmart`), com preview automático por branch. Os dois bancos nasceram da receita de migrações, sem passo manual — mas repositório e ambientes implantados não estão no mesmo lugar hoje, e vale medir os dois separado em vez de repetir um só número: **no repositório**, `alembic heads` aponta para `9b0c34de353b`, 30 migrações (`ls ArchSmart-api/alembic/versions/*.py | wc -l`); **nos bancos online os dois ambientes já não estão no mesmo lugar**: `staging` recebeu o merge da Seção 4 em 06/09/2026 e o contêiner subiu servindo o código novo (medido: `/health` → `{"status":"ok"}`, `/health/db` → `{"status":"ok","db":"up"}`, `/` → `{"message":"API Arq Smart"}`), e pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md) o uvicorn só sobe se a receita passou — então o schema de staging está no head que a branch levou. **produção** continua em `b77a9b5656c2`, 27 tabelas, porque `main` ainda não recebeu o merge. Não repita `9b0c34de353b` como se estivesse nos dois, nem `b77a9b5656c2` como se fosse o head do repositório — confira de qual dos três lugares a pergunta é antes de responder, e para o número exato de um ambiente rode `alembic current` com a `DATABASE_URL` dele em vez de deduzir.
+Frontend em `https://www.arqsmart.com.br` (Vercel, projeto `arqsmart`), com preview automático por branch. Os dois bancos nasceram da receita de migrações, sem passo manual — mas repositório e ambientes implantados não estão no mesmo lugar hoje, e vale medir os dois separado em vez de repetir um só número: **no repositório**, `alembic heads` aponta para `170b12223b9b`, 31 migrações (`ls ArchSmart-api/alembic/versions/*.py | wc -l`) — a Seção 7 acrescentou uma, que cria `product_events` e `ai_usage_logs`; **nos bancos online os dois ambientes já não estão no mesmo lugar**: `staging` recebeu o merge da Seção 7 em 11/09/2026 e o contêiner subiu servindo o código novo (medido: `/health` → `200`, `/health/db` → `{"status":"ok","db":"up"}`, e — a prova de que é o código **desta** seção — `POST /api/telemetry/events` sem token → `422`, com a rota listada no `openapi.json`, que agora tem 58 rotas), e pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md) o uvicorn só sobe se a receita passou — então o schema de staging está no head que a branch levou. **produção** continua em `b77a9b5656c2`, 27 tabelas, porque `main` ainda não recebeu o merge. Não repita `170b12223b9b` como se estivesse nos dois, nem `b77a9b5656c2` como se fosse o head do repositório — confira de qual dos três lugares a pergunta é antes de responder, e para o número exato de um ambiente rode `alembic current` com a `DATABASE_URL` dele em vez de deduzir.
 
 Quatro coisas que economizam tempo antes de mexer em ambiente:
 
@@ -262,8 +264,10 @@ para não acontecer.
    tarefa: (a) Thiago passar a senha por um canal fora do controle de versão;
    ou (b) isentar `/dev/componentes` de `ROTAS_PUBLICAS` só em desenvolvimento
    — a galeria já some em produção via `notFound()`, então isso não vazaria
-   nada extra ali. Detalhe completo em
-   `.superpowers/sdd/2026-09-10-secao-7-telemetria/task-1-report.md`.
+   nada extra ali, e a revisão final da branch endossou essa como a saída mais
+   barata. O que deu para verificar sem navegador, e o que continua dependendo
+   de olho humano, está separado item a item em
+   [`docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`](docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md).
 2. **A prova viva do `screen_viewed` (Tarefa 5, Passo 10) também não rodou,
    pela mesma parede.** A telemetria automática está montada e coberta por
    vitest, mas ninguém navegou pela Biblioteca com sessão real para confirmar
@@ -275,10 +279,50 @@ para não acontecer.
    recém-migrada, e ele ainda não existe. Mesmas duas rotas de desbloqueio do
    item 1.
 
+   > ⚠️ **A revisão final da branch, depois que este item foi escrito, achou
+   > mais que "não medido": achou que o número está errado.** O
+   > `TelemetriaDeTela` decide no **primeiro frame**, e a Biblioteca é servida
+   > por `<Suspense>` — a rota commita com o fallback, o frame passa com o
+   > cache parado, e o evento sai **antes de os dados existirem** (medido por
+   > experimento: `load_ms: 28` numa tela cujo dado levou ~100 ms). Pior: a
+   > lista da Biblioteca **nunca** dispara requisição do navegador, porque a
+   > Seção 5 a entrega por `prefetchQuery` + `HydrationBoundary` — então mesmo
+   > no caminho que emite `medido_ate: "dados"`, o que está sendo cronometrado
+   > é o `useInboxCount`, a query do badge que a Seção 5 deixou fora do
+   > prefetch. **Hoje `load_ms` não é dado utilizável**, está escrito assim na
+   > spec (correção datada na decisão 5), na nota desta seção no `PROGRESS.md`
+   > e em [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md).
+   > Quem for tirar média dessa coluna na Seção 8 está avisado — e consertar o
+   > gatilho é trabalho da Seção 8, que reescreve essas telas de qualquer jeito.
+
+3. **O `@limiter.limit("60/minute")` do endpoint de telemetria é um balde
+   global da plataforma, não por usuário.** `app/core/rate_limit.py` documenta
+   no próprio docstring que `get_remote_address` resolve para o **IP do
+   proxy** em toda requisição, porque o uvicorn roda sem
+   `--forwarded-allow-ips` (confira no `Dockerfile`) — foi por isso que
+   `chave_por_apresentacao` existe, como contorno para o portal. Como o
+   `useTrack()` manda uma requisição por evento e o `screen_viewed` sai a cada
+   navegação, dois ou três usuários navegando ao mesmo tempo no beta já
+   encostam no teto; e o `429` é engolido por `enviarEventos`, então **a perda
+   é silenciosa e indistinguível de "ninguém navegou"**. A Seção 8 vai
+   multiplicar os eventos ao acrescentar interação. Decidir entre chave por
+   conta, limite maior, ou buffer no cliente é decisão de produto, não de quem
+   executa.
+
+4. **O canal do `is_empty` guarda um valor só, e hoje ele é sempre `null`.**
+   Nenhuma tela de `(dashboard)` usa `QueryBoundary` — quem liga é a Seção 8 —,
+   então `is_empty` sai `null` em 100% dos eventos, o que é ordem das seções e
+   não defeito. Mas quando a Seção 8 ligar, a primeira tela com **dois**
+   boundaries (lista + painel lateral, por exemplo) vai gravar "o que reportar
+   por último", que é detalhe de ordem da árvore e não informação. A saída não
+   é só técnica: precisa de uma definição de o que "vazio" significa numa tela
+   com várias regiões.
+
 Um achado à parte, fora do escopo desta correção mas que vale o conhecimento
-de Thiago: a Tarefa 1 encontrou, salva por autofill do Chrome nesta máquina
-para `localhost:3000`, uma credencial de uma conta que **não** é a de teste
-E2E — não foi usada. Detalhe no mesmo relatório.
+de Thiago: a Tarefa 1 encontrou, salva por autofill do Chrome na máquina de
+desenvolvimento para `localhost:3000`, uma credencial de uma conta que **não**
+é a de teste E2E. Não foi usada — conta de identidade desconhecida não se usa
+para entrar em ambiente nenhum, nem em desenvolvimento.
 
 ## Portões de CI
 

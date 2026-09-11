@@ -758,6 +758,36 @@ _Última atualização: 2026-09-10_
 ## Seção 7 · Telemetria
 **4/5 (80%)** `████████████████░░░░`
 
+> **Mergeada até `staging` em 11/09/2026** — merge `c40089b` em `develop` e
+> PR #8 `develop` → `staging` (merge `3586319`), com os três jobs de CI verdes
+> e o PR em `MERGEABLE / CLEAN`. Antes do push, as suítes rodaram **na árvore já
+> mergeada**, não só na branch: `332 passed, 1 skipped` no backend,
+> `20 arquivos / 162 testes` no frontend, `Ran 96 tests, OK` em `tools/`, e
+> catraca, progresso e links verdes.
+>
+> **E desta vez a metade backend foi verificada de fora** — a primeira vez nesta
+> série que isso dá certo. Contra `https://arqsmart-staging.onrender.com`, em
+> 11/09/2026:
+>
+> ```
+> curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+>   -H "Content-Type: application/json" -d '{"eventos":[]}' \
+>   https://arqsmart-staging.onrender.com/api/telemetry/events        # 422
+>
+> curl -s https://arqsmart-staging.onrender.com/openapi.json \
+>   | python -c "import json,sys; print(len(json.load(sys.stdin)['paths']))"   # 58
+> ```
+>
+> O `422` é o mesmo status que o teste da Tarefa 4 fixou para requisição sem
+> token, e a rota aparece no `openapi.json` — junto, isso prova que o contêiner
+> serve o código **desta** seção, e não apenas que "a API responde". Eram 57
+> rotas antes. Pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md),
+> contêiner no ar implica receita de migrações aplicada, então o schema de
+> staging está em `170b12223b9b`.
+>
+> **A metade frontend continua não verificada de fora**, como nas Seções 5 e 6:
+> o preview de staging responde `302` para o SSO da Vercel.
+>
 > **Desenho aprovado em 10/09/2026**, antes de existir plano de execução:
 > [`docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md`](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md);
 > o plano das cinco tarefas está em
