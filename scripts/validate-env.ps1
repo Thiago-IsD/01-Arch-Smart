@@ -1,4 +1,4 @@
-Write-Host "=== Validating Environment Versions for Arch Smart ===" -ForegroundColor Cyan
+Write-Host "=== Validating Environment Versions for Arq Smart ===" -ForegroundColor Cyan
 Write-Host "----------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 

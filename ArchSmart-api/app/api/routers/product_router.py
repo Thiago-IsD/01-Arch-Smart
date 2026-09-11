@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from app.core.errors import ValidacaoDeDominio
 from app.db.repository import ScopedRepository, get_repo
-from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType
+from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, AiUsageLog
 from app.schemas.product_schema import ProductCreate, ProductUpdate, ProductResponse, PaginatedProductResponse
 from app.core.rate_limit import limiter
 
@@ -87,6 +87,7 @@ from app.services.ai_service import (
     AITimeoutError,
     extract_product_data,
 )
+from app.core.precos_ia import custo_usd
 
 class NormalizeRequest(BaseModel):
     text: str = ""
@@ -120,10 +121,31 @@ async def normalize_product(
     repo: ScopedRepository = Depends(get_repo),
 ):
     try:
-        return await extract_product_data(payload.text, payload.source_url)
+        dados, uso = await extract_product_data(payload.text, payload.source_url)
     except tuple(AI_ERROR_RESPONSES) as e:
         status_code, detail = AI_ERROR_RESPONSES[type(e)]
         raise HTTPException(status_code=status_code, detail=detail)
+
+    # `uso` e None quando nenhuma chamada de IA aconteceu (corpo vazio, sem
+    # texto e sem URL) — nao ha o que registrar, e gravar mesmo assim criaria
+    # uma linha fantasma (0 tokens, 0ms) indistinguivel de uma chamada real.
+    if uso is not None:
+        # Art. 9: na MESMA transacao da resposta, sem savepoint e sem engolir. Se o
+        # registro de custo falhar, a requisicao falha — nao se serve resposta de IA
+        # sem registrar o que ela custou. E o oposto de `track()`, de proposito.
+        repo.create(
+            AiUsageLog,
+            model_name=uso.model_name,
+            input_tokens=uso.input_tokens,
+            output_tokens=uso.output_tokens,
+            token_count=uso.input_tokens + uso.output_tokens,
+            cost_usd=custo_usd(uso.model_name, uso.input_tokens, uso.output_tokens),
+            latency_ms=uso.latency_ms,
+            feature="product_normalize",
+        )
+        repo.db.commit()
+
+    return dados
 
 @router.post("/", response_model=ProductResponse)
 def create_product(

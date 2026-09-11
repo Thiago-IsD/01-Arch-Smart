@@ -33,12 +33,15 @@ def tabelas_de_dado() -> list[str]:
     return sorted(t for t in Base.metadata.tables if t not in CATALOGO_GLOBAL)
 
 
-def test_sao_vinte_e_uma_tabelas_de_dado():
+def test_sao_vinte_e_tres_tabelas_de_dado():
     """
     Trava a contagem. Se este teste falhar, uma tabela foi adicionada ou
     removida — atualize o numero DEPOIS de decidir o escopo dela, nunca antes.
+
+    21 -> 23 na Secao 7: product_events e ai_usage_logs. As duas tem dono
+    (account_id + created_by), entao nao entram em CATALOGO_GLOBAL.
     """
-    assert len(tabelas_de_dado()) == 21
+    assert len(tabelas_de_dado()) == 23
 
 
 @pytest.mark.parametrize("tabela", tabelas_de_dado())

@@ -1,8 +1,9 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum, func, Index
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Float, Integer, JSON, Date, Text, Enum, func, Index, Numeric, text
 from sqlalchemy import Uuid as UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -534,3 +535,59 @@ class Document(Base):
     content = Column(Text)
     metadata_ = Column("metadata", JSON) # 'metadata' is reserved in SQLAlchemy Base, using alias or explicit name
     embedding = Column(Vector(1536))
+
+
+class ProductEvent(Base):
+    """
+    Evento de produto: uma linha por acontecimento observado.
+
+    `created_by` e a coluna de usuario da casa — e o que ScopedRepository.create
+    preenche do contexto. Nullable porque evento de sistema nao tem usuario.
+    """
+    __tablename__ = "product_events"
+    __table_args__ = (
+        Index("ix_product_events_account_created", "account_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    name = Column(String, nullable=False)
+    properties = Column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb"), default=dict
+    )
+    created_at = Column(
+        DateTime, nullable=False, server_default=func.now(), default=datetime.utcnow
+    )
+
+
+class AiUsageLog(Base):
+    """
+    Custo de uma chamada de IA, gravado na MESMA transacao da resposta (Art. 9).
+
+    `cost_usd` e nullable de proposito: modelo fora da tabela de precos grava os
+    tokens com custo nulo. Perder a contagem de tokens e pior que nao saber o
+    custo de uma linha.
+
+    `input_tokens`/`output_tokens` existem porque o provedor cobra entrada e
+    saida a precos diferentes; `token_count` e a soma, que a spec pede.
+    """
+    __tablename__ = "ai_usage_logs"
+    __table_args__ = (
+        Index("ix_ai_usage_logs_account_created", "account_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    model_name = Column(String, nullable=False)
+    input_tokens = Column(Integer, nullable=False)
+    output_tokens = Column(Integer, nullable=False)
+    token_count = Column(Integer, nullable=False)
+    # Numeric, nao Float: dinheiro nao anda em ponto flutuante.
+    cost_usd = Column(Numeric(10, 6), nullable=True)
+    latency_ms = Column(Integer, nullable=False)
+    feature = Column(String, nullable=False)
+    created_at = Column(
+        DateTime, nullable=False, server_default=func.now(), default=datetime.utcnow
+    )
