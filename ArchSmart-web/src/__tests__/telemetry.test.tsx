@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { ReactNode } from "react"
+import { StrictMode, type ReactNode } from "react"
 import { render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
 import { normalizarTela, decidirMedicao } from "@/features/telemetry/types"
@@ -144,6 +144,27 @@ describe("TelemetriaDeTela", () => {
         render(<Envolvido />)
         await waitFor(() => expect(eventos).toHaveLength(1))
         expect(eventos[0].properties.medido_ate).toBe("pintura")
+    })
+
+    // O StrictMode do `npm run dev` monta o efeito, desmonta e monta de novo.
+    // Este teste pede EXATAMENTE uma linha, e falha dos dois lados: zero (a
+    // emissao morreu no cleanup) e dois (a tela contou dobrado) reprovam
+    // igual. O `next.config.ts` nao desliga Strict Mode e o default do Next 16
+    // e `true`, entao este e o modo em que a prova viva do Passo 10 vai rodar.
+    it("sob StrictMode emite exatamente uma linha", async () => {
+        render(
+            <StrictMode>
+                <Envolvido>
+                    <TelaComLista itens={["a", "b"]} />
+                </Envolvido>
+            </StrictMode>
+        )
+        await screen.findByText("2 itens")
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        // Folga para uma segunda emissao aparecer, se ela existir.
+        await new Promise((r) => setTimeout(r, 50))
+        expect(eventos).toHaveLength(1)
+        expect(eventos[0].properties.medido_ate).toBe("dados")
     })
 
     it("uma navegacao emite uma linha, nao duas", async () => {

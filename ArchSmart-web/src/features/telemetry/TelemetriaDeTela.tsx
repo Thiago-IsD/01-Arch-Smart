@@ -10,9 +10,12 @@ import { decidirMedicao, normalizarTela } from "./types"
 /**
  * Emite `screen_viewed` uma vez por navegacao.
  *
- * O `load_ms` vem de quando as queries da rota assentam — isso e "dados na
+ * O `load_ms` vem de quando as queries em voo assentam — isso e "dados na
  * tela", que e a metrica do orcamento de performance. Tela sem query nenhuma
  * emite depois da pintura, e `medido_ate` diz qual dos dois o numero e.
+ *
+ * "Em voo" e no cliente inteiro, nao so nesta rota; ver o comentario de
+ * `buscandoAlgo` antes de tratar o numero como tempo desta tela.
  *
  * Monta DENTRO do QueryProvider, senao `useQueryClient` estoura.
  */
@@ -23,12 +26,18 @@ export function TelemetriaDeTela() {
     const track = useTrack()
 
     // Dedupe por navegacao: o duplo-efeito do StrictMode monta este efeito
-    // duas vezes em desenvolvimento, e sem isto cada tela conta duas.
+    // duas vezes em desenvolvimento, e sem isto cada tela contaria duas.
+    //
+    // A guarda mora dentro do `emitir`, NAO na entrada do efeito, e a diferenca
+    // e entre emitir uma vez e nao emitir nunca. Guardando na entrada, o run 1
+    // gravava a ref, assinava o cache e agendava o frame; o cleanup do
+    // StrictMode cancelava a inscricao e o frame; o run 2 batia na ref e
+    // voltava sem assinar nada. Os dois caminhos de emissao morriam, e o
+    // resultado em `npm run dev` era ZERO evento, nao dois — com o agravante de
+    // que `npm run dev` e o modo em que a conferencia manual acontece.
     const jaEmitido = useRef<string | null>(null)
 
     useEffect(() => {
-        if (jaEmitido.current === pathname) return
-        jaEmitido.current = pathname
         vazioDaTela?.limpar()
 
         const inicio = performance.now()
@@ -36,8 +45,9 @@ export function TelemetriaDeTela() {
         let aguardandoRender = 0
 
         const emitir = (queriesAssentaram: boolean) => {
-            if (emitido) return
+            if (emitido || jaEmitido.current === pathname) return
             emitido = true
+            jaEmitido.current = pathname
             track("screen_viewed", {
                 screen: normalizarTela(pathname),
                 load_ms: Math.round(performance.now() - inicio),
@@ -48,23 +58,36 @@ export function TelemetriaDeTela() {
             })
         }
 
+        /**
+         * "Tem QUALQUER query em voo no cliente inteiro?" — e nao "desta
+         * navegacao". Le com atencao antes de confiar na bandeira abaixo.
+         */
         const buscandoAlgo = () =>
             queryClient
                 .getQueryCache()
                 .getAll()
                 .some((q) => q.state.fetchStatus !== "idle")
 
-        // Escopo de NAVEGACAO, nao do cache inteiro: "esta tela chegou a
-        // buscar alguma coisa?".
+        // A bandeira significa "alguma query estava em voo no cliente enquanto
+        // esta tela carregava" — NAO "esta tela buscou alguma coisa".
         //
-        // Perguntar ao cache global se ele tem alguma entrada (`getAll().length
-        // > 0`) responde outra pergunta: da segunda navegacao em diante o cache
-        // NUNCA esta vazio, porque as queries da tela anterior continuam la ate
-        // o gcTime. Duas consequencias, as duas ruins: uma tela sem query
-        // nenhuma nunca pegava o caminho da pintura e ficava esperando um
-        // evento de cache que so chega na coleta de lixo — `load_ms` de
-        // minutos, rotulado `dados`; e revisitar uma tela com cache quente nao
-        // dispara busca nenhuma, entao nada assentava e o evento nunca saia.
+        // Ela e melhor do que perguntar ao cache se ele tem alguma ENTRADA
+        // (`getAll().length > 0`), que era a versao anterior: aquela nunca
+        // voltava falso da segunda navegacao em diante, porque as queries da
+        // tela anterior ficam no cache ate o gcTime — tela sem query nenhuma
+        // nunca pegava o caminho da pintura e esperava um evento de cache que
+        // so chega na coleta de lixo (`load_ms` de minutos rotulado `dados`), e
+        // revisita com cache quente nao emitia nada.
+        //
+        // Mas o escopo continua sendo o cliente, nao a navegacao, e isso tem
+        // consequencia MEDIDA: com uma query alheia de 400 ms em voo na hora da
+        // navegacao, uma tela sem query nenhuma emite `medido_ate: "dados"` com
+        // `load_ms` de ~430 ms — cronometrando a query da tela anterior. Nao e
+        // hipotese: o React Query nao cancela fetch no unmount, entao sair de
+        // uma tela lenta antes de ela terminar produz exatamente isso na
+        // seguinte. Escopar de verdade exige olhar os observadores montados
+        // nesta navegacao, que e mudanca de desenho — decidido para a Secao 8,
+        // que reescreve estas telas de qualquer jeito.
         let algumaBuscou = buscandoAlgo()
 
         const avaliar = () => {

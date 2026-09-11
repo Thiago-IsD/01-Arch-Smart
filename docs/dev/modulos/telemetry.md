@@ -59,6 +59,12 @@ vazia" são coisas diferentes, e gravar `false` inventaria uma medição. Fica
 `null` quando nenhum `QueryBoundary` da tela chegou a decidir — tela sem
 boundary, ou boundary que ainda estava em `skeleton`/`error`.
 
+> **Hoje `is_empty` sai `null` em 100% dos eventos reais, e isso é ordem das
+> seções, não defeito.** Nenhuma tela de `(dashboard)` usa `QueryBoundary`
+> ainda — quem liga é a Seção 8, migrando as telas. O canal está montado e
+> testado, mas nenhuma tela real o alimenta. Quem abrir `product_events` antes
+> disso vai ver só `null` na coluna; não é o canal quebrado.
+
 ## Decisões não-óbvias
 
 **Só as 15 telas autenticadas de `app/(dashboard)/`.** As outras 19 são
@@ -84,6 +90,14 @@ bandeira própria da navegação, ligada quando alguma query está em voo.
 React re-renderizar, e o `QueryBoundary` só decide "vazio" no render. Sem o
 `requestAnimationFrame`, `ler()` voltaria `null` em toda tela.
 
+**A guarda de dedupe mora dentro do `emitir`, não na entrada do efeito.** Sob
+StrictMode — que é o default do Next 16 e portanto o modo do `npm run dev` —
+o efeito monta, limpa e monta de novo. Com a guarda na entrada, o run 1
+gravava a ref, assinava o cache e agendava o frame; o cleanup cancelava os
+dois; o run 2 batia na ref e voltava sem assinar nada. Resultado: **zero
+evento**, não dois. `telemetry.test.tsx` tem teste montando em `StrictMode` e
+exigindo exatamente uma linha, que falha nas duas direções.
+
 **`enviarEventos` engole qualquer erro, de propósito.** Telemetria que derruba
 a tela do usuário é pior que telemetria nenhuma, e o modo de falha de uma
 promise rejeitada aqui é um *unhandled rejection* que ninguém vê até virar erro
@@ -106,6 +120,22 @@ de `(dashboard)`. Trocar o no-op por um `throw` derruba a galeria.
 **O no-op é uma referência de módulo, não um `() => {}` no `return`.** Uma
 função nova a cada render faria o efeito do `QueryBoundary` que depende dela
 rodar a cada render.
+
+**O canal do `is_empty` guarda UM valor, e todo boundary escreve nele.** A ref
+é um `boolean | null` só. Tela com mais de um `QueryBoundary` — uma lista e um
+painel lateral, por exemplo — grava "o último efeito que rodou", que é detalhe
+de ordem da árvore, não informação sobre a tela. Não acontece hoje (nenhuma
+tela real usa o boundary), mas **vai** acontecer na Seção 8, e a saída não é
+óbvia: `is_empty` de uma tela com duas listas precisa primeiro de uma
+definição de produto ("vazia" é nenhuma das duas ter dado? a principal?).
+
+**A bandeira do gatilho é do cliente inteiro, não desta navegação.**
+`buscandoAlgo()` varre o cache todo, então uma query **alheia** ainda em voo no
+momento da navegação faz uma tela sem query nenhuma emitir `medido_ate:
+"dados"` cronometrando a query da outra tela — medido: ~430 ms para uma query
+alheia de 400 ms. O React Query não cancela fetch no unmount, então sair de uma
+tela lenta antes de ela terminar produz isso na seguinte. Escopar por
+observadores montados na navegação é mudança de desenho, adiada para a Seção 8.
 
 **Mexer no gatilho sem medir vale pouco.** O que diz se o `load_ms` corresponde
 ao que o usuário esperou é uma navegação real gravando uma linha — os testes
