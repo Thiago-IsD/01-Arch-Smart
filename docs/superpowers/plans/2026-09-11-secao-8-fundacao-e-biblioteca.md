@@ -466,12 +466,31 @@ Três coisas acontecem por navegação:
    `principal` que chegue no mesmo commit ganhe dele. O primeiro a emitir vence;
    os demais reports da navegação são ignorados.
 
-E o caso sem report nenhum: **decide no fim da navegação**, não por prazo.
+E o caso sem report nenhum: **decide quando a navegação termina**, não por prazo.
 
 ```
-nenhum anúncio   → medido_ate: "pintura",     load_ms = navegação → primeira pintura
+nenhum anúncio     → medido_ate: "pintura",    load_ms = navegação → primeira pintura
 anúncio sem report → medido_ate: "abandonado", load_ms = navegação → fim da navegação
 ```
+
+**"Fim da navegação" são dois momentos concretos, e nenhum deles é o cleanup do
+efeito.** A pendência daquela navegação fica numa `ref`, e é descarregada:
+
+1. **no início do efeito da navegação seguinte**, quando o `pathname` é
+   diferente do que está na pendência; e
+2. **no `pagehide`**, que é o caso de a sessão terminar naquela tela.
+
+> ⚠️ **Não emita no cleanup do efeito.** O StrictMode do `npm run dev` monta,
+> desmonta e monta de novo com o **mesmo** `pathname`: emitir no cleanup
+> produziria uma linha espúria de `pintura`/`abandonado` no primeiro desmonte, e
+> — porque o dedupe por `pathname` já teria gravado — a linha real nunca sairia.
+> Descarregar por "o `pathname` da pendência é diferente do atual" é imune a
+> isso: no remonte do StrictMode os dois são iguais, então nada é emitido. O
+> teste "sob StrictMode emite exatamente uma linha" é o que prende isso, e ele
+> falha dos dois lados: zero e dois reprovam igual.
+>
+> O preço, em desenvolvimento só: o remonte do StrictMode substitui a pendência,
+> então o cronômetro reinicia. Em produção o StrictMode não duplica efeito.
 
 > **Por que não existe prazo.** A Biblioteca é servida por `<Suspense>` com
 > `await` no servidor (`LibraryData.tsx`): o `QueryBoundary` dela só monta
@@ -509,16 +528,28 @@ function TelaComLista({ itens, principal = false }: { itens: string[]; principal
     )
 }
 
-it("tela sem regiao nenhuma emite 'pintura' ao sair da tela", async () => {
-    const { unmount } = render(<Envolvido />)
+it("tela sem regiao nenhuma emite 'pintura' quando a sessao termina nela", async () => {
+    render(<Envolvido />)
     // Nada foi emitido ainda: sem anuncio, a decisao espera o fim da navegacao.
     await new Promise((r) => setTimeout(r, 50))
     expect(eventos).toHaveLength(0)
 
-    unmount()
+    window.dispatchEvent(new Event("pagehide"))
     await waitFor(() => expect(eventos).toHaveLength(1))
     expect(eventos[0].properties.medido_ate).toBe("pintura")
     expect(eventos[0].properties.is_empty).toBeNull()
+})
+
+it("tela sem regiao nenhuma emite 'pintura' quando a navegacao seguinte comeca", async () => {
+    const { rerender } = render(<Envolvido />)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(eventos).toHaveLength(0)
+
+    caminhoAtual = "/dashboard"
+    rerender(<Envolvido />)
+    await waitFor(() => expect(eventos).toHaveLength(1))
+    expect(eventos[0].properties.screen).toBe("/library")
+    expect(eventos[0].properties.medido_ate).toBe("pintura")
 })
 
 it("regiao que resolve com dados emite 'dados' e is_empty false", async () => {
@@ -639,7 +670,7 @@ it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => 
             </QueryBoundary>
         )
     }
-    const { unmount } = render(
+    render(
         <Envolvido>
             <TelaPendente />
         </Envolvido>
@@ -647,7 +678,7 @@ it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => 
     await screen.findByText("carregando")
     expect(eventos).toHaveLength(0)
 
-    unmount()
+    window.dispatchEvent(new Event("pagehide"))
     await waitFor(() => expect(eventos).toHaveLength(1))
     expect(eventos[0].properties.medido_ate).toBe("abandonado")
     expect(eventos[0].properties.is_empty).toBeNull()
@@ -656,7 +687,39 @@ it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => 
 
 Mantenha os dois testes que já existem e continuam valendo: "sob StrictMode
 emite exatamente uma linha" e "uma navegação emite uma linha, não duas" —
-acrescentando `principal` ao `TelaComLista` deles.
+acrescentando `principal` ao `TelaComLista` deles. O primeiro é o que prende o
+perigo do StrictMode descrito acima; não o enfraqueça.
+
+**E troque o `describe("decidirMedicao")`**, porque a assinatura mudou. Os dois
+testes antigos (`{ queriesAssentaram: true }` / `false`) não compilam mais:
+
+```ts
+describe("decidirMedicao", () => {
+    it("repassa o desfecho da regiao que reportou", () => {
+        expect(decidirMedicao({ desfecho: "dados", principal: true }, true)).toBe("dados")
+        expect(decidirMedicao({ desfecho: "vazio", principal: true }, true)).toBe("vazio")
+        expect(decidirMedicao({ desfecho: "erro", principal: true }, true)).toBe("erro")
+    })
+
+    it("diz 'abandonado' quando houve anuncio e ninguem reportou", () => {
+        expect(decidirMedicao(null, true)).toBe("abandonado")
+    })
+
+    it("diz 'pintura' quando a tela nao tem regiao nenhuma", () => {
+        expect(decidirMedicao(null, false)).toBe("pintura")
+    })
+})
+
+describe("vazioDoDesfecho", () => {
+    it("traduz os tres desfechos e o nulo", () => {
+        expect(vazioDoDesfecho("vazio")).toBe(true)
+        expect(vazioDoDesfecho("dados")).toBe(false)
+        // `null` e "nao sei", que e diferente de "nao esta vazia".
+        expect(vazioDoDesfecho("erro")).toBeNull()
+        expect(vazioDoDesfecho(null)).toBeNull()
+    })
+})
+```
 
 - [ ] **Passo 2: rodar e ver falhar**
 
@@ -796,7 +859,13 @@ import { usePathname } from "next/navigation"
 import { useProntidao } from "./contexto"
 import type { Report } from "./contexto"
 import { useTrack } from "./hooks"
-import { decidirMedicao, normalizarTela, vazioDoDesfecho } from "./types"
+import { decidirMedicao, normalizarTela, vazioDoDesfecho, type MedidoDe } from "./types"
+
+declare global {
+    interface Window {
+        __arqsmartOuvinteDeClique?: boolean
+    }
+}
 
 /** Instante do ultimo clique em link interno, para ancorar o cronometro. */
 let marcaDeClique: number | null = null
@@ -804,8 +873,8 @@ let marcaDeClique: number | null = null
 function instalarOuvinteDeClique() {
     if (typeof window === "undefined" || window.__arqsmartOuvinteDeClique) return
     window.__arqsmartOuvinteDeClique = true
-    // Captura: o handler do React pode chamar preventDefault, e a marca tem de
-    // existir de qualquer forma.
+    // Fase de CAPTURA: o handler do React pode chamar preventDefault, e a marca
+    // precisa existir de qualquer forma.
     document.addEventListener(
         "click",
         (evento) => {
@@ -820,11 +889,22 @@ function instalarOuvinteDeClique() {
     )
 }
 
+/** O que uma navegacao ainda deve ao banco. */
+interface Pendencia {
+    pathname: string
+    inicio: number
+    medidoDe: MedidoDe
+    instanteDaPintura: number | null
+    anunciadas: () => number
+}
+
 /**
  * Emite `screen_viewed` uma vez por navegacao.
  *
- * Nao infere nada: ouve o canal de prontidao. Ver o protocolo em
- * docs/dev/modulos/telemetry.md e a decisao 2 da spec da Secao 8.
+ * Nao infere nada: ouve o canal de prontidao. Quem sabe que os dados estao na
+ * tela e o QueryBoundary, e e a mesma coisa que sabe se a tela esta vazia. Ver
+ * o protocolo em docs/dev/modulos/telemetry.md e a decisao 2 da spec da
+ * Secao 8.
  *
  * Monta DENTRO do ProntidaoDaTelaProvider.
  */
@@ -832,76 +912,95 @@ export function TelemetriaDeTela() {
     const pathname = usePathname()
     const prontidao = useProntidao()
     const track = useTrack()
+
+    const pendencia = useRef<Pendencia | null>(null)
     const jaEmitido = useRef<string | null>(null)
 
     useEffect(() => {
         instalarOuvinteDeClique()
-        prontidao?.limpar()
 
-        const medidoDe = marcaDeClique !== null ? "clique" : "commit"
-        const inicio = marcaDeClique ?? performance.now()
-        marcaDeClique = null
+        const emitir = (p: Pendencia, report: Report | null) => {
+            if (jaEmitido.current === p.pathname) return
+            jaEmitido.current = p.pathname
+            if (pendencia.current === p) pendencia.current = null
 
-        let emitido = false
-        let pendente = 0
-        let instanteDaPintura: number | null = null
-
-        const emitir = (report: Report | null) => {
-            if (emitido || jaEmitido.current === pathname) return
-            emitido = true
-            jaEmitido.current = pathname
+            const houveAnuncio = p.anunciadas() > 0
+            // O instante da pintura e usado SO quando a tela nao tinha regiao
+            // nenhuma. Capturar e usar sao momentos diferentes: e isso que
+            // permite um load_ms honesto sem decidir no primeiro frame.
             const fim =
-                report === null && prontidao?.anunciadas() === 0 && instanteDaPintura !== null
-                    ? instanteDaPintura
+                report === null && !houveAnuncio && p.instanteDaPintura !== null
+                    ? p.instanteDaPintura
                     : performance.now()
+
             track("screen_viewed", {
-                screen: normalizarTela(pathname),
-                load_ms: Math.round(fim - inicio),
-                medido_ate: decidirMedicao(report, (prontidao?.anunciadas() ?? 0) > 0),
-                medido_de: medidoDe,
+                screen: normalizarTela(p.pathname),
+                load_ms: Math.round(fim - p.inicio),
+                medido_ate: decidirMedicao(report, houveAnuncio),
+                medido_de: p.medidoDe,
                 is_empty: vazioDoDesfecho(report?.desfecho ?? null),
                 principal_declarada: report?.principal ?? false,
             })
         }
 
-        // Um report principal emite na hora. Um nao-principal espera um frame,
-        // para que uma principal que chegue no MESMO commit ganhe dele — e so
-        // entao emite. Sem essa folga, a ordem da arvore decidiria o numero.
+        // 1. Descarrega a navegacao ANTERIOR, se houver uma em aberto e ela for
+        //    de outro caminho. Isto roda antes do `limpar()`, porque o canal
+        //    ainda guarda os anuncios daquela navegacao.
+        //
+        //    NAO faca isso no cleanup do efeito: o StrictMode monta, desmonta e
+        //    monta de novo com o MESMO pathname, e emitir no cleanup produziria
+        //    uma linha espuria — e, pelo dedupe, mataria a linha real.
+        const anterior = pendencia.current
+        if (anterior && anterior.pathname !== pathname) emitir(anterior, null)
+
+        prontidao?.limpar()
+
+        const medidoDe: MedidoDe = marcaDeClique !== null ? "clique" : "commit"
+        const atual: Pendencia = {
+            pathname,
+            inicio: marcaDeClique ?? performance.now(),
+            medidoDe,
+            instanteDaPintura: null,
+            anunciadas: () => prontidao?.anunciadas() ?? 0,
+        }
+        marcaDeClique = null
+        pendencia.current = atual
+
+        let aguardandoFolga = 0
         let candidato: Report | null = null
+
+        // Um report principal emite na hora. Um nao-principal espera um frame,
+        // para que uma principal que chegue no MESMO commit ganhe dele. Sem essa
+        // folga, a ordem da arvore decidiria o numero.
         const aoReportar = (report: Report) => {
-            if (emitido) return
+            if (jaEmitido.current === pathname) return
             if (report.principal) {
-                cancelAnimationFrame(pendente)
-                emitir(report)
+                cancelAnimationFrame(aguardandoFolga)
+                emitir(atual, report)
                 return
             }
             if (candidato) return
             candidato = report
-            pendente = requestAnimationFrame(() => emitir(candidato))
+            aguardandoFolga = requestAnimationFrame(() => emitir(atual, candidato))
         }
 
         const cancelarAssinatura = prontidao?.assinar(aoReportar)
 
-        // O instante da pintura e capturado agora e usado SO se a tela acabar
-        // sem regiao nenhuma. Capturar e usar sao momentos diferentes: e isso
-        // que permite um `load_ms` honesto sem decidir no primeiro frame.
         const naPintura = requestAnimationFrame(() => {
-            instanteDaPintura = performance.now()
+            atual.instanteDaPintura = performance.now()
         })
 
-        // A sessao pode terminar nesta tela. Sem isto, a ultima navegacao — a
-        // que diz onde o usuario parou — nunca chega.
-        const aoSair = () => emitir(null)
+        // 2. A sessao pode terminar nesta tela. Sem isto, a ultima navegacao — a
+        //    que diz onde o usuario parou — nunca chega.
+        const aoSair = () => emitir(atual, null)
         window.addEventListener("pagehide", aoSair)
 
         return () => {
             cancelarAssinatura?.()
             cancelAnimationFrame(naPintura)
-            cancelAnimationFrame(pendente)
+            cancelAnimationFrame(aguardandoFolga)
             window.removeEventListener("pagehide", aoSair)
-            // Fim da navegacao: se nada resolveu, decide agora. `pintura` quando
-            // a tela nao tinha regiao; `abandonado` quando tinha e nao resolveu.
-            emitir(null)
+            // Sem emissao aqui, de proposito. Ver o comentario do passo 1.
         }
     }, [pathname, prontidao, track])
 
@@ -909,15 +1008,17 @@ export function TelemetriaDeTela() {
 }
 ```
 
-Declare o campo global num `.d.ts` já existente ou no topo do arquivo:
+> Três armadilhas deste arquivo, todas com teste no Passo 1:
+>
+> - **`jaEmitido` é por `pathname`, não booleano.** Ele é o que impede a segunda
+>   linha na mesma navegação e o que sobrevive ao remonte do StrictMode.
+> - **`anunciadas` entra na pendência como função**, não como número: no momento
+>   em que a pendência é criada, nenhuma região anunciou ainda — o boundary
+>   anuncia no efeito dele, que roda depois deste.
+> - **A pendência anterior é descarregada antes do `limpar()`.** Invertido, o
+>   `abandonado` viraria `pintura`, porque a contagem de anúncios já teria sido
+>   zerada.
 
-```ts
-declare global {
-    interface Window {
-        __arqsmartOuvinteDeClique?: boolean
-    }
-}
-```
 
 - [ ] **Passo 6: fazer o `QueryBoundary` anunciar e reportar**
 
@@ -1376,10 +1477,27 @@ npm run typecheck
 npm test
 ```
 
-Esperado: verde. O `telemetry.test.tsx` mocka `@/lib/api/telemetry`, então os
-eventos continuam chegando ao array do teste — mas agora com até 1 s de atraso.
-Se algum teste de lá ficar instável, **não aumente o `waitFor` às cegas**: faça
-o teste descarregar a fila explicitamente com `descarregar()`.
+**O `telemetry.test.tsx` quebra aqui, e o conserto é obrigatório, não
+condicional.** Ele mocka `@/lib/api/telemetry` e espera os eventos com `waitFor`,
+cujo tempo padrão é 1000 ms — exatamente a janela da fila. Isso é um teste que
+passa ou falha por sorte de relógio, e o `CLAUDE.md` proíbe conviver com isso.
+
+Troque o mock daquele arquivo para interceptar **a fila**, não o envio:
+
+```tsx
+vi.mock("@/features/telemetry/fila", () => ({
+    // Os testes do gatilho verificam QUANDO o evento e emitido e COM QUE
+    // conteudo. O lote e a janela de 1s sao assunto de telemetry-fila.test.ts;
+    // misturar os dois faz o relogio decidir se o teste do gatilho passa.
+    enfileirar: (evento: EventoDeProduto) => {
+        eventos.push(evento)
+    },
+    descarregar: () => {},
+}))
+```
+
+O mock de `@/lib/api/telemetry` sai daquele arquivo: com a fila interceptada, ele
+não é mais alcançado. E **não aumente nenhum `waitFor`** para contornar isso.
 
 - [ ] **Passo 7: commit**
 
