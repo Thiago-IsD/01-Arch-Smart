@@ -25,16 +25,24 @@ export function TelemetriaDeTela() {
     const vazioDaTela = useVazioDaTela()
     const track = useTrack()
 
-    // Dedupe por navegacao: o duplo-efeito do StrictMode monta este efeito
-    // duas vezes em desenvolvimento, e sem isto cada tela contaria duas.
+    // Ref DEFENSIVA de dedupe por navegacao — nao e o que garante hoje a
+    // linha unica sob StrictMode, e nenhum teste discrimina esta condicao.
+    // Um revisor tirou `jaEmitido.current === pathname` de dentro de `emitir`
+    // e os 11 testes continuaram passando: quem garante uma emissao so e o
+    // `emitido` local desta chamada mais o cleanup do efeito (cancela a
+    // inscricao no cache e os frames agendados); como `queryClient`, `track`
+    // e `vazioDaTela` sao estaveis entre renders, o efeito so roda de novo
+    // quando `pathname` muda. `jaEmitido` so entraria em jogo se o efeito
+    // rodasse de novo para o MESMO pathname fora desse ciclo — cenario que
+    // nao acontece hoje, mas que o codigo trata mesmo assim.
     //
-    // A guarda mora dentro do `emitir`, NAO na entrada do efeito, e a diferenca
-    // e entre emitir uma vez e nao emitir nunca. Guardando na entrada, o run 1
-    // gravava a ref, assinava o cache e agendava o frame; o cleanup do
-    // StrictMode cancelava a inscricao e o frame; o run 2 batia na ref e
-    // voltava sem assinar nada. Os dois caminhos de emissao morriam, e o
-    // resultado em `npm run dev` era ZERO evento, nao dois — com o agravante de
-    // que `npm run dev` e o modo em que a conferencia manual acontece.
+    // Historico do bug que motivou a guarda estar dentro do `emitir`, e nao
+    // na entrada do efeito: guardando na entrada, o run 1 do StrictMode
+    // gravava a ref, assinava o cache e agendava o frame; o cleanup cancelava
+    // os dois; o run 2 batia na ref e voltava sem assinar nada. Os dois
+    // caminhos de emissao morriam, e o resultado em `npm run dev` era ZERO
+    // evento, nao dois — com o agravante de que `npm run dev` e o modo em
+    // que a conferencia manual acontece.
     const jaEmitido = useRef<string | null>(null)
 
     useEffect(() => {

@@ -21,8 +21,8 @@ MAX_PAGE_CHARS = 45000
 @dataclass(frozen=True)
 class UsoIA:
     """
-    O que uma chamada de IA consumiu. Nao fala com banco: quem grava e o
-    endpoint, que e quem tem o contexto da sessao (Art. 1).
+    O que uma chamada de IA consumiu. Não fala com banco: quem grava é o
+    endpoint, que é quem tem o contexto da sessão (Art. 1).
     """
     model_name: str
     input_tokens: int
@@ -32,8 +32,8 @@ class UsoIA:
 
 def _uso_de(response: Any, latency_ms: int) -> UsoIA:
     """
-    Le usage_metadata da resposta. Tolerante de proposito: o caminho com
-    url_context ja voltou sem metadata, e nesse caso o registro e gravado com
+    Lê usage_metadata da resposta. Tolerante de propósito: o caminho com
+    url_context já voltou sem metadata, e nesse caso o registro é gravado com
     zero em vez de descartado.
     """
     metadata = getattr(response, "usage_metadata", None)
