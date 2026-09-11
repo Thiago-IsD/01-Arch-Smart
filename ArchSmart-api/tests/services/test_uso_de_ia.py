@@ -10,7 +10,7 @@ from decimal import Decimal
 import pytest
 
 from app.core.precos_ia import PRECOS, custo_usd
-from app.services.ai_service import UsoIA, _uso_de
+from app.services.ai_service import UsoIA, _uso_de, extract_product_data
 
 
 def test_custo_soma_entrada_e_saida_com_precos_diferentes():
@@ -83,3 +83,16 @@ def test_uso_sem_metadata_conta_zero_em_vez_de_estourar():
     assert uso.input_tokens == 0
     assert uso.output_tokens == 0
     assert uso.latency_ms == 800
+
+
+async def test_extract_sem_texto_e_sem_url_devolve_uso_none():
+    """
+    Corpo vazio nunca chama o Gemini. O segundo valor tem que ser None, nao um
+    UsoIA zerado: um UsoIA(0, 0, 0) seria indistinguivel de uma chamada real
+    que por acaso devolveu zero tokens, e o endpoint usa esse None para saber
+    que nao ha nada a gravar em ai_usage_logs.
+    """
+    dados, uso = await extract_product_data("", None)
+
+    assert dados == {}
+    assert uso is None

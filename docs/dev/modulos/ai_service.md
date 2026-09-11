@@ -19,7 +19,7 @@ de produto" da Seção 8, que é sobre telas.
 ```python
 async def extract_product_data(
     raw_text: str, source_url: str | None = None
-) -> Tuple[Dict[str, Any], UsoIA]
+) -> Tuple[Dict[str, Any], UsoIA | None]
 ```
 
 Não é um endpoint HTTP. Chamado por `POST /api/products/normalize`
@@ -31,10 +31,10 @@ uma mensagem via o dicionário `AI_ERROR_RESPONSES`.
 
 Devolve uma **tupla** desde a Tarefa 3 da Seção 7, não só o dicionário de
 dados: o segundo elemento é `UsoIA(model_name, input_tokens, output_tokens,
-latency_ms)`, o que a chamada de IA consumiu. Todo `return` da função —
-inclusive o caminho vazio (sem texto e sem URL) e o de extração parcial
-(`source_blocked`) — devolve os dois valores; um `return` que devolvesse só o
-dicionário quebraria o desempacotamento no chamador em produção, não no tipo
+latency_ms)`, o que a chamada de IA consumiu — ou `None`, quando nenhuma
+chamada de IA aconteceu. Todo `return` da função devolve os dois valores; um
+`return` que devolvesse só o dicionário quebraria o desempacotamento no
+chamador em produção, não no tipo
 estático (o retorno é `Dict[str, Any]` num literal, não checado linha a
 linha pelo `mypy`/`tsc` deste repositório).
 
@@ -102,7 +102,15 @@ contá-la infla o número sem corresponder a custo nenhum.
 `_uso_de` é tolerante de propósito: o caminho com `url_context` usa `tools`
 em vez de JSON mode e às vezes volta sem `usage_metadata`; nesse caso os
 tokens são contados como zero em vez de a função estourar ou o registro ser
-descartado.
+descartado. Isso é diferente de **não ter chamado o Gemini**: quando
+`extract_product_data` recebe corpo vazio (sem texto e sem URL — o default
+de `NormalizeRequest`), nenhuma chamada acontece, e o segundo valor da
+tupla é `None`, não um `UsoIA` com tokens zerados. A distinção importa
+porque `UsoIA(0, 0, 0)` seria indistinguível de uma chamada real do Gemini
+que por acaso devolveu zero tokens — e o endpoint usa esse `None` para
+**pular a gravação** em vez de criar uma linha fantasma em
+`ai_usage_logs` (0 tokens, `cost_usd=0`, `latency_ms=0`) para uma
+requisição que nunca chegou ao provedor.
 
 **Este módulo não grava `UsoIA` em lugar nenhum.** Ele não tem `Session` nem
 `ScopedRepository` — não fala com o banco, ponto (é chamado antes de existir

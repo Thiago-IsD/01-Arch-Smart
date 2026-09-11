@@ -126,20 +126,24 @@ async def normalize_product(
         status_code, detail = AI_ERROR_RESPONSES[type(e)]
         raise HTTPException(status_code=status_code, detail=detail)
 
-    # Art. 9: na MESMA transacao da resposta, sem savepoint e sem engolir. Se o
-    # registro de custo falhar, a requisicao falha — nao se serve resposta de IA
-    # sem registrar o que ela custou. E o oposto de `track()`, de proposito.
-    repo.create(
-        AiUsageLog,
-        model_name=uso.model_name,
-        input_tokens=uso.input_tokens,
-        output_tokens=uso.output_tokens,
-        token_count=uso.input_tokens + uso.output_tokens,
-        cost_usd=custo_usd(uso.model_name, uso.input_tokens, uso.output_tokens),
-        latency_ms=uso.latency_ms,
-        feature="product_normalize",
-    )
-    repo.db.commit()
+    # `uso` e None quando nenhuma chamada de IA aconteceu (corpo vazio, sem
+    # texto e sem URL) — nao ha o que registrar, e gravar mesmo assim criaria
+    # uma linha fantasma (0 tokens, 0ms) indistinguivel de uma chamada real.
+    if uso is not None:
+        # Art. 9: na MESMA transacao da resposta, sem savepoint e sem engolir. Se o
+        # registro de custo falhar, a requisicao falha — nao se serve resposta de IA
+        # sem registrar o que ela custou. E o oposto de `track()`, de proposito.
+        repo.create(
+            AiUsageLog,
+            model_name=uso.model_name,
+            input_tokens=uso.input_tokens,
+            output_tokens=uso.output_tokens,
+            token_count=uso.input_tokens + uso.output_tokens,
+            cost_usd=custo_usd(uso.model_name, uso.input_tokens, uso.output_tokens),
+            latency_ms=uso.latency_ms,
+            feature="product_normalize",
+        )
+        repo.db.commit()
 
     return dados
 

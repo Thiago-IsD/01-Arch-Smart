@@ -288,16 +288,22 @@ def _parse(response_text: str) -> Dict[str, Any]:
 
 async def extract_product_data(
     raw_text: str, source_url: str | None = None
-) -> Tuple[Dict[str, Any], UsoIA]:
+) -> Tuple[Dict[str, Any], UsoIA | None]:
     """
     Extrai dados estruturados de um produto a partir de texto bruto e/ou da URL da loja.
 
     Tenta primeiro baixar a página diretamente (mais rápido e barato). Se a loja bloquear,
     delega a busca ao url_context do Gemini. Levanta AIServiceError em caso de falha.
+
+    O segundo valor da tupla e None quando nenhuma chamada de IA aconteceu (corpo
+    vazio, sem texto e sem URL) — nao um UsoIA zerado. Um UsoIA com tokens=0 seria
+    indistinguivel de uma chamada real que por acaso devolveu zero tokens, e quem
+    grava o log (o endpoint) nao deve criar uma linha fantasma para uma requisicao
+    que nunca chegou ao provedor.
     """
     if not isinstance(raw_text, str) or len(raw_text.strip()) == 0:
         if not source_url:
-            return {}, UsoIA(model_name=GEMINI_MODEL, input_tokens=0, output_tokens=0, latency_ms=0)
+            return {}, None
 
     scraped = await _scrape_page(source_url) if source_url else None
     use_url_context = source_url is not None and scraped is None
