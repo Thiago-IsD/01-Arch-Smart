@@ -1,9 +1,24 @@
 """
 Endpoint de telemetria: escopo, lote e identidade.
 
-O teste do account_id forjado e o que fecha a tarefa. Ele nao prova que o
-endpoint "ignora um campo": prova que a conta gravada e a da SESSAO, mesmo
-quando o corpo pede outra (Art. 1).
+O teste do account_id forjado e o que fecha a tarefa. Ele prova a garantia
+DE FORA, do ponto de vista de quem chama a API: a conta gravada e a da
+SESSAO, mesmo quando o corpo pede outra (Art. 1).
+
+Isso e so metade da defesa, e o teste nao prova a outra metade. Aqui quem
+barra o valor forjado e o SCHEMA: `EventoRecebido` (app/schemas/
+telemetry_schema.py) nao declara `account_id`, e o Pydantic v2 descarta o
+campo com `extra="ignore"` (o padrao do model_config) antes mesmo de o
+endpoint rodar — o valor nunca chega a `track()` nem a
+`ScopedRepository.create()`. A segunda camada, `ScopedRepository.create()`
+descartando `account_id`/`created_by` recebido em kwargs, tem teste proprio
+e direto contra o repositorio em tests/api/test_repositorio.py:
+`test_create_ignora_account_id_vindo_do_cliente`,
+`test_create_ignora_relacionamento_account_vindo_do_cliente` e
+`test_create_ignora_created_by_vindo_do_cliente` (Secao 4). Nao ha lacuna
+de comportamento — sao duas camadas, cada uma com seu teste —, mas um
+leitor que so olhasse este arquivo poderia achar que ele sozinho cobre as
+duas.
 """
 from sqlalchemy.orm import Session
 
@@ -26,6 +41,19 @@ def test_evento_e_gravado_na_conta_da_sessao(db: Session, client_a, conta_a):
 
 
 def test_account_id_forjado_no_corpo_e_ignorado(db: Session, client_a, conta_a, conta_b):
+    """
+    Prova a garantia de fora (Art. 1): a conta gravada e a da sessao, mesmo
+    quando o corpo pede outra. Nao prova a defesa do `ScopedRepository.
+    create()` — o mecanismo exercitado aqui e o schema: `EventoRecebido` nao
+    declara `account_id`, entao o Pydantic descarta o campo forjado antes de
+    o endpoint sequer rodar, e o valor nunca chega perto do repositorio. A
+    defesa de `create()` descartando `account_id`/`created_by` de kwargs tem
+    teste direto em tests/api/test_repositorio.py
+    (`test_create_ignora_account_id_vindo_do_cliente`,
+    `test_create_ignora_relacionamento_account_vindo_do_cliente`,
+    `test_create_ignora_created_by_vindo_do_cliente`) — duas camadas, dois
+    testes, sem lacuna.
+    """
     minha_conta, _ = conta_a
     conta_alheia, _ = conta_b
 
