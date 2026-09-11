@@ -3,7 +3,6 @@
   "eslint_erros": 85,
   "cores_literais": 518,
   "modulos_sem_doc": [
-    "ai_service",
     "auth_service"
   ],
   "fetch_fora_de_lib_api": 75,

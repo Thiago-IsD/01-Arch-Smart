@@ -1,7 +1,8 @@
 "use client"
 
-import type { ReactElement, ReactNode } from "react"
+import { useEffect, type ReactElement, type ReactNode } from "react"
 import type { UseQueryResult } from "@tanstack/react-query"
+import { useReportarVazio } from "@/features/telemetry/contexto"
 
 /**
  * Fronteira de query com os estados obrigatorios por tipo.
@@ -58,12 +59,27 @@ export function QueryBoundary<T>({
     isEmpty,
     children,
 }: Props<T>): ReactElement {
+    const reportarVazio = useReportarVazio()
+
+    // Calculado antes dos returns porque hook nao pode ficar atras de return.
+    // `null` enquanto nao ha resposta: nao da para dizer "vazio" nem
+    // "nao vazio" sobre dados que ainda nao chegaram.
+    const pronto = !query.isPending && !query.isError
+    const vazio = pronto
+        ? isEmpty
+            ? isEmpty(query.data as T)
+            : vazioPorPadrao(query.data)
+        : null
+
+    // Em efeito, nao no render: reportar durante o render e efeito colateral
+    // no meio de uma fase que o React pode repetir ou descartar.
+    useEffect(() => {
+        if (vazio !== null) reportarVazio(vazio)
+    }, [vazio, reportarVazio])
+
     if (query.isPending) return <>{skeleton}</>
     if (query.isError) return <>{error(query.error as Error, () => void query.refetch())}</>
-
-    const dados = query.data as T
-    const vazio = isEmpty ? isEmpty(dados) : vazioPorPadrao(dados)
     if (vazio) return <>{empty}</>
 
-    return <>{children(dados)}</>
+    return <>{children(query.data as T)}</>
 }

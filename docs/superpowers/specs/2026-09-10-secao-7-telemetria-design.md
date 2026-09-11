@@ -143,6 +143,35 @@ Tela autenticada sem query nenhuma emite depois da pintura. Para não misturar
 duas medições na mesma coluna, o evento carrega
 **`medido_ate: "dados" | "pintura"`** dizendo qual das duas o `load_ms` é.
 
+> **Corrigido em 10/09/2026, na revisão final da execução.** O primeiro
+> bullet desta decisão afirma que `load_ms` "funciona hoje na Biblioteca […]
+> o que permite conferir a telemetria contra uma medição independente."
+> **Não funciona, e o motivo é estrutural, não um bug pequeno:**
+>
+> - **`TelemetriaDeTela` decide no primeiro frame.** Se nada está em voo no
+>   primeiro `requestAnimationFrame` depois de montar, emite
+>   `medido_ate: "pintura"` e encerra. Mas `app/(dashboard)/library/page.tsx`
+>   serve a Biblioteca por streaming — `<LibraryData>` dentro de
+>   `<Suspense>` —, e a query da tela só monta quando o stream chega, depois
+>   desse primeiro frame. Medido por experimento numa tela cujo dado levou
+>   ~100 ms: `{"screen":"/library","load_ms":28,"medido_ate":"pintura",
+>   "is_empty":null}`.
+> - **Mesmo no caminho que chega a emitir `"dados"`, não é a lista que se
+>   mede.** A lista da Biblioteca **nunca** dispara requisição do navegador —
+>   `LibraryData` faz `prefetchQuery` no servidor e entrega por
+>   `HydrationBoundary` (Seção 5). O que fica em voo, e o que
+>   `TelemetriaDeTela` cronometra quando algo cronometra, é o
+>   `useInboxCount` — a query do badge, que a Seção 5 deixou fora do
+>   prefetch.
+>
+> A Biblioteca foi escolhida como a tela de aferição justamente por ter um
+> número independente (a mediana de 1454 ms do E2E de 10/09) — e é a tela em
+> que o instrumento não mede o que se propõe a medir. Definição correta do
+> que `load_ms` mede em
+> [`docs/dev/modulos/telemetry.md`](../../dev/modulos/telemetry.md); a nota
+> da Seção 7 no `PROGRESS.md` registra que a coluna não é dado utilizável
+> hoje.
+
 > **Corrigido em 10/09/2026, ao mapear os arquivos do plano.** Uma versão
 > anterior deste parágrafo dizia que landing e páginas legais emitiriam depois
 > da pintura. **Não emitem, e não dá para emitirem:** o endpoint tira
