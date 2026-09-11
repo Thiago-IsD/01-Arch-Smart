@@ -138,11 +138,36 @@ legais, e toda tela que a Seção 8 ainda não migrou. Isso é o ponto: **o rót
 passa a dizer a verdade sobre o que foi medido**, em vez de chamar de `dados`
 um número que cronometrou outra coisa.
 
+> ⚠️ **Corrigido em 11/09/2026, ao escrever o plano de execução — duas coisas
+> que este desenho deixou ambíguas, e o plano
+> [`2026-09-11-secao-8-fundacao-e-biblioteca.md`](../plans/2026-09-11-secao-8-fundacao-e-biblioteca.md)
+> vale sobre o texto acima onde os dois discordarem.**
+>
+> 1. **Quando `"pintura"` é decidido.** O texto acima diz que `"pintura"` vale
+>    para tela sem `QueryBoundary`, e não diz quando essa conclusão é tirada.
+>    Qualquer prazo fixo erra: o boundary da Biblioteca só monta **depois** de a
+>    API responder, porque o `LibraryData` dá `await` antes de o `<Suspense>`
+>    liberar o bloco — e o P95 dessa API é 1.220 ms. Prazo curto rotula a
+>    Biblioteca de `pintura`, que é o defeito que esta decisão conserta; prazo
+>    longo atrasa toda tela sem região. A decisão acontece no **fim da
+>    navegação** (troca de rota, desmontagem, ou `pagehide`), com o instante da
+>    primeira pintura capturado antes e usado depois — então o número continua
+>    sendo o tempo até pintar, e só o envio é que fica para depois. O preço:
+>    tela sem região emite o evento quando o usuário sai dela, e uma aba fechada
+>    sem `pagehide` perde aquela visita.
+> 2. **`medido_ate` tem um quinto valor: `"abandonado"`.** Região que anuncia e
+>    nunca resolve — o usuário saiu antes de o dado chegar — não é `pintura`.
+>    Chamá-la de `pintura` seria a mesma classe de mentira que esta seção
+>    conserta, e o caso é informação útil numa seção de performance: é a
+>    desistência, medida. `is_empty` é `null` nele.
+
 **Uma região principal por tela.** Duas marcadas emitem aviso de console em
 desenvolvimento e a primeira ganha — determinístico, em vez de depender da
 ordem da árvore. Isso responde a pendência 4, que perguntava o que "vazio"
-significa numa tela com várias regiões: significa o vazio da região principal,
-e `null` quando nenhuma foi marcada.
+significa numa tela com várias regiões: significa o vazio da região principal.
+Quando nenhuma é marcada, vale a primeira região que reportar, e o evento grava
+`principal_declarada: false` — para a consulta poder separar o número que veio
+de região declarada do que veio de quem chegou primeiro.
 
 **O report vai para uma `ref` e fica latchado.** A telemetria lê o latch ao
 montar o efeito, então a ordem de execução dos efeitos entre `TelemetriaDeTela`
