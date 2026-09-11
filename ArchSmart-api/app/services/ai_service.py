@@ -1,6 +1,8 @@
 import json
 import logging
+import time
 import httpx
+from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 from app.core.config import settings
 from pydantic import BaseModel, ValidationError
@@ -14,6 +16,33 @@ GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_TIMEOUT_MS = 30_000
 SCRAPE_TIMEOUT_S = 10.0
 MAX_PAGE_CHARS = 45000
+
+
+@dataclass(frozen=True)
+class UsoIA:
+    """
+    O que uma chamada de IA consumiu. Nao fala com banco: quem grava e o
+    endpoint, que e quem tem o contexto da sessao (Art. 1).
+    """
+    model_name: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: int
+
+
+def _uso_de(response: Any, latency_ms: int) -> UsoIA:
+    """
+    Le usage_metadata da resposta. Tolerante de proposito: o caminho com
+    url_context ja voltou sem metadata, e nesse caso o registro e gravado com
+    zero em vez de descartado.
+    """
+    metadata = getattr(response, "usage_metadata", None)
+    return UsoIA(
+        model_name=GEMINI_MODEL,
+        input_tokens=getattr(metadata, "prompt_token_count", None) or 0,
+        output_tokens=getattr(metadata, "candidates_token_count", None) or 0,
+        latency_ms=latency_ms,
+    )
 
 
 class AIServiceError(Exception):
@@ -145,9 +174,9 @@ def _classify(exc: Exception) -> AIServiceError:
     wait=wait_exponential_jitter(initial=1, max=8),
     reraise=True,
 )
-async def _generate(prompt: str, use_url_context: bool) -> Tuple[str, bool]:
+async def _generate(prompt: str, use_url_context: bool) -> Tuple[str, bool, UsoIA]:
     """
-    Chama o Gemini e devolve (texto, source_blocked).
+    Chama o Gemini e devolve (texto, source_blocked, uso).
 
     Com use_url_context, o próprio Google busca a URL — o que contorna bloqueios ao nosso IP.
     Esse caminho não pode usar JSON mode: combinar tools com response_mime_type exige um
@@ -168,6 +197,7 @@ async def _generate(prompt: str, use_url_context: bool) -> Tuple[str, bool]:
             response_mime_type="application/json",
         )
 
+    inicio = time.perf_counter()
     try:
         response = await client.aio.models.generate_content(
             model=GEMINI_MODEL,
@@ -178,8 +208,13 @@ async def _generate(prompt: str, use_url_context: bool) -> Tuple[str, bool]:
         raise
     except Exception as e:
         raise _classify(e) from e
+    latency_ms = int((time.perf_counter() - inicio) * 1000)
 
-    return response.text or "", _url_retrieval_failed(response) if use_url_context else False
+    return (
+        response.text or "",
+        _url_retrieval_failed(response) if use_url_context else False,
+        _uso_de(response, latency_ms),
+    )
 
 
 def _url_retrieval_failed(response: Any) -> bool:
@@ -251,7 +286,9 @@ def _parse(response_text: str) -> Dict[str, Any]:
     return result
 
 
-async def extract_product_data(raw_text: str, source_url: str | None = None) -> Dict[str, Any]:
+async def extract_product_data(
+    raw_text: str, source_url: str | None = None
+) -> Tuple[Dict[str, Any], UsoIA]:
     """
     Extrai dados estruturados de um produto a partir de texto bruto e/ou da URL da loja.
 
@@ -260,7 +297,7 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
     """
     if not isinstance(raw_text, str) or len(raw_text.strip()) == 0:
         if not source_url:
-            return {}
+            return {}, UsoIA(model_name=GEMINI_MODEL, input_tokens=0, output_tokens=0, latency_ms=0)
 
     scraped = await _scrape_page(source_url) if source_url else None
     use_url_context = source_url is not None and scraped is None
@@ -272,7 +309,7 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
         prompt += f"\n\nExtraia os dados do produto a partir desta página: {source_url}"
 
     try:
-        response_text, source_blocked = await _generate(prompt, use_url_context)
+        response_text, source_blocked, uso = await _generate(prompt, use_url_context)
     except AIServiceError:
         raise
     except Exception as e:
@@ -283,4 +320,4 @@ async def extract_product_data(raw_text: str, source_url: str | None = None) -> 
     if source_blocked:
         logger.warning(f"Gemini url_context could not retrieve {source_url}; returning name-only extraction.")
         result["source_blocked"] = True
-    return result
+    return result, uso
