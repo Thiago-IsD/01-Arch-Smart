@@ -45,7 +45,7 @@ Nenhuma diretamente. Do outro lado do endpoint, `product_events` — ver
 | Propriedade | O que é |
 |---|---|
 | `screen` | O caminho normalizado (`/projects/[id]`). |
-| `load_ms` | Milissegundos do início da navegação até o momento medido. |
+| `load_ms` | Milissegundos desde que o efeito de `TelemetriaDeTela` monta — depois do commit da rota, incluindo o fallback de um `<Suspense>` — até o momento medido. **Não** é desde o clique nem desde que os dados chegam; ver o aviso abaixo da tabela. |
 | `medido_ate` | `"dados"` ou `"pintura"` — qual dos dois o `load_ms` é. |
 | `is_empty` | `true`, `false` ou **`null`**. |
 
@@ -65,6 +65,25 @@ boundary, ou boundary que ainda estava em `skeleton`/`error`.
 > testado, mas nenhuma tela real o alimenta. Quem abrir `product_events` antes
 > disso vai ver só `null` na coluna; não é o canal quebrado.
 
+> **Hoje `load_ms` não é dado utilizável, e o motivo é estrutural, não um
+> bug pequeno.** O relógio decide no primeiro `requestAnimationFrame` depois
+> de o efeito montar: se nada está em voo naquele frame, emite
+> `medido_ate: "pintura"` e encerra. Isso roda **antes** de existir dado
+> algum em qualquer tela servida por streaming — `app/(dashboard)/library/page.tsx`
+> põe `<LibraryData>` dentro de `<Suspense>`, e a query da tela só monta
+> quando o stream chega, depois desse primeiro frame. Medido por
+> experimento numa tela cujo dado levou ~100 ms:
+> `{"screen":"/library","load_ms":28,"medido_ate":"pintura","is_empty":null}`.
+>
+> Há uma segunda camada, específica da Biblioteca: a lista **nunca** dispara
+> requisição do navegador — `LibraryData` faz `prefetchQuery` no servidor e
+> entrega por `HydrationBoundary` (Seção 5). Então mesmo quando o caminho
+> chega a emitir `medido_ate: "dados"`, o que está sendo cronometrado é o
+> `useInboxCount` — a query do badge, que a Seção 5 deixou fora do prefetch
+> —, **não a lista**. Quem abrir `product_events` para tirar média de
+> `load_ms` antes de a Seção 8 mudar este gatilho vai somar zeros de
+> `"pintura"` prematura e tempos de badge como se fossem tempo de tela.
+
 ## Decisões não-óbvias
 
 **Só as 15 telas autenticadas de `app/(dashboard)/`.** As outras 19 são
@@ -74,7 +93,7 @@ anônimas: sem sessão não há `account_id`, e o Art. 1 não admite um inventad
 re-renderizaria a árvore inteira do dashboard a cada boundary que decide, e o
 valor só é lido uma vez, na hora de emitir.
 
-**O gatilho é escopado à navegação, não ao cache global.** Esta é a parte
+**O gatilho ainda pergunta ao cache global, não à navegação.** Esta é a parte
 delicada do módulo, e vale explicar o que ela evita. A pergunta certa é "esta
 tela chegou a buscar alguma coisa?"; perguntar ao cache se ele tem alguma
 entrada (`getQueryCache().getAll().length > 0`) responde outra, porque da
@@ -102,6 +121,18 @@ exigindo exatamente uma linha, que falha nas duas direções.
 a tela do usuário é pior que telemetria nenhuma, e o modo de falha de uma
 promise rejeitada aqui é um *unhandled rejection* que ninguém vê até virar erro
 no console de um cliente.
+
+> **Um dos erros que isso engole é `429`, e o balde é da plataforma inteira,
+> não por usuário.** `POST /api/telemetry/events` tem
+> `@limiter.limit("60/minute")`, mas o uvicorn roda sem
+> `--forwarded-allow-ips` (`ArchSmart-api/Dockerfile`), e
+> `app/core/rate_limit.py` documenta que por isso `get_remote_address`
+> resolve para o IP do proxy em toda requisição — as 60 requisições por
+> minuto somam **todos os usuários da plataforma**, não 60 por pessoa. Como
+> `useTrack()` manda uma requisição por evento e `screen_viewed` sai a cada
+> navegação, um punhado de usuários navegando ao mesmo tempo já encosta no
+> teto, e a perda pelo `429` é silenciosa — indistinguível de "ninguém
+> navegou".
 
 ## O que quebra se você mexer aqui
 

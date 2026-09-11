@@ -823,6 +823,28 @@ _Última atualização: 2026-09-10_
 > foi inventado, estimado ou escrito como aproximação em lugar nenhum deste
 > repositório.
 >
+> **Achado da revisão final, mais grave do que "a prova viva não rodou": hoje
+> `load_ms` não é dado utilizável, nem para a Biblioteca.** `TelemetriaDeTela`
+> decide no primeiro `requestAnimationFrame`: se nada está em voo naquele
+> frame, emite `medido_ate: "pintura"` e encerra. Mas
+> `app/(dashboard)/library/page.tsx` serve a Biblioteca por streaming —
+> `<LibraryData>` dentro de `<Suspense>` —, e a query da tela só monta quando
+> o stream chega, depois desse primeiro frame. Medido por experimento numa
+> tela cujo dado levou ~100 ms:
+> `{"screen":"/library","load_ms":28,"medido_ate":"pintura","is_empty":null}`.
+> E mesmo no caminho que chega a emitir `"dados"`, a lista da Biblioteca
+> **nunca** dispara requisição do navegador (`LibraryData` faz `prefetchQuery`
+> no servidor e entrega por `HydrationBoundary`, Seção 5) — o que se
+> cronometra ali é o `useInboxCount`, a query do badge fora do prefetch, não
+> a lista. A decisão 5 da spec desta seção afirmava que dava para conferir
+> `load_ms` contra a mediana de 1454 ms do E2E; não dá, e a correção está
+> registrada na própria spec, datada. **Quem abrir `product_events` na Seção
+> 8 para tirar média de `load_ms` vai somar zeros de "pintura" prematura e
+> tempos de badge como se fossem tempo de tela — isso precisa ser sabido
+> antes de calcular qualquer coisa com essa coluna.** Definição correta do
+> que `load_ms` mede em
+> [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md).
+>
 > **Os preços de IA que entraram em `ArchSmart-api/app/core/precos_ia.py`:**
 > fonte `https://ai.google.dev/gemini-api/docs/pricing`, consultada em
 > 10/09/2026 (a página informa "last update 2026-09-08 UTC"). Tier pago,
@@ -838,9 +860,12 @@ _Última atualização: 2026-09-10_
 > `arquivos_acima_de_400: 8`, `contraste_reprovado: 4`, `cores_literais: 518`,
 > `fetch_fora_de_lib_api: 75`, `hover_sem_focus: 8`, `modulos_sem_doc: 1`,
 > `supabase_fora_de_lib_api: 0`, `tabindex_negativo: 5` (`eslint_erros` sai
-> `PULADA` sem `--eslint-json`, baseline 85, não medido nesta rodada de
-> fechamento por não ter havido mudança de frontend fora do já coberto pelas
-> tarefas).
+> `PULADA` sem `--eslint-json` nesta rodada — não medido localmente; quem
+> mede é o job `frontend` do CI. Medido à parte, na onda de correção final
+> desta seção: `cd ArchSmart-web && npx eslint . --format json
+> --output-file eslint-report.json`, depois `python tools/catraca.py
+> --eslint-json ArchSmart-web/eslint-report.json` da raiz →
+> `eslint_erros: 85, igual ao baseline`).
 >
 > **Três defeitos que o plano tinha e que a execução encontrou** — registrados
 > aqui para que não voltem pelo mesmo caminho:
@@ -900,6 +925,20 @@ _Última atualização: 2026-09-10_
 > usuário" (a mesma regra que rege `ai_usage_logs` ao contrário — Art. 9), mas
 > precisa estar escrito para quem for depurar perda silenciosa de evento: um
 > `204` desta rota não é prova de que algo foi gravado.
+>
+> **O rate limit do endpoint também precisa de registro correto.** Uma
+> triagem anterior classificou `@limiter.limit("60/minute")` como "folgado
+> hoje, aperta na Seção 8" — errado, e o motivo muda a natureza da pendência:
+> o uvicorn roda sem `--forwarded-allow-ips` (`ArchSmart-api/Dockerfile`), e
+> `app/core/rate_limit.py` documenta que por isso `get_remote_address`
+> resolve para o IP do proxy em **toda** requisição. Não são 60 requisições
+> por minuto por usuário: são 60 para a plataforma inteira, somando todos os
+> usuários simultâneos. Como `useTrack()` manda uma requisição por evento e
+> `screen_viewed` sai a cada navegação, e o `429` é engolido por
+> `enviarEventos` (a mesma regra de "telemetria nunca derruba a requisição do
+> usuário"), a perda é silenciosa e indistinguível de "ninguém navegou" — não
+> é uma folga que aperta com volume futuro, é um teto raso hoje, para a
+> plataforma inteira.
 
 ## Seção 8 · Migração das telas
 **0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`

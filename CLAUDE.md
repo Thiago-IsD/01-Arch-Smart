@@ -142,6 +142,14 @@ de uma pendência é o que impede que ela volte pelo mesmo caminho.
    > `docs/dev/ambientes-online.md` e `docs/dev/deploy.md` do `<title>`
    > medido em 30/08/2026 — anterior ao fix do `layout.tsx`, registro
    > histórico, não violação viva.
+   >
+   > **Esta enumeração envelheceu no mesmo dia em que foi escrita.**
+   > `scripts/validate-env.ps1:1` também tinha "Arch Smart", fora do escopo de
+   > `ArchSmart-web/src` e por isso fora de toda varredura anterior —
+   > inclusive a sem restrição de extensão acima, que só olhou
+   > `ArchSmart-web/src`. Corrigida na mesma onda de correção que acrescentou
+   > este parágrafo, para "Arq Smart". Confere com
+   > `grep -rn "Arch Smart" scripts/` → 0.
 
 ## O que a Seção 6 deixou em aberto — **as duas foram decididas em 10/09/2026**
 

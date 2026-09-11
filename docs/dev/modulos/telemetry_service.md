@@ -31,7 +31,7 @@ abre sessão própria — e grava um `ProductEvent` com `name=evento` e
 parâmetro: saem do `ctx.ctx` (o `RequestContext` resolvido no servidor),
 exatamente como todo `repo.create(...)` no resto da API. `propriedades`
 ausente vira `{}`, nunca `NULL` — a coluna é `NOT NULL` com
-`server_default 'jsonb `{}``, e o valor Python espelha isso.
+`server_default=text("'{}'::jsonb")`, e o valor Python espelha isso.
 
 `track()` **nunca levanta**. Qualquer exceção — `name` nulo, tipo que o
 JSONB não aceita, o que for — vira `logger.warning(..., exc_info=True)` e o
@@ -88,12 +88,12 @@ num log.
 
 ## O que quebra se você mexer aqui
 
-Ainda não há chamador em produção: esta tarefa entrega só o modelo e o
-serviço. A Tarefa 4 da Seção 7 é quem vai chamar
-`track(repo, evento.name, evento.properties)` a partir de um ponto central
-(não endpoint por endpoint) — mudar a assinatura de `track()` agora (nome
-dos parâmetros, ordem, ou o fato de retornar `None`) é decisão que afeta
-diretamente essa tarefa. `ProductEvent`/`AiUsageLog` em
-`app.models.all_models` e `track()` em `app.services.telemetry_service` são
-os dois nomes que a Seção 7 já está construindo em cima — não renomear sem
-avisar quem depende deles.
+A Tarefa 4 da Seção 7 já chama `track(repo, evento.name, evento.properties)`
+a partir de `POST /api/telemetry/events`
+(`app/api/endpoints/telemetry.py`), um ponto central, não endpoint por
+endpoint — mudar a assinatura de `track()` agora (nome dos parâmetros,
+ordem, ou o fato de retornar `None`) quebra esse chamador.
+`ProductEvent`/`AiUsageLog` em `app.models.all_models` e `track()` em
+`app.services.telemetry_service` são os dois nomes que a Tarefa 5
+(`useTrack()`/`screen_viewed`, no frontend) também está construindo em
+cima — não renomear sem avisar quem depende deles.
