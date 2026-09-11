@@ -17,10 +17,10 @@ a decisão de não pôr. As quatro foram decididas hoje, e três delas viram
 trabalho nesta seção. A quarta — a visibilidade do `429` — ficou deliberadamente
 de fora, e está registrada abaixo como tal.
 
-Além das quatro, a Seção 8 herdava seis itens listados no `CLAUDE.md` em "O que
-a Seção 8 herda". Três entram aqui (`FormField`, `e2e` sem portão, badge do
-inbox sem prefetch), três ficam para a tela que os encontrar (`DataTable`,
-`archsmart:budget_updated`, furos que sobrarem).
+Além das quatro, a Seção 8 herdava **seis** itens listados no `CLAUDE.md` em
+"O que a Seção 8 herda". **Quatro entram aqui**: os dois `FormField`, os furos
+da catraca, o `e2e` sem portão, e o badge do inbox sem prefetch. **Dois ficam
+para a tela que os encontrar**: o `DataTable` e o `archsmart:budget_updated`.
 
 ## O estado medido em 11/09/2026
 
