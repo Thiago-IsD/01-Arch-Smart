@@ -49,6 +49,21 @@ class TestContagemDeCores(unittest.TestCase):
         raiz = self._escrever("bg-emerald-600", nome="LEIAME.md")
         self.assertEqual(contar_cores(raiz), 0)
 
+    def test_conta_branco_e_preto(self):
+        # `white`/`black` nao tem sufixo numerico, entao RE_PALETA nao os pega.
+        # Sao 68 ocorrencias reais no front medidas em 11/09/2026, e a regua
+        # dizia zero.
+        raiz = self._escrever('<div className="bg-white text-black border-white" />')
+        self.assertEqual(contar_cores(raiz), 3)
+
+    def test_conta_hex_fora_de_bg_text_border(self):
+        raiz = self._escrever('<div className="shadow-[#F88379] ring-[#fff]" />')
+        self.assertEqual(contar_cores(raiz), 2)
+
+    def test_conta_ring_offset_de_paleta(self):
+        raiz = self._escrever('<div className="ring-offset-slate-900" />')
+        self.assertEqual(contar_cores(raiz), 1)
+
 
 class TestModulosSemDoc(unittest.TestCase):
     def _base(self):
@@ -323,10 +338,13 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
         self.assertEqual(catraca.medir(None)["tabindex_negativo"], 5)
 
     def test_conta_hover_sem_focus(self):
-        # Rodada 1 de revisao: a regua ampliada (grupo nomeado dos dois lados)
-        # mede 8, batendo o numero do brief -- mas medido, nao suposto. Ver
-        # tools/catraca.py (RE_GROUP_HOVER/RE_FOCUS) e task-7-report.md.
-        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 8)
+        # Subiu de 8 para 9 na Tarefa 2 da Secao 8: a regua passou a ver
+        # `invisible`/`hidden` ao lado de `opacity-0`, e BudgetItemQuantityCell
+        # tem `hidden group-hover:block` sem escape de foco -- defeito real que
+        # sempre existiu e a regua nao via. Nao e defeito novo entrando; e a
+        # regua vendo mais do que sempre esteve la. Medido, nao suposto -- ver
+        # tools/catraca.py (RE_INVISIVEL) e task-2-report.md.
+        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 9)
 
     def test_linha_com_focus_within_nao_conta(self):
         self.assertEqual(
@@ -380,6 +398,47 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
         self.assertEqual(
             catraca.contar_hover_sem_focus_no_texto(
                 'className="opacity-0 group-hover/opt:opacity-100 focus-within/opt:opacity-100"'
+            ),
+            0,
+        )
+
+    def test_invisible_com_group_hover_sem_foco_conta(self):
+        # `invisible group-hover:visible` e `hidden group-hover:block` sao o
+        # MESMO defeito que `opacity-0 group-hover:opacity-100`: o elemento so
+        # existe para quem tem mouse. A regua via um e nao via os outros dois.
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="invisible group-hover:visible"'
+            ),
+            1,
+        )
+
+    def test_hidden_com_group_hover_sem_foco_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="hidden group-hover:block"'
+            ),
+            1,
+        )
+
+    def test_invisible_com_focus_within_nao_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="invisible group-hover:visible focus-within:visible"'
+            ),
+            0,
+        )
+
+    def test_aria_hidden_na_mesma_linha_de_group_hover_nao_conta(self):
+        # `\bhidden\b` sem guarda casa "hidden" dentro de "aria-hidden", porque
+        # "-" nao e caractere de palavra e satisfaz \b por conta propria. Essa
+        # linha existe de verdade em app/page.tsx:261 -- group-hover: de
+        # animacao, aria-hidden de acessibilidade, nada a ver com o defeito de
+        # visibilidade que esta medida cobre. Medido: sem o `(?<!-)` em
+        # RE_INVISIVEL, esta linha inflava hover_sem_focus de 9 para 10.
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="group-hover:translate-x-1" aria-hidden="true"'
             ),
             0,
         )
