@@ -101,9 +101,9 @@ export function MoveToProjectModal({
 
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">1. Escolha o Projeto</label>
+                        <label htmlFor="mover-projeto" className="text-sm font-medium">1. Escolha o Projeto</label>
                         <Select value={selectedProjectId} onValueChange={handleProjectChange} disabled={isLoadingProjects}>
-                            <SelectTrigger>
+                            <SelectTrigger id="mover-projeto">
                                 <SelectValue placeholder={isLoadingProjects ? "Carregando projetos..." : "Selecione um projeto"} />
                             </SelectTrigger>
                             <SelectContent>
@@ -115,9 +115,9 @@ export function MoveToProjectModal({
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">2. Escolha o Ambiente</label>
+                        <label htmlFor="mover-ambiente" className="text-sm font-medium">2. Escolha o Ambiente</label>
                         <Select value={envIdEfetivo} onValueChange={setSelectedEnvId} disabled={!selectedProjectId || isLoadingEnvs || environments.length === 0}>
-                            <SelectTrigger>
+                            <SelectTrigger id="mover-ambiente">
                                 <SelectValue placeholder={
                                     !selectedProjectId ? "Selecione o projeto primeiro" :
                                         isLoadingEnvs ? "Carregando..." :
@@ -133,9 +133,9 @@ export function MoveToProjectModal({
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">3. Regra de Medição</label>
+                        <label htmlFor="mover-regra" className="text-sm font-medium">3. Regra de Medição</label>
                         <Select value={ruleType} onValueChange={setRuleType}>
-                            <SelectTrigger>
+                            <SelectTrigger id="mover-regra">
                                 <SelectValue placeholder="Regra de Medição" />
                             </SelectTrigger>
                             <SelectContent>

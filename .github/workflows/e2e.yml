@@ -1,0 +1,96 @@
+name: E2E
+
+# SOB DEMANDA, e nao em `pull_request`/`push`. Isto NAO e skip silencioso: o job
+# existe, roda inteiro quando alguem o dispara, e a condicao de promocao esta
+# escrita logo abaixo.
+#
+# POR QUE saiu do gatilho de PR, em 12/09/2026:
+#
+#   1. `gh secret list` e `gh variable list` voltam VAZIOS — nenhum dos cinco
+#      valores existe;
+#   2. mesmo com os cinco, o job continuaria vermelho, porque a credencial do
+#      usuario de teste e rejeitada pelo Supabase de staging desde 11/09/2026
+#      (`HTTP 400, "Invalid login credentials"`).
+#
+# Ou seja: em todo PR, um X vermelho permanente que nao diz nada sobre o PR. A
+# ADR 0006 diz textualmente que um portao que nasce vermelho e desligado na
+# primeira semana — e aqui o custo e pior que isso. Branch protection nao esta
+# ligada, entao o unico mecanismo que segura a qualidade e uma pessoa lendo os
+# checks antes de mergear, sob a regra "um X vermelho e defeito real, nao
+# ruido". Um quarto X permanente treina exatamente o reflexo contrario, e leva
+# junto a credibilidade dos tres que dizem a verdade.
+#
+# CONDICAO DE PROMOCAO — volta para `on: pull_request` / `push` no dia em que as
+# DUAS forem verdade:
+#
+#   (a) a credencial do usuario de teste E2E logar em staging; e
+#   (b) os cinco valores existirem no repositorio: `NEXT_PUBLIC_API_URL` e
+#       `NEXT_PUBLIC_SUPABASE_URL` em Variables; `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+#       `E2E_EMAIL` e `E2E_PASSWORD` em Secrets.
+#
+# Nada de `continue-on-error`: um job que reporta verde sem ter medido e pior
+# que um job que nao roda.
+#
+# Para rodar:  gh workflow run e2e.yml --ref <branch>
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E — Playwright contra staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ArchSmart-web/package-lock.json
+      - name: Instalar dependencias
+        working-directory: ArchSmart-web
+        run: npm ci
+      - name: Instalar o Chromium do Playwright
+        working-directory: ArchSmart-web
+        run: npx playwright install --with-deps chromium
+      - name: Rodar os specs de guarda
+        working-directory: ArchSmart-web
+        env:
+          # `playwright.config.ts` sobe o proprio servidor (`npm run dev` em
+          # localhost:3000), e `src/lib/env.ts` valida as tres variaveis
+          # abaixo com Zod na primeira pagina carregada — sem elas nenhuma
+          # rota renderiza, nem a de login. Elas NAO estao no repositorio
+          # (Art. 4): as duas URLs sao de ambiente e vao em Variables, a
+          # chave anon e o par de credenciais vao em Secrets.
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        # O cold start do Render ja foi medido em 41,9 s (ADR 0009) e em 41,4 s
+        # em 08/09/2026. Este `timeout-minutes` e do passo inteiro; quem
+        # tropeca primeiro no cold start sao os timeouts POR TESTE do
+        # Playwright (30 s de teste e 30 s de `waitForSelector`, por padrao) —
+        # por isso `playwright.config.ts` os levanta quando `CI` esta ligado.
+        # Os dois precisam cobrir o cold start, senao o primeiro PR da manha
+        # reprova por um motivo que nao e defeito de codigo.
+        timeout-minutes: 15
+        # Os specs vao POR NOME, e nao `npx playwright test` sem filtro.
+        # `e2e/` tem dois INSTRUMENTOS, que nao sao guarda e nao podem virar
+        # portao: `medicao-biblioteca.spec.ts` produz uma mediana (um numero
+        # de medicao nao tem verde nem vermelho) e `captura-visual-secao-6.spec.ts`
+        # exige `CAPTURAS_DIR` no ambiente e escreve imagem fora do
+        # repositorio. Rodar sem filtro reprovaria por falta de variavel, e a
+        # saida barata para isso seria um `skip` silencioso — que este
+        # repositorio nao admite. Spec novo de guarda entra nesta linha; nao
+        # basta criar o arquivo.
+        run: >-
+          npx playwright test
+          e2e/auth.spec.ts
+          e2e/dashboard.spec.ts
+          e2e/hidratacao-biblioteca.spec.ts
+          e2e/telemetria-biblioteca.spec.ts
+          --reporter=line

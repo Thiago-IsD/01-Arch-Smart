@@ -23,6 +23,7 @@ duas.
 from sqlalchemy.orm import Session
 
 from app.models.all_models import ProductEvent
+from app.schemas.telemetry_schema import LoteDeEventos
 
 
 def test_evento_e_gravado_na_conta_da_sessao(db: Session, client_a, conta_a):
@@ -116,4 +117,72 @@ def test_anonimo_nao_grava(db: Session, client_anon):
 
     assert r.status_code == 422
     assert "authorization" in str(r.json()["detail"]).lower()
+    assert db.query(ProductEvent).count() == 0
+
+
+# O cliente descarrega a fila quando ela chega a `TAMANHO_MAXIMO = 20`
+# (ArchSmart-web/src/features/telemetry/fila.ts). O servidor aceita
+# `max_length=50` (app/schemas/telemetry_schema.py). Hoje ha folga de 30, e
+# nada ligava os dois numeros — os dois testes abaixo ligam.
+TAMANHO_DO_LOTE_DO_CLIENTE = 20
+
+
+def test_aceita_o_lote_cheio_do_cliente(db: Session, client_a):
+    """
+    O maior lote que o cliente chega a mandar tem de passar.
+
+    Isto prende uma relacao entre dois arquivos de repositorios diferentes:
+    baixar o `max_length` do schema abaixo de `TAMANHO_MAXIMO` da fila do
+    cliente faria o Pydantic rejeitar o lote INTEIRO com 422 — e, desde que a
+    Secao 8 pos os eventos em lote, o lote e a unidade de perda: `enviarEventos`
+    engole o erro de proposito, entao os 20 eventos sumiriam calados, sem erro
+    no console de ninguem e indistinguivel de "ninguem navegou".
+
+    Por que um teste, e nao um comentario nos dois arquivos: comentario nao
+    reprova. Quem baixar o teto do servidor para 10 vai ver esta linha
+    vermelha em vez de descobrir pela ausencia de dado semanas depois.
+    """
+    lote = [
+        {"name": "screen_viewed", "properties": {"screen": f"/tela-{i}"}}
+        for i in range(TAMANHO_DO_LOTE_DO_CLIENTE)
+    ]
+
+    r = client_a.post("/api/telemetry/events", json={"eventos": lote})
+
+    assert r.status_code == 204, (
+        f"o servidor recusou um lote de {TAMANHO_DO_LOTE_DO_CLIENTE} eventos, que e "
+        "exatamente o tamanho em que a fila do cliente descarrega "
+        "(TAMANHO_MAXIMO em ArchSmart-web/src/features/telemetry/fila.ts). "
+        f"Resposta: {r.text}"
+    )
+    assert db.query(ProductEvent).count() == TAMANHO_DO_LOTE_DO_CLIENTE
+
+
+def test_lote_acima_do_teto_e_recusado_inteiro(db: Session, client_a):
+    """
+    O teto existe, e recusar passa o lote inteiro para o chao.
+
+    O numero do teto (50) nao esta escrito aqui de proposito: o que o teste
+    afirma e a forma — existe um teto acima do lote do cliente, e quem o
+    estoura nao grava NADA, nem os eventos validos do comeco do lote. E a
+    metade incomoda da folga medida no teste acima: a recusa e total, e o
+    cliente a engole.
+    """
+    teto_declarado = LoteDeEventos.model_fields["eventos"].metadata
+    limites = [m.max_length for m in teto_declarado if hasattr(m, "max_length")]
+    assert limites, "LoteDeEventos.eventos perdeu o max_length: o lote ficou sem teto"
+    teto = limites[0]
+    assert teto > TAMANHO_DO_LOTE_DO_CLIENTE, (
+        f"o teto do servidor ({teto}) nao cobre o lote do cliente "
+        f"({TAMANHO_DO_LOTE_DO_CLIENTE}): todo lote cheio seria recusado inteiro"
+    )
+
+    lote = [
+        {"name": "screen_viewed", "properties": {"screen": f"/tela-{i}"}}
+        for i in range(teto + 1)
+    ]
+
+    r = client_a.post("/api/telemetry/events", json={"eventos": lote})
+
+    assert r.status_code == 422
     assert db.query(ProductEvent).count() == 0

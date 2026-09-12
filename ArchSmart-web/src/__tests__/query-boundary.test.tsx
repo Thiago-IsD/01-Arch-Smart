@@ -3,6 +3,7 @@ import type { UseQueryResult } from "@tanstack/react-query"
 import { describe, expect, it, vi } from "vitest"
 
 import { QueryBoundary } from "@/components/ui/query-boundary"
+import { ContextoDeProntidao, type ProntidaoDaTela } from "@/features/telemetry/contexto"
 import { RESPOSTA_VAZIA, type ProductsResponse } from "@/features/library/types"
 
 function query<T>(parcial: Partial<UseQueryResult<T>>): UseQueryResult<T> {
@@ -14,6 +15,17 @@ function query<T>(parcial: Partial<UseQueryResult<T>>): UseQueryResult<T> {
         refetch: vi.fn(),
         ...parcial,
     } as unknown as UseQueryResult<T>
+}
+
+/** Canal espiao: conta chamadas, que e o que o provider real nao permite. */
+function canalEspiao() {
+    return {
+        anunciar: vi.fn(),
+        reportar: vi.fn(),
+        assinar: vi.fn(() => () => {}),
+        anunciadas: vi.fn(() => 0),
+        limpar: vi.fn(),
+    } satisfies ProntidaoDaTela
 }
 
 describe("QueryBoundary", () => {
@@ -162,5 +174,89 @@ describe("QueryBoundary", () => {
             {(dados) => <p>{dados.join()}</p>}
         </QueryBoundary>
         expect(so_o_feliz).toBeTruthy()
+    })
+    // O contrato com a telemetria, testado DIRETO e nao de lado. Ate a onda de
+    // correcao da revisao final da Secao 8, este arquivo nao mencionava
+    // `anunciar`, `reportar` nem `principal`: o contrato que as oito telas
+    // seguintes copiam era exercitado so indiretamente, pelos testes da
+    // `TelemetriaDeTela`.
+    describe("o contrato com o canal de prontidao", () => {
+        const comCanal = (canal: ProntidaoDaTela, q: UseQueryResult<string[]>, principal = false) => (
+            <ContextoDeProntidao.Provider value={canal}>
+                <QueryBoundary
+                    query={q}
+                    skeleton={<p>carregando</p>}
+                    empty={<p>vazio</p>}
+                    error={() => <p>erro</p>}
+                    principal={principal}
+                >
+                    {(dados) => <p>{dados.join()}</p>}
+                </QueryBoundary>
+            </ContextoDeProntidao.Provider>
+        )
+
+        it("anuncia UMA vez por montagem, e nao a cada mudanca de desfecho", () => {
+            const canal = canalEspiao()
+            const { rerender } = render(
+                comCanal(canal, query<string[]>({ isPending: true, fetchStatus: "fetching" })),
+            )
+            expect(canal.anunciar).toHaveBeenCalledTimes(1)
+
+            // O desfecho muda duas vezes: pendente -> dados -> erro. O anuncio
+            // responde a MONTAGEM, nao ao desfecho.
+            rerender(comCanal(canal, query<string[]>({ data: ["a"] })))
+            rerender(comCanal(canal, query<string[]>({ isError: true, error: new Error("caiu") })))
+            expect(canal.anunciar).toHaveBeenCalledTimes(1)
+
+            // Os dois desfechos resolvidos viraram report; o pendente nao.
+            expect(canal.reportar).toHaveBeenCalledTimes(2)
+        })
+
+        it("o `principal` chega ao report", () => {
+            const canal = canalEspiao()
+            render(comCanal(canal, query<string[]>({ data: ["a"] }), true))
+            expect(canal.reportar).toHaveBeenCalledWith(
+                expect.objectContaining({ desfecho: "dados", principal: true }),
+            )
+        })
+
+        it("sem `principal` o report sai com `principal: false`", () => {
+            const canal = canalEspiao()
+            render(comCanal(canal, query<string[]>({ data: ["a"] })))
+            expect(canal.reportar).toHaveBeenCalledWith(
+                expect.objectContaining({ principal: false }),
+            )
+        })
+
+        // Os dois lados da query DESABILITADA. No react-query v5, `enabled:
+        // false` e `isPending` + `fetchStatus: "idle"` para sempre: o boundary
+        // mostra skeleton eterno e a regiao nunca reporta. Anunciar nesse caso
+        // fazia a telemetria gravar `abandonado` FALSO na saida da tela.
+        it("nao anuncia quando a query esta desabilitada", () => {
+            const canal = canalEspiao()
+            render(comCanal(canal, query<string[]>({ isPending: true, fetchStatus: "idle" })))
+            expect(canal.anunciar).not.toHaveBeenCalled()
+            expect(canal.reportar).not.toHaveBeenCalled()
+            // O skeleton eterno e o comportamento documentado no docstring: o
+            // certo e a tela NAO renderizar o boundary nesse caso.
+            expect(screen.getByText("carregando")).toBeInTheDocument()
+        })
+
+        it("anuncia quando a query esta carregando de verdade", () => {
+            const canal = canalEspiao()
+            render(comCanal(canal, query<string[]>({ isPending: true, fetchStatus: "fetching" })))
+            expect(canal.anunciar).toHaveBeenCalledTimes(1)
+        })
+
+        it("uma query que SAI do desabilitado passa a anunciar", () => {
+            const canal = canalEspiao()
+            const { rerender } = render(
+                comCanal(canal, query<string[]>({ isPending: true, fetchStatus: "idle" })),
+            )
+            expect(canal.anunciar).not.toHaveBeenCalled()
+
+            rerender(comCanal(canal, query<string[]>({ isPending: true, fetchStatus: "fetching" })))
+            expect(canal.anunciar).toHaveBeenCalledTimes(1)
+        })
     })
 })

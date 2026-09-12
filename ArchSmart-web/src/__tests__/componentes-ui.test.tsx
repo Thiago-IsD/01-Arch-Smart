@@ -1,10 +1,20 @@
+import { useEffect } from "react"
+
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { useForm } from "react-hook-form"
 import { describe, expect, it, vi } from "vitest"
 
 import { EmptyState } from "@/components/ui/empty-state"
 import { CurrencyInput } from "@/components/ui/currency-input"
-import { FormField } from "@/components/ui/form-field"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
 import { ErrorBoundary, registrarReportadorDeErro } from "@/components/ui/error-boundary"
 import { DataTable } from "@/components/ui/data-table"
 import {
@@ -88,47 +98,104 @@ describe("CurrencyInput", () => {
     })
 })
 
-describe("FormField", () => {
-    it("liga rotulo e campo por htmlFor, sem depender de aninhamento", () => {
-        render(<FormField id="nome" rotulo="Nome do projeto"><input id="nome" /></FormField>)
-        expect(screen.getByLabelText("Nome do projeto")).toBeInTheDocument()
+// Existiam dois componentes chamados FormField: o desta suite (Secao 6,
+// manual) e o do react-hook-form (@/components/ui/form), usado por 11 telas
+// reais contra as zero do primeiro. A Secao 8 apagou o manual e portou a
+// unica coisa que ele tinha e o outro nao — `sensivel` -> `data-private` —
+// para o `FormItem` do conjunto vigente. Os testes abaixo substituem os
+// cinco de antes, um a um:
+//   - "liga rotulo e campo por htmlFor"            -> mantido
+//   - "anuncia erro por aria-describedby/invalid"   -> mantido
+//   - "injeta id no campo sem o chamador repetir"   -> mantido (explicito)
+//   - "nao sobrescreve id que o chamador passou"    -> mantido (explicito)
+//   - "marca data-private quando sensivel"          -> mantido, mais o
+//     caso negativo (nao marcar quando nao e sensivel), que a suite antiga
+//     nao tinha.
+function FormularioDeTeste({
+    sensivel = false,
+    erro,
+    idExplicito,
+}: {
+    sensivel?: boolean
+    erro?: string
+    idExplicito?: string
+}) {
+    const form = useForm({ defaultValues: { cpf: "" } })
+    // setError precisa rodar em efeito, nao direto no corpo do componente:
+    // chama-lo a cada render (incondicional, porque `erro` nao muda) dispara
+    // um loop — setError muda o formState, o que re-renderiza, o que chama
+    // setError de novo. O exemplo do brief tinha esse bug; useEffect corrige
+    // sem mudar o que o teste verifica.
+    useEffect(() => {
+        if (erro) form.setError("cpf", { message: erro })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [erro])
+    return (
+        <Form {...form}>
+            <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                    <FormItem sensivel={sensivel}>
+                        <FormLabel>CPF</FormLabel>
+                        <FormControl>
+                            <input {...field} {...(idExplicito ? { id: idExplicito } : {})} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+        </Form>
+    )
+}
+
+describe("FormItem", () => {
+    it("liga rotulo e campo por htmlFor", () => {
+        render(<FormularioDeTeste />)
+        const campo = screen.getByLabelText("CPF")
+        expect(campo).toBeInTheDocument()
     })
 
-    it("anuncia o erro pelo aria-describedby e marca aria-invalid", () => {
-        render(
-            <FormField id="email" rotulo="E-mail" erro="E-mail invalido">
-                <input id="email" />
-            </FormField>,
-        )
-        const campo = screen.getByLabelText("E-mail")
-        expect(campo).toHaveAttribute("aria-invalid", "true")
-        expect(campo).toHaveAccessibleDescription("E-mail invalido")
+    it("injeta o id no campo quando o chamador nao passa nenhum", () => {
+        // O <input> de FormularioDeTeste nao recebe id proprio (idExplicito
+        // nao foi passado): o FormControl (Slot do Radix) injeta o
+        // formItemId gerado. Sem essa injecao, getByLabelText acima tambem
+        // falharia — este teste torna a garantia explicita em vez de deixa-la
+        // so implicita no primeiro.
+        render(<FormularioDeTeste />)
+        const campo = screen.getByLabelText("CPF")
+        expect(campo.getAttribute("id")).toBeTruthy()
     })
 
-    it("injeta o id no campo — o chamador nao precisa repetir", () => {
-        // O componente existe justamente para ligar rotulo e campo. Ele ja
-        // injetava aria-invalid e aria-describedby, mas nao o `id`: esquecer
-        // de repeti-lo no filho produzia rotulo orfao EM SILENCIO, sem erro
-        // de tipo e sem lint. Note o <input> sem id nenhum.
-        render(<FormField id="cidade" rotulo="Cidade"><input /></FormField>)
-        expect(screen.getByLabelText("Cidade")).toHaveAttribute("id", "cidade")
-    })
-
-    it("nao sobrescreve um id que o chamador passou de proposito", () => {
-        // Caso divergente: quando os dois ids existem e sao diferentes, quem
-        // manda e o filho — ele pode estar ligado a outra coisa (um
-        // aria-controls, um form externo). O rotulo segue o `id` da prop, e a
-        // divergencia fica visivel em vez de ser silenciosamente "consertada".
-        render(<FormField id="rotulo-cep" rotulo="CEP"><input id="campo-cep" /></FormField>)
-        expect(screen.getByRole("textbox")).toHaveAttribute("id", "campo-cep")
-        expect(screen.queryByLabelText("CEP")).toBeNull()
+    it("preserva o id que o chamador passa de proposito, mesmo divergindo do rotulo", () => {
+        // Radix Slot faz merge de props priorizando o valor explicito do
+        // filho para atributos simples como `id` (node_modules/@radix-ui/
+        // react-slot: mergeProps devolve overrideProps, que comeca como
+        // spread de childProps, por cima de slotProps). Quando o consumidor
+        // define o proprio id, ele vence — e a divergencia com o rotulo fica
+        // visivel em vez de ser silenciosamente "consertada".
+        render(<FormularioDeTeste idExplicito="campo-proprio" />)
+        expect(screen.getByRole("textbox")).toHaveAttribute("id", "campo-proprio")
+        expect(screen.queryByLabelText("CPF")).toBeNull()
     })
 
     it("marca data-private quando o dado e sensivel", () => {
-        const { container } = render(
-            <FormField id="cpf" rotulo="CPF" sensivel><input id="cpf" /></FormField>,
-        )
-        expect(container.querySelector("[data-private='true']")).not.toBeNull()
+        const { container } = render(<FormularioDeTeste sensivel />)
+        expect(container.querySelector('[data-private="true"]')).not.toBeNull()
+    })
+
+    it("nao marca data-private quando o dado nao e sensivel", () => {
+        const { container } = render(<FormularioDeTeste />)
+        expect(container.querySelector("[data-private]")).toBeNull()
+    })
+
+    it("anuncia o erro pelo aria-describedby e marca aria-invalid", async () => {
+        render(<FormularioDeTeste erro="CPF invalido" />)
+        const campo = await screen.findByLabelText("CPF")
+        expect(campo).toHaveAttribute("aria-invalid", "true")
+        const descrito = campo.getAttribute("aria-describedby") ?? ""
+        expect(descrito.length).toBeGreaterThan(0)
+        expect(screen.getByText("CPF invalido")).toBeInTheDocument()
     })
 })
 

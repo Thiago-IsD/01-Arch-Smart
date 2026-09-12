@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 49/64 (77%)**
-`███████████████░░░░░`
+**Progresso geral: 50/64 (78%)**
+`████████████████░░░░`
 
-_Última atualização: 2026-09-10_
+_Última atualização: 2026-09-12_
 
 ---
 
@@ -758,6 +758,36 @@ _Última atualização: 2026-09-10_
 ## Seção 7 · Telemetria
 **4/5 (80%)** `████████████████░░░░`
 
+> **Mergeada até `staging` em 11/09/2026** — merge `c40089b` em `develop` e
+> PR #8 `develop` → `staging` (merge `3586319`), com os três jobs de CI verdes
+> e o PR em `MERGEABLE / CLEAN`. Antes do push, as suítes rodaram **na árvore já
+> mergeada**, não só na branch: `332 passed, 1 skipped` no backend,
+> `20 arquivos / 162 testes` no frontend, `Ran 96 tests, OK` em `tools/`, e
+> catraca, progresso e links verdes.
+>
+> **E desta vez a metade backend foi verificada de fora** — a primeira vez nesta
+> série que isso dá certo. Contra `https://arqsmart-staging.onrender.com`, em
+> 11/09/2026:
+>
+> ```
+> curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+>   -H "Content-Type: application/json" -d '{"eventos":[]}' \
+>   https://arqsmart-staging.onrender.com/api/telemetry/events        # 422
+>
+> curl -s https://arqsmart-staging.onrender.com/openapi.json \
+>   | python -c "import json,sys; print(len(json.load(sys.stdin)['paths']))"   # 58
+> ```
+>
+> O `422` é o mesmo status que o teste da Tarefa 4 fixou para requisição sem
+> token, e a rota aparece no `openapi.json` — junto, isso prova que o contêiner
+> serve o código **desta** seção, e não apenas que "a API responde". Eram 57
+> rotas antes. Pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md),
+> contêiner no ar implica receita de migrações aplicada, então o schema de
+> staging está em `170b12223b9b`.
+>
+> **A metade frontend continua não verificada de fora**, como nas Seções 5 e 6:
+> o preview de staging responde `302` para o SSO da Vercel.
+>
 > **Desenho aprovado em 10/09/2026**, antes de existir plano de execução:
 > [`docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md`](docs/superpowers/specs/2026-09-10-secao-7-telemetria-design.md);
 > o plano das cinco tarefas está em
@@ -941,7 +971,7 @@ _Última atualização: 2026-09-10_
 > plataforma inteira.
 
 ## Seção 8 · Migração das telas
-**0/9 (0%)** `░░░░░░░░░░░░░░░░░░░░`
+**1/9 (11%)** `██░░░░░░░░░░░░░░░░░░`
 
 > Cada tela migrada aqui converte também as **cores literais** e as **imagens**
 > dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
@@ -966,7 +996,7 @@ _Última atualização: 2026-09-10_
 > `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
 > silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
-- [ ] Biblioteca
+- [x] Biblioteca
 - [ ] Dashboard
 - [ ] Projetos (lista + detalhe)
 - [ ] Orçamento
@@ -975,6 +1005,153 @@ _Última atualização: 2026-09-10_
 - [ ] Agenda
 - [ ] Auth, Perfil, Configurações e Billing
 - [ ] Landing e páginas legais
+
+> ## A Biblioteca, 12/09/2026 — a fundação e a primeira tela
+>
+> Dez tarefas na branch `secao-8-fundacao-e-biblioteca`. A seção fechou **uma**
+> das nove telas; as outras oito continuam no padrão antigo, e é de propósito —
+> a Biblioteca é o piloto de onde elas copiam.
+>
+> **A fundação (Tarefas 2–6), que é o que as outras oito herdam:**
+>
+> 1. **A tela declara prontidão; a telemetria parou de inferir.** O
+>    `QueryBoundary` anuncia na montagem ("existe região de dados aqui") e
+>    reporta quando resolve (`dados`/`vazio`/`erro`, mais `principal`). O
+>    `screen_viewed` passou a ter **cinco** valores de `medido_ate`
+>    (`dados`, `vazio`, `erro`, `pintura`, `abandonado`), mais `medido_de`
+>    (`clique` ou `commit`) e `principal_declarada`. Protocolo inteiro em
+>    [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md).
+> 2. **Os eventos saem em lote** (janela de 1 s ou 20 eventos), com `keepalive`
+>    na saída da página. Uma navegação que gastava três requisições gasta uma.
+>    O preço está escrito: o lote virou a **unidade de perda**, porque
+>    `enviarEventos` engole erro de propósito.
+> 3. **O balde do rate limit virou por conta**, não por IP do proxy
+>    (`chave_por_conta`).
+> 4. **Um `FormField` só** — o do react-hook-form. A ambiguidade que a Seção 6
+>    deixou para esta seção fechou.
+> 5. **Quatro furos da catraca tapados antes de medir as telas**, e três
+>    arquivos acima de 400 linhas divididos (8 → 5).
+>
+> **Os portões, medidos em 12/09/2026 pelo código de saída:**
+>
+> | | |
+> |---|---|
+> | `npm run typecheck` | exit 0, sem saída |
+> | `npm test` | **29 arquivos / 236 testes**, exit 0 |
+> | `pytest -q` (backend, Postgres real) | **343 passaram, 1 pulado**, exit 0 |
+> | `tools/`, de dentro de `tools/` | **103 testes, OK**, exit 0 |
+> | `python tools/catraca.py --eslint-json …` | exit 0, as **nove** medidas iguais ao baseline |
+> | `checa_links.py` / `progresso.py --check` | 0 link quebrado / consistente |
+>
+> ⚠️ **Esses números mudaram duas vezes, e vale saber de onde cada um vem.**
+> As dez tarefas fecharam com **28 arquivos / 217 testes** — a tabela dizia
+> **216**, que era erro de transcrição: a mensagem do commit `e92831f`, o
+> último das tarefas, já dizia 217. Depois deles, a **onda de correção da
+> revisão final** acrescentou 19 testes (o latch do canal de prontidão, o aviso
+> de duas regiões `principal`, e o contrato do `QueryBoundary` testado direto),
+> e é daí que saem os **29 / 236** da tabela. Meça, não copie:
+> `cd ArchSmart-web && npm test`.
+>
+> Sete desses testes vêm de uma rodada de revisão da Tarefa 9 que estava **não
+> commitada** na árvore quando a Tarefa 10 começou, e foi preservada em commit
+> próprio (rótulos de Art. 6, e o chip de `success` medido sobre a pilha real de
+> fundos, não sobre `--background`).
+>
+> **O quarto job de CI existe: `E2E — Playwright contra staging`** — em
+> `.github/workflows/e2e.yml`, com gatilho **`workflow_dispatch`**, fora do
+> `pull_request`/`push` (`gh workflow run e2e.yml --ref <branch>`). Roda os
+> specs de **guarda** por nome — `auth`, `dashboard`, `hidratacao-biblioteca` e
+> o novo `telemetria-biblioteca` —, nunca `npx playwright test` sem filtro: os
+> dois **instrumentos** da pasta (`medicao-biblioteca`,
+> `captura-visual-secao-6`) produzem número e imagem, exigem variável que o CI
+> não tem, e a saída barata para isso seria um `skip` silencioso. O
+> `playwright.config.ts` levanta os timeouts quando `CI` está ligado, porque os
+> 30 s padrão do Playwright ficam **abaixo** do cold start do Render (41,9 s).
+>
+> ⚠️ **Ele roda sob demanda, e não em PR — decidido na revisão final da
+> seção, em 12/09/2026.** No gatilho de PR ele nasceria vermelho e
+> permaneceria vermelho: `gh secret list` e `gh variable list` voltam
+> **vazios**, e mesmo com os cinco valores a credencial do usuário de teste é
+> rejeitada por staging (`HTTP 400`). Um quarto X permanente treinaria o
+> reflexo de ignorar X vermelho, que é o único mecanismo em pé no lugar da
+> branch protection — e a ADR 0006 diz que portão que nasce vermelho é
+> desligado na primeira semana. **Não** recebeu `continue-on-error`: falha é
+> falha, e job que reporta verde sem medir é pior que job que não roda.
+>
+> **Volta ao gatilho de PR** quando a credencial logar em staging **e** os
+> cinco valores existirem — `E2E_EMAIL`, `E2E_PASSWORD` e
+> `NEXT_PUBLIC_SUPABASE_ANON_KEY` em Secrets; `NEXT_PUBLIC_API_URL` e
+> `NEXT_PUBLIC_SUPABASE_URL` em Variables (sem as três `NEXT_PUBLIC_*`,
+> `src/lib/env.ts` derruba a primeira página com erro do Zod). A condição
+> está escrita no próprio `e2e.yml`.
+>
+> ### Três itens da definição de pronto NÃO foram verificados
+>
+> A tela está migrada; a **verificação** dela está pela metade, e o motivo é um
+> só: **a credencial do usuário de teste E2E passou a ser rejeitada pelo
+> Supabase de staging** (`HTTP 400, "Invalid login credentials"`, verificado
+> direto no endpoint de auth em 11/09/2026). Toda rota exige sessão, então
+> nenhum spec de Playwright roda, nem a medição, nem a prova viva. Nenhum número
+> foi estimado para tapar o buraco.
+>
+> 1. **axe sem violação** — rodou em **jsdom**
+>    (`src/__tests__/library-a11y-imagens.test.tsx`), que cobre estrutura e ARIA
+>    e **não** cobre contraste: a regra `color-contrast` cai em `incomplete`,
+>    nunca em `violations`, porque o Tailwind não é compilado ali. Ninguém rodou
+>    axe em `/library` num navegador.
+> 2. **Navegável só por teclado** — não verificado. Dois pontos dependem disso:
+>    se a ação escondida do `ProductCard` de fato **aparece** ao receber foco
+>    (está provado como classe na árvore, não como comportamento), e se o Radix
+>    abre o tooltip ao foco nos dois gatilhos que saíram de `tabIndex={-1}`.
+> 3. **Testada em 390px e 1440px** — não verificado, com um risco já localizado
+>    por leitura: `LibraryToolbar.tsx:167` não quebra linha abaixo de `md`, e
+>    `:180` é um `SelectTrigger` de `w-[160px]` fixo ao lado de um input
+>    `w-full` sem `min-w-0`.
+>
+> Pela mesma parede ficou de fora o item **"orçamento de performance atingido
+> contra staging com dado realista"**: o P95 de `/api/products` não foi medido,
+> e a mediana de 1454 ms que existe é de **10/09/2026**, anterior às mudanças
+> desta seção. O item **"doc do módulo com o número medido"** está escrito mas
+> sem o número — e diz isso, em
+> [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md), com o comando de
+> cada medição que falta.
+>
+> Os cinco comandos da retomada estão em
+> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md),
+> na nota de 12/09/2026.
+>
+> ### Correção de uma afirmação da Seção 7 que circulou como garantia
+>
+> A pendência 3 daquela seção está escrita como se o balde do rate limit fosse
+> atacável por qualquer um, com o balde por IP servindo de "segunda guarda" no
+> cenário anônimo. **Não é.** O `@limiter.limit` decora `receber_eventos`, e o
+> FastAPI resolve `Depends(get_repo)` **antes** de chamar a função decorada — a
+> checagem do slowapi roda dentro dela (`sync_wrapper`,
+> `slowapi/extension.py`). Token inválido leva **401** antes de a função de
+> chave ser chamada. Medido na Tarefa 4 desta seção, com TestClient e lendo o
+> slowapi. O balde por IP não é segunda guarda ali: o cenário **não chega lá**.
+> Isso é detalhe de implementação do FastAPI/slowapi, não contrato — por isso
+> `chave_por_conta` continua endurecida contra JWT ilegível.
+>
+> ### O que a Seção 8 ainda deve, para as oito telas que faltam
+>
+> 1. **A credencial de teste, viva.** Sem ela, nenhuma das oito telas seguintes
+>    consegue fechar os mesmos três itens da definição de pronto — o bloqueio é
+>    da seção inteira, não da Biblioteca.
+> 2. **O `@limiter.limit("60/minute")` continua apertado para telemetria.** A
+>    chave por conta resolveu o contágio entre usuários; o teto por pessoa
+>    continua o mesmo, e cada tela migrada acrescenta evento de interação.
+> 3. **`is_empty` numa tela com mais de uma região** continua sem definição de
+>    produto. `principal_declarada` tornou o problema **visível** (a coluna diz
+>    quando o número é o que sobrou), mas não respondeu o que "vazio" significa
+>    numa tela com lista e painel lateral.
+> 4. **O aviso essencial preso num tooltip** na Biblioteca — *"Sempre confira o
+>    valor!"*, sobre preço possivelmente promocional. Mudança de copy, decisão
+>    de produto.
+> 5. **`DataTable` continua provavelmente inadequado às telas** (sem
+>    renderizador de célula; ordena e pagina no cliente sobre o array inteiro,
+>    enquanto as listagens reais são paginadas no servidor). A Biblioteca não o
+>    usa, então a seção não respondeu isso.
 
 ## Seção 9 · Rename final
 **0/5 (0%)** `░░░░░░░░░░░░░░░░░░░░`

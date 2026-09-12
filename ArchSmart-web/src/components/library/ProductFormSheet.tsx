@@ -33,33 +33,8 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { ImageUpload } from "@/components/ui/image-upload"
-
-const CATEGORIES = [
-    "Mobiliário",
-    "Iluminação",
-    "Decoração",
-    "Revestimentos",
-    "Marcenaria",
-    "Paisagismo",
-    "Outros"
-]
-
-const formSchema = z.object({
-    name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-    store: z.string().optional(),
-    category: z.string().optional(),
-    price: z.coerce.number().min(0, "Preço inválido").optional(),
-    cost_price: z.coerce.number().min(0, "Preço inválido").optional(),
-    markup: z.coerce.number().optional(),
-    image_url: z.string().url("URL inválida").optional().or(z.literal("")),
-    description: z.string().optional(),
-    // Dimensions
-    width: z.coerce.number().optional(),
-    height: z.coerce.number().optional(),
-    depth: z.coerce.number().optional(),
-    yield_factor: z.coerce.number().optional(),
-    source_url: z.string().url("URL inválida").optional().or(z.literal("")),
-})
+import { CATEGORIES, formSchema } from "./product-form-schema"
+import { ProductDimensionFields } from "./ProductDimensionFields"
 
 interface ProductFormSheetProps {
     isOpen: boolean
@@ -362,51 +337,11 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                         />
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Dimensões (cm)</label>
-                            <div className="flex gap-2">
-                                <FormField
-                                    control={form.control}
-                                    name="width"
-                                    render={({ field }) => (
-                                        <FormItem className="flex-1">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Largura</span>
-                                                <FormControl>
-                                                    <Input type="number" placeholder="L" title="Largura" {...field} />
-                                                </FormControl>
-                                            </div>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="height"
-                                    render={({ field }) => (
-                                        <FormItem className="flex-1">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Altura</span>
-                                                <FormControl>
-                                                    <Input type="number" placeholder="A" title="Altura" {...field} />
-                                                </FormControl>
-                                            </div>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="depth"
-                                    render={({ field }) => (
-                                        <FormItem className="flex-1">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Profundidade</span>
-                                                <FormControl>
-                                                    <Input type="number" placeholder="P" title="Profundidade" {...field} />
-                                                </FormControl>
-                                            </div>
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
+                            {/* Legenda do grupo, e por isso um span: ela nao rotula UM controle — os
+                                tres campos tem FormLabel proprio em ProductDimensionFields.
+                                Um rotulo sem htmlFor aqui violava o Art. 6 (Tarefa 9). */}
+                            <span className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Dimensões (cm)</span>
+                            <ProductDimensionFields control={form.control} />
                         </div>
 
                         <FormField

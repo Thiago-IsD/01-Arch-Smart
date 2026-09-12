@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { UseQueryResult } from "@tanstack/react-query"
+import { useForm } from "react-hook-form"
 
 import {
     AlertDialog,
@@ -20,7 +21,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ErrorBoundary } from "@/components/ui/error-boundary"
-import { FormField } from "@/components/ui/form-field"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
 import { QueryBoundary } from "@/components/ui/query-boundary"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -59,6 +67,88 @@ const LINHAS = [
     { nome: "Abajur Linho", valor: 100 },
 ]
 
+/**
+ * Campo de CurrencyInput dentro do conjunto de formulario do react-hook-form
+ * — o padrao vigente desde a Secao 8 (ver "Um FormField so" no CLAUDE.md).
+ * `CurrencyInput` fala centavos direto (nao evento), por isso o `onChange`
+ * aqui chama `field.onChange(novoCentavos)` com o valor, nao com o evento —
+ * o proprio react-hook-form aceita os dois formatos.
+ */
+function CampoDeValor({ centavos, setCentavos }: { centavos: number; setCentavos: (v: number) => void }) {
+    const form = useForm({ defaultValues: { valor: centavos } })
+
+    return (
+        <Form {...form}>
+            <FormField
+                control={form.control}
+                name="valor"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Valor do item</FormLabel>
+                        <FormControl>
+                            <CurrencyInput
+                                value={field.value}
+                                onChange={(novoCentavos) => {
+                                    field.onChange(novoCentavos)
+                                    setCentavos(novoCentavos)
+                                }}
+                            />
+                        </FormControl>
+                    </FormItem>
+                )}
+            />
+        </Form>
+    )
+}
+
+/**
+ * Mostra o conjunto completo: rotulo ligado por `htmlFor`, erro anunciado por
+ * `aria-describedby`/`aria-invalid`, e `sensivel` -> `data-private` no
+ * `FormItem` (a decisao de produto que veio do componente apagado na Secao 8).
+ */
+function FormularioDeExemplo() {
+    const form = useForm({ defaultValues: { email: "", cpf: "" } })
+
+    React.useEffect(() => {
+        // So para a galeria mostrar o estado de erro sem precisar de
+        // interacao — nao dispara de novo porque so roda no mount.
+        form.setError("email", { message: "E-mail invalido" })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    return (
+        <Form {...form}>
+            <div className="flex flex-col gap-4">
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>E-mail</FormLabel>
+                            <FormControl>
+                                <input {...field} className="rounded border border-input p-2" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="cpf"
+                    render={({ field }) => (
+                        <FormItem sensivel>
+                            <FormLabel>CPF</FormLabel>
+                            <FormControl>
+                                <input {...field} className="rounded border border-input p-2" />
+                            </FormControl>
+                        </FormItem>
+                    )}
+                />
+            </div>
+        </Form>
+    )
+}
+
 export function Galeria() {
     const [centavos, setCentavos] = React.useState(12345)
 
@@ -75,19 +165,12 @@ export function Galeria() {
             </Secao>
 
             <Secao nome="CurrencyInput">
-                <FormField id="galeria-valor" rotulo="Valor do item">
-                    <CurrencyInput id="galeria-valor" value={centavos} onChange={setCentavos} />
-                </FormField>
+                <CampoDeValor centavos={centavos} setCentavos={setCentavos} />
                 <p className="text-sm text-muted-foreground">Em centavos: {centavos}</p>
             </Secao>
 
             <Secao nome="FormField">
-                <FormField id="galeria-email" rotulo="E-mail" erro="E-mail invalido">
-                    <input id="galeria-email" className="rounded border border-input p-2" />
-                </FormField>
-                <FormField id="galeria-cpf" rotulo="CPF" sensivel>
-                    <input id="galeria-cpf" className="rounded border border-input p-2" />
-                </FormField>
+                <FormularioDeExemplo />
             </Secao>
 
             <Secao nome="DataTable">

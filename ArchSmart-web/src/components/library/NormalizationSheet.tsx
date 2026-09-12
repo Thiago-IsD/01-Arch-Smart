@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2, Sparkles, ExternalLink, Info } from "lucide-react"
+import { Loader2, Sparkles, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { normalizeProduct } from "@/lib/normalize-product"
 import { useApproveProduct } from "@/features/library/hooks"
@@ -40,27 +40,9 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-
-const CATEGORIES = [
-    "Mobiliário",
-    "Iluminação",
-    "Decoração",
-    "Revestimentos",
-    "Marcenaria",
-    "Paisagismo",
-    "Outros"
-]
-
-const formSchema = z.object({
-    name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-    category: z.string().optional(),
-    price: z.coerce.number().min(0, "Preço inválido").optional(),
-    width: z.coerce.number().optional(),
-    height: z.coerce.number().optional(),
-    depth: z.coerce.number().optional(),
-    yield_factor: z.coerce.number().optional(),
-    source_url: z.string().url("URL inválida").optional().or(z.literal("")),
-})
+import { CATEGORIES, formSchema } from "./normalization-sheet-schema"
+import { NormalizationProductPreview } from "./NormalizationProductPreview"
+import { NormalizationDimensionFields } from "./NormalizationDimensionFields"
 
 interface NormalizationSheetProps {
     isOpen: boolean
@@ -210,33 +192,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                 </SheetHeader>
 
                 {productToNormalize && (
-                    <div className="flex gap-4 mb-6 p-4 border rounded-lg bg-muted/50">
-                        {productToNormalize.image_url ? (
-                            <img
-                                src={productToNormalize.image_url}
-                                alt={productToNormalize.name}
-                                className="w-24 h-24 object-cover rounded-md"
-                            />
-                        ) : (
-                            <div className="w-24 h-24 bg-muted rounded-md flex items-center justify-center">
-                                Sem imagem
-                            </div>
-                        )}
-                        <div className="flex flex-col flex-1 justify-center">
-                            <h4 className="font-medium text-sm line-clamp-2">{productToNormalize.name}</h4>
-                            <p className="text-sm text-muted-foreground mt-1">{productToNormalize.store}</p>
-
-                            <Button variant="link" className="p-0 h-auto self-start mt-2" size="sm" asChild>
-                                {productToNormalize.source_url ? (
-                                    <a href={productToNormalize.source_url} target="_blank" rel="noopener noreferrer">
-                                        Ver na Loja <ExternalLink className="ml-1 h-3 w-3" />
-                                    </a>
-                                ) : (
-                                    <span className="text-muted-foreground">URL não disponível</span>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
+                    <NormalizationProductPreview product={productToNormalize} />
                 )}
 
                 <div className="mb-6">
@@ -324,7 +280,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                             <FormLabel>Preço (R$)</FormLabel>
                                             <TooltipProvider delayDuration={300}>
                                                 <Tooltip>
-                                                    <TooltipTrigger type="button" tabIndex={-1} className="cursor-help">
+                                                    <TooltipTrigger type="button" aria-label="Ajuda sobre o preço" className="cursor-help">
                                                         <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
                                                     </TooltipTrigger>
                                                     <TooltipContent side="top" className="max-w-[250px] text-center">
@@ -342,58 +298,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                             />
                         </div>
 
-                        <div className="space-y-3">
-                            <label className="text-sm font-medium leading-none">
-                                Dimensões: Largura x Altura x Prof. (cm) {!hasDimensions && <span className="text-destructive">*</span>}
-                            </label>
-                            <div className="flex gap-2">
-                                <FormField
-                                    control={form.control}
-                                    name="width"
-                                    render={({ field }) => (
-                                        <FormItem className="flex-1 space-y-1">
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground w-4 text-center">L</span>
-                                                    <Input type="number" step="0.1" className="pl-8" placeholder="0" title="Largura em cm" {...field} />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="height"
-                                    render={({ field }) => (
-                                        <FormItem className="flex-1 space-y-1">
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground w-4 text-center">A</span>
-                                                    <Input type="number" step="0.1" className="pl-8" placeholder="0" title="Altura em cm" {...field} />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="depth"
-                                    render={({ field }) => (
-                                        <FormItem className="flex-1 space-y-1">
-                                            <FormControl>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground w-4 text-center">P</span>
-                                                    <Input type="number" step="0.1" className="pl-8" placeholder="0" title="Profundidade em cm" {...field} />
-                                                </div>
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                            {!hasDimensions && (
-                                <p className="text-[0.8rem] text-destructive font-medium">As dimensões são obrigatórias para aprovação.</p>
-                            )}
-                        </div>
+                        <NormalizationDimensionFields control={form.control} hasDimensions={hasDimensions} />
 
                         <FormField
                             control={form.control}
@@ -404,7 +309,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                         <FormLabel>Rendimento (Caixa / Unidade)</FormLabel>
                                         <TooltipProvider delayDuration={300}>
                                             <Tooltip>
-                                                <TooltipTrigger type="button" tabIndex={-1} className="cursor-help">
+                                                <TooltipTrigger type="button" aria-label="Ajuda sobre o rendimento" className="cursor-help">
                                                     <Info className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
                                                 </TooltipTrigger>
                                                 <TooltipContent side="top" className="max-w-[250px] text-center">

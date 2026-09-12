@@ -31,8 +31,18 @@ export default async function LibraryPage(props: {
                 </div>
             </div>
 
+            {/*
+              * `library-shell-streaming`, e nao `library-skeleton`: este
+              * fallback e o SERVIDOR fazendo stream (o LibraryData ainda nao
+              * chegou), e o skeleton do `QueryBoundary` dentro do
+              * LibraryContent e o CLIENTE carregando a lista. Os dois tinham o
+              * mesmo testid ate a Tarefa 7 da Secao 8, e um teste que esperasse
+              * "o skeleton do cliente apareceu" passava aqui sem nunca chegar
+              * ao boundary. O nome tambem era falso: o que gira aqui e um
+              * spinner, nao um skeleton.
+              */}
             <Suspense fallback={
-                <div data-testid="library-skeleton" className="flex flex-1 items-center justify-center py-20 text-muted-foreground">
+                <div data-testid="library-shell-streaming" className="flex flex-1 items-center justify-center py-20 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
             }>

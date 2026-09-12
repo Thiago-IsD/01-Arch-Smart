@@ -133,38 +133,87 @@ Ver a armadilha do espaço não-quebrável na seção 6.
 
 ### `FormField`
 
+O padrão é o conjunto de `@/components/ui/form.tsx`: `Form`, `FormField`,
+`FormItem`, `FormLabel`, `FormControl`, `FormMessage` — a API do
+`react-hook-form` (`{ control, name, render }`). É o que as telas já usam.
+
 ```tsx
-FormField({ id: string, rotulo: string, erro?: string, sensivel?: boolean,
-            children: ReactElement })
+<Form {...form}>
+  <FormField
+    control={form.control}
+    name="cpf"
+    render={({ field }) => (
+      <FormItem sensivel>
+        <FormLabel>CPF</FormLabel>
+        <FormControl>
+          <input {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</Form>
 ```
 
-**Decisão de produto:** liga rótulo e campo por `htmlFor` **injetando o `id` no
-filho** — o chamador não repete o id, e não existe rótulo órfão por descuido. Um
-`id` que o filho já traga ganha (ele pode estar ligado a outra coisa), e aí a
-divergência com o `htmlFor` fica visível em vez de ser consertada por baixo.
-`erro` vira `aria-invalid` + `aria-describedby`, anunciado por leitor de tela e
-não só pintado de vermelho. `sensivel` marca `data-private`, para telemetria e
-session replay nunca capturarem o valor — e mora **aqui**, não na tela, porque
-"este campo é sensível" é decisão de produto: deixá-la na tela é como ela some.
+**Decisão de produto:** `FormLabel` liga rótulo e campo por `htmlFor`, e
+`FormControl` (um `Slot` do Radix) injeta o `id` gerado no filho — o chamador
+não repete o id, e não existe rótulo órfão por descuido. Um `id` que o filho
+já traga ganha (o `Slot` prioriza o valor explícito do filho para atributos
+simples), e aí a divergência com o `htmlFor` fica visível em vez de ser
+consertada por baixo. `FormMessage` vira `aria-invalid` + `aria-describedby`
+quando há erro, anunciado por leitor de tela e não só pintado de vermelho.
 
-> ⚠️ **Existem dois `FormField` no repositório — não são o mesmo componente.**
-> O de cima é `@/components/ui/form-field` (`{ id, rotulo, erro, sensivel,
-> children }`), criado nesta seção. O outro é `@/components/ui/form.tsx`, do
-> `react-hook-form` (API `{ control, name, render }`), e é o que a maioria das
-> telas já usa hoje. Meça antes de importar:
+`FormItem` aceita `sensivel?: boolean`, que marca `data-private` no elemento
+raiz — para telemetria e session replay nunca capturarem o valor. Essa decisão
+mora **no componente**, não na tela, pelo mesmo motivo de sempre: "este campo
+é sensível" é decisão de produto, e deixá-la na tela é como ela some — uma
+tela nova que esqueça de marcar não dá erro nenhum, só captura o dado errado
+em silêncio. Centralizar no `FormItem` faz essa decisão valer para toda tela
+que usar o padrão, sem precisar ser lembrada caso a caso.
+
+> ✅ **Existiam dois `FormField` no repositório, e a ambiguidade foi fechada
+> em 11/09/2026, na Tarefa 6 da Seção 8.** O que existia até então era um
+> segundo componente, `@/components/ui/form-field` (`{ id, rotulo, erro,
+> sensivel, children }`), criado na Seção 6. Antes de apagar, a tarefa mediu
+> quem usava cada um:
 >
 > ```
-> grep -rl '@/components/ui/form"' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
-> grep -rl '@/components/ui/form-field"' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
+> grep -rln "components/ui/form-field" ArchSmart-web/src --include=*.tsx
+> grep -rln 'from "@/components/ui/form"' ArchSmart-web/src --include=*.tsx \
+>   | grep -v "dev/componentes/galeria.tsx" | grep -v "__tests__" | wc -l
 > ```
 >
-> Hoje sai **11** para o `FormField` do `react-hook-form` (entre outras,
+> Saiu **0 telas reais** para o componente da Seção 6 (só `galeria.tsx` e o
+> teste dela) contra **11 telas** para o do `react-hook-form` (entre outras,
 > `ProductFormSheet`, `NormalizationSheet`, `EventDialog`, `settings/page`,
-> `QuickEntryDialog`) e **2** para o desta seção — `galeria.tsx` e o teste
-> desta seção, nenhuma tela de produto ainda. Quem for migrar uma dessas 11
-> telas já tem `FormField` importado, e é do outro. Qual dos dois vira o
-> padrão (ou se os dois convivem) é decisão da **Seção 8**, não desta — este
-> arquivo só registra que a colisão existe.
+> `QuickEntryDialog`) — foi esse número que decidiu qual dos dois ficava.
+>
+> **Esse 11 é histórico do momento da decisão, e já não reproduz.** Rodando os
+> dois comandos acima hoje (12/09/2026), saem **13** com o filtro e **16** sem
+> ele. Os dois que entraram são `ProductDimensionFields.tsx` e
+> `NormalizationDimensionFields.tsx`, criados **pela própria Seção 8** quando a
+> Tarefa 8 dividiu `ProductFormSheet` e `NormalizationSheet` por
+> responsabilidade (commits `48e8f6d` e `ff551b7`) — não são telas novas, são
+> pedaços de duas que já contavam. O segundo comando exclui a galeria e o teste
+> de propósito: depois da Tarefa 6 os dois também importam
+> `@/components/ui/form`, para mostrar o padrão vigente e não um componente de
+> produto. Meça **com** o filtro se a pergunta é "quantas telas reais", e **sem**
+> ele se a pergunta é "quantos arquivos importam o módulo"; a diferença entre
+> 13 e 16 é exatamente a galeria mais os dois arquivos de teste. A
+> única coisa que o componente apagado tinha e o outro não era exatamente a
+> decisão de produto `sensivel` → `data-private`, descrita acima; ela foi
+> portada para o `FormItem` no mesmo commit que apagou o órfão, e os cinco
+> testes que cobriam o componente apagado foram reescritos contra o conjunto
+> que ficou — nenhuma garantia foi perdida no caminho. Detalhe da migração e
+> da verificação de cada teste em
+> `.superpowers/sdd/2026-09-11-secao-8-fundacao-e-biblioteca/task-6-report.md`.
+>
+> O comando de contagem que este documento trazia antes
+> (`grep -rl '@/components/ui/form-field"' ...`) não faz mais sentido: o
+> arquivo não existe, e o grep sempre dá zero. O comando acima, que mede
+> import por caminho (não por aspas de import específico), é o que continua
+> útil — para confirmar que a migração não regrediu, não para decidir entre
+> dois componentes que não competem mais.
 
 ### `ErrorBoundary`
 
@@ -286,13 +335,35 @@ seu problema — e o sintoma é silencioso.
 Baseline em `tools/catraca.json`; medida por `python tools/catraca.py`. Cada
 número só pode descer. Ver o [ADR 0006](decisoes/0006-portoes-de-ci-com-catraca.md).
 
-| Medida | Hoje | Quem zera |
-|---|---|---|
-| `cores_literais` | 518 | Seção 8, tela a tela |
-| `contraste_reprovado` | 4 pares | decisão de identidade visual (fora de escopo) |
-| `tabindex_negativo` | 5 | Seção 8 |
-| `hover_sem_focus` | 8 | Seção 8 |
-| `arquivos_acima_de_400` | 8 arquivos | Seção 8 (e dois estão fora de escopo) |
+| Medida | Quando a Seção 8 começou | Hoje | Quem zera |
+|---|---|---|---|
+| `cores_literais` | 518 | **583** | as oito telas que faltam |
+| `contraste_reprovado` | 4 pares | **4 pares** | decisão de identidade visual (fora de escopo) |
+| `tabindex_negativo` | 5 | **3** | as oito telas que faltam |
+| `hover_sem_focus` | 8 | **8** | as oito telas que faltam |
+| `arquivos_acima_de_400` | 8 arquivos | **5 arquivos** | as oito telas que faltam |
+
+> **Corrigido em 12/09/2026.** Esta tabela dizia só "Hoje" e trazia os cinco
+> números de quando a Seção 6 a escreveu — afirmação viva com valor velho, que é
+> a forma exata de defeito que a seção seguinte inteira passou caçando. Duas
+> colunas agora, e o comando que produz a da direita:
+>
+> ```
+> python tools/catraca.py        # da raiz; compara com tools/catraca.json
+> ```
+>
+> **Dois números SUBIRAM antes de descer, e isso é de propósito.** A Tarefa 2 da
+> Seção 8 tapou quatro furos da régua **antes** de qualquer tela ser medida:
+> `cores_literais` foi de 518 para **588** e `hover_sem_focus` de 8 para **9**,
+> sem nenhum defeito novo ter entrado — era a régua passando a enxergar
+> `bg-white`/`text-white`/`-black` (68 ocorrências), hex fora de
+> `bg|text|border`, `ring-offset-<paleta>-<n>` e `invisible`/`hidden` com
+> `group-hover`. Depois a Biblioteca desceu os dois. Sem essa ordem, a queda de
+> cada tela seria parcialmente fictícia. Os valores intermediários conferem com
+> `git show 0350895:tools/catraca.json`.
+>
+> E "Seção 8" virou "as oito telas que faltam" porque a Seção 8 migrou **uma**:
+> a Biblioteca, que é o piloto de onde as outras copiam.
 
 **O ponto cego importa mais que o número.** Uma catraca mede o que a régua
 dela vê, e a régua é um regex:
@@ -303,6 +374,22 @@ dela vê, e a régua é um regex:
   - **`bg-white`, `text-white`, `bg-black`** e afins — não têm número, e
     `white`/`black` não estão na lista de paletas. Medido em 10/09/2026:
     **67 ocorrências** (`grep -rnoE "\b(bg|text|border|ring|ring-offset)-(white|black)\b" src --include=*.tsx --include=*.ts | wc -l`).
+
+    > **67 aqui e 68 no `CLAUDE.md` da raiz: os dois números estão certos, para
+    > comandos diferentes — e isto precisa estar dito, porque dois documentos com
+    > dois números e nenhuma reconciliação é como um número errado entra.** A
+    > diferença é a **lista de prefixos**: o grep desta linha cobre cinco
+    > (`bg|text|border|ring|ring-offset`), e o `RE_BRANCO_PRETO` de
+    > `tools/catraca.py` cobre os **17** de `_PREFIXOS` — os mesmos do
+    > `RE_PALETA`. A 68ª é **`from-black`**, em
+    > `ArchSmart-web/src/app/portal/[uuid]/components/EnvironmentGallery.tsx:62`.
+    > A régua da catraca é a dos 17; quem for conferir o baseline use **ela**:
+    >
+    > ```
+    > cd ArchSmart-web
+    > grep -rnoE "\b(bg|text|border|ring|ring-offset)-(white|black)\b" src --include=*.tsx --include=*.ts | wc -l   # 67
+    > grep -rnoE "\b(ring-offset|ring|bg|text|border|from|to|via|fill|stroke|outline|decoration|shadow|accent|caret|divide|placeholder)-(white|black)\b" src --include=*.tsx --include=*.ts | wc -l   # 68
+    > ```
   - **hex arbitrário fora de `bg`/`text`/`border`** — `ring-[#...]`,
     `shadow-[#...]`, `from-[#...]`. Medido: **2**
     (`grep -rnoE "\b[a-z-]+-\[#[0-9a-fA-F]{3,8}\]" src --include=*.tsx --include=*.ts | grep -vE "\b(bg|text|border)-\[#" | wc -l`).

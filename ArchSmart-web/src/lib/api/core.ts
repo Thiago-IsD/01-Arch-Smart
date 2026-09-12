@@ -23,6 +23,12 @@ export interface Requisicao {
     query?: Record<string, ValorDeQuery>
     /** Frase a exibir quando a API nao mandar uma. Ver lib/api/errors.ts. */
     fallbackDeErro?: string
+    /**
+     * Deixa a requisicao sobreviver a saida da pagina. So para telemetria: o
+     * navegador limita o volume total de requisicoes keepalive, entao isto nao
+     * e uma opcao para chamada comum.
+     */
+    keepalive?: boolean
 }
 
 export type ClienteApi = <T>(path: string, req?: Requisicao) => Promise<T>
@@ -72,6 +78,7 @@ export function criarCliente(opts: OpcoesDoCliente): ClienteApi {
             headers,
             body: req.body === undefined ? undefined : JSON.stringify(req.body),
             signal: req.signal,
+            keepalive: req.keepalive,
         })
 
         if (!res.ok) throw await erroDaResposta(res, req.fallbackDeErro)

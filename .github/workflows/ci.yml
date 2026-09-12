@@ -85,6 +85,12 @@ jobs:
       - name: Catraca — lint, cores literais e doc de modulo
         run: python tools/catraca.py --eslint-json ArchSmart-web/eslint.json
 
+  # O job de E2E MUDOU DE ARQUIVO em 12/09/2026: virou `.github/workflows/e2e.yml`,
+  # com gatilho `workflow_dispatch` em vez de `pull_request`/`push`. O motivo, a
+  # condicao de promocao de volta para o gatilho de PR, e por que nao ficou aqui
+  # com um `if:` (viraria um check CINZA permanente, que este arquivo ja diz ser
+  # lido como "nao ha nada aqui") estao escritos la.
+
   repo:
     name: Repositorio — progresso, links e sincronia
     runs-on: ubuntu-latest

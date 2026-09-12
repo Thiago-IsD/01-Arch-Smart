@@ -10,7 +10,7 @@ import io
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -48,6 +48,21 @@ class TestContagemDeCores(unittest.TestCase):
     def test_ignora_arquivo_que_nao_e_ts_nem_tsx(self):
         raiz = self._escrever("bg-emerald-600", nome="LEIAME.md")
         self.assertEqual(contar_cores(raiz), 0)
+
+    def test_conta_branco_e_preto(self):
+        # `white`/`black` nao tem sufixo numerico, entao RE_PALETA nao os pega.
+        # Sao 68 ocorrencias reais no front medidas em 11/09/2026, e a regua
+        # dizia zero.
+        raiz = self._escrever('<div className="bg-white text-black border-white" />')
+        self.assertEqual(contar_cores(raiz), 3)
+
+    def test_conta_hex_fora_de_bg_text_border(self):
+        raiz = self._escrever('<div className="shadow-[#F88379] ring-[#fff]" />')
+        self.assertEqual(contar_cores(raiz), 2)
+
+    def test_conta_ring_offset_de_paleta(self):
+        raiz = self._escrever('<div className="ring-offset-slate-900" />')
+        self.assertEqual(contar_cores(raiz), 1)
 
 
 class TestModulosSemDoc(unittest.TestCase):
@@ -320,12 +335,25 @@ class TestMainAtualizarIgnoraChaveDeDocumentacao(unittest.TestCase):
 
 class TestMedidasDeAcessibilidade(unittest.TestCase):
     def test_conta_tabindex_negativo(self):
-        self.assertEqual(catraca.medir(None)["tabindex_negativo"], 5)
+        # Caiu de 5 para 3 na Tarefa 9 da Secao 8: os dois TooltipTrigger da
+        # Biblioteca (NormalizationSheet) tinham `tabIndex={-1}` com
+        # `cursor-help` -- informacao que so existia para quem usa mouse. Eles
+        # voltaram para a ordem de tabulacao, e ganharam `aria-label` no mesmo
+        # conserto, porque controle focavel cujo unico filho e um icone nao tem
+        # nome acessivel. Medido, nao suposto -- ver task-9-report.md.
+        self.assertEqual(catraca.medir(None)["tabindex_negativo"], 3)
 
     def test_conta_hover_sem_focus(self):
-        # Rodada 1 de revisao: a regua ampliada (grupo nomeado dos dois lados)
-        # mede 8, batendo o numero do brief -- mas medido, nao suposto. Ver
-        # tools/catraca.py (RE_GROUP_HOVER/RE_FOCUS) e task-7-report.md.
+        # Subiu de 8 para 9 na Tarefa 2 da Secao 8: a regua passou a ver
+        # `invisible`/`hidden` ao lado de `opacity-0`, e BudgetItemQuantityCell
+        # tem `hidden group-hover:block` sem escape de foco -- defeito real que
+        # sempre existiu e a regua nao via. Nao e defeito novo entrando; e a
+        # regua vendo mais do que sempre esteve la. Medido, nao suposto -- ver
+        # tools/catraca.py (RE_INVISIVEL) e task-2-report.md.
+        #
+        # Voltou a 8 na Tarefa 9 da mesma secao: a acao do ProductCard escondida
+        # atras de hover ganhou `group-focus-within:opacity-100`. O que sobra sao
+        # 8 ocorrencias em telas que a Secao 8 ainda nao migrou.
         self.assertEqual(catraca.medir(None)["hover_sem_focus"], 8)
 
     def test_linha_com_focus_within_nao_conta(self):
@@ -380,6 +408,47 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
         self.assertEqual(
             catraca.contar_hover_sem_focus_no_texto(
                 'className="opacity-0 group-hover/opt:opacity-100 focus-within/opt:opacity-100"'
+            ),
+            0,
+        )
+
+    def test_invisible_com_group_hover_sem_foco_conta(self):
+        # `invisible group-hover:visible` e `hidden group-hover:block` sao o
+        # MESMO defeito que `opacity-0 group-hover:opacity-100`: o elemento so
+        # existe para quem tem mouse. A regua via um e nao via os outros dois.
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="invisible group-hover:visible"'
+            ),
+            1,
+        )
+
+    def test_hidden_com_group_hover_sem_foco_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="hidden group-hover:block"'
+            ),
+            1,
+        )
+
+    def test_invisible_com_focus_within_nao_conta(self):
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="invisible group-hover:visible focus-within:visible"'
+            ),
+            0,
+        )
+
+    def test_aria_hidden_na_mesma_linha_de_group_hover_nao_conta(self):
+        # `\bhidden\b` sem guarda casa "hidden" dentro de "aria-hidden", porque
+        # "-" nao e caractere de palavra e satisfaz \b por conta propria. Essa
+        # linha existe de verdade em app/page.tsx:261 -- group-hover: de
+        # animacao, aria-hidden de acessibilidade, nada a ver com o defeito de
+        # visibilidade que esta medida cobre. Medido: sem o `(?<!-)` em
+        # RE_INVISIVEL, esta linha inflava hover_sem_focus de 9 para 10.
+        self.assertEqual(
+            catraca.contar_hover_sem_focus_no_texto(
+                'className="group-hover:translate-x-1" aria-hidden="true"'
             ),
             0,
         )
@@ -529,6 +598,325 @@ class TestRotulosDeMedidaEmLista(unittest.TestCase):
             {"arquivos_acima_de_400": ["a.tsx", "b.tsx"]},
         )
         self.assertEqual(pioras, ["arquivos_acima_de_400: agora acima do limite: b.tsx"])
+
+
+class TestPiorasAceitas(unittest.TestCase):
+    """`_pioras_aceitas` e a justificativa de uma subida, dentro do arquivo.
+
+    O job `Repositorio` reprovou o PR #9 com `cores_literais: 518 -> 583` sendo
+    que o numero subiu porque a REGUA ficou mais rigorosa na Tarefa 2 da Secao
+    8, nao porque o codigo piorou. `_auditar_baseline` compara baseline com
+    baseline: olhando so os dois numeros, "regua nova" e "numero inflado na mao"
+    sao indistinguiveis. A saida nao e ignorar subidas -- e exigir registro
+    auditavel dentro do arquivo. Cada teste aqui e uma das condicoes
+    fail-closed de `registro_cobre_piora`.
+    """
+
+    def _auditar(self, atual, base, medicoes=None, argv_extra=()):
+        """Roda o modo de auditoria com dois catraca.json de mentira -> (codigo, saida).
+
+        `medicoes` substitui os medidores reais, para o teste fixar o que "a
+        medicao de hoje" devolve -- a quarta condicao de aceitacao confere o
+        baseline contra ela. Sem `medicoes`, os medidores de verdade rodam.
+        """
+        with tempfile.TemporaryDirectory() as diretorio:
+            atual_path = Path(diretorio) / "catraca.json"
+            base_path = Path(diretorio) / "base.json"
+            atual_path.write_text(json.dumps(atual), encoding="utf-8")
+            base_path.write_text(json.dumps(base), encoding="utf-8")
+            saida = io.StringIO()
+            argv = ["--comparar-baseline-com", str(base_path), *argv_extra]
+            with ExitStack() as pilha:
+                pilha.enter_context(mock.patch.object(catraca, "BASELINE", atual_path))
+                if medicoes is not None:
+                    medidores = {c: (lambda v=v: v) for c, v in medicoes.items()}
+                    pilha.enter_context(mock.patch.object(catraca, "MEDIDORES", medidores))
+                pilha.enter_context(redirect_stdout(saida))
+                codigo = catraca.main(argv)
+        return codigo, saida.getvalue()
+
+    def test_subida_com_registro_valido_passa(self):
+        codigo, saida = self._auditar(
+            {"cores_literais": 588,
+             "_pioras_aceitas": {"cores_literais": {
+                 "de": 518, "ate": 588, "commit": "0350895",
+                 "motivo": "a regua passou a ver quatro furos"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 588},
+        )
+        self.assertEqual(codigo, 0)
+        # O valor desta guarda e o revisor LER o motivo; aceitar em silencio
+        # seria quase o mesmo que nao exigir registro.
+        self.assertIn("a regua passou a ver quatro furos", saida)
+        self.assertIn("0350895", saida)
+
+    def test_subida_sem_registro_reprova(self):
+        # O cenario do docstring de _auditar_baseline: numero subido na mao.
+        codigo, saida = self._auditar({"cores_literais": 9999}, {"cores_literais": 518})
+        self.assertEqual(codigo, 1)
+        self.assertIn("afrouxou", saida)
+        self.assertIn("nao ha registro", saida)
+
+    def test_subida_com_de_divergente_reprova(self):
+        # Registro de OUTRA transicao: quando a branch base adotar um baseline
+        # novo, o registro para de valer e a guarda volta a morder.
+        codigo, saida = self._auditar(
+            {"cores_literais": 588,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 560},
+        )
+        self.assertEqual(codigo, 1)
+        self.assertIn("outra transicao", saida)
+
+    def test_subida_acima_do_teto_reprova(self):
+        # A subida aceita tinha teto. Passar dele e subida nova, nao coberta.
+        codigo, saida = self._auditar(
+            {"cores_literais": 600,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+        )
+        self.assertEqual(codigo, 1)
+        self.assertIn("passa do teto", saida)
+
+    def test_valor_abaixo_do_teto_passa(self):
+        # O caso real: aceita ate 588, hoje em 583 -- o numero DESCEU desde a
+        # piora aceita e continua acima dos 518 da base. E por isso que o campo
+        # e `ate` (teto) e nao `para` (valor exato).
+        codigo, saida = self._auditar(
+            {"cores_literais": 583,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertEqual(codigo, 0)
+        self.assertIn("583", saida)
+
+    def test_registro_de_outra_chave_nao_cobre_esta(self):
+        codigo, saida = self._auditar(
+            {"cores_literais": 588, "tabindex_negativo": 9,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518, "tabindex_negativo": 3},
+            medicoes={"cores_literais": 588, "tabindex_negativo": 9},
+        )
+        self.assertEqual(codigo, 1)
+        self.assertIn("tabindex_negativo", saida.split("afrouxou")[1])
+
+    def test_registro_sem_ate_reprova(self):
+        codigo, saida = self._auditar(
+            {"cores_literais": 588,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "motivo": "x"}}},
+            {"cores_literais": 518},
+        )
+        self.assertEqual(codigo, 1)
+        self.assertIn("nao tem", saida)
+
+    def test_medida_em_lista_nao_e_coberta_por_registro(self):
+        # Um teto numerico nao diz nada sobre "qual arquivo entrou na lista".
+        codigo, saida = self._auditar(
+            {"arquivos_acima_de_400": ["a.tsx", "b.tsx"],
+             "_pioras_aceitas": {"arquivos_acima_de_400": {"de": 1, "ate": 99, "motivo": "x"}}},
+            {"arquivos_acima_de_400": ["a.tsx"]},
+        )
+        self.assertEqual(codigo, 1)
+        self.assertIn("so subida numerica", saida)
+
+    def test_motivo_em_branco_aparece_na_auditoria(self):
+        # Aceita -- a ferramenta consegue auditar a transicao --, mas o revisor
+        # tem que ver que ninguem escreveu o porque.
+        codigo, saida = self._auditar(
+            {"cores_literais": 588,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": ""}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 588},
+        )
+        self.assertEqual(codigo, 0)
+        self.assertIn("EM BRANCO", saida)
+
+    def test_registro_nao_e_tratado_como_medida(self):
+        # Nem por medir(), nem por comparar(), nem por medidas_pioradas():
+        # `_pioras_aceitas` e documentacao, como `_leia-me`. Se ela virasse
+        # medida, todo comando reprovaria com "SUMIU DA MEDICAO".
+        registro = {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}
+        self.assertNotIn(catraca.CHAVE_PIORAS_ACEITAS, medir(None))
+        baseline = {catraca.CHAVE_PIORAS_ACEITAS: registro, "cores_literais": 583}
+        ok, linhas = comparar(baseline, {"cores_literais": 583})
+        self.assertTrue(ok)
+        self.assertNotIn(catraca.CHAVE_PIORAS_ACEITAS, " ".join(linhas))
+        self.assertEqual(
+            medidas_pioradas({c: v for c, v in baseline.items() if not c.startswith("_")},
+                             {"cores_literais": 583}),
+            [],
+        )
+
+    def test_atualizar_com_aceitar_piora_grava_o_registro(self):
+        medido_real = medir(None)
+        # Baseline com a medida real de cores_literais MENOS 1: medir() acha um
+        # numero maior, e essa e a piora que o registro tem que cobrir.
+        anterior = medido_real["cores_literais"] - 1
+        baseline = {"_leia-me": "doc", **medido_real, "cores_literais": anterior}
+        with tempfile.TemporaryDirectory() as diretorio:
+            baseline_temp = Path(diretorio) / "catraca.json"
+            baseline_temp.write_text(json.dumps(baseline), encoding="utf-8")
+            saida = io.StringIO()
+            with mock.patch.object(catraca, "BASELINE", baseline_temp):
+                with redirect_stdout(saida):
+                    codigo = catraca.main(["--atualizar", "--aceitar-piora"])
+            self.assertEqual(codigo, 0, saida.getvalue())
+            gravado = json.loads(baseline_temp.read_text(encoding="utf-8"))
+        registro = gravado[catraca.CHAVE_PIORAS_ACEITAS]["cores_literais"]
+        self.assertEqual(registro["de"], anterior)
+        self.assertEqual(registro["ate"], medido_real["cores_literais"])
+        self.assertEqual(registro["motivo"], "")
+        self.assertIn("EM BRANCO", saida.getvalue())
+        # `commit` so existe dentro de um repositorio git; este teste roda
+        # dentro de um. Sem .git a ferramenta grava sem o campo, em vez de
+        # estourar -- ver _commit_corrente.
+        self.assertEqual(registro.get("commit"), catraca._commit_corrente())
+
+    def test_atualizar_sem_piora_nao_inventa_registro(self):
+        baseline = {"_leia-me": "doc", **medir(None)}
+        with tempfile.TemporaryDirectory() as diretorio:
+            baseline_temp = Path(diretorio) / "catraca.json"
+            baseline_temp.write_text(json.dumps(baseline), encoding="utf-8")
+            with mock.patch.object(catraca, "BASELINE", baseline_temp):
+                with redirect_stdout(io.StringIO()):
+                    codigo = catraca.main(["--atualizar", "--aceitar-piora"])
+            self.assertEqual(codigo, 0)
+            gravado = json.loads(baseline_temp.read_text(encoding="utf-8"))
+        self.assertEqual(gravado.get(catraca.CHAVE_PIORAS_ACEITAS, {}), {})
+
+    def test_segunda_subida_na_mesma_branch_preserva_o_de_original(self):
+        # Duas subidas na mesma branch sao UMA transicao vista da branch base.
+        # Se o `de` fosse sobrescrito pelo valor intermediario, o registro
+        # deixaria de cobrir a transicao contra a base e a auditoria reprovaria
+        # um caso que ela acabou de aceitar.
+        baseline = {"cores_literais": 583,
+                    catraca.CHAVE_PIORAS_ACEITAS: {"cores_literais": {
+                        "de": 518, "ate": 588, "motivo": "a regua mudou"}}}
+        linhas = catraca.registrar_pioras_aceitas(baseline, {"cores_literais": 600})
+        registro = baseline[catraca.CHAVE_PIORAS_ACEITAS]["cores_literais"]
+        self.assertEqual(registro["de"], 518)
+        self.assertEqual(registro["ate"], 600)
+        self.assertEqual(registro["motivo"], "a regua mudou")
+        self.assertIn("de=518", "\n".join(linhas))
+
+    # --- Quarta condicao: o baseline da medida com registro e conferido contra
+    # a medicao de hoje. Sem ela, o teto deixava um buraco do tamanho da
+    # diferenca entre o teto e a medicao: com `ate: 588` medindo 583, dava para
+    # editar o baseline a mao para 585 e os DOIS portoes passavam -- a auditoria
+    # porque 585 <= 588, e o portao principal porque a invariante dele e
+    # `medicao <= baseline` e ele lia isso como "baixou de 585 para 583".
+
+    def test_baseline_igual_a_medicao_passa(self):
+        codigo, saida = self._auditar(
+            {"cores_literais": 583,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertEqual(codigo, 0, saida)
+        # A saida tem que mostrar que a conferencia ACONTECEU; aceitar sem dizer
+        # contra o que conferiu seria indistinguivel de nao ter conferido.
+        self.assertIn("conferido contra a medicao de hoje: 583", saida)
+
+    def test_baseline_dentro_do_teto_mas_diferente_da_medicao_reprova(self):
+        # O caso 585: tres condicoes passam, a quarta mata.
+        codigo, saida = self._auditar(
+            {"cores_literais": 585,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertEqual(codigo, 1, saida)
+
+    def test_a_mensagem_do_descasamento_diz_que_ha_piora_aceita_e_a_diferenca(self):
+        # Quem le o log do CI tem que entender numa linha que o numero foi
+        # editado a mao -- nao cair no "afrouxou" genérico, que descreve outro
+        # defeito.
+        _, saida = self._auditar(
+            {"cores_literais": 585,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertIn("o baseline desta branch diz 585", saida)
+        self.assertIn("medicao de hoje da 583", saida)
+        self.assertIn("piora aceita", saida)
+        self.assertIn("+2", saida)
+        self.assertIn("editado a mao", saida)
+
+    def test_medida_sem_registro_nao_e_medida(self):
+        # A regra geral do modo continua sendo "nao mede nada": medir e trabalho
+        # do outro modo. So a medida que um registro LIBEROU e conferida. Este
+        # medidor estoura se for chamado.
+        def nunca():
+            raise AssertionError("medidor chamado para medida sem registro")
+
+        with mock.patch.dict(catraca.MEDIDORES, {"cores_literais": nunca}):
+            codigo, saida = self._auditar({"cores_literais": 583}, {"cores_literais": 583})
+        self.assertEqual(codigo, 0, saida)
+
+    def test_medida_sem_registro_que_subiu_reprova_sem_medir(self):
+        # Subida sem registro reprova pelo motivo de sempre, e tambem sem medir.
+        def nunca():
+            raise AssertionError("medidor chamado para medida sem registro")
+
+        with mock.patch.dict(catraca.MEDIDORES, {"cores_literais": nunca}):
+            codigo, saida = self._auditar({"cores_literais": 600}, {"cores_literais": 518})
+        self.assertEqual(codigo, 1)
+        self.assertIn("nao ha registro", saida)
+
+    def test_eslint_erros_com_registro_e_sem_relatorio_reprova(self):
+        # `eslint_erros` nao se mede a partir do repositorio: depende do
+        # relatorio que so o job `frontend` produz. Sem ele, a quarta condicao
+        # nao PODE ser conferida -- e aceitar por omissao devolveria o buraco.
+        codigo, saida = self._auditar(
+            {"eslint_erros": 90,
+             "_pioras_aceitas": {"eslint_erros": {"de": 85, "ate": 95, "motivo": "x"}}},
+            {"eslint_erros": 85},
+        )
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn("NAO DA PARA AUDITAR", saida)
+        self.assertIn("--eslint-json", saida)
+
+    def test_eslint_erros_com_registro_e_com_relatorio_confere(self):
+        # Com o relatorio, a conferencia acontece igual as outras: 90 no
+        # baseline e 90 no relatorio (dois arquivos, 45 erros cada) -> passa.
+        relatorio = [{"errorCount": 45}, {"errorCount": 45}]
+        with tempfile.TemporaryDirectory() as diretorio:
+            caminho = Path(diretorio) / "eslint.json"
+            caminho.write_text(json.dumps(relatorio), encoding="utf-8")
+            codigo, saida = self._auditar(
+                {"eslint_erros": 90,
+                 "_pioras_aceitas": {"eslint_erros": {"de": 85, "ate": 95, "motivo": "x"}}},
+                {"eslint_erros": 85},
+                argv_extra=("--eslint-json", str(caminho)),
+            )
+        self.assertEqual(codigo, 0, saida)
+        self.assertIn("conferido contra a medicao de hoje: 90", saida)
+
+    def test_chave_com_registro_e_sem_medidor_reprova(self):
+        # Registro para uma chave que `medir()` nao produz: nao da para conferir,
+        # entao reprova. Fail-closed, como as outras tres condicoes.
+        codigo, saida = self._auditar(
+            {"medida_inventada": 10,
+             "_pioras_aceitas": {"medida_inventada": {"de": 5, "ate": 20, "motivo": "x"}}},
+            {"medida_inventada": 5},
+        )
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn("nao existe medidor", saida)
+
+    def test_catraca_json_do_repositorio_nao_afrouxou_contra_si_mesmo(self):
+        # Guarda de sanidade do arquivo real: auditado contra ele mesmo, nada
+        # subiu, entao passa sem depender de registro nenhum.
+        atual = json.loads(catraca.BASELINE.read_text(encoding="utf-8"))
+        saida = io.StringIO()
+        with tempfile.TemporaryDirectory() as diretorio:
+            base_path = Path(diretorio) / "base.json"
+            base_path.write_text(json.dumps(atual), encoding="utf-8")
+            with redirect_stdout(saida):
+                codigo = catraca.main(["--comparar-baseline-com", str(base_path)])
+        self.assertEqual(codigo, 0, saida.getvalue())
 
 
 if __name__ == "__main__":

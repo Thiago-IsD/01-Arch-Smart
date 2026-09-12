@@ -6,7 +6,7 @@ O prefixo `telemetry` existe porque `/api/events` ja significa Agenda. E nao ha
 """
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.core.rate_limit import limiter
+from app.core.rate_limit import chave_por_conta, limiter
 from app.db.repository import ScopedRepository, get_repo
 from app.schemas.telemetry_schema import LoteDeEventos
 from app.services.telemetry_service import track
@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 @router.post("/events", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("60/minute")
+@limiter.limit("60/minute", key_func=chave_por_conta)
 def receber_eventos(
     request: Request,
     lote: LoteDeEventos,

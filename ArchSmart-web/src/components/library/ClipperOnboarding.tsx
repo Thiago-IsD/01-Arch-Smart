@@ -45,7 +45,22 @@ export function ClipperOnboarding() {
                     <span className="text-sm font-medium">Status da Conexão:</span>
                     {status === "loading" && <Badge variant="secondary">Verificando...</Badge>}
                     {status === "connected" && (
-                        <Badge className="bg-green-500/15 text-green-700 hover:bg-green-500/25 border-green-500/20 gap-1.5">
+                        // Chip PREENCHIDO, pelo mesmo motivo que o aviso em
+                        // BatchNormalizeRow: token de estado nao serve como cor de texto.
+                        // Medido compondo o alfa da pilha REAL (este badge fica dentro de um
+                        // `bg-muted/50`): `text-success` sobre `bg-success/15` sobre
+                        // `bg-muted/50` da 3,97:1 no claro e REPROVA o 4.5:1 do Art. 6 — os
+                        // 5,07:1 que justificavam a versao anterior eram sobre
+                        // `--background`, que nao e o fundo que aparece na tela. Medir o
+                        // token sobre o fundo da pagina, e nao sobre o par que renderiza, foi
+                        // o erro; o par do chip da 5,07:1 no claro e 10,17:1 no escuro.
+                        //
+                        // `hover:bg-success` nao e redundante: a variante `default` do Badge
+                        // traz `hover:bg-primary/80`, e sem sobrescrever isso o chip mudaria
+                        // de cor no hover. Fixar o mesmo tom mantem os 5,07:1 em todo estado
+                        // — um `hover:bg-success/90` cairia para 4,25:1 sobre o `bg-muted/50`
+                        // e reprovaria de novo, no hover.
+                        <Badge className="bg-success text-success-foreground hover:bg-success gap-1.5">
                             <CheckCircle2 className="h-3 w-3" />
                             Conta Pronta para Conexão
                         </Badge>
