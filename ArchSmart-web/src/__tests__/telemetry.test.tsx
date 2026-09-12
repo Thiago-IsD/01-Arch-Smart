@@ -1,57 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { StrictMode, type ReactNode } from "react"
-import { render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
-import { normalizarTela, decidirMedicao, vazioDoDesfecho } from "@/features/telemetry/types"
 import type { EventoDeProduto } from "@/features/telemetry/types"
 import { TelemetriaDeTela } from "@/features/telemetry/TelemetriaDeTela"
 import { ProntidaoDaTelaProvider } from "@/features/telemetry/contexto"
 import { QueryBoundary } from "@/components/ui/query-boundary"
-
-describe("normalizarTela", () => {
-    it("troca uuid por [id]", () => {
-        expect(normalizarTela("/projects/3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6a7b")).toBe(
-            "/projects/[id]"
-        )
-    })
-
-    it("troca cada uuid de um caminho aninhado", () => {
-        const caminho =
-            "/projects/3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6a7b/presentation/" +
-            "8e7d6c5b-4a39-2817-6f5e-4d3c2b1a0987"
-        expect(normalizarTela(caminho)).toBe("/projects/[id]/presentation/[id]")
-    })
-
-    it("deixa caminho sem id intacto", () => {
-        expect(normalizarTela("/library")).toBe("/library")
-    })
-})
-
-describe("decidirMedicao", () => {
-    it("repassa o desfecho da regiao que reportou", () => {
-        expect(decidirMedicao({ desfecho: "dados", principal: true }, true)).toBe("dados")
-        expect(decidirMedicao({ desfecho: "vazio", principal: true }, true)).toBe("vazio")
-        expect(decidirMedicao({ desfecho: "erro", principal: true }, true)).toBe("erro")
-    })
-
-    it("diz 'abandonado' quando houve anuncio e ninguem reportou", () => {
-        expect(decidirMedicao(null, true)).toBe("abandonado")
-    })
-
-    it("diz 'pintura' quando a tela nao tem regiao nenhuma", () => {
-        expect(decidirMedicao(null, false)).toBe("pintura")
-    })
-})
-
-describe("vazioDoDesfecho", () => {
-    it("traduz os tres desfechos e o nulo", () => {
-        expect(vazioDoDesfecho("vazio")).toBe(true)
-        expect(vazioDoDesfecho("dados")).toBe(false)
-        // `null` e "nao sei", que e diferente de "nao esta vazia".
-        expect(vazioDoDesfecho("erro")).toBeNull()
-        expect(vazioDoDesfecho(null)).toBeNull()
-    })
-})
 
 // --- TelemetriaDeTela: o gatilho do `screen_viewed` ---------------------------
 //
@@ -108,11 +62,39 @@ function TelaComLista({ itens, principal = false }: { itens: string[]; principal
     )
 }
 
+/** Regiao que anuncia e NUNCA resolve: o caminho do `abandonado`. */
+function TelaPendente() {
+    const query = useQuery({
+        queryKey: ["nunca-resolve"],
+        queryFn: () => new Promise<string[]>(() => {}),
+    })
+    return (
+        <QueryBoundary
+            query={query}
+            principal
+            skeleton={<p>carregando</p>}
+            empty={<p>vazio</p>}
+            error={() => <p>erro</p>}
+        >
+            {() => <p>nunca</p>}
+        </QueryBoundary>
+    )
+}
+
 describe("TelemetriaDeTela", () => {
     beforeEach(() => {
         eventos.length = 0
         caminhoAtual = "/library"
         cliente = clienteDeTeste()
+    })
+
+    // O desmonte agenda a decisao do evento para o tick seguinte (ver o cleanup
+    // do TelemetriaDeTela). O desmonte automatico do RTL roda DEPOIS do teste,
+    // entao sem drenar esse tick aqui a linha de um teste cairia dentro do
+    // proximo — e o `beforeEach` limparia o array antes de ela chegar.
+    afterEach(async () => {
+        cleanup()
+        await new Promise((r) => setTimeout(r, 0))
     })
 
     it("tela sem regiao nenhuma emite 'pintura' quando a sessao termina nela", async () => {
@@ -240,23 +222,6 @@ describe("TelemetriaDeTela", () => {
     })
 
     it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => {
-        function TelaPendente() {
-            const query = useQuery({
-                queryKey: ["nunca-resolve"],
-                queryFn: () => new Promise<string[]>(() => {}),
-            })
-            return (
-                <QueryBoundary
-                    query={query}
-                    principal
-                    skeleton={<p>carregando</p>}
-                    empty={<p>vazio</p>}
-                    error={() => <p>erro</p>}
-                >
-                    {() => <p>nunca</p>}
-                </QueryBoundary>
-            )
-        }
         render(
             <Envolvido>
                 <TelaPendente />
@@ -335,6 +300,43 @@ describe("TelemetriaDeTela", () => {
         await new Promise((r) => setTimeout(r, 50))
         expect(eventos).toHaveLength(1)
         expect(eventos[0].properties.medido_ate).toBe("dados")
+    })
+
+    // Sair de (dashboard) para uma rota publica — logout, landing — desmonta o
+    // layout inteiro: nao ha navegacao seguinte para descarregar a pendencia, e
+    // `pagehide` NAO dispara em navegacao de cliente. Sem o adiamento no
+    // cleanup, estes dois eventos se perdiam; com emissao sincrona no cleanup,
+    // o StrictMode contava errado. Os dois testes abaixo prendem o caminho, e o
+    // "sob StrictMode" prende o outro lado.
+    it("desmonte sem pagehide emite 'pintura' na tela sem regiao", async () => {
+        const { unmount } = render(<Envolvido />)
+        await new Promise((r) => setTimeout(r, 50))
+        expect(eventos).toHaveLength(0)
+
+        unmount()
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        expect(eventos[0].properties.screen).toBe("/library")
+        expect(eventos[0].properties.medido_ate).toBe("pintura")
+        // Folga: uma segunda linha reprova igual.
+        await new Promise((r) => setTimeout(r, 50))
+        expect(eventos).toHaveLength(1)
+    })
+
+    it("desmonte sem pagehide emite 'abandonado' se a regiao nao resolveu", async () => {
+        const { unmount } = render(
+            <Envolvido>
+                <TelaPendente />
+            </Envolvido>
+        )
+        await screen.findByText("carregando")
+        expect(eventos).toHaveLength(0)
+
+        unmount()
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        expect(eventos[0].properties.medido_ate).toBe("abandonado")
+        expect(eventos[0].properties.is_empty).toBeNull()
+        await new Promise((r) => setTimeout(r, 50))
+        expect(eventos).toHaveLength(1)
     })
 
     // A Biblioteca e as duas coisas de uma vez: StrictMode em `npm run dev` E

@@ -152,11 +152,27 @@ export function TelemetriaDeTela() {
             cancelAnimationFrame(naPintura)
             cancelAnimationFrame(aguardandoFolga)
             window.removeEventListener("pagehide", aoSair)
-            // Sem emissao aqui, de proposito: o StrictMode desmonta e remonta
-            // com o MESMO pathname. Emitir aqui produz uma linha espuria de
-            // `abandonado` no primeiro desmonte e, pelo dedupe, mata a linha
-            // real — medido por mutacao em 11/09/2026, e o teste que pega isso
-            // e o "sob StrictMode emite exatamente uma linha".
+
+            // Desmonte de verdade x remonte do StrictMode: os dois passam por
+            // aqui, e so da para distinguir DEPOIS. Emitir de forma SINCRONA
+            // aqui produz uma linha espuria de `abandonado` no primeiro
+            // desmonte do StrictMode e, pelo dedupe, mata a linha real — medido
+            // por mutacao em 11/09/2026, e quem pega isso e o teste "sob
+            // StrictMode emite exatamente uma linha".
+            //
+            // Adiar um tick resolve: se o efeito voltar (StrictMode, ou
+            // navegacao dentro do dashboard), ele troca `pendencia.current` por
+            // outro objeto e este timeout nao faz nada. Se ninguem voltou, foi
+            // desmonte de verdade — sair de (dashboard) para uma rota publica
+            // (logout, landing) desmonta o layout inteiro, e nao ha navegacao
+            // seguinte para descarregar a pendencia nem `pagehide` para avisar.
+            //
+            // A comparacao e por IDENTIDADE do objeto, nao por `pathname`: e ela
+            // que distingue "a pendencia ainda e minha" de "outro efeito
+            // assumiu". Por pathname, o remonte do StrictMode passaria.
+            setTimeout(() => {
+                if (pendencia.current === atual) emitir(atual, null)
+            }, 0)
         }
     }, [pathname, prontidao, track])
 
