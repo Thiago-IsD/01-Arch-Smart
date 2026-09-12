@@ -20,9 +20,17 @@ export default function DashboardLayout({
     // `medido_ate: "pintura"`. O risco nao e ficar sem dado: e ficar com dado
     // que mente, que e exatamente o que esta secao existe para consertar.
     //
-    // `TelemetriaDeTela` aparece ANTES do `AppShell` de proposito: assim o
-    // efeito dele roda antes do efeito de todo `QueryBoundary` da tela, e a
-    // assinatura do canal existe quando a primeira regiao reporta.
+    // `TelemetriaDeTela` aparece ANTES do `AppShell`, e isso continua sendo o
+    // certo — mas NAO e mais o que segura o mecanismo. O canal agora LATCHA o
+    // ultimo report (`features/telemetry/contexto.tsx`) e o reproduz para quem
+    // assinar depois, entao um report que chegue antes da assinatura nao se
+    // perde mais. Antes disso, a ordem era o unico motivo de a assinatura
+    // existir quando a primeira regiao reportava — "acidente de posicao e nao
+    // garantia", nas palavras da spec.
+    //
+    // O motivo que sobra para a ordem: `TelemetriaDeTela` chama `limpar()` no
+    // inicio do efeito dele, e `limpar()` zera o latch. Rodando primeiro, ele
+    // limpa o resto da tela ANTERIOR antes de as regioes desta reportarem.
     return (
         <QueryProvider>
             <ProntidaoDaTelaProvider>

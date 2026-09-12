@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { Button } from "@/components/ui/button"
 import type { FiltrosDeProduto } from "@/lib/query/keys"
 
@@ -29,8 +31,14 @@ export function BibliotecaVazia({ filtros }: { filtros: FiltrosDeProduto }) {
         >
             <p>Nenhum produto encontrado com os filtros selecionados.</p>
             {temFiltroAtivo && (
+                // `Link`, nao `<a>`: com a ancora crua isto era recarga dura da
+                // rota inteira — perde o cache do React Query, o estado do
+                // cliente e a hidratacao que a Secao 5 pagou para existir. Era
+                // paridade verbatim com o codigo anterior, entao nao era
+                // regressao; mas este arquivo e o que as outras oito telas
+                // copiam como "o estado vazio".
                 <Button variant="link" className="mt-2" asChild>
-                    <a href="/library">Limpar filtros</a>
+                    <Link href="/library">Limpar filtros</Link>
                 </Button>
             )}
         </div>

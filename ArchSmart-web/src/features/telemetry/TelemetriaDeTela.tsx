@@ -7,12 +7,6 @@ import type { Report } from "./contexto"
 import { useTrack } from "./hooks"
 import { decidirMedicao, normalizarTela, vazioDoDesfecho, type MedidoDe } from "./types"
 
-declare global {
-    interface Window {
-        __arqsmartOuvinteDeClique?: boolean
-    }
-}
-
 /**
  * O ultimo clique que PODE ancorar o cronometro: quando, e para onde ia.
  *
@@ -31,9 +25,27 @@ interface MarcaDeClique {
 
 let marcaDeClique: MarcaDeClique | null = null
 
+/**
+ * "Ja instalei" mora no MESMO escopo que `marcaDeClique`, de proposito.
+ *
+ * Isto era `window.__arqsmartOuvinteDeClique`, e o estado partido em dois
+ * escopos tinha um modo de falha silencioso em DESENVOLVIMENTO — que e o modo
+ * em que a conferencia manual acontece. Um Fast Refresh deste arquivo troca a
+ * instancia do modulo mas nao recarrega a pagina: a flag no `window`
+ * sobrevivia, entao o modulo novo via "ja instalei" e nao instalava o dele,
+ * enquanto o ouvinte antigo continuava escrevendo na `marcaDeClique` da
+ * instancia MORTA. Resultado: `medido_de` virava `"commit"` para sempre, sem
+ * erro nenhum.
+ *
+ * Com a flag aqui, a instancia nova nasce com `false` e instala o ouvinte
+ * dela — o pior caso passa a ser um ouvinte vazado pelo HMR, que escreve numa
+ * marca que ninguem le. O modulo vivo sempre ganha.
+ */
+let ouvinteInstalado = false
+
 function instalarOuvinteDeClique() {
-    if (typeof window === "undefined" || window.__arqsmartOuvinteDeClique) return
-    window.__arqsmartOuvinteDeClique = true
+    if (typeof window === "undefined" || ouvinteInstalado) return
+    ouvinteInstalado = true
     // Fase de CAPTURA: o handler do React pode chamar preventDefault — e o
     // `<Link>` do Next chama —, e a marca precisa existir de qualquer forma.
     document.addEventListener(
@@ -48,6 +60,14 @@ function instalarOuvinteDeClique() {
             if (!alvo) return
 
             // `target` para fora desta aba tambem nao navega este documento.
+            //
+            // SEM TESTE DISCRIMINANTE, e de propriedade: a conferencia de
+            // destino no efeito (`marca.caminho === pathname`) ja impede o
+            // efeito desta linha de aparecer, entao remove-la nao faz teste
+            // nenhum ficar vermelho. Ela e defesa em profundidade, nao logica
+            // morta — barata, e o `settings/page.tsx` com `target="_blank"` e o
+            // caso real. Quem remover a conferencia de destino acabou de tornar
+            // ESTA linha carga: escreva o teste dela antes.
             const destino = alvo.getAttribute("target")
             if (destino && destino !== "_self") return
 
@@ -55,6 +75,12 @@ function instalarOuvinteDeClique() {
             // Interno de verdade: "/library". Nao "https://...", nao "#ancora",
             // e nao "//host/x", que e EXTERNO (protocol-relative) apesar de
             // comecar com barra.
+            //
+            // O `startsWith("//")` esta na mesma situacao do `target` acima:
+            // SEM TESTE DISCRIMINANTE, porque a conferencia de destino no efeito
+            // derruba a marca de qualquer forma — `//host/x` nunca vai casar com
+            // um `pathname` deste app. Mesma advertencia: quem tirar a
+            // conferencia torna esta clausula carga.
             if (!href.startsWith("/") || href.startsWith("//")) return
 
             marcaDeClique = {
