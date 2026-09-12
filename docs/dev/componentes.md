@@ -133,38 +133,79 @@ Ver a armadilha do espaço não-quebrável na seção 6.
 
 ### `FormField`
 
+O padrão é o conjunto de `@/components/ui/form.tsx`: `Form`, `FormField`,
+`FormItem`, `FormLabel`, `FormControl`, `FormMessage` — a API do
+`react-hook-form` (`{ control, name, render }`). É o que as telas já usam.
+
 ```tsx
-FormField({ id: string, rotulo: string, erro?: string, sensivel?: boolean,
-            children: ReactElement })
+<Form {...form}>
+  <FormField
+    control={form.control}
+    name="cpf"
+    render={({ field }) => (
+      <FormItem sensivel>
+        <FormLabel>CPF</FormLabel>
+        <FormControl>
+          <input {...field} />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</Form>
 ```
 
-**Decisão de produto:** liga rótulo e campo por `htmlFor` **injetando o `id` no
-filho** — o chamador não repete o id, e não existe rótulo órfão por descuido. Um
-`id` que o filho já traga ganha (ele pode estar ligado a outra coisa), e aí a
-divergência com o `htmlFor` fica visível em vez de ser consertada por baixo.
-`erro` vira `aria-invalid` + `aria-describedby`, anunciado por leitor de tela e
-não só pintado de vermelho. `sensivel` marca `data-private`, para telemetria e
-session replay nunca capturarem o valor — e mora **aqui**, não na tela, porque
-"este campo é sensível" é decisão de produto: deixá-la na tela é como ela some.
+**Decisão de produto:** `FormLabel` liga rótulo e campo por `htmlFor`, e
+`FormControl` (um `Slot` do Radix) injeta o `id` gerado no filho — o chamador
+não repete o id, e não existe rótulo órfão por descuido. Um `id` que o filho
+já traga ganha (o `Slot` prioriza o valor explícito do filho para atributos
+simples), e aí a divergência com o `htmlFor` fica visível em vez de ser
+consertada por baixo. `FormMessage` vira `aria-invalid` + `aria-describedby`
+quando há erro, anunciado por leitor de tela e não só pintado de vermelho.
 
-> ⚠️ **Existem dois `FormField` no repositório — não são o mesmo componente.**
-> O de cima é `@/components/ui/form-field` (`{ id, rotulo, erro, sensivel,
-> children }`), criado nesta seção. O outro é `@/components/ui/form.tsx`, do
-> `react-hook-form` (API `{ control, name, render }`), e é o que a maioria das
-> telas já usa hoje. Meça antes de importar:
+`FormItem` aceita `sensivel?: boolean`, que marca `data-private` no elemento
+raiz — para telemetria e session replay nunca capturarem o valor. Essa decisão
+mora **no componente**, não na tela, pelo mesmo motivo de sempre: "este campo
+é sensível" é decisão de produto, e deixá-la na tela é como ela some — uma
+tela nova que esqueça de marcar não dá erro nenhum, só captura o dado errado
+em silêncio. Centralizar no `FormItem` faz essa decisão valer para toda tela
+que usar o padrão, sem precisar ser lembrada caso a caso.
+
+> ✅ **Existiam dois `FormField` no repositório, e a ambiguidade foi fechada
+> em 11/09/2026, na Tarefa 6 da Seção 8.** O que existia até então era um
+> segundo componente, `@/components/ui/form-field` (`{ id, rotulo, erro,
+> sensivel, children }`), criado na Seção 6. Antes de apagar, a tarefa mediu
+> quem usava cada um:
 >
 > ```
-> grep -rl '@/components/ui/form"' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
-> grep -rl '@/components/ui/form-field"' ArchSmart-web/src --include=*.tsx --include=*.ts | wc -l
+> grep -rln "components/ui/form-field" ArchSmart-web/src --include=*.tsx
+> grep -rln 'from "@/components/ui/form"' ArchSmart-web/src --include=*.tsx \
+>   | grep -v "dev/componentes/galeria.tsx" | grep -v "__tests__" | wc -l
 > ```
 >
-> Hoje sai **11** para o `FormField` do `react-hook-form` (entre outras,
+> Saiu **0 telas reais** para o componente da Seção 6 (só `galeria.tsx` e o
+> teste dela) contra **11 telas** para o do `react-hook-form` (entre outras,
 > `ProductFormSheet`, `NormalizationSheet`, `EventDialog`, `settings/page`,
-> `QuickEntryDialog`) e **2** para o desta seção — `galeria.tsx` e o teste
-> desta seção, nenhuma tela de produto ainda. Quem for migrar uma dessas 11
-> telas já tem `FormField` importado, e é do outro. Qual dos dois vira o
-> padrão (ou se os dois convivem) é decisão da **Seção 8**, não desta — este
-> arquivo só registra que a colisão existe.
+> `QuickEntryDialog`) — foi esse número que decidiu qual dos dois ficava. O
+> segundo comando exclui a galeria e o teste de propósito: depois da Tarefa 6,
+> os dois também importam `@/components/ui/form` (para mostrar o padrão
+> vigente, não um componente de produto), então a contagem sem o filtro dá
+> **13**, não 11 — meça com o filtro se a pergunta é "quantas telas reais", ou
+> sem ele se a pergunta é "quantos arquivos importam o módulo". A
+> única coisa que o componente apagado tinha e o outro não era exatamente a
+> decisão de produto `sensivel` → `data-private`, descrita acima; ela foi
+> portada para o `FormItem` no mesmo commit que apagou o órfão, e os cinco
+> testes que cobriam o componente apagado foram reescritos contra o conjunto
+> que ficou — nenhuma garantia foi perdida no caminho. Detalhe da migração e
+> da verificação de cada teste em
+> `.superpowers/sdd/2026-09-11-secao-8-fundacao-e-biblioteca/task-6-report.md`.
+>
+> O comando de contagem que este documento trazia antes
+> (`grep -rl '@/components/ui/form-field"' ...`) não faz mais sentido: o
+> arquivo não existe, e o grep sempre dá zero. O comando acima, que mede
+> import por caminho (não por aspas de import específico), é o que continua
+> útil — para confirmar que a migração não regrediu, não para decidir entre
+> dois componentes que não competem mais.
 
 ### `ErrorBoundary`
 
