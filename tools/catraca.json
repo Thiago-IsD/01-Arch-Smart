@@ -20,9 +20,6 @@
     "ArchSmart-web/src/app/(dashboard)/settings/page.tsx",
     "ArchSmart-web/src/app/portal/[uuid]/components/PortalBudget.tsx",
     "ArchSmart-web/src/app/produto/page.tsx",
-    "ArchSmart-web/src/components/calendar/EventDialog.tsx",
-    "ArchSmart-web/src/components/library/BatchNormalizeModal.tsx",
-    "ArchSmart-web/src/components/library/NormalizationSheet.tsx",
-    "ArchSmart-web/src/components/library/ProductFormSheet.tsx"
+    "ArchSmart-web/src/components/calendar/EventDialog.tsx"
   ]
 }
