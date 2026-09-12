@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 12/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8: a fundação e a primeira tela concluídas e mergeadas até `staging`, 1/9** — 10 tarefas, 37 commits, merge `b08be29` em `develop` e PR #9 `develop` → `staging` (merge `a4bdf56`, 12/09/2026), com os **cinco** checks verdes e o PR em `MERGEABLE / CLEAN`. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que roda **sob demanda** (`workflow_dispatch`, em `.github/workflows/e2e.yml`) e não no gatilho de PR, porque nasceria e permaneceria vermelho — ver "Portões de CI" para a razão e a condição de promoção. ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. **A metade backend foi verificada de fora em 12/09/2026, depois do merge**, contra `https://arqsmart-staging.onrender.com`: `/health` → `200`, `/health/db` → `{"status":"ok","db":"up"}`, `openapi.json` com **58 rotas** (a Seção 8 não acrescentou rota nem migração — `alembic heads` continua em `170b12223b9b`, 31 migrações), e `POST /api/telemetry/events` sem token → `422`, igual ao que a Seção 7 mediu. ⚠️ **Isso NÃO prova que a chave nova do rate limit está servindo**, e a razão é a própria descoberta da Tarefa 4: o `@limiter.limit` roda **depois** de o FastAPI resolver `Depends(get_repo)`, então requisição sem token válido morre antes de a função de chave ser chamada — a mudança não é observável de fora sem sessão. **A metade frontend continua não verificada de fora**, como nas Seções 5, 6 e 7.
+Estado em 12/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8: a fundação e a primeira tela concluídas e mergeadas até `staging`, 1/9** — 10 tarefas, 37 commits, merge `b08be29` em `develop` e PR #9 `develop` → `staging` (merge `a4bdf56`, 12/09/2026), com os **cinco** checks verdes e o PR em `MERGEABLE / CLEAN`. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que roda **sob demanda** (`workflow_dispatch`, em `.github/workflows/e2e.yml`) e não no gatilho de PR, porque nasceria e permaneceria vermelho — ver "Portões de CI" para a razão e a condição de promoção. ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. ✅ **A parede caiu em 12/09/2026 e as medições rodaram** (Thiago corrigiu a credencial, que tinha um caractere sobrando; verificada antes de medir: `HTTP 200`, token, e-mail confirmado). O orçamento de performance **foi medido**: mediana da Biblioteca de **1415 ms** (`AMOSTRAS=1390,1403,1415,1418,1422`) contra os 1454 ms de **antes** da Seção 8 — **ausência de regressão**, não ganho reivindicado. O `telemetria-biblioteca.spec.ts`, que nunca havia rodado, **passou** (3/3), e `product_events` — que estava com **0 linhas** — recebeu as primeiras linhas do protocolo novo: `medido_ate=dados`, `medido_de=clique`, `is_empty=false`, `load_ms` de mediana **1068 ms**, mesma ordem de grandeza do E2E. **O `load_ms` virou dado utilizável** e a pendência 2 da Seção 7 fechou. O P95 de `/api/products` **estoura o orçamento** (634 ms contra 400 ms) e a causa **não é a query**, que custa 17 ms: o Supabase de staging assina em **ES256** e a API valida em HS256, então toda requisição autenticada paga uma ida remota a `/auth/v1/user` — é isso que a Tarefa 11 de backend tem para consertar. Os três itens de olho humano **continuam abertos**. Números e comandos em [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **A metade backend foi verificada de fora em 12/09/2026, depois do merge**, contra `https://arqsmart-staging.onrender.com`: `/health` → `200`, `/health/db` → `{"status":"ok","db":"up"}`, `openapi.json` com **58 rotas** (a Seção 8 não acrescentou rota nem migração — `alembic heads` continua em `170b12223b9b`, 31 migrações), e `POST /api/telemetry/events` sem token → `422`, igual ao que a Seção 7 mediu. ⚠️ **Isso NÃO prova que a chave nova do rate limit está servindo**, e a razão é a própria descoberta da Tarefa 4: o `@limiter.limit` roda **depois** de o FastAPI resolver `Depends(get_repo)`, então requisição sem token válido morre antes de a função de chave ser chamada — a mudança não é observável de fora sem sessão. **A metade frontend continua não verificada de fora**, como nas Seções 5, 6 e 7.
 
 **A próxima tela é o Dashboard** — a ordem das nove está na tabela da Seção 8 em [`docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md`](docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md), e o padrão a copiar está em [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) e [`docs/dev/componentes.md`](docs/dev/componentes.md). **Leia antes o bloco "O que a Biblioteca (Seção 8) deixou em aberto"** mais abaixo: ele tem os itens que o plano da próxima tela precisa pôr como tarefa ou recusar por escrito. Seção 9 pendente. Produção ainda não recebeu: `main` está na Seção 3.
 
@@ -285,11 +285,15 @@ que os fechou; os dois que sobram são pauta das oito telas que faltam:
   da Seção 8**: `LibraryData` prefetcha a lista e o badge em `Promise.all`, pelas
   mesmas funções de query que o cliente usa (`queryDeProdutos`, `queryDoInbox` —
   duas montagens da mesma chave divergem em silêncio e fazem o prefetch virar
-  custo puro). ⚠️ **Ninguém confirmou ao vivo que o `state=CAPTURED` parou de
-  sair do navegador**: `hidratacao-biblioteca.spec.ts` ainda filtra por
-  `state=NORMALIZED`, de propósito — apertar a asserção sem ter rodado o spec
-  seria escrever afirmação não medida. Quem rodar aperta o filtro no mesmo
-  commit.
+  custo puro). ✅ **Confirmado ao vivo em 12/09/2026: o `state=CAPTURED`
+  parou de sair do navegador.** Três execuções consecutivas de
+  `hidratacao-biblioteca.spec.ts`, instrumentado para listar **todos** os
+  pedidos, deram `PEDIDOS_TOTAL=0` / `PEDIDOS_NORMALIZED=0` /
+  `PEDIDOS_CAPTURED=0` — zero pedido a `/api/products` de qualquer tipo no
+  primeiro carregamento. O prefetch do badge **está sendo aproveitado**, e a
+  asserção foi apertada no mesmo commit, como esta nota mandava: o spec deixou
+  de filtrar por `state=NORMALIZED` e exige zero pedido de qualquer tipo, com a
+  distinção entre lista e badge movida para a mensagem de falha.
 
 ## O que a Seção 7 deixou em aberto — **as quatro foram enfrentadas na Seção 8; duas fecharam**
 
@@ -339,8 +343,22 @@ existe e está escrito** — o que falta é uma credencial viva, e isso é de Th
    barata. O que deu para verificar sem navegador, e o que continua dependendo
    de olho humano, está separado item a item em
    [`docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`](docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md).
-2. **A prova viva do `screen_viewed` continua sem rodar, pela mesma parede — mas
-   o defeito que ela ia expor foi consertado, e o spec que a fecha já existe.**
+2. ~~**A prova viva do `screen_viewed` continua sem rodar, pela mesma parede.**~~
+   ✅ **FECHADA em 12/09/2026.** `telemetria-biblioteca.spec.ts` rodou pela
+   primeira vez e **passou**, em três execuções consecutivas, sem que nenhuma
+   asserção fosse afrouxada — o spec estava correto como escrito. E a linha
+   chegou ao banco: `product_events` estava com **0 linhas** (medido, não
+   suposto) e passou a ter linhas de `/library` com `medido_ate=dados`,
+   `medido_de=clique`, `principal_declarada=true`, `is_empty=false` e `load_ms`
+   de mediana **1068 ms** (n=21) — mesma ordem de grandeza da mediana de
+   **1415 ms** do E2E, e longe do `load_ms: 28` da Seção 7. **O `load_ms` é
+   dado utilizável**, com uma ressalva que a própria medição tornou concreta:
+   `/dashboard`, que a Seção 8 não migrou, grava mediana de **18 ms** com
+   `medido_ate=pintura` — **agregue sempre filtrando `medido_ate`**. Números e
+   comandos em
+   [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md).
+   O texto original fica abaixo porque a **forma** dele continua valendo — o
+   defeito que ela ia expor foi consertado, e o spec que a fecha já existia:
    A Seção 8 trocou o gatilho (ver o ⚠️ abaixo, e a resolução depois dele) e
    escreveu `ArchSmart-web/e2e/telemetria-biblioteca.spec.ts`, que afirma
    `medido_ate: "dados"`, `medido_de: "clique"`, `principal_declarada: true` e um
@@ -387,16 +405,16 @@ existe e está escrito** — o que falta é uma credencial viva, e isso é de Th
    > quando a navegação termina. Protocolo inteiro em
    > [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md).
    >
-   > **Duas ressalvas, para ninguém ler isto como mais do que é:** o corte entre
-   > o gatilho antigo e este é um **evento, não uma data — é o deploy**. A
-   > Seção 8 não foi mergeada em lugar nenhum, então **toda** linha de
-   > `product_events` em staging é do gatilho antigo, inclusive as datadas depois
-   > de 12/09/2026: código em branch não grava nada. E a parede da credencial
-   > impediu até a navegação local, então não existe linha gravada pelo protocolo
-   > novo em ambiente nenhum. Quem consultar a coluna confere primeiro se a
-   > Seção 8 chegou ao ambiente de onde a linha veio. E o conserto está provado por
-   > vitest, que prende *qual* rótulo sai e *quantas* linhas por navegação —
-   > **nunca a grandeza do número**. Essa parte é a que continua aberta.
+   > **Uma ressalva, e ela mudou de forma em 12/09/2026.** O corte entre o
+   > gatilho antigo e este é um **evento, não uma data — é o deploy**; isso
+   > continua valendo. O que mudou: `product_events` em staging **tem** linhas do
+   > protocolo novo, e elas **não vieram do deployment de staging** — vieram de
+   > front e API rodando na máquina de desenvolvimento, com o código da Seção 8,
+   > apontados para o **banco** de staging. Ou seja: a tabela tem dado do
+   > protocolo novo enquanto o ambiente ainda serve o antigo. Quem cruzar "linha
+   > recente" com "deploy de staging" erra nas duas direções — confira **de onde
+   > a linha veio**, não a data dela. A grandeza do número, que era a parte
+   > aberta, **foi medida** (mediana de 1068 ms; ver o ✅ no item 2 acima).
 
 3. ~~O `@limiter.limit("60/minute")` do endpoint de telemetria é um balde
    global da plataforma, não por usuário.~~ **Fechada em 11/09/2026, na Seção 8,
@@ -468,10 +486,24 @@ agente decidir sozinho.** Quem escrever o plano da próxima tela põe cada uma
 como tarefa ou registra por escrito a decisão de não pôr. A primeira bloqueia
 as oito telas seguintes, não só a Biblioteca.
 
-1. ⚠️ **A credencial do usuário de teste E2E está sendo rejeitada pelo Supabase
-   de staging.** `HTTP 400, "Invalid login credentials"` para
-   `ana.arquiteta@seed.arqsmart.local`, verificado direto no endpoint de auth em
-   11/09/2026. Enquanto durar: nenhuma tela consegue fechar os três itens da
+1. ~~⚠️ **A credencial do usuário de teste E2E está sendo rejeitada pelo
+   Supabase de staging.**~~ ✅ **A PAREDE CAIU em 12/09/2026.** Thiago corrigiu
+   a credencial — tinha um caractere sobrando — e ela foi verificada direto no
+   endpoint de auth antes de qualquer medição: **`HTTP 200`**, token recebido,
+   `email_confirmed_at: 2026-09-10T11:36:43Z`. A senha vive em
+   `ArchSmart-web/.env.e2e.local` (não versionada) e é carregada com
+   `set -a; . ./.env.e2e.local; set +a`. **O que a queda da parede fechou:** o
+   orçamento de performance (1415 ms, contra 1454 ms de antes), a prova viva do
+   `screen_viewed` (3/3), a confirmação de que o badge do inbox saiu do
+   navegador, e o P95 de `/api/products` (634 ms, estourando o orçamento por
+   causa do JWT e não da query). **O que a queda da parede NÃO fechou:** os três
+   itens que dependem de olho humano (axe em navegador, teclado, 390px/1440px) e
+   a verificação visual da Seção 6 — agora **executáveis**, já que
+   `e2e/captura-visual-secao-6.spec.ts` existe e a credencial funciona, mas
+   ninguém olhou captura nenhuma ainda. Os Secrets do repositório, que o job
+   `e2e` do CI espera, **continuam sem existir** — o job segue sob demanda. O
+   texto original fica abaixo como histórico do que a parede custou. Enquanto
+   ela durou: nenhuma tela consegue fechar os três itens da
    definição de pronto que exigem navegador (axe, teclado, 390px/1440px), nem o
    orçamento de performance, nem a prova viva do `screen_viewed`; e o job de E2E
    do CI reprovaria — foi por isso que ele saiu do gatilho de PR e passou a
