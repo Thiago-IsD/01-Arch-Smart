@@ -3,15 +3,19 @@
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
-import { Loader2, Sparkles } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import { ProductCard } from "@/components/library/ProductCard"
 import { LibraryToolbar } from "@/components/library/LibraryToolbar"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { ProductFormSheet } from "@/components/library/ProductFormSheet"
 import { ClipperOnboarding } from "@/components/library/ClipperOnboarding"
 import { Button } from "@/components/ui/button"
-import { useProducts, useProduct, useInboxCount, RESPOSTA_VAZIA } from "@/features/library/hooks"
+import { QueryBoundary } from "@/components/ui/query-boundary"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useProducts, useProduct, useInboxCount } from "@/features/library/hooks"
 import { filtrosDaUrl } from "@/features/library/filters"
+import { BibliotecaVazia } from "./BibliotecaVazia"
+import { ListaComErro } from "./ListaComErro"
 
 // `loading: () => null` porque estes dois sao overlay (sheet e modal). Um
 // modal fechado nao ocupa espaco no fluxo da pagina, entao o fallback dele
@@ -41,17 +45,16 @@ export function LibraryContent() {
 
     // Lista de produtos da aba atual — cacheada por combinação de filtros.
     // placeholderData mantém a lista anterior visível enquanto a nova carrega,
-    // evitando "pulos" de layout ao paginar/filtrar.
-    const { data, isLoading } = useProducts(filtros, { ativo: needsList })
+    // evitando "pulos" de layout ao paginar/filtrar. Com o QueryBoundary isso
+    // continua valendo: `isPending` é falso enquanto há placeholderData, então
+    // paginar não volta ao skeleton — que é o motivo de placeholderData existir.
+    const query = useProducts(filtros, { ativo: needsList })
 
     // Contagem do inbox (badge) — independente da aba, sempre o total de CAPTURED.
     const { data: inboxCount = 0 } = useInboxCount()
 
     // Produto em edição/normalização (quando aplicável).
     const { data: productToEdit } = useProduct(editId, action === "edit" || action === "normalize")
-
-    const result = data ?? RESPOSTA_VAZIA
-    const products = result.items
 
     return (
         <>
@@ -68,15 +71,26 @@ export function LibraryContent() {
                 )}
 
                 {needsList && (
-                    <>
-                        {isLoading ? (
-                            <div className="flex flex-1 items-center justify-center py-20 text-muted-foreground">
-                                <Loader2 className="h-8 w-8 animate-spin" />
+                    // `principal` fica AQUI, e não no badge do inbox: é a lista
+                    // que define "dados na tela" para esta rota, e é dela que
+                    // saem o `load_ms` e o `is_empty` do `screen_viewed`.
+                    <QueryBoundary
+                        query={query}
+                        principal
+                        skeleton={
+                            <div data-testid="library-skeleton" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                {Array.from({ length: 10 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-64 w-full" />
+                                ))}
                             </div>
-                        ) : (
-                            <div data-testid="product-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                                {products.length > 0 ? (
-                                    products.map((product) => (
+                        }
+                        empty={<BibliotecaVazia filtros={filtros} />}
+                        error={(erro, refazer) => <ListaComErro erro={erro} refazer={refazer} />}
+                    >
+                        {(resposta) => (
+                            <>
+                                <div data-testid="product-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                    {resposta.items.map((product) => (
                                         <ProductCard
                                             key={product.id}
                                             id={product.id}
@@ -89,29 +103,19 @@ export function LibraryContent() {
                                             dimensions={product.dimensions ?? undefined}
                                             isInbox={filtros.tab === "inbox"}
                                         />
-                                    ))
-                                ) : (
-                                    <div data-testid="library-empty" className="col-span-full flex flex-col items-center justify-center py-10 text-muted-foreground">
-                                        <p>Nenhum produto encontrado com os filtros selecionados.</p>
-                                        {(filtros.q || (filtros.categories?.length ?? 0) > 0 || (filtros.origins?.length ?? 0) > 0) && (
-                                            <Button variant="link" className="mt-2" asChild>
-                                                <a href="/library">Limpar filtros</a>
-                                            </Button>
-                                        )}
-                                    </div>
+                                    ))}
+                                </div>
+                                {resposta.items.length > 0 && (
+                                    <PaginationControls
+                                        total={resposta.total}
+                                        page={resposta.page}
+                                        size={resposta.size}
+                                        pages={resposta.pages}
+                                    />
                                 )}
-                            </div>
+                            </>
                         )}
-
-                        {products.length > 0 && (
-                            <PaginationControls
-                                total={result.total}
-                                page={result.page}
-                                size={result.size}
-                                pages={result.pages}
-                            />
-                        )}
-                    </>
+                    </QueryBoundary>
                 )}
 
                 {filtros.tab === "clipper" && <ClipperOnboarding />}

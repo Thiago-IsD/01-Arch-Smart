@@ -17,16 +17,38 @@ import { LibraryContent } from "./LibraryContent"
 export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
     const queryClient = criarQueryClientDoServidor()
 
-    await tentarPrefetch((signal) =>
-        queryClient.prefetchQuery({
-            queryKey: queryKeys.products.list(filtros),
-            queryFn: () =>
-                apiServer<ProductsResponse>("/api/products", {
-                    signal,
-                    query: queryDeProdutos(filtros),
-                }),
-        }),
-    )
+    // O badge do inbox ficou fora do prefetch na Secao 5, e por isso era a
+    // UNICA requisicao que a Biblioteca disparava do navegador no primeiro
+    // carregamento — foi ela que o load_ms quebrado da Secao 7 cronometrava.
+    // `useInboxCount` tem `select`, entao o que se prefetcha e a resposta CRUA,
+    // e o query tem de ser identico ao de `contarInbox` (features/library/api.ts):
+    // divergir nao da erro, so faz o prefetch virar custo puro.
+    //
+    // Os dois em Promise.all, nao em sequencia: sao chamadas independentes, e em
+    // serie elas somariam latencia dentro do <Suspense> — o oposto do que a
+    // ADR 0009 buscava.
+    await Promise.all([
+        tentarPrefetch((signal) =>
+            queryClient.prefetchQuery({
+                queryKey: queryKeys.products.list(filtros),
+                queryFn: () =>
+                    apiServer<ProductsResponse>("/api/products", {
+                        signal,
+                        query: queryDeProdutos(filtros),
+                    }),
+            }),
+        ),
+        tentarPrefetch((signal) =>
+            queryClient.prefetchQuery({
+                queryKey: queryKeys.products.inboxCount(),
+                queryFn: () =>
+                    apiServer<ProductsResponse>("/api/products", {
+                        signal,
+                        query: { page: 1, size: 1, state: "CAPTURED" },
+                    }),
+            }),
+        ),
+    ])
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>

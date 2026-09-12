@@ -13,17 +13,22 @@ import { test, expect } from "@playwright/test"
  * A asserção filtra por `state=NORMALIZED` de propósito, e não por
  * `/api/products` cru. `useInboxCount()` (`features/library/hooks.ts`) chama
  * o mesmo endpoint com `state=CAPTURED` para o badge do inbox, e essa chamada
- * **nunca foi prefetchada pelo servidor** — lacuna já documentada por leitura
- * de código desde a Tarefa 12 da Seção 5
+ * ficou fora do prefetch durante toda a Seção 5 — lacuna documentada por
+ * leitura de código desde a Tarefa 12 daquela seção
  * (`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`, seção 1) e confirmada
- * ao vivo por este mesmo spec antes desta correção. Ela é pendência aberta da
- * Seção 5 (`PROGRESS.md`, nota da Seção 5, item 9), não desta seção — um
- * `toHaveLength(0)` sem esse filtro reprovaria este teste para sempre pelo
- * motivo já conhecido, o que a regra da casa contra "é esperado que falhe"
- * não permite deixar em pé. O que este teste garante é mais estreito e ainda
- * assim é o que importa aqui: se a hidratação da LISTA quebrar (a chave não
- * bater, o timeout do prefetch estourar), esta asserção acende — o badge do
- * inbox pedir como já sabido não apaga esse sinal.
+ * ao vivo por este mesmo spec. O filtro nasceu por isso: um `toHaveLength(0)`
+ * sem ele reprovaria para sempre pelo motivo já conhecido, o que a regra da
+ * casa contra "é esperado que falhe" não permite deixar em pé.
+ *
+ * **A Tarefa 7 da Seção 8 fechou essa lacuna**: `LibraryData` agora prefetcha
+ * a lista e o badge em `Promise.all`, então o `state=CAPTURED` também deve
+ * deixar de sair do navegador. O filtro continua aqui porque ninguém rodou
+ * este spec depois daquela mudança — apertar a asserção sem ter rodado é
+ * escrever uma afirmação não medida. Quem rodar com credencial de teste
+ * confere os pedidos `state=CAPTURED` e, se vierem zero, aperta o filtro.
+ * O que este teste garante hoje segue estreito e é o que importa: se a
+ * hidratação da LISTA quebrar (a chave não bater, o timeout do prefetch
+ * estourar), esta asserção acende.
  */
 test("a lista da Biblioteca nao busca /api/products no navegador no primeiro carregamento", async ({ page }) => {
     const email = process.env.E2E_EMAIL
@@ -50,9 +55,9 @@ test("a lista da Biblioteca nao busca /api/products no navegador no primeiro car
     await page.goto("/library")
     await page.waitForSelector("[data-testid='product-grid'], [data-testid='library-empty']")
 
-    // `state=NORMALIZED` e a chave da lista principal (a que o servidor
-    // prefetcha); `state=CAPTURED` e o badge do inbox (nunca prefetchado,
-    // pendencia separada — ver comentario do teste, acima).
+    // `state=NORMALIZED` e a chave da lista principal; `state=CAPTURED` e o
+    // badge do inbox, prefetchado desde a Tarefa 7 da Secao 8 mas ainda nao
+    // medido ao vivo — ver o comentario do teste, acima.
     const pedidosDaLista = pedidos.filter((url) => url.includes("state=NORMALIZED"))
 
     expect(
