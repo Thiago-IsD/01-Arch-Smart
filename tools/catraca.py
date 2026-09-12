@@ -94,6 +94,7 @@ grava mesmo assim, mas imprime um aviso destacado com cada medida que subiu.
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -203,6 +204,36 @@ ROTULOS_PADRAO = ("entrou no baseline", "saiu do baseline")
 MOTIVOS_DE_PULADA = {
     "eslint_erros": "--eslint-json nao foi passado; quem mede o lint e o job `frontend` do CI",
 }
+
+# Chave de documentacao (prefixo "_", logo invisivel para medir()/comparar())
+# onde mora a justificativa de cada subida aceita de propósito. Existe porque
+# `_auditar_baseline` compara baseline com baseline: ela nao tem como saber se
+# um numero subiu porque alguem abriu o arquivo e inflou o valor, ou porque a
+# REGUA ficou mais rigorosa e passou a enxergar defeito que sempre esteve la --
+# e os dois casos sao indistinguiveis olhando so os dois numeros. A saida nao e
+# afrouxar a comparacao: e exigir que a justificativa viva DENTRO do arquivo,
+# onde a ferramenta le e o revisor audita. Antes disto ela vivia so no corpo do
+# PR, que nenhuma ferramenta le.
+CHAVE_PIORAS_ACEITAS = "_pioras_aceitas"
+
+
+def _commit_corrente() -> str | None:
+    """O commit curto de HEAD, ou None fora de um repositorio git.
+
+    Nunca estoura: gravar o registro sem o campo `commit` e pior que nao
+    gravar registro nenhum, mas e MUITO melhor que derrubar o --atualizar de
+    quem roda a ferramenta de um tarball sem .git.
+    """
+    try:
+        saida = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=RAIZ, capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if saida.returncode != 0:
+        return None
+    return saida.stdout.strip() or None
 
 
 class DiretorioMedidoSumiu(Exception):
@@ -446,17 +477,42 @@ def medidas_pioradas(baseline: dict, medido: dict, chave_nova_e_piora: bool = Tr
       `Repositorio` reprova todo PR que introduz uma medida nova, com o
       diagnostico invertido de que o baseline afrouxou.
     """
+    return [p["descricao"] for p in pioras_detalhadas(baseline, medido, chave_nova_e_piora)]
+
+
+def pioras_detalhadas(baseline: dict, medido: dict,
+                      chave_nova_e_piora: bool = True) -> list[dict]:
+    """Cada piora como dict, em vez de so a frase que `medidas_pioradas` imprime.
+
+    Mesma logica e mesma ordem -- `medidas_pioradas` e um mapa sobre esta
+    funcao, para nao existirem duas definicoes de "piorou" divergindo com o
+    tempo. O que esta forma acrescenta e `chave`/`de`/`para` separados, que e o
+    que `_auditar_baseline` precisa para consultar `_pioras_aceitas` e que
+    nenhum consumidor conseguiria extrair de volta da frase sem reparsear texto.
+
+    `numerica` e True so quando os dois lados sao numeros e o valor subiu --
+    o unico caso que um registro de piora aceita pode cobrir. Medida em lista,
+    chave sumida e chave sem baseline ficam `numerica=False` e portanto fora do
+    alcance do registro, de proposito: um teto numerico nao diz nada sobre
+    "qual arquivo entrou na lista".
+    """
     pioras = []
     for chave in sorted(set(baseline) - set(medido)):
         # Chave existia e sumiu do lado atual -- sempre piora, nos dois usos.
-        pioras.append(f"{chave}: {baseline[chave]!r} -> sumiu (a chave sumiu do catraca.json)")
+        pioras.append({
+            "chave": chave, "de": baseline[chave], "para": None, "numerica": False,
+            "descricao": f"{chave}: {baseline[chave]!r} -> sumiu (a chave sumiu do catraca.json)",
+        })
     for chave, valor in sorted(medido.items()):
         base = baseline.get(chave)
         if isinstance(valor, list):
             novos = sorted(set(valor) - set(base or []))
             if novos:
                 rotulo_subiu = ROTULOS_DE_LISTA.get(chave, ROTULOS_PADRAO)[0]
-                pioras.append(f"{chave}: {rotulo_subiu}: {', '.join(novos)}")
+                pioras.append({
+                    "chave": chave, "de": base, "para": valor, "numerica": False,
+                    "descricao": f"{chave}: {rotulo_subiu}: {', '.join(novos)}",
+                })
         elif base is None:
             if not chave_nova_e_piora:
                 continue
@@ -464,10 +520,51 @@ def medidas_pioradas(baseline: dict, medido: dict, chave_nova_e_piora: bool = Tr
             # do catraca.json e rodar --atualizar gravava o numero novo em
             # silencio, saida 0 — o cenario que o ADR 0006 nomeia como prova de
             # que a protecao dele falhou.
-            pioras.append(f"{chave}: sem baseline -> {valor} (a chave sumiu do catraca.json)")
+            pioras.append({
+                "chave": chave, "de": None, "para": valor, "numerica": False,
+                "descricao": f"{chave}: sem baseline -> {valor} (a chave sumiu do catraca.json)",
+            })
         elif valor > base:
-            pioras.append(f"{chave}: {base} -> {valor}")
+            pioras.append({
+                "chave": chave, "de": base, "para": valor, "numerica": True,
+                "descricao": f"{chave}: {base} -> {valor}",
+            })
     return pioras
+
+
+def registro_cobre_piora(registro: object, de: object, para: object) -> tuple[bool, str]:
+    """(aceita, motivo_da_recusa) para um registro de `_pioras_aceitas`.
+
+    Fail-closed nas tres condicoes, e cada uma cobre um caso distinto:
+
+    - **sem registro** -- e exatamente o cenario do docstring de
+      `_auditar_baseline`: numero subido na mao, sem justificativa nenhuma.
+    - **`de` diferente do valor da base** -- o registro e de OUTRA transicao.
+      Quando a branch base receber um baseline novo, o registro para de valer
+      sozinho e a guarda volta a morder, que e o comportamento correto: um
+      registro nao vira licenca permanente para aquela chave.
+    - **valor acima de `ate`** -- a subida aceita tinha teto. Passar dele e
+      subida nova, que ninguem justificou ainda.
+
+    O campo e `ate` (teto), nao `para` (valor exato), porque o caminho normal
+    depois de uma subida aceita e o numero voltar a DESCER sem deixar de ser
+    maior que o da base -- foi o que aconteceu com `cores_literais` na Secao 8:
+    aceita ate 588, hoje em 583, e 583 continua acima dos 518 da base porque a
+    regua ficou mais rigorosa e enxerga o que sempre esteve la.
+    """
+    if not isinstance(registro, dict):
+        return False, "nao ha registro em _pioras_aceitas para esta medida"
+    if "de" not in registro or "ate" not in registro:
+        return False, "o registro em _pioras_aceitas nao tem `de` e `ate`"
+    if registro["de"] != de:
+        return False, (f"o registro em _pioras_aceitas e de outra transicao"
+                       f" (registro: de={registro['de']!r}; branch base: {de!r})")
+    teto = registro["ate"]
+    if not isinstance(teto, (int, float)) or isinstance(teto, bool):
+        return False, f"o `ate` do registro em _pioras_aceitas nao e numero: {teto!r}"
+    if para > teto:
+        return False, f"{para} passa do teto aceito no registro (ate={teto})"
+    return True, ""
 
 
 def decidir_atualizacao(baseline: dict, medido: dict, aceitar_piora: bool) -> tuple[bool, list[str]]:
@@ -491,6 +588,65 @@ def decidir_atualizacao(baseline: dict, medido: dict, aceitar_piora: bool) -> tu
     return True, linhas
 
 
+def registrar_pioras_aceitas(baseline: dict, medido: dict) -> list[str]:
+    """Grava em `baseline[_pioras_aceitas]` cada subida numerica de `medido`. Devolve as linhas a imprimir.
+
+    Muta `baseline` no lugar -- quem chama grava o arquivo logo depois.
+
+    `motivo` nasce em branco **de proposito**: a ferramenta sabe o numero e o
+    commit, nao sabe por que o numero subiu. A saida diz, em voz alta, que o
+    campo precisa ser preenchido antes do commit, e `_auditar_baseline` repete o
+    aviso em cada auditoria enquanto ele estiver vazio -- um registro sem motivo
+    ainda e melhor que nenhum (a ferramenta consegue auditar a transicao), mas
+    nao serve ao revisor, que e quem essa guarda protege.
+
+    Quando ja existe registro cujo intervalo cobre o valor antigo do baseline
+    local, o `de` dele e PRESERVADO e so o teto sobe: duas subidas na mesma
+    branch sao uma transicao so, vista da branch base. Se a branch base tiver
+    adotado um baseline novo no meio disso, o `de` preservado deixa de bater e a
+    auditoria reprova dizendo qual `de` ela esperava -- fail-closed, e o conserto
+    e apagar o registro velho e gravar de novo.
+    """
+    registros = baseline.setdefault(CHAVE_PIORAS_ACEITAS, {})
+    if not isinstance(registros, dict):
+        registros = {}
+        baseline[CHAVE_PIORAS_ACEITAS] = registros
+    commit = _commit_corrente()
+    linhas = []
+    numericas = [p for p in pioras_detalhadas(
+        {c: v for c, v in baseline.items() if not c.startswith("_")}, medido,
+    ) if p["numerica"]]
+    if not numericas:
+        return linhas
+    linhas.append(f"Registrado em {CHAVE_PIORAS_ACEITAS} (tools/catraca.json):")
+    for piora in numericas:
+        chave = piora["chave"]
+        anterior = registros.get(chave)
+        de, motivo = piora["de"], ""
+        if isinstance(anterior, dict) and isinstance(anterior.get("ate"), (int, float)):
+            if anterior.get("de") is not None and anterior["de"] <= piora["de"] <= anterior["ate"]:
+                de = anterior["de"]
+                motivo = anterior.get("motivo") or ""
+        registro = {"de": de, "ate": piora["para"]}
+        if commit is not None:
+            registro["commit"] = commit
+        registro["motivo"] = motivo
+        registros[chave] = registro
+        linhas.append(f"  - {chave}: de={de}, ate={piora['para']}"
+                      + (f", commit={commit}" if commit else ""))
+    if commit is None:
+        linhas.append("  ATENCAO: nao foi possivel obter o commit corrente"
+                      " (`git rev-parse --short HEAD` falhou);")
+        linhas.append("  o registro foi gravado SEM o campo `commit`.")
+    faltando = [p["chave"] for p in numericas if not (registros[p["chave"]].get("motivo") or "").strip()]
+    if faltando:
+        linhas.append("  ATENCAO: o campo `motivo` ficou EM BRANCO em: "
+                      + ", ".join(faltando) + ".")
+        linhas.append("  Preencha antes de commitar: e o que o revisor le, e a unica")
+        linhas.append("  parte do registro que a ferramenta nao consegue descobrir sozinha.")
+    return linhas
+
+
 def _auditar_baseline(referencia: Path) -> int:
     """
     Audita o proprio catraca.json contra o da branch base.
@@ -508,6 +664,20 @@ def _auditar_baseline(referencia: Path) -> int:
     registrada, nao um afrouxamento. Sem isso, todo PR que acrescenta uma
     medida (como as duas que a Tarefa 11 da Secao 5 acrescentou) reprovaria
     aqui com o diagnostico invertido de "o baseline afrouxou".
+
+    Uma subida numerica passa **so** quando `_pioras_aceitas` (no catraca.json
+    desta branch) tem registro que a cubra, pelas tres condicoes de
+    `registro_cobre_piora`. Esse caminho nao afrouxa a comparacao: o cenario do
+    paragrafo acima -- numero subido na mao -- continua reprovando, porque
+    registro nenhum o cobre. O que ele muda e onde a justificativa vive: dentro
+    do arquivo, auditavel, em vez de so no corpo do PR, que nenhuma ferramenta
+    le.
+
+    O caso que motivou: a Tarefa 2 da Secao 8 tapou quatro furos da regua de
+    `cores_literais`, e o numero subiu de 518 para 588 medindo defeito que
+    sempre existiu. 518 (regua antiga, em `staging`) e 583 (regua nova, hoje)
+    nao sao numeros comparaveis, e comparando baseline com baseline nao ha como
+    descobrir isso -- so o registro conta.
     """
     atual = json.loads(BASELINE.read_text(encoding="utf-8"))
     try:
@@ -516,21 +686,61 @@ def _auditar_baseline(referencia: Path) -> int:
         print(f"[X] baseline de referencia nao encontrado: {referencia}")
         return 1
 
-    pioras = medidas_pioradas(
+    pioras = pioras_detalhadas(
         {c: v for c, v in base.items() if not c.startswith("_")},
         {c: v for c, v in atual.items() if not c.startswith("_")},
         chave_nova_e_piora=False,
     )
-    if not pioras:
+    registros = atual.get(CHAVE_PIORAS_ACEITAS) or {}
+    if not isinstance(registros, dict):
+        registros = {}
+
+    aceitas, recusadas = [], []
+    for piora in pioras:
+        if not piora["numerica"]:
+            # `_pioras_aceitas` tem `de`/`ate` numericos: um teto nao diz nada
+            # sobre "qual arquivo entrou na lista" nem sobre uma chave que
+            # sumiu. Estas continuam reprovando como antes desta guarda existir.
+            if piora["para"] is None:
+                razao = ("a chave nao existe nesta branch — restaure-a;"
+                         " so subida numerica pode ser coberta por _pioras_aceitas")
+            else:
+                razao = ("medida em lista — so subida numerica pode ser"
+                         " coberta por _pioras_aceitas")
+            recusadas.append((piora, razao))
+            continue
+        registro = registros.get(piora["chave"])
+        cobre, motivo_da_recusa = registro_cobre_piora(registro, piora["de"], piora["para"])
+        if cobre:
+            aceitas.append((piora, registro))
+        else:
+            recusadas.append((piora, motivo_da_recusa))
+
+    # Imprime as aceitas ANTES de decidir a saida, e imprime mesmo quando o
+    # comando vai reprovar por outra medida. O valor desta guarda nao esta em
+    # sair 0: esta em o revisor ler por que aquele numero subiu.
+    for piora, registro in aceitas:
+        print(f"[v] {piora['chave']}: SUBIU de {piora['de']} para {piora['para']},"
+              f" e a subida esta registrada em {CHAVE_PIORAS_ACEITAS}")
+        print(f"    aceita ate: {registro['ate']}")
+        if registro.get("commit"):
+            print(f"    commit: {registro['commit']}")
+        motivo = (registro.get("motivo") or "").strip()
+        print(f"    motivo: {motivo}" if motivo
+              else "    motivo: EM BRANCO — quem gravou o registro precisa preencher")
+
+    if not recusadas:
         print(f"[v] tools/catraca.json nao afrouxou em relacao a {referencia}")
         return 0
     print("[X] o BASELINE afrouxou em relacao a branch base:")
-    for piora in pioras:
-        print(f"  - {piora}")
+    for piora, motivo_da_recusa in recusadas:
+        print(f"  - {piora['descricao']}")
+        print(f"    {motivo_da_recusa}")
     print()
     print("Subir um numero do baseline e afrouxar a catraca. Se e mesmo")
     print("intencional, justifique no PR e use --atualizar --aceitar-piora, que")
-    print("deixa o aviso registrado na saida do comando.")
+    print("deixa o aviso registrado na saida do comando e grava a justificativa")
+    print(f"em {CHAVE_PIORAS_ACEITAS}, dentro do proprio tools/catraca.json.")
     return 1
 
 
@@ -542,10 +752,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="regrava catraca.json com o valor medido; recusa se alguma medida piorou")
     parser.add_argument("--aceitar-piora", action="store_true",
                         help="usado com --atualizar: grava mesmo que alguma medida tenha piorado,"
-                             " imprimindo um aviso; sozinho nao faz nada")
+                             " imprimindo um aviso e registrando a subida em _pioras_aceitas,"
+                             " dentro do proprio catraca.json; sozinho nao faz nada")
     parser.add_argument("--comparar-baseline-com", type=Path, default=None,
                         help="caminho de um catraca.json de referencia (o da branch base);"
-                             " falha se ALGUM numero deste baseline for maior que o de la."
+                             " falha se ALGUM numero deste baseline for maior que o de la,"
+                             " exceto a subida que _pioras_aceitas cobrir."
                              " Nao mede nada: audita o proprio arquivo de baseline")
     args = parser.parse_args(argv)
 
@@ -570,6 +782,12 @@ def main(argv: list[str] | None = None) -> int:
             print("\n".join(avisos))
         if not grava:
             return 1
+        if args.aceitar_piora:
+            # Grava a justificativa DENTRO do arquivo, nao so no aviso acima.
+            # Sem isto, a proxima mudanca de regua obrigava alguem a editar o
+            # catraca.json a mao para o job `Repositorio` passar -- que e
+            # exatamente o habito que `_auditar_baseline` existe para impedir.
+            print("\n".join(registrar_pioras_aceitas(baseline, medido)))
         baseline.update(medido)
         BASELINE.write_text(json.dumps(baseline, indent=2, ensure_ascii=False) + "\n",
                             encoding="utf-8")

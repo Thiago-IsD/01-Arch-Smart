@@ -1,5 +1,13 @@
 {
   "_leia-me": "Baselines medidos em 24/08/2026. Cada numero so pode descer. Ao baixar, rode `python tools/catraca.py --atualizar` e commite o resultado junto com a mudanca que o fez baixar. Se algo piorou, --atualizar recusa gravar sozinho; para subir de proposito, use `python tools/catraca.py --atualizar --aceitar-piora` e justifique no PR.",
+  "_pioras_aceitas": {
+    "cores_literais": {
+      "de": 518,
+      "ate": 588,
+      "commit": "0350895",
+      "motivo": "A Tarefa 2 da Secao 8 tapou quatro furos da regua de cores_literais: bg-white/text-white/-black, hex arbitrario fora de bg|text|border, ring-offset-<paleta>-<n>, e invisible/hidden com group-hover. O numero subiu de 518 para 588 porque a regua passou a enxergar defeito que sempre existiu -- nenhuma cor literal nova entrou no codigo. 518 (regua antiga, em staging) e 583 (regua nova, hoje) foram medidos por reguas diferentes e nao sao comparaveis. Hoje em 583: a migracao da Biblioteca baixou cinco."
+    }
+  },
   "eslint_erros": 85,
   "cores_literais": 583,
   "modulos_sem_doc": [
