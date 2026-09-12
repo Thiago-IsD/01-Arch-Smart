@@ -11,9 +11,17 @@ export interface EventoDeProduto {
  *
  * `dados`/`vazio`/`erro`: uma regiao de dados resolveu, e o numero e o tempo
  * ate ela. `pintura`: a tela nao tem regiao nenhuma (landing, paginas legais, e
- * toda tela que a Secao 8 ainda nao migrou), e o numero e o tempo ate pintar.
- * `abandonado`: havia regiao, e o usuario saiu antes de ela resolver — o numero
- * e o tempo que ele esperou sem receber o dado.
+ * toda tela que a Secao 8 ainda nao migrou). `abandonado`: havia regiao, e o
+ * usuario saiu antes de ela resolver — o numero e o tempo que ele esperou sem
+ * receber o dado.
+ *
+ * Duas ressalvas no `pintura`, para o numero nao ser lido como mais do que e:
+ * o fim e o primeiro frame pintado **quando esse frame chegou a rodar** — em
+ * aba oculta, ou se a tela desmontar antes dele, o fim e a saida da tela, e o
+ * numero fica maior do que a pintura levou. E o inicio e o clique so quando deu
+ * para ancorar nele; em carga dura (URL digitada, recarga) e o commit do efeito,
+ * ja depois do time origin do documento, entao o tempo de rede e de boot do
+ * bundle nao estao dentro. `medido_de` diz qual dos dois inicios foi usado.
  *
  * Sem este campo, as cinco situacoes moram na mesma coluna e quem consultar
  * soma laranja com maca.
