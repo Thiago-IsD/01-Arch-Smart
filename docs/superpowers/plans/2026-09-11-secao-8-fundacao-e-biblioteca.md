@@ -191,67 +191,109 @@ nenhuma outra conta (a Seção 7 encontrou uma credencial alheia salva no autofi
 do Chrome desta máquina; conta de identidade desconhecida não se usa para entrar
 em ambiente nenhum).
 
-- [ ] **Passo 2: subir o dev server**
+> ⚠️ **Rota corrigida em 11/09/2026, depois de a primeira tentativa voltar
+> bloqueada.** A tentativa original era dirigir o Chrome por automação e digitar
+> a credencial no formulário. Isso **não é possível**: um agente não digita
+> senha em campo de formulário, e as duas alternativas indiretas tentadas foram
+> recusadas pelo próprio ambiente. Registrado no commit `95b3003`.
+>
+> A rota que funciona já existe neste repositório e já rodou em 10/09/2026: o
+> **Playwright** faz o login lendo `E2E_EMAIL`/`E2E_PASSWORD` de `process.env`
+> e preenchendo com `fill()` — a senha vai do ambiente para a página sem passar
+> por nada que o agente escreva. É o que `e2e/medicao-biblioteca.spec.ts:31-36`
+> já faz.
+>
+> Então esta tarefa captura por Playwright, inspeciona as capturas, e entrega as
+> capturas a Thiago. **E diz, item a item, quem olhou o quê:** estilo computado
+> é máquina; captura inspecionada é modelo; olho humano é Thiago. São três
+> evidências diferentes, e o doc não pode embaralhá-las — foi exatamente esse
+> embaralhamento que deixou a Seção 6 parecer verificada.
 
-```bash
-cd ArchSmart-web
-npm run dev
-```
+- [ ] **Passo 2: escrever o instrumento de captura**
 
-- [ ] **Passo 3: entrar e abrir a galeria**
+Crie `ArchSmart-web/e2e/captura-visual-secao-6.spec.ts`. É **instrumento**, não
+guarda permanente — como o `medicao-biblioteca.spec.ts`. Ele:
 
-Com as ferramentas de navegador: abrir `http://localhost:3000/auth/login`,
-preencher com `E2E_EMAIL`/`E2E_PASSWORD` **lidos do ambiente**, entrar, e
-navegar para `http://localhost:3000/dev/componentes`.
+1. exige `CAPTURAS_DIR` no ambiente e **falha com mensagem clara** se faltar
+   (nunca pule silenciosamente: o `CLAUDE.md` proíbe);
+2. faz login pelo mesmo caminho do `medicao-biblioteca.spec.ts`;
+3. para cada alvo e em **duas larguras** (390×844 e 1440×900), navega, abre o
+   menu quando o alvo é um menu, e salva a captura em `CAPTURAS_DIR`;
+4. lê o **estilo computado** do que dá para medir por máquina, e imprime.
 
-> A galeria existe para ser olhada e nunca foi. Ela só existe em
-> desenvolvimento: em produção ela chama `notFound()`.
+Os alvos, e o que medir em cada um:
 
-- [ ] **Passo 4: olhar as três mudanças da Seção 6, uma a uma**
+| Alvo | Rota | Captura | Estilo computado a imprimir |
+|---|---|---|---|
+| galeria de componentes | `/dev/componentes` | página inteira | — |
+| menu do cabeçalho | `/dashboard` | menu aberto | `min-height` de cada `[role="menuitem"]` |
+| card de produto | `/library` | menu do card aberto | `min-height` dos itens |
+| tabela financeira | `/finance` | menu de linha aberto | `min-height` dos itens |
+| card de ambiente | `/projects/<id>` | menu aberto | `min-height` dos itens |
+| alternador de tema | `/dashboard` | menu aberto | `min-height` dos itens |
+| toast destrutivo | galeria | toast visível | `color` do botão de fechar e `background-color` do toast |
+| `Skeleton` | galeria | estado de carregamento | `aria-hidden` de cada skeleton |
 
-| O quê | Onde olhar | O que confirmar |
-|---|---|---|
-| `min-h-11` no `DropdownMenuItem` | galeria, e os 6 arquivos com item de menu | o alvo de toque tem ~44px, e menu comprido não estourou o viewport nem cortou item |
-| botão de fechar do toast destrutivo | galeria, variante destrutiva | o ícone tem contraste contra o fundo destrutivo, e não ficou invisível ao trocar `text-red-*` por token |
-| `aria-hidden="true"` no `Skeleton` | qualquer estado de carregamento | o leitor de tela não anuncia o skeleton; visualmente nada mudou |
+O `min-height` esperado é **44px** (`min-h-11`). Imprima o valor medido, não um
+"ok": o número é a evidência.
 
-Os seis arquivos com item de menu, medidos (não confie na lista; rode):
+Para achar os seletores, leia os seis arquivos que têm item de menu — e **meça a
+lista, não confie nela**:
 
 ```bash
 grep -rc  "<DropdownMenu\(Checkbox\|Radio\)\?Item" ArchSmart-web/src --include=*.tsx | grep -v ":0" | grep -v __tests__
 ```
 
-- [ ] **Passo 5: abrir as 5 telas reais dessa lista e olhar o mesmo**
+Se um alvo não for alcançável (rota que exige dado que a conta de seed não tem,
+por exemplo), **não invente**: registre o alvo como não alcançado e o motivo.
 
-Cabeçalho (`AppShell`), card de produto (`/library`), tabela financeira
-(`/finance`), card de ambiente (`/projects/<id>`), alternador de tema.
-
-- [ ] **Passo 6: capturar tela de cada uma**
-
-Salve as capturas no diretório de scratch da sessão, não no repositório. O
-repositório recebe o **texto** do que foi visto, não os PNGs.
-
-- [ ] **Passo 7: preencher o doc de medição**
-
-Em `docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`, substituir cada
-item que hoje está marcado como dependente de olho humano pelo que foi
-observado, com data de 11/09/2026. Onde algo estiver **errado**, registre como
-achado e **não conserte aqui** — a correção é tarefa própria, e a Seção 8 não
-deve misturar "olhar" com "mexer".
-
-- [ ] **Passo 8: commit**
+- [ ] **Passo 3: rodar a captura**
 
 ```bash
-git add docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md
-git commit -m "docs(secao-8): fecha a verificacao visual da Secao 6
-
-Tres mudancas visuais da Secao 6 foram olhadas por olho humano em
-11/09/2026, com sessao real em desenvolvimento: min-h-11 no
-DropdownMenuItem, o botao de fechar do toast destrutivo e o aria-hidden
-do Skeleton. O doc de medicao registra item a item o que foi visto."
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; set +a
+CAPTURAS_DIR="<diretório de scratch da sessão>" npx playwright test e2e/captura-visual-secao-6.spec.ts --reporter=line
 ```
 
----
+O `playwright.config.ts` já sobe o dev server (`webServer: npm run dev`, com
+`reuseExistingServer`), então não é preciso subi-lo à mão.
+
+Guarde a saída dos estilos computados: ela vai no doc de medição.
+
+- [ ] **Passo 4: inspecionar as capturas**
+
+Abra cada PNG e olhe. O que procurar, por alvo:
+
+- **`min-h-11`:** o alvo de toque ficou com ~44px e o menu **não** estourou o
+  viewport nem cortou item — em 390px especialmente, que é onde um menu
+  comprido quebra. Essa é a maior das três mudanças: 44px é bem mais que os
+  ~30px de antes.
+- **toast destrutivo:** o ícone de fechar é visível contra o fundo destrutivo. A
+  troca de `text-red-*` por token pode ter deixado o ícone quase invisível, e
+  isso o CSS compilado não diz.
+- **`Skeleton`:** visualmente nada mudou — o `aria-hidden` é para leitor de tela.
+
+- [ ] **Passo 5: entregar as capturas a Thiago**
+
+Mande os PNGs com `SendUserFile`, para que o olho humano aconteça de verdade.
+Priorize as duas larguras do menu mais comprido e o toast destrutivo.
+
+- [ ] **Passo 6: preencher o doc de medição**
+
+Em `docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`, uma seção
+datada de 11/09/2026 com **três evidências por item**: estilo computado
+(máquina), captura inspecionada (modelo), olho humano (Thiago — pendente até ele
+responder). Onde algo estiver errado, registre como achado e **não conserte
+aqui**: esta tarefa é olhar, não mexer, e misturar as duas arruína a medição de
+qual mudança causou o quê.
+
+- [ ] **Passo 7: commit**
+
+```bash
+git add ArchSmart-web/e2e/captura-visual-secao-6.spec.ts docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md
+git commit -m "test(secao-8): captura visual da Secao 6 por Playwright"
+```
+
 
 ## Tarefa 2 — Tapar os quatro furos da catraca
 
