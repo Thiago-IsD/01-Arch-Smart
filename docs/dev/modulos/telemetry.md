@@ -16,6 +16,7 @@ mede até os dados; quem não usa ganha um `load_ms` rotulado `pintura`.
 |---|---|---|
 | `useTrack()` | `hooks.ts` | Devolve `track(nome, propriedades?)`, estável entre renders. **Não manda nada: enfileira.** Quem junta o lote e decide o momento de enviar é `fila.ts`. |
 | `enfileirar(evento)` / `descarregar(opcoes?)` | `fila.ts` | A fila. Junta a janela de 1 s num lote só, descarrega sozinha ao chegar a **20** eventos, e descarrega com `keepalive` no `pagehide` e na aba escondida. |
+| `TAMANHO_MAXIMO` | `fila.ts` | **20** — em quantos eventos a fila descarrega sozinha. Exportada só para que um teste a compare com o teto do servidor; ver "Contrato com a API". |
 | `_zerarFila()` | `fila.ts` | Só para teste: zera a fila, cancela o timer e desliga o estado de saída. |
 | `<TelemetriaDeTela />` | `TelemetriaDeTela.tsx` | Emite `screen_viewed` uma vez por navegação. Não renderiza nada. |
 | `ProntidaoDaTelaProvider` | `contexto.tsx` | O canal por onde as regiões de dados da tela anunciam que existem e reportam que resolveram. |
@@ -58,12 +59,21 @@ deste front (Art. 4). O 204 já é tratado lá dentro (`lib/api/core.ts`), entã
 `api<void>()` não tenta parsear corpo vazio.
 
 **O teto do servidor (50) e o lote do cliente (20) são dois arquivos em dois
-repositórios, e agora há teste ligando os dois**:
-`test_aceita_o_lote_cheio_do_cliente` e
-`test_lote_acima_do_teto_e_recusado_inteiro` (mesmo arquivo). Baixar o teto
-abaixo de 20 faria o Pydantic recusar o **lote inteiro** com 422 — e o cliente
-engole o erro, então os 20 eventos sumiriam calados. Comentário não reprova;
-o teste reprova.
+repositórios, e a relação entre eles está presa por um teste de cada lado — um
+só não basta.** O risco é o mesmo nas duas direções: se o lote cheio não cabe no
+teto, o Pydantic recusa o **lote inteiro** com 422, e o cliente engole o erro,
+então os eventos somem calados.
+
+| Direção perigosa | Quem reprova |
+|---|---|
+| baixar o `max_length` do servidor abaixo do lote do cliente | `tests/api/test_telemetria.py::test_aceita_o_lote_cheio_do_cliente` (backend), que posta 20 eventos e exige 204 |
+| subir `TAMANHO_MAXIMO` do cliente acima do teto do servidor | `src/__tests__/telemetry-fila.test.ts`, descrição "o teto do servidor" (frontend) |
+
+**Cada teste só reprova a mudança feita no lado dele**, porque cada um carrega o
+número do outro como cópia literal — e é por isso que são dois. O teste de
+backend sozinho (que era o que existia primeiro) deixava passar exatamente a
+metade mais provável: alguém subir a fila do cliente, no arquivo onde a fila
+mora. Comentário não reprova; teste reprova — e um teste só reprovava metade.
 
 ## Tabelas que toca
 
@@ -300,5 +310,14 @@ de teste estava sendo rejeitada pelo Supabase de staging em 11/09/2026
 (`HTTP 400, "Invalid login credentials"`). O instrumento que fecha isso existe e
 está escrito: `ArchSmart-web/e2e/telemetria-biblioteca.spec.ts`, rodado pelo job
 `e2e` do CI. **Até ele rodar, não tire média desta coluna sem olhar `medido_ate`
-e `principal_declarada` primeiro** — e as linhas gravadas antes de 11/09/2026
-são do gatilho antigo, com o defeito descrito acima.
+e `principal_declarada` primeiro.**
+
+> ⚠️ **O corte entre o gatilho antigo e este é um EVENTO, não uma data: é o
+> deploy.** Enquanto a Seção 8 não chegar a staging, **toda** linha de
+> `product_events` lá é do gatilho antigo — inclusive as datadas depois de o
+> protocolo novo existir no repositório, porque código em branch não grava
+> nada. E a parede da credencial impediu até a navegação local, então não há
+> linha de lugar nenhum gravada pelo protocolo novo. Quem for consultar essa
+> coluna confere primeiro **se a Seção 8 chegou ao ambiente de onde a linha
+> veio**; uma data de corte convidaria a confiar em linha velha por ela ser
+> recente.

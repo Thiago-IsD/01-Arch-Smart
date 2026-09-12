@@ -19,7 +19,19 @@ import type { EventoDeProduto } from "./types"
  * evento. Ver a docstring de `lib/api/telemetry.ts`.
  */
 const JANELA_MS = 1000
-const TAMANHO_MAXIMO = 20
+
+/**
+ * Quantos eventos a fila acumula antes de descarregar sozinha.
+ *
+ * **Exportada para que um teste a compare com o teto do servidor**
+ * (`max_length` de `LoteDeEventos`, em
+ * `ArchSmart-api/app/schemas/telemetry_schema.py`). Subir este numero acima
+ * daquele teto faz o Pydantic recusar o LOTE INTEIRO com 422 — e `enviarEventos`
+ * engole o erro, entao o lote cheio passaria a sumir calado, sem erro no
+ * console de ninguem. Quem mexer aqui encosta em
+ * `src/__tests__/telemetry-fila.test.ts`.
+ */
+export const TAMANHO_MAXIMO = 20
 
 let fila: EventoDeProduto[] = []
 let timer: ReturnType<typeof setTimeout> | null = null

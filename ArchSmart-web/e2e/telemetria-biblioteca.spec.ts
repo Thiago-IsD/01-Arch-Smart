@@ -15,9 +15,9 @@ import { esperarListaDaBiblioteca } from "./biblioteca"
  * fallback do `<Suspense>` ainda no ar.
  *
  * > ⚠️ **Este spec nunca foi executado.** Escrito na Tarefa 10 da Seção 8, em
- * > 11/09/2026, quando a credencial do usuário de teste E2E estava sendo
+ * > 11–12/09/2026, quando a credencial do usuário de teste E2E estava sendo
  * > rejeitada pelo Supabase de staging (`HTTP 400, "Invalid login
- * > credentials"`). Ele está no quarto job do CI
+ * > credentials"`, verificado em 11/09/2026). Ele está no quarto job do CI
  * > (`.github/workflows/ci.yml`, job `e2e`) e é lá, ou à mão com a credencial
  * > viva, que ele roda pela primeira vez. Até então **nenhuma navegação real
  * > confirmou que um `screen_viewed` com `medido_ate: "dados"` chega ao banco**
@@ -45,6 +45,19 @@ interface LoteRecebido {
 const PISO_MS = 200
 const TETO_MS = 10_000
 
+/**
+ * A janela da fila (`JANELA_MS` em `features/telemetry/fila.ts`), mais folga.
+ *
+ * O `screen_viewed` do aquecimento é **também** de `/library`, e portanto
+ * indistinguível por conteúdo do que este spec vai medir. Ele sai pelo timer de
+ * 1 s ou pelo `keepalive` do `pagehide`, então um POST atrasado entraria na
+ * contagem e o `toHaveLength(1)` reprovaria com "saiu mais de um
+ * screen_viewed" — culpando o dedupe por um defeito deste spec. Drenar a fila
+ * antes de começar a contar é o que impede isso; o instante de captura de cada
+ * lote é a segunda guarda, para o caso de um lote escapar mesmo assim.
+ */
+const DRENAGEM_DA_FILA_MS = 1_500
+
 test("o screen_viewed da Biblioteca mede ate os dados, a partir do clique", async ({ page }) => {
     const email = process.env.E2E_EMAIL
     const password = process.env.E2E_PASSWORD
@@ -56,7 +69,10 @@ test("o screen_viewed da Biblioteca mede ate os dados, a partir do clique", asyn
         )
     }
 
-    const lotes: LoteRecebido[] = []
+    // Cada lote vai com o instante em que foi capturado: e o unico jeito de
+    // distinguir o evento desta navegacao do evento do aquecimento, que tem o
+    // mesmo `screen` e o mesmo `name`.
+    const lotes: { recebidoEm: number; corpo: LoteRecebido }[] = []
     page.on("request", (requisicao: Request) => {
         if (requisicao.method() !== "POST") return
         if (!requisicao.url().includes("/api/telemetry/events")) return
@@ -64,7 +80,7 @@ test("o screen_viewed da Biblioteca mede ate os dados, a partir do clique", asyn
         // ilegivel aqui e defeito do cliente, e deixar passar como "nenhum
         // evento" esconderia exatamente isso.
         const corpo = requisicao.postDataJSON() as LoteRecebido | null
-        if (corpo) lotes.push(corpo)
+        if (corpo) lotes.push({ recebidoEm: Date.now(), corpo })
     })
 
     await page.goto("/auth/login")
@@ -78,6 +94,10 @@ test("o screen_viewed da Biblioteca mede ate os dados, a partir do clique", asyn
     await page.goto("/library")
     await esperarListaDaBiblioteca(page)
 
+    // Deixa a fila do aquecimento esvaziar ANTES de comecar a contar. Ver
+    // DRENAGEM_DA_FILA_MS: o evento do aquecimento e de `/library` tambem.
+    await page.waitForTimeout(DRENAGEM_DA_FILA_MS)
+
     // Volta ao Dashboard para que a ida a Biblioteca seja uma navegacao de
     // cliente, nascida de um clique — o unico caminho que rende
     // `medido_de: "clique"`.
@@ -85,6 +105,7 @@ test("o screen_viewed da Biblioteca mede ate os dados, a partir do clique", asyn
     await page.waitForLoadState("networkidle")
 
     lotes.length = 0
+    const instanteDoClique = Date.now()
     await page.click("a[href='/library']")
     await esperarListaDaBiblioteca(page)
 
@@ -105,7 +126,11 @@ test("o screen_viewed da Biblioteca mede ate os dados, a partir do clique", asyn
     // pelos eventos, e nao por tempo fixo, e o que mantem isto estavel.
     const eventosDaBiblioteca = () =>
         lotes
-            .flatMap((lote) => lote.eventos ?? [])
+            // Segunda guarda contra o lote do aquecimento: so conta o que foi
+            // capturado a partir do clique. `lotes` e zerado logo antes do
+            // clique, mas um lote em voo pode chegar no meio.
+            .filter((lote) => lote.recebidoEm >= instanteDoClique)
+            .flatMap((lote) => lote.corpo.eventos ?? [])
             .filter((evento) => evento.name === "screen_viewed")
             .filter((evento) => evento.properties?.screen === "/library")
 

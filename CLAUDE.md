@@ -232,9 +232,17 @@ que os fechou; os dois que sobram são pauta das oito telas que faltam:
   `RE_PALETA` nunca via porque não têm sufixo numérico), hex fora de
   `bg|text|border` (2), `ring-offset-<paleta>-<n>` (0 hoje — furo fechado antes
   de aparecer) e `invisible`/`hidden` + `group-hover` (1). O baseline subiu por
-  isso: `cores_literais` 518 → 588 e `hover_sem_focus` 8 → 9. **Nenhum defeito
-  novo entrou; foi a régua passando a ver o que sempre existiu** — e é por isso
-  que um número que sobe nem sempre é regressão. A lição de fundo continua de
+  isso, **no commit `0350895`**: `cores_literais` 518 → 588 e `hover_sem_focus`
+  8 → 9. **Nenhum defeito novo entrou; foi a régua passando a ver o que sempre
+  existiu** — e é por isso que um número que sobe nem sempre é regressão.
+  ⚠️ **Esses dois números são histórico daquele commit, não o baseline de hoje:**
+  a Tarefa 9 baixou as duas medidas ao migrar a Biblioteca, e em 12/09/2026
+  `tools/catraca.json` tem **`cores_literais` 583** e **`hover_sem_focus` 8**.
+  Não republique 588/9 como se fossem o número vigente — meça:
+
+  ```
+  python tools/catraca.py --eslint-json ArchSmart-web/eslint.json
+  ``` A lição de fundo continua de
   pé: **régua não é prova**, e o próximo furo medido já apareceu na Tarefa 9 —
   `contraste_reprovado` mede só pares (cor, cor-foreground) de `globals.css`, e
   **nunca** um token de texto sobre `--background`, então `text-warning` a
@@ -361,9 +369,14 @@ existe e está escrito** — o que falta é uma credencial viva, e isso é de Th
    > quando a navegação termina. Protocolo inteiro em
    > [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md).
    >
-   > **Duas ressalvas, para ninguém ler isto como mais do que é:** as linhas de
-   > `product_events` gravadas **antes** de 12/09/2026 são do gatilho antigo e
-   > continuam com o defeito descrito acima; e o conserto está provado por
+   > **Duas ressalvas, para ninguém ler isto como mais do que é:** o corte entre
+   > o gatilho antigo e este é um **evento, não uma data — é o deploy**. A
+   > Seção 8 não foi mergeada em lugar nenhum, então **toda** linha de
+   > `product_events` em staging é do gatilho antigo, inclusive as datadas depois
+   > de 12/09/2026: código em branch não grava nada. E a parede da credencial
+   > impediu até a navegação local, então não existe linha gravada pelo protocolo
+   > novo em ambiente nenhum. Quem consultar a coluna confere primeiro se a
+   > Seção 8 chegou ao ambiente de onde a linha veio. E o conserto está provado por
    > vitest, que prende *qual* rótulo sai e *quantas* linhas por navegação —
    > **nunca a grandeza do número**. Essa parte é a que continua aberta.
 
@@ -508,8 +521,10 @@ E2E — Playwright contra staging
 > `NEXT_PUBLIC_*` porque `playwright.config.ts` sobe o próprio `npm run dev` e
 > `src/lib/env.ts` valida as três com Zod na primeira página carregada. Só
 > Thiago cria isso, e **não** há `continue-on-error` escondendo a reprovação: a
-> regra da casa é que falha é falha. Enquanto durar, este é o único X vermelho
-> esperado — e ele deixa de ser esperado no dia em que os Secrets existirem.
+> regra da casa é que falha é falha — e esta é uma falha real, com causa de uma
+> linha e dono: **reprova por falta de Secret, dono Thiago**. Não leia o X dele
+> como ruído nem como "é assim mesmo"; ele apaga no dia em que os cinco valores
+> existirem, e até lá os outros três jobs continuam dizendo a verdade sobre o PR.
 >
 > Ele roda os specs de **guarda** por nome (`auth`, `dashboard`,
 > `hidratacao-biblioteca`, `telemetria-biblioteca`), nunca `npx playwright test`

@@ -21,7 +21,7 @@ vi.mock("@/lib/api/telemetry", () => ({
     },
 }))
 
-import { _zerarFila, descarregar, enfileirar } from "@/features/telemetry/fila"
+import { _zerarFila, descarregar, enfileirar, TAMANHO_MAXIMO } from "@/features/telemetry/fila"
 
 function nomes(): string[] {
     return lotes.flatMap((l) => l.eventos.map((e) => e.name))
@@ -144,5 +144,34 @@ describe("fila na saida da pagina", () => {
         document.dispatchEvent(new Event("visibilitychange"))
         expect(lotes).toHaveLength(1)
         expect(lotes[0].opcoes.keepalive).toBe(true)
+    })
+})
+
+// --- O lote cheio tem de CABER no que o servidor aceita ---------------------
+//
+// `LoteDeEventos.eventos` declara `max_length=50` em
+// ArchSmart-api/app/schemas/telemetry_schema.py. Subir `TAMANHO_MAXIMO` acima
+// disso faz o Pydantic recusar o lote INTEIRO com 422, e `enviarEventos` engole
+// o erro: a perda seria total e silenciosa, indistinguivel de "ninguem
+// navegou".
+//
+// Este teste prende UMA direcao: a mudanca que acontece no cliente. A outra —
+// baixar o teto do servidor abaixo do lote do cliente — esta presa do lado do
+// backend, em
+// tests/api/test_telemetria.py::test_aceita_o_lote_cheio_do_cliente. Sao dois
+// testes porque cada lado so reprova a mudanca feita NELE: um teste sozinho,
+// em qualquer dos dois repositorios, deixa passar a metade perigosa que mora no
+// outro. O numero do servidor e copia literal aqui, e e por isso que o teste
+// dele mora la.
+const MAX_LENGTH_DO_SERVIDOR = 50
+
+describe("o teto do servidor", () => {
+    it("o lote cheio do cliente cabe no max_length do schema", () => {
+        expect(
+            TAMANHO_MAXIMO,
+            `a fila descarrega em ${TAMANHO_MAXIMO} eventos, acima do max_length de ` +
+            `${MAX_LENGTH_DO_SERVIDOR} de LoteDeEventos: todo lote cheio seria recusado ` +
+            "inteiro com 422, e enviarEventos engoliria o erro",
+        ).toBeLessThanOrEqual(MAX_LENGTH_DO_SERVIDOR)
     })
 })
