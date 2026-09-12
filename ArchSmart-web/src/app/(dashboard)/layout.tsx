@@ -2,7 +2,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { GlobalChatWidget } from "@/components/layout/GlobalChatWidget";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { TelemetriaDeTela } from "@/features/telemetry/TelemetriaDeTela";
-import { VazioDaTelaProvider } from "@/features/telemetry/contexto";
+import { ProntidaoDaTelaProvider } from "@/features/telemetry/contexto";
 
 export default function DashboardLayout({
     children,
@@ -10,17 +10,21 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     // A ordem importa duas vezes: `TelemetriaDeTela` precisa ficar dentro do
-    // `QueryProvider` (senao `useQueryClient` estoura) e dentro do
-    // `VazioDaTelaProvider` (senao `useVazioDaTela` volta null e o `is_empty`
-    // e sempre nulo). E o `VazioDaTelaProvider` embrulha o `AppShell` tambem,
-    // senao os `QueryBoundary` das telas ficam fora dele e nada reporta vazio.
+    // `ProntidaoDaTelaProvider` (senao `useProntidao` volta null, a telemetria
+    // nao assina canal nenhum e NENHUM evento sai) e o provider precisa
+    // embrulhar o `AppShell` tambem, senao os `QueryBoundary` das telas ficam
+    // fora dele e nada anuncia nem reporta.
+    //
+    // `TelemetriaDeTela` aparece ANTES do `AppShell` de proposito: assim o
+    // efeito dele roda antes do efeito de todo `QueryBoundary` da tela, e a
+    // assinatura do canal existe quando a primeira regiao reporta.
     return (
         <QueryProvider>
-            <VazioDaTelaProvider>
+            <ProntidaoDaTelaProvider>
                 <TelemetriaDeTela />
                 <AppShell>{children}</AppShell>
                 <GlobalChatWidget />
-            </VazioDaTelaProvider>
+            </ProntidaoDaTelaProvider>
         </QueryProvider>
     );
 }

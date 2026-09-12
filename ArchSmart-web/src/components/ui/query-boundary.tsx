@@ -2,7 +2,8 @@
 
 import { useEffect, type ReactElement, type ReactNode } from "react"
 import type { UseQueryResult } from "@tanstack/react-query"
-import { useReportarVazio } from "@/features/telemetry/contexto"
+import { useProntidao } from "@/features/telemetry/contexto"
+import type { Desfecho } from "@/features/telemetry/contexto"
 
 /**
  * Fronteira de query com os estados obrigatorios por tipo.
@@ -22,6 +23,12 @@ type Props<T> = {
      * `vazioPorPadrao` — ver o comentario dele.
      */
     isEmpty?: (dados: T) => boolean
+    /**
+     * Marca esta regiao como a que decide o `load_ms` e o `is_empty` da tela.
+     * Uma por tela. Tela com varias regioes e nenhuma marcada usa a primeira
+     * que resolver, e o evento grava `principal_declarada: false`.
+     */
+    principal?: boolean
     children: (dados: T) => ReactNode
 }
 
@@ -57,9 +64,17 @@ export function QueryBoundary<T>({
     empty,
     error,
     isEmpty,
+    principal = false,
     children,
 }: Props<T>): ReactElement {
-    const reportarVazio = useReportarVazio()
+    const prontidao = useProntidao()
+
+    // Anuncia UMA vez, na montagem: e o que distingue "tela sem regiao de
+    // dados" de "regiao ainda carregando". Sem isto a telemetria teria de
+    // decidir no primeiro frame, que e o defeito que esta secao conserta.
+    useEffect(() => {
+        prontidao?.anunciar()
+    }, [prontidao])
 
     // Calculado antes dos returns porque hook nao pode ficar atras de return.
     // `null` enquanto nao ha resposta: nao da para dizer "vazio" nem
@@ -71,11 +86,19 @@ export function QueryBoundary<T>({
             : vazioPorPadrao(query.data)
         : null
 
+    const desfecho: Desfecho | null = query.isPending
+        ? null
+        : query.isError
+          ? "erro"
+          : vazio
+            ? "vazio"
+            : "dados"
+
     // Em efeito, nao no render: reportar durante o render e efeito colateral
     // no meio de uma fase que o React pode repetir ou descartar.
     useEffect(() => {
-        if (vazio !== null) reportarVazio(vazio)
-    }, [vazio, reportarVazio])
+        if (desfecho) prontidao?.reportar({ desfecho, principal })
+    }, [desfecho, principal, prontidao])
 
     if (query.isPending) return <>{skeleton}</>
     if (query.isError) return <>{error(query.error as Error, () => void query.refetch())}</>

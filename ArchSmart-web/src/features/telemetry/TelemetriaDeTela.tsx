@@ -2,135 +2,163 @@
 
 import { useEffect, useRef } from "react"
 import { usePathname } from "next/navigation"
-import { useQueryClient } from "@tanstack/react-query"
-import { useVazioDaTela } from "./contexto"
+import { useProntidao } from "./contexto"
+import type { Report } from "./contexto"
 import { useTrack } from "./hooks"
-import { decidirMedicao, normalizarTela } from "./types"
+import { decidirMedicao, normalizarTela, vazioDoDesfecho, type MedidoDe } from "./types"
+
+declare global {
+    interface Window {
+        __arqsmartOuvinteDeClique?: boolean
+    }
+}
+
+/** Instante do ultimo clique em link interno, para ancorar o cronometro. */
+let marcaDeClique: number | null = null
+
+function instalarOuvinteDeClique() {
+    if (typeof window === "undefined" || window.__arqsmartOuvinteDeClique) return
+    window.__arqsmartOuvinteDeClique = true
+    // Fase de CAPTURA: o handler do React pode chamar preventDefault, e a marca
+    // precisa existir de qualquer forma.
+    document.addEventListener(
+        "click",
+        (evento) => {
+            const alvo = (evento.target as HTMLElement | null)?.closest("a[href]")
+            if (!alvo) return
+            const href = alvo.getAttribute("href") ?? ""
+            // Link interno so: "/library", nao "https://..." nem "#ancora".
+            if (!href.startsWith("/")) return
+            marcaDeClique = performance.now()
+        },
+        true
+    )
+}
+
+/** O que uma navegacao ainda deve ao banco. */
+interface Pendencia {
+    pathname: string
+    inicio: number
+    medidoDe: MedidoDe
+    instanteDaPintura: number | null
+    anunciadas: () => number
+}
 
 /**
  * Emite `screen_viewed` uma vez por navegacao.
  *
- * O `load_ms` vem de quando as queries em voo assentam — isso e "dados na
- * tela", que e a metrica do orcamento de performance. Tela sem query nenhuma
- * emite depois da pintura, e `medido_ate` diz qual dos dois o numero e.
+ * Nao infere nada: ouve o canal de prontidao. Quem sabe que os dados estao na
+ * tela e o QueryBoundary, e e a mesma coisa que sabe se a tela esta vazia. Ver
+ * o protocolo em docs/dev/modulos/telemetry.md e a decisao 2 da spec da
+ * Secao 8.
  *
- * "Em voo" e no cliente inteiro, nao so nesta rota; ver o comentario de
- * `buscandoAlgo` antes de tratar o numero como tempo desta tela.
- *
- * Monta DENTRO do QueryProvider, senao `useQueryClient` estoura.
+ * Monta DENTRO do ProntidaoDaTelaProvider.
  */
 export function TelemetriaDeTela() {
     const pathname = usePathname()
-    const queryClient = useQueryClient()
-    const vazioDaTela = useVazioDaTela()
+    const prontidao = useProntidao()
     const track = useTrack()
 
-    // Ref DEFENSIVA de dedupe por navegacao — nao e o que garante hoje a
-    // linha unica sob StrictMode, e nenhum teste discrimina esta condicao.
-    // Um revisor tirou `jaEmitido.current === pathname` de dentro de `emitir`
-    // e os 11 testes continuaram passando: quem garante uma emissao so e o
-    // `emitido` local desta chamada mais o cleanup do efeito (cancela a
-    // inscricao no cache e os frames agendados); como `queryClient`, `track`
-    // e `vazioDaTela` sao estaveis entre renders, o efeito so roda de novo
-    // quando `pathname` muda. `jaEmitido` so entraria em jogo se o efeito
-    // rodasse de novo para o MESMO pathname fora desse ciclo — cenario que
-    // nao acontece hoje, mas que o codigo trata mesmo assim.
-    //
-    // Historico do bug que motivou a guarda estar dentro do `emitir`, e nao
-    // na entrada do efeito: guardando na entrada, o run 1 do StrictMode
-    // gravava a ref, assinava o cache e agendava o frame; o cleanup cancelava
-    // os dois; o run 2 batia na ref e voltava sem assinar nada. Os dois
-    // caminhos de emissao morriam, e o resultado em `npm run dev` era ZERO
-    // evento, nao dois — com o agravante de que `npm run dev` e o modo em
-    // que a conferencia manual acontece.
+    const pendencia = useRef<Pendencia | null>(null)
     const jaEmitido = useRef<string | null>(null)
 
     useEffect(() => {
-        vazioDaTela?.limpar()
+        instalarOuvinteDeClique()
 
-        const inicio = performance.now()
-        let emitido = false
-        let aguardandoRender = 0
+        const emitir = (p: Pendencia, report: Report | null) => {
+            if (jaEmitido.current === p.pathname) return
+            jaEmitido.current = p.pathname
+            if (pendencia.current === p) pendencia.current = null
 
-        const emitir = (queriesAssentaram: boolean) => {
-            if (emitido || jaEmitido.current === pathname) return
-            emitido = true
-            jaEmitido.current = pathname
+            const houveAnuncio = p.anunciadas() > 0
+            // O instante da pintura e usado SO quando a tela nao tinha regiao
+            // nenhuma. Capturar e usar sao momentos diferentes: e isso que
+            // permite um load_ms honesto sem decidir no primeiro frame.
+            const fim =
+                report === null && !houveAnuncio && p.instanteDaPintura !== null
+                    ? p.instanteDaPintura
+                    : performance.now()
+
             track("screen_viewed", {
-                screen: normalizarTela(pathname),
-                load_ms: Math.round(performance.now() - inicio),
-                medido_ate: decidirMedicao({ queriesAssentaram }),
-                // null, e nao false: "nao sei" e "nao esta vazia" sao coisas
-                // diferentes, e gravar false aqui inventaria uma medicao.
-                is_empty: vazioDaTela?.ler() ?? null,
+                screen: normalizarTela(p.pathname),
+                load_ms: Math.round(fim - p.inicio),
+                medido_ate: decidirMedicao(report, houveAnuncio),
+                medido_de: p.medidoDe,
+                is_empty: vazioDoDesfecho(report?.desfecho ?? null),
+                principal_declarada: report?.principal ?? false,
             })
         }
 
-        /**
-         * "Tem QUALQUER query em voo no cliente inteiro?" — e nao "desta
-         * navegacao". Le com atencao antes de confiar na bandeira abaixo.
-         */
-        const buscandoAlgo = () =>
-            queryClient
-                .getQueryCache()
-                .getAll()
-                .some((q) => q.state.fetchStatus !== "idle")
-
-        // A bandeira significa "alguma query estava em voo no cliente enquanto
-        // esta tela carregava" — NAO "esta tela buscou alguma coisa".
+        // 1. Descarrega a navegacao ANTERIOR, se houver uma em aberto e ela for
+        //    de outro caminho. Isto roda antes do `limpar()`, porque o canal
+        //    ainda guarda os anuncios daquela navegacao.
         //
-        // Ela e melhor do que perguntar ao cache se ele tem alguma ENTRADA
-        // (`getAll().length > 0`), que era a versao anterior: aquela nunca
-        // voltava falso da segunda navegacao em diante, porque as queries da
-        // tela anterior ficam no cache ate o gcTime — tela sem query nenhuma
-        // nunca pegava o caminho da pintura e esperava um evento de cache que
-        // so chega na coleta de lixo (`load_ms` de minutos rotulado `dados`), e
-        // revisita com cache quente nao emitia nada.
-        //
-        // Mas o escopo continua sendo o cliente, nao a navegacao, e isso tem
-        // consequencia MEDIDA: com uma query alheia de 400 ms em voo na hora da
-        // navegacao, uma tela sem query nenhuma emite `medido_ate: "dados"` com
-        // `load_ms` de ~430 ms — cronometrando a query da tela anterior. Nao e
-        // hipotese: o React Query nao cancela fetch no unmount, entao sair de
-        // uma tela lenta antes de ela terminar produz exatamente isso na
-        // seguinte. Escopar de verdade exige olhar os observadores montados
-        // nesta navegacao, que e mudanca de desenho — decidido para a Secao 8,
-        // que reescreve estas telas de qualquer jeito.
-        let algumaBuscou = buscandoAlgo()
+        //    NAO faca isso no cleanup do efeito: o StrictMode monta, desmonta e
+        //    monta de novo com o MESMO pathname, e emitir no cleanup produziria
+        //    uma linha espuria — e, pelo dedupe, mataria a linha real.
+        const anterior = pendencia.current
+        if (anterior && anterior.pathname !== pathname) emitir(anterior, null)
 
-        const avaliar = () => {
-            if (buscandoAlgo()) {
-                algumaBuscou = true
+        prontidao?.limpar()
+
+        const medidoDe: MedidoDe = marcaDeClique !== null ? "clique" : "commit"
+        const atual: Pendencia = {
+            pathname,
+            inicio: marcaDeClique ?? performance.now(),
+            medidoDe,
+            instanteDaPintura: null,
+            anunciadas: () => prontidao?.anunciadas() ?? 0,
+        }
+        marcaDeClique = null
+        pendencia.current = atual
+
+        let aguardandoFolga = 0
+        let candidato: Report | null = null
+
+        // Um report principal emite na hora. Um nao-principal espera um frame,
+        // para que uma principal que chegue no MESMO commit ganhe dele. Sem essa
+        // folga, a ordem da arvore decidiria o numero.
+        const aoReportar = (report: Report) => {
+            // Atalho: a guarda que DECIDE e a de dentro do `emitir`. Tirar esta
+            // daqui nao muda o comportamento de nenhum teste — medido por
+            // mutacao em 11/09/2026. Tirar as DUAS faz a tela contar dobrado
+            // sob StrictMode com cache quente, que e a configuracao da
+            // Biblioteca; o teste que pega isso e o "sob StrictMode, com cache
+            // quente, ainda emite exatamente uma linha".
+            if (jaEmitido.current === pathname) return
+            if (report.principal) {
+                cancelAnimationFrame(aguardandoFolga)
+                emitir(atual, report)
                 return
             }
-            if (!algumaBuscou) return
-            // Um frame de folga antes de ler `is_empty`: o cache assenta ANTES
-            // de o React re-renderizar, e o QueryBoundary so decide "vazio" no
-            // render. Sem esta espera, `ler()` volta null em toda tela.
-            cancelAnimationFrame(aguardandoRender)
-            aguardandoRender = requestAnimationFrame(() => emitir(true))
+            if (candidato) return
+            candidato = report
+            aguardandoFolga = requestAnimationFrame(() => emitir(atual, candidato))
         }
 
-        const cancelarInscricao = queryClient.getQueryCache().subscribe(avaliar)
+        const cancelarAssinatura = prontidao?.assinar(aoReportar)
 
-        // Fim do primeiro frame. Se nada buscou ate aqui, esta tela nao busca
-        // dados — ou serviu tudo de cache quente — e o unico numero honesto e o
-        // tempo ate a pintura, que e o que `medido_ate: "pintura"` diz.
-        const aoPintar = requestAnimationFrame(() => {
-            if (buscandoAlgo()) {
-                algumaBuscou = true
-                return
-            }
-            if (algumaBuscou) avaliar()
-            else emitir(false)
+        const naPintura = requestAnimationFrame(() => {
+            atual.instanteDaPintura = performance.now()
         })
 
+        // 2. A sessao pode terminar nesta tela. Sem isto, a ultima navegacao — a
+        //    que diz onde o usuario parou — nunca chega.
+        const aoSair = () => emitir(atual, null)
+        window.addEventListener("pagehide", aoSair)
+
         return () => {
-            cancelarInscricao()
-            cancelAnimationFrame(aoPintar)
-            cancelAnimationFrame(aguardandoRender)
+            cancelarAssinatura?.()
+            cancelAnimationFrame(naPintura)
+            cancelAnimationFrame(aguardandoFolga)
+            window.removeEventListener("pagehide", aoSair)
+            // Sem emissao aqui, de proposito: o StrictMode desmonta e remonta
+            // com o MESMO pathname. Emitir aqui produz uma linha espuria de
+            // `abandonado` no primeiro desmonte e, pelo dedupe, mata a linha
+            // real — medido por mutacao em 11/09/2026, e o teste que pega isso
+            // e o "sob StrictMode emite exatamente uma linha".
         }
-    }, [pathname, queryClient, track, vazioDaTela])
+    }, [pathname, prontidao, track])
 
     return null
 }

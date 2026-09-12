@@ -2,61 +2,68 @@
 
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react"
 
+export type Desfecho = "dados" | "vazio" | "erro"
+export interface Report {
+    desfecho: Desfecho
+    principal: boolean
+}
+
 /**
- * O canal do `is_empty`.
+ * O canal entre as regioes de dados da tela e a telemetria.
  *
- * Quem sabe se a tela esta vazia e o QueryBoundary, nao o shell. Este contexto
- * carrega esse unico dado da tela ate a telemetria, para que nenhuma tela
- * precise lembrar de reportar nada.
+ * Quem sabe que os dados estao na tela e o QueryBoundary, nao o shell — e e a
+ * mesma coisa que sabe se a tela esta vazia. Antes desta secao a telemetria
+ * inferia as duas espiando o QueryCache do cliente inteiro, e cronometrava a
+ * query da tela anterior.
  *
  * Guardado em ref, e nao em state, DE PROPOSITO: um setState aqui re-renderiza
- * a arvore inteira do dashboard a cada boundary que decide, e o valor so e
- * lido uma vez, na hora de emitir o evento.
+ * a arvore inteira do dashboard a cada regiao que resolve.
  */
-interface VazioDaTela {
-    reportar: (vazio: boolean) => void
-    ler: () => boolean | null
+export interface ProntidaoDaTela {
+    anunciar: () => void
+    reportar: (report: Report) => void
+    assinar: (ouvinte: (report: Report) => void) => () => void
+    anunciadas: () => number
     limpar: () => void
 }
 
-const Contexto = createContext<VazioDaTela | null>(null)
+const Contexto = createContext<ProntidaoDaTela | null>(null)
 
-export function VazioDaTelaProvider({ children }: { children: ReactNode }) {
-    const valor = useRef<boolean | null>(null)
-    const canal = useMemo<VazioDaTela>(
+export function ProntidaoDaTelaProvider({ children }: { children: ReactNode }) {
+    const anuncios = useRef(0)
+    const ouvintes = useRef(new Set<(report: Report) => void>())
+
+    const canal = useMemo<ProntidaoDaTela>(
         () => ({
-            reportar: (vazio: boolean) => {
-                valor.current = vazio
+            anunciar: () => {
+                anuncios.current += 1
             },
-            ler: () => valor.current,
+            reportar: (report) => {
+                ouvintes.current.forEach((ouvinte) => ouvinte(report))
+            },
+            assinar: (ouvinte) => {
+                ouvintes.current.add(ouvinte)
+                return () => {
+                    ouvintes.current.delete(ouvinte)
+                }
+            },
+            anunciadas: () => anuncios.current,
             limpar: () => {
-                valor.current = null
+                anuncios.current = 0
             },
         }),
         []
     )
+
     return <Contexto.Provider value={canal}>{children}</Contexto.Provider>
 }
 
 /**
- * Uma unica referencia para o caso "fora do provider".
+ * Fora do provider devolve null, e quem chama trata.
  *
- * Se fosse `() => {}` escrito no `return`, cada render devolveria uma funcao
- * nova, e o efeito do QueryBoundary que depende dela rodaria a cada render.
+ * A galeria `/dev/componentes` usa o QueryBoundary e NAO fica dentro de
+ * `(dashboard)`; sem o null, abrir a galeria estouraria.
  */
-const NAO_REPORTA = () => {}
-
-/**
- * O QueryBoundary chama isto.
- *
- * Fora do provider vira no-op: a galeria `/dev/componentes` usa o boundary e
- * NAO fica dentro de `(dashboard)`. Sem o no-op, abrir a galeria estouraria.
- */
-export function useReportarVazio(): (vazio: boolean) => void {
-    const canal = useContext(Contexto)
-    return canal ? canal.reportar : NAO_REPORTA
-}
-
-export function useVazioDaTela(): VazioDaTela | null {
+export function useProntidao(): ProntidaoDaTela | null {
     return useContext(Contexto)
 }
