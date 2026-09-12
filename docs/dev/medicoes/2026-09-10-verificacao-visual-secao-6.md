@@ -244,3 +244,191 @@ alguém precisa liberar explicitamente, fora deste fluxo de agente, uma
 ferramenta de preenchimento de credencial que não exponha o valor a quem
 executa (o tipo de "credential-request tool" citado nas regras de segurança,
 que este ambiente não tinha disponível nesta tentativa).
+
+## Tentativa de 11/09/2026, rota Playwright (Tarefa 1 da Seção 8, brief corrigido) — terceiro bloqueio, diferente dos dois anteriores
+
+A rota mudou: em vez de dirigir o Chrome por automação e digitar a senha,
+`ArchSmart-web/e2e/captura-visual-secao-6.spec.ts` faz login como
+`e2e/medicao-biblioteca.spec.ts` já faz desde 10/09/2026 — `page.fill()` do
+Playwright lê `E2E_EMAIL`/`E2E_PASSWORD` de `process.env` e preenche o
+formulário sem que o agente escreva a senha em nenhuma chamada de ferramenta.
+**Essa parte funcionou** — é a primeira vez que o bloqueio de "agente não
+digita senha" não impediu a tarefa.
+
+**Topologia necessária, montada nesta tarefa:** `ArchSmart-web` já tinha um
+`npm run dev` no ar (herdado da tentativa anterior, na porta 3000). Faltava a
+API local na porta 8000 — `NEXT_PUBLIC_API_URL=http://localhost:8000` em
+`ArchSmart-web/.env.local` exige isso, e o login passa pelo backend
+(`POST /api/auth/login`), não direto pelo Supabase client-side. Subida com:
+
+```
+cd ArchSmart-api
+.\venv\Scripts\Activate.ps1
+uvicorn app.main:app --port 8000
+```
+
+`ArchSmart-api/.env` já apontava para staging (`ipbhtqzybgdltewwnvnl`, bloco
+`## staging ##` ativo, `## production ##` inteiro comentado — conferido antes
+de subir, como o `CLAUDE.md` manda). `GET /health` → `200`,
+`GET /health/db` → `{"status":"ok","db":"up"}`.
+
+**O login falhou com 401, credencial rejeitada pelo próprio Supabase — não é
+mais bloqueio de ferramenta, é bloqueio de dado:**
+
+```
+LOGIN_RESPONSE_STATUS=401
+LOGIN_FALHOU=page.waitForURL: Timeout 20000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "**/dashboard" until "load"
+============================================================
+```
+
+`app/api/auth.py::login` só devolve 401 com a mensagem "E-mail ou senha
+incorretos." quando a resposta do Supabase contém `"invalid login
+credentials"` ou `"invalid_grant"` — não é timeout de rede, não é erro 500,
+não é confirmação de e-mail pendente (esse caminho é 403, mensagem diferente,
+tratado à parte no mesmo arquivo). O e-mail carregado (`E2E_EMAIL`) bateu com
+o esperado, confirmado sem imprimir a senha, do mesmo jeito que a tentativa
+anterior já tinha confirmado:
+
+```
+email: ana.arquiteta@seed.arqsmart.local
+senha: presente
+```
+
+Ou seja: a senha que está hoje em `ArchSmart-web/.env.e2e.local` **não
+autentica** contra o projeto Supabase de staging (`ipbhtqzybgdltewwnvnl`) para
+este e-mail, agora. Não investiguei mais fundo — a Regra 6 do brief desta
+tarefa é clara: "Se o Playwright falhar no login, reporte a mensagem exata.
+Não tente rota alternativa de credencial." Não sei se a senha do arquivo
+diverge da senha real, se o usuário foi removido/alterado no Supabase, ou
+outra causa — qualquer uma dessas é decisão/diagnóstico de Thiago, não desta
+tarefa.
+
+### Achado de segurança: exposição remediada nesta tarefa (o snapshot de acessibilidade do Playwright expõe a senha em texto puro), causa raiz não corrigida
+
+Numa tentativa anterior desta mesma sessão (antes do ajuste de timeout
+descrito acima), o teste estourou o timeout com o campo de senha já
+preenchido. Playwright grava, a cada falha, um `error-context.md` com um
+"page snapshot" em formato de árvore de acessibilidade — e essa árvore lê o
+atributo `value` do DOM, não a renderização visual mascarada (`type="password"`
+mascara na tela, não no `value`). O arquivo gerado continha a senha em texto
+puro, dentro de `ArchSmart-web/test-results/`, um diretório que **não estava
+no `.gitignore`** (`grep -n "test-results" ArchSmart-web/.gitignore` → sem
+saída). Cada ocorrência foi apagada assim que percebida
+(`rm -rf ArchSmart-web/test-results`), antes de qualquer commit, e o valor
+nunca foi copiado para este documento, para o relatório da tarefa, ou para
+qualquer commit. **Isto não ficou versionado em nenhum momento** — mas é uma
+exposição real que qualquer novo spec de Playwright que preencha senha e
+estoure timeout volta a criar, e o repositório não tem rede de proteção
+nenhuma contra ela hoje (nem `.gitignore`, nem aviso). Registrado aqui como
+achado — **não corrigido nesta tarefa**, porque o único arquivo de
+configuração que esta tarefa está autorizada a tocar é este documento e o
+spec de captura, e adicionar `test-results/`/`playwright-report/` ao
+`.gitignore` do `ArchSmart-web` é mudança de escopo maior (afeta todo `e2e/`,
+não só este spec). Recomendação para quem pegar isso a seguir: adicionar
+`test-results/` e `playwright-report/` ao `.gitignore` do `ArchSmart-web`
+antes que outro spec de Playwright volte a gerar esse arquivo.
+
+### O que foi capturado, de verdade, nesta tentativa
+
+Só o que não depende de sessão: o alternador de tema (`ModeToggle`,
+`DropdownMenuItem`), que o brief original apontava para `/dashboard` — **e
+não é lá que ele vive**. O `Header` do dashboard tem um botão Sol/Lua sem
+menu; o único `ModeToggle` com `DropdownMenuItem` de verdade é renderizado
+pelo `Navbar` público (`src/components/landing/Navbar.tsx:87`), presente em
+`/` e nas páginas de auth/marketing — confirmado por leitura de código antes
+de escrever o spec, não deduzido:
+
+```
+grep -rn "ModeToggle" ArchSmart-web/src --include=*.tsx
+src/components/landing/Navbar.tsx:9:import { ModeToggle } from '@/components/theme-toggle'
+src/components/landing/Navbar.tsx:87:                                <ModeToggle />
+src/components/theme-toggle.tsx:15:export function ModeToggle() {
+```
+
+Capturado em `/`, público, sem precisar de sessão nenhuma:
+
+| Largura | `min-height` computado dos 3 itens (`Claro`/`Escuro`/`Sistema`) | Rótulo |
+|---|---|---|
+| 390×844 | `["44px","44px","44px"]` | verificado por máquina (getComputedStyle) **e inspecionado pelo modelo** (captura vista abaixo) |
+| 1440×900 | `["44px","44px","44px"]` | idem |
+
+Comando exato que produziu os números (saída do `console.log` do spec, sem
+edição):
+
+```
+ALTERNADOR_TEMA_MIN_HEIGHT[mobile-390x844]=["44px","44px","44px"]
+ALTERNADOR_TEMA_MIN_HEIGHT[desktop-1440x900]=["44px","44px","44px"]
+```
+
+Isto fecha, para este único alvo dos seis, a lacuna "altura renderizada de
+verdade" que a nota de 10/09/2026 registrava como dependente de sessão —
+**44px bate com o `min-h-11` esperado, medido pelo motor de layout real do
+Chromium, não por jsdom.**
+
+Capturas salvas fora do repositório (diretório de scratch da sessão, nunca
+commitadas): `alternador-tema-mobile-390x844.png` e
+`alternador-tema-desktop-1440x900.png`. Inspecionadas pelo modelo (esta
+tarefa): no desktop, o menu abre alinhado à direita do botão, com espaçamento
+generoso entre "Claro"/"Escuro"/"Sistema" — compatível com os 44px medidos, e
+sem cortar contra a borda da janela. No mobile, o menu abre **sobrepondo**
+parte do próprio menu hambúrguer do `Navbar` (que precisou ser aberto antes,
+porque o `ModeToggle` mobile vive dentro dele) — os botões "Entrar"/"Criar
+Conta" aparecem por trás do dropdown. Não sei se isto é um defeito real de
+z-index/layout quando os dois menus coexistem, ou um artefato do momento exato
+da captura (o menu hambúrguer pode não ter terminado a animação de abertura
+quando o dropdown foi acionado). **Registro como achado, não investigado mais
+fundo — fora do escopo das três mudanças da Seção 6, e esta tarefa é para
+olhar, não mexer.** Fica para o olho humano de Thiago decidir se é um
+problema.
+
+**Os outros cinco alvos do brief — galeria, menu do cabeçalho, card de
+produto, toast destrutivo, tabela financeira, card de ambiente — continuam
+sem nenhuma evidência de tela real**, pelo bloqueio de login acima. A lacuna
+"depende de olho humano/sessão autenticada" da nota de 10/09/2026 continua
+aberta para esses cinco.
+
+### Achado à parte, fora do escopo desta correção: o wordmark "Arq Smart" renderiza como "arch smart"
+
+A tentativa de 10/09/2026 já tinha visto isto na tela de login, sem
+investigar. Esta tentativa viu o mesmo problema de novo, de forma
+independente, na landing pública (`/`) — capturado na própria imagem do
+alternador de tema acima: o logotipo no canto superior esquerdo (ícone +
+texto) renderiza **"arch smart"**, minúsculo, sem Q. O `alt` da tag
+`<Image>` está correto (`alt="Arq Smart"`, `src/components/landing/Navbar.tsx:39`),
+o que aponta para o problema estar **dentro do arquivo de imagem**
+(`BRAND_ASSETS.horizontal`, um PNG/SVG), não no texto/JSX — por isso nenhum
+`grep "Arch Smart"` em `.ts`/`.tsx` (a varredura que fechou a pendência 2 da
+Seção 5) o pegaria: o texto errado está desenhado dentro dos pixels do
+logotipo, não em uma string do código. Isto é uma violação visível do Art. 8
+("Proibido, sem exceção" — a marca é "Arq Smart", zero ocorrência de
+"ArchSmart"/variações em copy). **Não investigado a fundo, não corrigido** —
+fora do escopo desta tarefa (as três mudanças da Seção 6) e a regra desta
+tarefa é olhar, não mexer. Registrado aqui, além do relatório da tarefa, por
+ser Art. 8 e por já ter aparecido duas vezes de forma independente.
+
+### Conclusão desta tentativa
+
+**Um dos seis alvos foi verificado de ponta a ponta** (alternador de tema:
+máquina + modelo; falta só o olho humano de Thiago). **Os outros cinco
+continuam sem verificação visual nenhuma.** O bloqueio não é mais de
+ferramenta (Playwright resolve isso) nem de arquivo ausente (a credencial
+existe em `.env.e2e.local`) — é que essa credencial não autentica hoje contra
+o Supabase de staging. Comparado com as duas tentativas anteriores, este é
+progresso real: a rota técnica está provada (o mesmo spec, com uma senha que
+funcione, chegaria às seis superfícies), e o único obstáculo que falta
+resolver é externo ao código e ao agente — revalidar ou regerar a senha do
+usuário de teste E2E.
+
+**Para desbloquear:** Thiago confirma (ou regenera, pelo roteiro em
+`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`) a senha de
+`ana.arquiteta@seed.arqsmart.local` no projeto Supabase de staging
+(`ipbhtqzybgdltewwnvnl`) e atualiza `ArchSmart-web/.env.e2e.local` — depois
+disso, rodar de novo é só:
+
+```
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; set +a
+CAPTURAS_DIR=<diretorio fora do repositorio> npx playwright test e2e/captura-visual-secao-6.spec.ts --reporter=line
+```
