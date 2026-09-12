@@ -1037,16 +1037,25 @@ _Última atualização: 2026-09-12_
 > | | |
 > |---|---|
 > | `npm run typecheck` | exit 0, sem saída |
-> | `npm test` | **28 arquivos / 216 testes**, exit 0 |
+> | `npm test` | **29 arquivos / 236 testes**, exit 0 |
 > | `pytest -q` (backend, Postgres real) | **343 passaram, 1 pulado**, exit 0 |
 > | `tools/`, de dentro de `tools/` | **103 testes, OK**, exit 0 |
 > | `python tools/catraca.py --eslint-json …` | exit 0, as **nove** medidas iguais ao baseline |
 > | `checa_links.py` / `progresso.py --check` | 0 link quebrado / consistente |
 >
-> Sete dos 216 testes do front vêm de uma rodada de revisão da Tarefa 9 que
-> estava **não commitada** na árvore quando a Tarefa 10 começou, e foi
-> preservada em commit próprio (rótulos de Art. 6, e o chip de `success` medido
-> sobre a pilha real de fundos, não sobre `--background`).
+> ⚠️ **Esses números mudaram duas vezes, e vale saber de onde cada um vem.**
+> As dez tarefas fecharam com **28 arquivos / 217 testes** — a tabela dizia
+> **216**, que era erro de transcrição: a mensagem do commit `e92831f`, o
+> último das tarefas, já dizia 217. Depois deles, a **onda de correção da
+> revisão final** acrescentou 19 testes (o latch do canal de prontidão, o aviso
+> de duas regiões `principal`, e o contrato do `QueryBoundary` testado direto),
+> e é daí que saem os **29 / 236** da tabela. Meça, não copie:
+> `cd ArchSmart-web && npm test`.
+>
+> Sete desses testes vêm de uma rodada de revisão da Tarefa 9 que estava **não
+> commitada** na árvore quando a Tarefa 10 começou, e foi preservada em commit
+> próprio (rótulos de Art. 6, e o chip de `success` medido sobre a pilha real de
+> fundos, não sobre `--background`).
 >
 > **O quarto job de CI existe: `E2E — Playwright contra staging`.** Roda os
 > specs de **guarda** por nome — `auth`, `dashboard`, `hidratacao-biblioteca` e

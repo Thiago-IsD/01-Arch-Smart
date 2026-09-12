@@ -186,12 +186,20 @@ que usar o padrão, sem precisar ser lembrada caso a caso.
 > Saiu **0 telas reais** para o componente da Seção 6 (só `galeria.tsx` e o
 > teste dela) contra **11 telas** para o do `react-hook-form` (entre outras,
 > `ProductFormSheet`, `NormalizationSheet`, `EventDialog`, `settings/page`,
-> `QuickEntryDialog`) — foi esse número que decidiu qual dos dois ficava. O
-> segundo comando exclui a galeria e o teste de propósito: depois da Tarefa 6,
-> os dois também importam `@/components/ui/form` (para mostrar o padrão
-> vigente, não um componente de produto), então a contagem sem o filtro dá
-> **13**, não 11 — meça com o filtro se a pergunta é "quantas telas reais", ou
-> sem ele se a pergunta é "quantos arquivos importam o módulo". A
+> `QuickEntryDialog`) — foi esse número que decidiu qual dos dois ficava.
+>
+> **Esse 11 é histórico do momento da decisão, e já não reproduz.** Rodando os
+> dois comandos acima hoje (12/09/2026), saem **13** com o filtro e **16** sem
+> ele. Os dois que entraram são `ProductDimensionFields.tsx` e
+> `NormalizationDimensionFields.tsx`, criados **pela própria Seção 8** quando a
+> Tarefa 8 dividiu `ProductFormSheet` e `NormalizationSheet` por
+> responsabilidade (commits `48e8f6d` e `ff551b7`) — não são telas novas, são
+> pedaços de duas que já contavam. O segundo comando exclui a galeria e o teste
+> de propósito: depois da Tarefa 6 os dois também importam
+> `@/components/ui/form`, para mostrar o padrão vigente e não um componente de
+> produto. Meça **com** o filtro se a pergunta é "quantas telas reais", e **sem**
+> ele se a pergunta é "quantos arquivos importam o módulo"; a diferença entre
+> 13 e 16 é exatamente a galeria mais os dois arquivos de teste. A
 > única coisa que o componente apagado tinha e o outro não era exatamente a
 > decisão de produto `sensivel` → `data-private`, descrita acima; ela foi
 > portada para o `FormItem` no mesmo commit que apagou o órfão, e os cinco
@@ -344,6 +352,22 @@ dela vê, e a régua é um regex:
   - **`bg-white`, `text-white`, `bg-black`** e afins — não têm número, e
     `white`/`black` não estão na lista de paletas. Medido em 10/09/2026:
     **67 ocorrências** (`grep -rnoE "\b(bg|text|border|ring|ring-offset)-(white|black)\b" src --include=*.tsx --include=*.ts | wc -l`).
+
+    > **67 aqui e 68 no `CLAUDE.md` da raiz: os dois números estão certos, para
+    > comandos diferentes — e isto precisa estar dito, porque dois documentos com
+    > dois números e nenhuma reconciliação é como um número errado entra.** A
+    > diferença é a **lista de prefixos**: o grep desta linha cobre cinco
+    > (`bg|text|border|ring|ring-offset`), e o `RE_BRANCO_PRETO` de
+    > `tools/catraca.py` cobre os **16** de `_PREFIXOS` — os mesmos do
+    > `RE_PALETA`. A 68ª é **`from-black`**, em
+    > `ArchSmart-web/src/app/portal/[uuid]/components/EnvironmentGallery.tsx:62`.
+    > A régua da catraca é a dos 16; quem for conferir o baseline use **ela**:
+    >
+    > ```
+    > cd ArchSmart-web
+    > grep -rnoE "\b(bg|text|border|ring|ring-offset)-(white|black)\b" src --include=*.tsx --include=*.ts | wc -l   # 67
+    > grep -rnoE "\b(ring-offset|ring|bg|text|border|from|to|via|fill|stroke|outline|decoration|shadow|accent|caret|divide|placeholder)-(white|black)\b" src --include=*.tsx --include=*.ts | wc -l   # 68
+    > ```
   - **hex arbitrário fora de `bg`/`text`/`border`** — `ring-[#...]`,
     `shadow-[#...]`, `from-[#...]`. Medido: **2**
     (`grep -rnoE "\b[a-z-]+-\[#[0-9a-fA-F]{3,8}\]" src --include=*.tsx --include=*.ts | grep -vE "\b(bg|text|border)-\[#" | wc -l`).

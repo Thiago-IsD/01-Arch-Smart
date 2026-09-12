@@ -229,7 +229,11 @@ que os fechou; os dois que sobram são pauta das oito telas que faltam:
   listados aqui foram tapados em 11/09/2026, na Seção 8 (commit `0350895`),
   antes de a seção medir tela nenhuma** — cada um com teste no mesmo commit. A
   régua passou a ver `bg-white`/`text-white`/`-black` (68 ocorrências reais, que
-  `RE_PALETA` nunca via porque não têm sufixo numérico), hex fora de
+  `RE_PALETA` nunca via porque não têm sufixo numérico — e
+  [`componentes.md`](docs/dev/componentes.md) diz **67** na mesma frase sem estar
+  errado: o grep de lá cobre 5 prefixos e o `RE_BRANCO_PRETO` cobre os 16 de
+  `_PREFIXOS`; a 68ª é `from-black`, em `EnvironmentGallery.tsx:62`, e a
+  reconciliação dos dois comandos está lá), hex fora de
   `bg|text|border` (2), `ring-offset-<paleta>-<n>` (0 hoje — furo fechado antes
   de aparecer) e `invisible`/`hidden` + `group-hover` (1). O baseline subiu por
   isso, **no commit `0350895`**: `cores_literais` 518 → 588 e `hover_sem_focus`
@@ -241,8 +245,17 @@ que os fechou; os dois que sobram são pauta das oito telas que faltam:
   Não republique 588/9 como se fossem o número vigente — meça:
 
   ```
-  python tools/catraca.py --eslint-json ArchSmart-web/eslint.json
-  ``` A lição de fundo continua de
+  python tools/catraca.py
+  ```
+
+  (Sem `--eslint-json`: o `ArchSmart-web/eslint.json` é gitignored e só existe
+  se alguém rodou o eslint antes, então o comando com o flag **estoura
+  `FileNotFoundError` cru em clone limpo**. Quem mede o lint é o job `frontend`
+  do CI, que gera o relatório no passo anterior; sem o flag a medida
+  `eslint_erros` sai como `PULADA`, com o motivo impresso, e as outras oito são
+  conferidas.)
+
+  A lição de fundo continua de
   pé: **régua não é prova**, e o próximo furo medido já apareceu na Tarefa 9 —
   `contraste_reprovado` mede só pares (cor, cor-foreground) de `globals.css`, e
   **nunca** um token de texto sobre `--background`, então `text-warning` a
@@ -636,7 +649,7 @@ npm run typecheck
 npm test
 ```
 
-Sai limpo: `Test Files 28 passed (28)`, `Tests 216 passed (216)` (medido em 12/09/2026, na primeira metade da Seção 8; eram 20/162 depois da Seção 7 — o número sobe quando uma seção acrescenta testes, então **meça, não copie daqui**). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade. O backend, no mesmo dia, sai `343 passed, 1 skipped`.
+Sai limpo: `Test Files 29 passed (29)`, `Tests 236 passed (236)` (medido em 12/09/2026, na revisão final da Seção 8; as dez tarefas dela fecharam em 28/**217** — a tabela do `PROGRESS.md` dizia 216, erro de transcrição corrigido nesta revisão —, e eram 20/162 depois da Seção 7. O número sobe quando uma seção acrescenta testes, então **meça, não copie daqui**). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade. O backend, no mesmo dia, sai `343 passed, 1 skipped`.
 
 Repositório, sem venv e sem instalar nada (os scripts de `tools/` usam só a biblioteca padrão):
 

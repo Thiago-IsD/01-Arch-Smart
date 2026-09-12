@@ -200,10 +200,26 @@ layout real. O que foi entregue sem sessão: axe em **jsdom**
 ```
 cd ArchSmart-web && npm run dev
 # com sessão, em /library:
-#   console do navegador: axe.run().then(r => console.table(r.violations))
 #   Tab a partir do topo, sem tocar no mouse
 #   DevTools > device toolbar > 390x844 e 1440x900
 ```
+
+Para o axe no navegador, **nada injeta o `axe` no runtime**: `axe-core` é
+`devDependency` e só é carregado pelo vitest em jsdom, então `axe.run(...)` no
+console responde `axe is not defined`. Duas saídas que funcionam — a primeira
+sem instalar nada:
+
+```
+# 1) cole o conteúdo do bundle no console e só então rode o axe
+cat ArchSmart-web/node_modules/axe-core/axe.min.js   # copie a saída para o console
+# no console, depois de colar:
+#   axe.run().then(r => console.table(r.violations))
+```
+
+Ou **2)** instale a extensão **axe DevTools** no navegador e use a aba dela, que
+é o caminho que não depende de colar 600 KB num console. Os dois medem a página
+real, com o Tailwind compilado — que é a diferença que importa: em jsdom a regra
+`color-contrast` cai em `incomplete`, nunca em `violations`.
 
 Dois riscos já localizados por leitura, que só o navegador decide:
 

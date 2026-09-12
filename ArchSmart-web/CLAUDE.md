@@ -177,7 +177,41 @@ Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, 
 > composto. Quem escrever `text-success` numa tela nova não vai ser reprovado por
 > ferramenta nenhuma; é esta regra escrita que segura.
 
-Se a tela precisa de um estado que nenhum token cobre, reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um literal de paleta — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
+Se a tela precisa de um estado que nenhum token cobre, reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um literal de paleta — o desvio que esta regra existe para evitar.
+
+O tamanho da dívida, medido em 12/09/2026 com **os regexes da régua**, que é o que a catraca de verdade conta:
+
+| O que a régua vê | Quantas | Regex |
+|---|---|---|
+| classe de paleta nomeada (`bg-emerald-600`, `bg-slate-100`) | **502** | `RE_PALETA` |
+| `bg-white` / `text-white` / `-black`, sem sufixo numérico | **68** | `RE_BRANCO_PRETO` |
+| hex arbitrário, com prefixo qualquer (`bg-[#F88379]`, `shadow-[#F88379]`) | **13** | `RE_ARBITRARIA` |
+| **total — é este o `cores_literais` do baseline** | **583** | soma dos três |
+
+São **46** arquivos `.ts`/`.tsx` de `src/` com alguma das três. **Não acrescente a 584ª.**
+
+Meça importando a régua, nunca com um grep improvisado — os três regexes têm sutilezas que um grep de vizinhança erra (`ring-offset` antes de `ring` na alternância; `white`/`black` não têm sufixo numérico; `RE_ARBITRARIA` aceita prefixo qualquer, não só `bg|text|border`):
+
+```
+python - <<'EOF'
+import sys; sys.path.insert(0, "tools")
+from pathlib import Path
+import catraca
+raiz = Path("ArchSmart-web/src")
+p = b = a = 0; arquivos = set()
+for c in raiz.rglob("*"):
+    if c.suffix not in (".ts", ".tsx") or not c.is_file(): continue
+    t = c.read_text(encoding="utf-8", errors="ignore")
+    n = (len(catraca.RE_PALETA.findall(t)), len(catraca.RE_BRANCO_PRETO.findall(t)),
+         len(catraca.RE_ARBITRARIA.findall(t)))
+    p += n[0]; b += n[1]; a += n[2]
+    if any(n): arquivos.add(c)
+print(p, b, a, p + b + a, len(arquivos))
+EOF
+# 502 68 13 583 46
+```
+
+> ⚠️ **Este parágrafo dizia "510 classes em 39 arquivos, mais 11 hex" e os três números estavam errados** — corrigidos em 12/09/2026, na revisão final da Seção 8. Dois motivos, e os dois são a própria seção mexendo na régua: a Tarefa 2 **ensinou a régua a ver** `bg-white`/`text-white`/`-black`, e essas 68 ocorrências simplesmente não apareciam na frase; e o `RE_ARBITRARIA` passou a enxergar prefixo qualquer, o que levou o hex de 11 para 13 (em `develop` o regex era só `bg|text|border`; confira com `git show develop:tools/catraca.py | grep RE_ARBITRARIA`). O 510 de paleta, por sua vez, baixou para 502 porque a Tarefa 9 migrou a Biblioteca. Quem somasse 510 + 11 chegava a 521, que não é o `cores_literais` de lugar nenhum: o baseline era **518** em `develop` e é **583** aqui.
 
 ## Convenções
 
@@ -189,7 +223,7 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 `tsc --noEmit`). Os dois são o que o job **Frontend** do CI executa; rode-os
 antes de abrir PR.
 
-A suíte sai limpa: `Test Files 11 passed (11)` e `Tests 63 passed (63)` (a Seção 5 acrescentou os testes de `lib/api/`, `lib/query/` e `features/*`; eram 4 arquivos/7 testes antes dela). **Um
+A suíte sai limpa: `Test Files 29 passed (29)` e `Tests 236 passed (236)` (medido em 12/09/2026, na revisão final da Seção 8; eram 11 arquivos/63 testes depois da Seção 5, e 4/7 antes dela — o número sobe quando uma seção acrescenta testes, então **meça, não copie daqui**). **Um
 `failed` em qualquer das duas linhas é um teste realmente quebrado.** Até a
 Seção 3, o `vitest.config.ts` não excluía `e2e/` e o Vitest tentava coletar
 dois specs do Playwright, reportando `2 failed` de forma permanente — a
