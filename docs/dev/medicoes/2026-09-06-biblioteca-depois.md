@@ -493,3 +493,52 @@ teste garantindo que as duas montagens não voltam a divergir — por isso
 `npm test` sai hoje `Test Files 11 passed (11)`, `Tests 63 passed (63)`, um
 arquivo e um teste a mais que o `Test Files 10 passed (10)`/`Tests 62 passed
 (62)` registrado acima.
+
+---
+
+## 12/09/2026 — a Seção 8 mudou a tela e **não** conseguiu re-medir
+
+Registro na Tarefa 10 da Seção 8, a tarefa de fechamento. A mediana de
+**1454 ms** acima continua sendo o último número medido desta tela, e ela é de
+**antes** da Seção 8: antes de a lista passar pelo `QueryBoundary`, antes de o
+badge do inbox entrar no prefetch, antes de a telemetria medir até os dados.
+
+**Nenhuma medição nova rodou, e nenhum número foi estimado.** A causa é uma só:
+a credencial do usuário de teste E2E
+(`ana.arquiteta@seed.arqsmart.local`, ver
+[`2026-09-09-usuario-de-teste-e2e.md`](2026-09-09-usuario-de-teste-e2e.md))
+passou a ser **rejeitada** pelo Supabase de staging — `HTTP 400,
+"Invalid login credentials"`, verificado direto no endpoint de auth em
+11/09/2026. Todo spec desta pasta faz login de verdade pela UI, então todos
+falham no primeiro passo. Só Thiago resolve isso (redefinir a senha do usuário,
+ou recriar o usuário pelo roteiro do documento acima).
+
+O que ficou por medir, com o comando de cada um — a retomada é um comando, não
+uma investigação:
+
+```bash
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; set +a   # a senha nunca entra na linha de comando
+
+# 1. A mediana depois da Seção 8 (compare com os 1454 ms acima).
+npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+
+# 2. A hidratação continua de pé (guarda: a Tarefa 7 mexeu no prefetch).
+npx playwright test e2e/hidratacao-biblioteca.spec.ts --reporter=line
+
+# 3. O `load_ms` real do `screen_viewed` — spec novo, nunca executado.
+npx playwright test e2e/telemetria-biblioteca.spec.ts --reporter=line
+```
+
+Os três também rodam sozinhos no job `e2e` do CI
+(`.github/workflows/ci.yml`), criado nesta mesma tarefa — **e esse job reprova
+até os Secrets existirem no repositório**. Ver a nota da Seção 8 no
+`PROGRESS.md`.
+
+> **O `hidratacao-biblioteca.spec.ts` continua com o filtro de
+> `state=NORMALIZED`, e isso é deliberado.** A Tarefa 7 pôs o badge do inbox no
+> prefetch, então o `state=CAPTURED` **deveria** ter deixado de sair do
+> navegador também — e apertar a asserção sem ter rodado o spec seria escrever
+> uma afirmação não medida, que é exatamente o que este repositório não admite.
+> Quem rodar confere os pedidos `state=CAPTURED` e, se vierem zero, aperta o
+> filtro no mesmo commit.

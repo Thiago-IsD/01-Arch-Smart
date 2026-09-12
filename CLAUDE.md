@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 11/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção grava **não é dado utilizável hoje** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec). Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. Seções 8 e 9 pendentes; **a próxima é a Seção 8** (migração das telas). Produção ainda não recebeu: `main` está na Seção 3.
+Estado em 12/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8 em andamento: a fundação e a primeira tela estão prontas, 1/9** — branch `secao-8-fundacao-e-biblioteca`, 10 tarefas, 12/09/2026. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que **reprova até os Secrets existirem** — ver "Portões de CI". ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. Nada da Seção 8 foi mergeado ainda. Seção 9 pendente. Produção ainda não recebeu: `main` está na Seção 3.
 
 > **A metade backend da Seção 7 foi verificada de fora, e essa é a primeira vez nesta série que isso dá certo.** Em 11/09/2026, contra `https://arqsmart-staging.onrender.com`: `POST /api/telemetry/events` sem token responde **422** — o mesmo status que o teste da Tarefa 4 fixou, e prova de que a rota existe —, e o `openapi.json` lista **58 rotas** (eram 57 antes desta seção), com `/api/telemetry/events` entre elas. `/health` → `200` e `/health/db` → `{"status":"ok","db":"up"}`. Pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md) o uvicorn só sobe se a receita de migrações passou, então o schema de staging está no head que a branch levou. **A metade frontend continua não verificada de fora**: o preview de staging responde `302` para o SSO da Vercel, como nas Seções 5 e 6.
 
@@ -209,23 +209,37 @@ histórico de uma pendência é o que impede que ela volte pelo mesmo caminho.
    [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md)
    documenta como recriar o usuário do zero.
 
-### O que a Seção 8 herda, e que **não** é da Seção 7
+### O que a Seção 8 herdou, e que **não** era da Seção 7
 
-Registrado aqui para não se perder, mas não é pauta de agora:
+Registrado aqui para não se perder. **Quatro destes seis foram fechados na
+primeira metade da Seção 8** (a fundação e a Biblioteca) e estão riscados com o
+que os fechou; os dois que sobram são pauta das oito telas que faltam:
 
-- **Existem dois `FormField` diferentes.** O da Seção 6
+- ~~**Existem dois `FormField` diferentes.**~~ **Fechada em 11/09/2026, na
+  Seção 8 (commit `4ef878b`): sobrou um, o do react-hook-form
+  (`@/components/ui/form`).** Quem migrar tela não escolhe mais. O texto
+  original: O da Seção 6
   (`@/components/ui/form-field`, com `id`/`rotulo`/`erro`/`sensivel`) e o do
   react-hook-form (`@/components/ui/form.tsx`, com `control`/`name`/`render`),
   este usado por **11 arquivos de tela** (medido:
   `grep -rl "from \"@/components/ui/form\"" ArchSmart-web/src --include=*.tsx | wc -l`).
   Quem migrar uma dessas telas já tem `FormField` importado — do outro. Escolher
   entre os dois é decisão da Seção 8.
-- **Catraca em zero não quer dizer defeito em zero.** `cores_literais` chegando
-  a 0 não significa zero cor literal: a régua não vê `bg-white`/`text-white`
-  (67 hoje), hex fora de `bg|text|border`, nem `ring-offset-<paleta>-<n>`. E
-  `hover_sem_focus` em 0 não significa zero: `invisible group-hover:visible` e
-  `hidden group-hover:block` são o mesmo defeito e passam batido. Os furos e o
-  grep de cada um estão em [`docs/dev/componentes.md`](docs/dev/componentes.md).
+- ~~**Catraca em zero não quer dizer defeito em zero.**~~ **Os quatro furos
+  listados aqui foram tapados em 11/09/2026, na Seção 8 (commit `0350895`),
+  antes de a seção medir tela nenhuma** — cada um com teste no mesmo commit. A
+  régua passou a ver `bg-white`/`text-white`/`-black` (68 ocorrências reais, que
+  `RE_PALETA` nunca via porque não têm sufixo numérico), hex fora de
+  `bg|text|border` (2), `ring-offset-<paleta>-<n>` (0 hoje — furo fechado antes
+  de aparecer) e `invisible`/`hidden` + `group-hover` (1). O baseline subiu por
+  isso: `cores_literais` 518 → 588 e `hover_sem_focus` 8 → 9. **Nenhum defeito
+  novo entrou; foi a régua passando a ver o que sempre existiu** — e é por isso
+  que um número que sobe nem sempre é regressão. A lição de fundo continua de
+  pé: **régua não é prova**, e o próximo furo medido já apareceu na Tarefa 9 —
+  `contraste_reprovado` mede só pares (cor, cor-foreground) de `globals.css`, e
+  **nunca** um token de texto sobre `--background`, então `text-warning` a
+  1,99:1 passava verde. Os furos conhecidos e o grep de cada um estão em
+  [`docs/dev/componentes.md`](docs/dev/componentes.md).
 - **`DataTable` provavelmente não serve às telas como está** — não tem
   renderizador de célula (faz `String(valor)`), e ordena e pagina no cliente
   sobre o array inteiro, enquanto as listagens reais são paginadas no servidor.
@@ -233,25 +247,56 @@ Registrado aqui para não se perder, mas não é pauta de agora:
   ocorrências em 3 arquivos (`grep -rn "archsmart:" ArchSmart-web/src`).
   Renomear é mudança de contrato entre emissor e ouvinte — mexer só nos
   emissores quebra o rodapé de totais **em silêncio**.
-- **`e2e/` não roda em portão nenhum.** O `vitest.config.ts` exclui `e2e/**` e
-  não há job de Playwright no CI. `hidratacao-biblioteca.spec.ts` — a única
-  prova viva de que o prefetch da Seção 5 funciona — é instrumento de medição,
-  não guarda permanente, e a Seção 8 vai editar exatamente a tela que ele cobre.
-- **O badge do inbox (`useInboxCount()`) nunca é prefetchado** — pendência da
-  Seção 5, confirmada ao vivo na Seção 6.
+- ~~**`e2e/` não roda em portão nenhum.**~~ **Fechada em 12/09/2026, na Seção 8:
+  existe o job `E2E — Playwright contra staging`**, que roda os specs de guarda
+  (incluindo `hidratacao-biblioteca.spec.ts`) em todo PR. Duas ressalvas que
+  continuam valendo: o `vitest.config.ts` segue excluindo `e2e/**`, que é
+  correto — são suítes diferentes —, e **o job reprova até os Secrets existirem**
+  (ver "Portões de CI"), então "existe o portão" ainda não é "o portão já mediu
+  alguma coisa".
+- ~~**O badge do inbox (`useInboxCount()`) nunca é prefetchado**~~ — pendência
+  da Seção 5, confirmada ao vivo na Seção 6, **fechada em 11/09/2026 na Tarefa 7
+  da Seção 8**: `LibraryData` prefetcha a lista e o badge em `Promise.all`, pelas
+  mesmas funções de query que o cliente usa (`queryDeProdutos`, `queryDoInbox` —
+  duas montagens da mesma chave divergem em silêncio e fazem o prefetch virar
+  custo puro). ⚠️ **Ninguém confirmou ao vivo que o `state=CAPTURED` parou de
+  sair do navegador**: `hidratacao-biblioteca.spec.ts` ainda filtra por
+  `state=NORMALIZED`, de propósito — apertar a asserção sem ter rodado o spec
+  seria escrever afirmação não medida. Quem rodar aperta o filtro no mesmo
+  commit.
 
-## O que a Seção 7 deixou em aberto — **planejar no início da Seção 8**
+## O que a Seção 7 deixou em aberto — **as quatro foram enfrentadas na Seção 8; duas fecharam**
 
 Como nos blocos anteriores: nenhuma destas é para um agente decidir sozinho.
-Diferente das anteriores, as duas abaixo **não foram decididas** — a Seção 7
-tentou executá-las e bateu na mesma parede nas duas vezes. Quem escrever o
-plano da Seção 8 põe cada uma como tarefa ou registra por escrito a decisão
-de não pôr; carregar as duas adiante sem decisão é o que este arquivo pede
-para não acontecer.
+A Seção 8 pôs as quatro no plano e executou. **As pendências 3 e 4 fecharam** e
+estão riscadas abaixo, cada uma com o que a fechou. **As pendências 1 e 2
+continuam abertas**, e não por falta de trabalho: as duas dependem de sessão
+autenticada, e em 11/09/2026 a credencial do usuário de teste E2E passou a ser
+**rejeitada** pelo Supabase de staging (`HTTP 400, "Invalid login
+credentials"`). O que mudou nelas é que **o instrumento que as fecha agora
+existe e está escrito** — o que falta é uma credencial viva, e isso é de Thiago.
 
-1. **A verificação visual da Seção 6 continua 100% aberta.** A Tarefa 1 da
-   Seção 7 devia abrir a galeria `/dev/componentes` e as 5 telas reais e medir
-   a olho — não rodou. Toda rota da aplicação exige sessão: `src/proxy.ts`
+1. **A verificação visual da Seção 6 continua aberta — mas não mais "100%", e
+   a rota de desbloqueio foi decidida.** Em 11/09/2026, no desenho da Seção 8
+   (decisão de fronteira 1 da spec daquela seção), Thiago escolheu a **primeira**
+   das duas rotas abaixo: a senha do usuário de teste vai para
+   `ArchSmart-web/.env.e2e.local`, fora do controle de versão, lida por variável
+   de ambiente. A segunda — isentar `/dev/componentes` em desenvolvimento — foi
+   **descartada por escrito**: desbloquearia só a galeria, e as cinco telas
+   reais, a Biblioteca e a prova viva continuariam inalcançáveis; uma mudança no
+   proxy que resolve um sexto do problema é pior que nenhuma, porque parece
+   resolvida. A Tarefa 1 da Seção 8 então **escreveu o instrumento** —
+   `ArchSmart-web/e2e/captura-visual-secao-6.spec.ts`, que fotografa os alvos
+   nas duas larguras — e ele **não rodou**, porque a credencial começou a ser
+   rejeitada. Três correções medidas que esse spec registra, e que valem para
+   quem for rodá-lo: a galeria exige sessão como qualquer rota; o alternador de
+   tema que usa `DropdownMenuItem` está no `Navbar` público, não no `Header` do
+   dashboard; e a galeria não tem seção de Toast.
+
+   O texto original segue abaixo, porque continua sendo a descrição exata do que
+   precisa ser olhado — e porque a parede que ele descreve é a mesma. A Tarefa 1
+   da Seção 7 devia abrir a galeria `/dev/componentes` e as 5 telas reais e
+   medir a olho — não rodou. Toda rota da aplicação exige sessão: `src/proxy.ts`
    manda para `/auth/login` qualquer rota fora de `ROTAS_PUBLICAS`,
    **inclusive a galeria**, mesmo em desenvolvimento (confirmado com
    `curl -s -D - -o /dev/null http://localhost:3000/dev/componentes | grep -i
@@ -268,8 +313,15 @@ para não acontecer.
    barata. O que deu para verificar sem navegador, e o que continua dependendo
    de olho humano, está separado item a item em
    [`docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`](docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md).
-2. **A prova viva do `screen_viewed` (Tarefa 5, Passo 10) também não rodou,
-   pela mesma parede.** A telemetria automática está montada e coberta por
+2. **A prova viva do `screen_viewed` continua sem rodar, pela mesma parede — mas
+   o defeito que ela ia expor foi consertado, e o spec que a fecha já existe.**
+   A Seção 8 trocou o gatilho (ver o ⚠️ abaixo, e a resolução depois dele) e
+   escreveu `ArchSmart-web/e2e/telemetria-biblioteca.spec.ts`, que afirma
+   `medido_ate: "dados"`, `medido_de: "clique"`, `principal_declarada: true` e um
+   `load_ms` em faixa generosa — o piso existe para reprovar o `load_ms: 28`.
+   **Esse spec nunca foi executado**, e está no quarto job do CI: é lá, ou à mão
+   com credencial viva, que ele roda pela primeira vez. O texto original:
+   A telemetria automática está montada e coberta por
    vitest, mas ninguém navegou pela Biblioteca com sessão real para confirmar
    que uma linha em `product_events` sai com `load_ms` na ordem de grandeza da
    mediana de 1454 ms medida no E2E de 10/09/2026 — os testes provam *qual*
@@ -295,8 +347,51 @@ para não acontecer.
    > Quem for tirar média dessa coluna na Seção 8 está avisado — e consertar o
    > gatilho é trabalho da Seção 8, que reescreve essas telas de qualquer jeito.
 
-3. **O `@limiter.limit("60/minute")` do endpoint de telemetria é um balde
-   global da plataforma, não por usuário.** `app/core/rate_limit.py` documenta
+   > ✅ **O gatilho foi consertado em 12/09/2026, na Seção 8 — a frase "hoje
+   > `load_ms` não é dado utilizável" não vale mais para o código de hoje.** A
+   > tela passou a **declarar**: o `QueryBoundary` anuncia na montagem que existe
+   > região de dados e reporta quando ela resolve, e a telemetria deixou de
+   > espiar o `QueryCache` e de decidir no primeiro frame. `medido_ate` ganhou
+   > cinco valores (`dados`, `vazio`, `erro`, `pintura`, `abandonado`), `medido_de`
+   > diz se o cronômetro partiu do clique ou do commit, e `principal_declarada`
+   > diz se o número veio da região que a tela escolheu ou da primeira que
+   > sobrou. Na Biblioteca a região principal é a **lista**, não o badge do
+   > inbox — e o badge entrou no prefetch, então ele deixou de ser a única coisa
+   > cronometrável. O preço assumido: tela **sem** região de dados só emite
+   > quando a navegação termina. Protocolo inteiro em
+   > [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md).
+   >
+   > **Duas ressalvas, para ninguém ler isto como mais do que é:** as linhas de
+   > `product_events` gravadas **antes** de 12/09/2026 são do gatilho antigo e
+   > continuam com o defeito descrito acima; e o conserto está provado por
+   > vitest, que prende *qual* rótulo sai e *quantas* linhas por navegação —
+   > **nunca a grandeza do número**. Essa parte é a que continua aberta.
+
+3. ~~O `@limiter.limit("60/minute")` do endpoint de telemetria é um balde
+   global da plataforma, não por usuário.~~ **Fechada em 11/09/2026, na Seção 8,
+   nas duas pontas.** No servidor, a chave virou `chave_por_conta`
+   (`app/core/rate_limit.py`): o `sub` do portador do token, decodificado do
+   base64 do JWT **sem** verificar assinatura — é agrupamento, nunca
+   autorização, e quem autoriza continua sendo `get_repo`. No cliente, a fila
+   junta a janela de 1 s num lote só, então a navegação que gastava três
+   requisições gasta uma. **O que sobra aberto é outra coisa, e está na lista da
+   Seção 8:** o teto de 60/minuto **por pessoa** continua o mesmo, e cada tela
+   migrada acrescenta evento de interação.
+
+   > ⚠️ **Correção de uma afirmação deste item que circulou como garantia.**
+   > Estava escrito como se o balde fosse atacável por qualquer um, com o balde
+   > por IP servindo de "segunda guarda" no cenário anônimo. **Não é.** O
+   > `@limiter.limit` decora `receber_eventos`, e o FastAPI resolve
+   > `Depends(get_repo)` **antes** de chamar a função decorada — a checagem do
+   > slowapi roda dentro dela (`sync_wrapper`, `slowapi/extension.py`). Token
+   > inválido leva **401** antes de a função de chave ser chamada. Medido na
+   > Tarefa 4 da Seção 8, com TestClient e lendo o slowapi. O balde por IP não é
+   > segunda guarda ali: o cenário **não chega lá**. Isso é detalhe de
+   > implementação do FastAPI/slowapi, não contrato — por isso `chave_por_conta`
+   > continua endurecida contra JWT ilegível mesmo sem ninguém conseguir provar
+   > esse caminho de fora hoje.
+
+   O texto original, que descreve o problema que foi fechado: `app/core/rate_limit.py` documenta
    no próprio docstring que `get_remote_address` resolve para o **IP do
    proxy** em toda requisição, porque o uvicorn roda sem
    `--forwarded-allow-ips` (confira no `Dockerfile`) — foi por isso que
@@ -309,7 +404,18 @@ para não acontecer.
    conta, limite maior, ou buffer no cliente é decisão de produto, não de quem
    executa.
 
-4. **O canal do `is_empty` guarda um valor só, e hoje ele é sempre `null`.**
+4. ~~O canal do `is_empty` guarda um valor só, e hoje ele é sempre `null`.~~
+   **A primeira metade fechou em 12/09/2026, na Seção 8; a segunda continua
+   aberta, e agora é visível em vez de silenciosa.** O `is_empty` deixou de ser
+   sempre `null`: a Biblioteca usa `QueryBoundary`, então a tela grava `false`
+   com dado e `true` vazia. E o problema das **várias regiões** não é mais
+   "grava o que reportar por último, em silêncio": a região que decide é a
+   marcada `principal` (na Biblioteca, a lista — não o badge do inbox), e quando
+   nenhuma é marcada o evento grava `principal_declarada: false`, que é a coluna
+   dizendo "este número é o que sobrou, não o que a tela escolheu". **O que
+   continua sem resposta é a parte que nunca foi técnica:** o que "vazio"
+   significa numa tela com lista e painel lateral. Isso segue na lista da
+   Seção 8, para as oito telas que faltam. O texto original:
    Nenhuma tela de `(dashboard)` usa `QueryBoundary` — quem liga é a Seção 8 —,
    então `is_empty` sai `null` em 100% dos eventos, o que é ordem das seções e
    não defeito. Mas quando a Seção 8 ligar, a primeira tela com **dois**
@@ -324,15 +430,96 @@ desenvolvimento para `localhost:3000`, uma credencial de uma conta que **não**
 é a de teste E2E. Não foi usada — conta de identidade desconhecida não se usa
 para entrar em ambiente nenhum, nem em desenvolvimento.
 
+## O que a Biblioteca (Seção 8) deixou em aberto — **planejar antes da próxima tela**
+
+Mesmo padrão dos blocos acima, e a mesma regra: **nenhuma destas é para um
+agente decidir sozinho.** Quem escrever o plano da próxima tela põe cada uma
+como tarefa ou registra por escrito a decisão de não pôr. A primeira bloqueia
+as oito telas seguintes, não só a Biblioteca.
+
+1. ⚠️ **A credencial do usuário de teste E2E está sendo rejeitada pelo Supabase
+   de staging.** `HTTP 400, "Invalid login credentials"` para
+   `ana.arquiteta@seed.arqsmart.local`, verificado direto no endpoint de auth em
+   11/09/2026. Enquanto durar: nenhuma tela consegue fechar os três itens da
+   definição de pronto que exigem navegador (axe, teclado, 390px/1440px), nem o
+   orçamento de performance, nem a prova viva do `screen_viewed`; e o job de E2E
+   do CI reprova. **Não é uma pendência de documentação — é a parede.** Só
+   Thiago resolve: redefinir a senha do usuário, ou recriar o usuário pelo
+   roteiro de
+   [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md).
+   Depois disso, a senha vai para `ArchSmart-web/.env.e2e.local` (não
+   versionado) e os Secrets do repositório — os cinco comandos da retomada estão
+   na nota de 12/09/2026 em
+   [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md).
+
+2. **A Biblioteca fechou com três dos nove itens da definição de pronto não
+   verificados**, pela pendência 1: axe em navegador (o que rodou foi axe em
+   **jsdom**, que não vê contraste — `color-contrast` cai em `incomplete`),
+   navegação só por teclado, e as larguras de 390px e 1440px. Mais o orçamento de
+   performance, não medido. **A decisão de Thiago é se a próxima tela começa
+   antes de isso fechar** — a seção inteira acumula o mesmo débito a cada tela
+   migrada, e quanto mais camadas entrarem por cima, mais caro fica saber o que
+   causou o quê. Detalhe item a item, com o comando de cada um, na nota da
+   Seção 8 em `PROGRESS.md` e em
+   [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md).
+
+3. **Dois riscos localizados por leitura, que só o navegador decide.**
+   `LibraryToolbar.tsx:167` não quebra linha abaixo de `md` e `:180` é um
+   `SelectTrigger` de `w-[160px]` fixo ao lado de um input `w-full` sem
+   `min-w-0` — provável estouro em 390px, com as saídas baratas já apontadas
+   (`flex-wrap` ou `min-w-0`). E o `group-focus-within:opacity-100` do
+   `ProductCard` está provado como **classe na árvore**, não como
+   comportamento: jsdom não aplica Tailwind. Nenhum dos dois foi mexido, de
+   propósito — alterar layout que ninguém pode ver é como se introduz regressão
+   visual.
+
+4. **O teto de 60/minuto do endpoint de telemetria continua o mesmo, agora por
+   pessoa.** A chave por conta acabou com o contágio entre usuários e a fila
+   cortou requisições, mas cada tela migrada acrescenta evento de interação, e o
+   `429` continua engolido — a perda é silenciosa. Decidir entre limite maior,
+   amostragem, ou buffer mais longo no cliente é decisão de produto.
+
+5. **`is_empty` numa tela com mais de uma região ainda não tem definição.** O
+   mecanismo está resolvido (a região `principal` decide, e
+   `principal_declarada` denuncia quando ninguém declarou), mas "vazio" numa tela
+   com lista e painel lateral é pergunta de produto, não de código. A primeira
+   tela com duas regiões a encontra.
+
+6. **O aviso essencial preso num tooltip, na Biblioteca.** *"Sempre confira o
+   valor!"*, sobre preço que o sistema admite poder extrair errado, só existe
+   atrás do hover/foco de um ícone. Mudança de copy.
+
 ## Portões de CI
 
-Desde a Seção 3, `.github/workflows/ci.yml` roda três jobs em todo PR:
+Desde a Seção 3, `.github/workflows/ci.yml` roda em todo PR — **quatro** jobs
+desde a Seção 8, que acrescentou o último:
 
 ```
 Backend — testes contra Postgres real
 Frontend — tipos, testes e catraca
 Repositorio — progresso, links e sincronia
+E2E — Playwright contra staging
 ```
+
+> ⚠️ **O job de E2E reprova hoje, e não por defeito de código: faltam os
+> Secrets e Variables do repositório.** Ele precisa de `E2E_EMAIL`,
+> `E2E_PASSWORD` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` em **Secrets**, e de
+> `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_SUPABASE_URL` em **Variables** — as três
+> `NEXT_PUBLIC_*` porque `playwright.config.ts` sobe o próprio `npm run dev` e
+> `src/lib/env.ts` valida as três com Zod na primeira página carregada. Só
+> Thiago cria isso, e **não** há `continue-on-error` escondendo a reprovação: a
+> regra da casa é que falha é falha. Enquanto durar, este é o único X vermelho
+> esperado — e ele deixa de ser esperado no dia em que os Secrets existirem.
+>
+> Ele roda os specs de **guarda** por nome (`auth`, `dashboard`,
+> `hidratacao-biblioteca`, `telemetria-biblioteca`), nunca `npx playwright test`
+> sem filtro: `e2e/` também tem **instrumentos** (`medicao-biblioteca`,
+> `captura-visual-secao-6`), que produzem número e imagem, exigem variável que o
+> CI não tem, e cuja saída barata seria um `skip` silencioso. **Spec novo de
+> guarda precisa ser acrescentado naquela linha do workflow** — criar o arquivo
+> não basta. E o `playwright.config.ts` levanta os timeouts quando `CI` está
+> ligado, porque os 30 s padrão do Playwright ficam **abaixo** do cold start do
+> Render (41,9 s, ADR 0009).
 
 > ⚠️ **Eles reprovam, mas não bloqueiam — e isso é decisão tomada, não
 > pendência.** Branch protection não está disponível: o repositório é privado
@@ -434,7 +621,7 @@ npm run typecheck
 npm test
 ```
 
-Sai limpo: `Test Files 20 passed (20)`, `Tests 162 passed (162)` (medido em 10/09/2026, depois da Seção 7; o número sobe quando uma seção acrescenta testes — **meça, não copie daqui**). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade.
+Sai limpo: `Test Files 28 passed (28)`, `Tests 216 passed (216)` (medido em 12/09/2026, na primeira metade da Seção 8; eram 20/162 depois da Seção 7 — o número sobe quando uma seção acrescenta testes, então **meça, não copie daqui**). Um `failed` em qualquer das duas linhas é um teste quebrado de verdade. O backend, no mesmo dia, sai `343 passed, 1 skipped`.
 
 Repositório, sem venv e sem instalar nada (os scripts de `tools/` usam só a biblioteca padrão):
 
