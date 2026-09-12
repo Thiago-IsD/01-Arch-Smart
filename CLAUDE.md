@@ -515,6 +515,57 @@ as oito telas seguintes, não só a Biblioteca.
    valor!"*, sobre preço que o sistema admite poder extrair errado, só existe
    atrás do hover/foco de um ícone. Mudança de copy.
 
+7. ⚠️ **A arte do logotipo escreve "arch smart" — minúscula e sem Q. É violação
+   literal do Art. 8 que nenhum grep pega, porque o texto está dentro do PNG.**
+   Verificado a olho em 12/09/2026, abrindo os arquivos. Não é só o vertical:
+
+   | Arquivo | Onde aparece | Quantas telas |
+   |---|---|---|
+   | `logo-vertical.png` | `BRAND_ASSETS.vertical` — login, recuperação, cadastro, reset e verificação | **5** |
+   | `logo-horizontal.png` | `BRAND_ASSETS.horizontal` — `Navbar`, `Footer`, `AuthWrapper` e `smart-core/header` | **4** |
+
+   ```
+   grep -rl "BRAND_ASSETS.vertical" ArchSmart-web/src | wc -l     # 5
+   grep -rl "BRAND_ASSETS.horizontal" ArchSmart-web/src | wc -l   # 4
+   ```
+
+   Ou seja, a grafia errada está na **porta de entrada do produto** (landing e
+   autenticação), e em produção as imagens são servidas do Supabase Storage —
+   trocar o arquivo no repositório não basta sozinho. **Não foi consertado aqui
+   de propósito: trocar arte de marca é decisão de design, não de quem executa.**
+   `logo-mix.png` não é usado por ninguém (0 referências) e `icone.png` não tem
+   texto. Registrado aqui porque o commit `b4fae10` da Seção 5 declarou a marca
+   corrigida com base em greps de texto, e um grep nunca ia encontrar isto.
+
+8. **`ArchSmart-web/package.json:2` tem `"name": "arch-smart-web"`** — a mesma
+   grafia errada, agora em metadado. Aparece em toda saída de `npm`
+   (`> arch-smart-web@0.1.0 typecheck`). **É achado para a Seção 9**, que já faz
+   a varredura final de `ArchSmart` em código, copy e metadados, e que renomeia
+   os dois diretórios de qualquer forma — mexer agora seria renomear fora da
+   tarefa dedicada, que este arquivo proíbe.
+
+9. **O `keepalive` da telemetria não garante a entrega da última navegação, e
+   falta decidir o conserto.** A cadeia na saída da página é `descarregar` →
+   `enviarEventos` → `api()` → **`await opts.resolverToken()`** →
+   `getAccessToken()` → `supabase.auth.getSession()` → só então `fetch`
+   (`ArchSmart-web/src/lib/api/core.ts:67`). O `keepalive` protege requisição
+   **já iniciada**; não protege uma que ainda espera o Supabase resolver a
+   sessão — e o teste não vê isso porque **mocka o resolvedor de token**, que é
+   justamente a peça que insere o `await`. O texto que sugeria entrega garantida
+   já foi corrigido em [`docs/dev/modulos/telemetry.md`](docs/dev/modulos/telemetry.md);
+   **o que falta é a decisão**, e ela tem consequência fora da telemetria: cache
+   síncrono de token, ou `sendBeacon` dentro de `lib/api/`. As duas mexem em
+   `lib/api/`, que toda tela usa.
+
+10. **O prefetch pareado é garantido por teste escrito à mão, uma query de cada
+    vez.** Nada liga o `prefetchQuery` do servidor à `useQuery` do cliente: se
+    as chaves ou as opções divergirem, o prefetch vira **custo puro sem erro
+    nenhum** — o modo de falha é silencioso, e o próprio piloto errou isso uma
+    vez. São oito telas × N queries pela frente. A decisão que falta é qual
+    mecanismo substitui a disciplina: um helper que sirva os dois lados a partir
+    de uma definição só, ou uma medida de catraca que reprove chave prefetchada
+    sem consumidor. **É para o plano da próxima tela, não para agora.**
+
 ## Portões de CI
 
 Desde a Seção 3, `.github/workflows/ci.yml` roda em todo PR — **quatro** jobs

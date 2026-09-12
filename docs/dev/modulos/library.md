@@ -85,6 +85,35 @@ desviou esse caso para `empty` antes de chamar o render. Por isso a paginação
 não tem `items.length > 0` na frente: a guarda era resto da lógica manual, e
 resto sem explicação é o que as outras oito telas copiariam junto.
 
+### A paridade que se rompeu de propósito: a paginação some no erro
+
+A Tarefa 9 tinha paridade verbatim como primeiro item da definição de pronto, e
+**um comportamento visível ao usuário mudou mesmo assim** — aceito por decisão
+registrada, e escrito aqui porque o relatório que o continha vive em
+`.superpowers/`, que é gitignored e some no merge.
+
+**Antes:** `placeholderData` mantém a lista anterior visível enquanto a nova
+carrega. Um refetch que **falhava** caía nesse mesmo caminho: a grade anterior
+continuava na tela, com a paginação junto, e o usuário podia voltar à página
+anterior normalmente.
+
+**Agora:** a região inteira vira o estado de erro (`ListaComErro`), e **os
+controles de paginação somem com ela** — não dá para voltar à página anterior
+pela interface. O que sobrevive é o que está **fora** do boundary: a barra de
+ferramentas e as abas.
+
+**Por que isso foi aceito:** o comportamento antigo **escondia a falha**. O
+usuário via uma grade de dados que podia estar velha, sem nada dizendo que a
+última requisição tinha falhado — e a saída dali era clicar em algo que falharia
+de novo. Trocar dado silenciosamente velho por um erro explícito com `refazer` é
+o que esta seção existe para fazer.
+
+**Se um dia o conserto for quisto, ele é no `QueryBoundary`, não aqui** — seria
+um modo "erro sobre os dados anteriores" (manter `children` e sobrepor o aviso
+quando há `data` de placeholder). Feito lá, vale para as **nove** telas de uma
+vez; feito nesta tela, vira mais uma coisa que as outras oito copiam sem saber
+por quê.
+
 ## Quem é a região principal
 
 ```

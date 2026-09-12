@@ -21,6 +21,7 @@ mede até os dados; quem não usa ganha um `load_ms` rotulado `pintura`.
 | `<TelemetriaDeTela />` | `TelemetriaDeTela.tsx` | Emite `screen_viewed` uma vez por navegação. Não renderiza nada. |
 | `ProntidaoDaTelaProvider` | `contexto.tsx` | O canal por onde as regiões de dados da tela anunciam que existem e reportam que resolveram. |
 | `useProntidao()` | `contexto.tsx` | Leitura do canal. **Devolve `null` fora do provider** — a galeria `/dev/componentes` usa o `QueryBoundary` e não fica dentro de `(dashboard)`. |
+| `ContextoDeProntidao` | `contexto.tsx` | O contexto cru. Existe **só para teste** injetar um canal espião (contar chamadas, que o provider real não permite). Tela nenhuma usa: telas usam `useProntidao()`. |
 | `normalizarTela(caminho)` | `types.ts` | `/projects/<uuid>` → `/projects/[id]`. |
 | `decidirMedicao(report, houveAnuncio)` | `types.ts` | O rótulo de `medido_ate` a partir do que a tela reportou. |
 | `vazioDoDesfecho(desfecho)` | `types.ts` | `true` / `false` / `null` para `is_empty`. |
@@ -33,13 +34,38 @@ export type Desfecho = "dados" | "vazio" | "erro"
 export interface Report { desfecho: Desfecho; principal: boolean }
 
 export interface ProntidaoDaTela {
-    anunciar: () => void                                  // "existe região aqui"
+    anunciar: (origem: object) => void                     // "existe região aqui"
     reportar: (report: Report) => void                     // "minha região resolveu"
     assinar: (ouvinte: (r: Report) => void) => () => void  // a telemetria ouve
-    anunciadas: () => number                               // quantas anunciaram
+    anunciadas: () => number                               // quantas regiões DISTINTAS
     limpar: () => void                                     // a cada navegação
 }
 ```
+
+Três propriedades deste canal não são óbvias pela assinatura, e as três foram
+acrescentadas na revisão final da Seção 8 (`telemetry-contexto.test.tsx` cobre
+cada uma):
+
+- **O report fica latchado.** `reportar` guarda o último report numa `ref`, e
+  quem **assinar depois** o recebe na hora. Sem isso, um report que chegasse
+  antes de a `TelemetriaDeTela` assinar era descartado em silêncio — e o efeito
+  era global: **todo evento virava `pintura`**. A spec prometia esse latch desde
+  o começo, chamando a alternativa (depender da ordem dos efeitos) de *"acidente
+  de posição e não garantia"*; o código não o tinha. `limpar()` zera o latch
+  junto, senão a tela seguinte herdaria o `load_ms` da anterior.
+- **Duas regiões `principal` emitem `console.warn` em desenvolvimento**, uma vez
+  por navegação. Quem ganha continua sendo a primeira a **reportar**, que é a
+  ordem da árvore — é justamente por não ser determinístico que precisa de
+  aviso. É a única guarda contra o erro de cópia mais provável das oito telas
+  seguintes: duas `principal`, ou nenhuma.
+- **`anunciadas()` conta regiões distintas, não chamadas.** É por isso que
+  `anunciar` recebe uma `origem` (um objeto estável por instância, e `Report`
+  carrega a mesma coisa). Antes era um contador, e **não era uma contagem**: sob
+  StrictMode o efeito de cada região roda duas vezes sem decremento no cleanup,
+  então uma região devolvia `2`. Era inócuo enquanto só `> 0` fosse consumido,
+  mas a [pendência 4 da Seção 7](../../../CLAUDE.md) é exatamente onde alguém vai
+  querer contar regiões de verdade — e o mesmo conserto é o que impede o aviso
+  acima de disparar falso em desenvolvimento, onde o StrictMode está ligado.
 
 ## Contrato com a API
 
@@ -185,6 +211,29 @@ sobrou, não o que a tela escolheu. Isso é o que impede a pendência 4 da Seç�
 de voltar calada — lá, `is_empty` ia gravar "o último boundary que rodou", que é
 detalhe de ordem da árvore e não informação.
 
+### ⚠️ Abas misturam `pintura` e `dados` dentro da MESMA `screen`
+
+Correto por construção, e ainda assim uma armadilha para quem for tirar média —
+e **abas são a norma nas oito telas seguintes**, então isto vale mais para elas
+do que para a Biblioteca.
+
+`normalizarTela` só troca UUID por `[id]`; ele recebe o `pathname`, que **nunca
+carrega a query string** (`usePathname()` não a devolve). Então `/library`,
+`/library?tab=inbox` e `/library?tab=clipper` gravam todas
+`screen: "/library"` — e não são a mesma coisa:
+
+| Aba | Renderiza `QueryBoundary`? | `medido_ate` |
+|---|---|---|
+| `library` / `inbox` | sim (`needsList`) | `dados` / `vazio` / `erro` |
+| `clipper` | **não** — é `<ClipperOnboarding />`, estático | **`pintura`** |
+
+Quem tirar `AVG(load_ms) GROUP BY screen` soma laranja com maçã: linhas de
+`pintura` (primeiro frame de uma tela estática) com linhas de `dados` (a lista
+carregada). **Agrupe também por `medido_ate`** — que é exatamente para isso que
+a coluna existe. Separar as abas em `screen` distintas é possível, mas é decisão
+de esquema (muda a cardinalidade da coluna e os eventos já gravados), e não foi
+tomada.
+
 ## O preço assumido: tela sem região emite no fim da navegação
 
 O protocolo tem um custo, e ele foi escolhido por escrito.
@@ -230,6 +279,30 @@ não aborta `fetch` nenhum e nenhum teste de comportamento consegue ver a falha
 que o `keepalive` evita. O que `src/__tests__/telemetry-fila-keepalive.test.ts`
 prova é que a opção percorre a cadeia inteira — fila → `enviarEventos` → `api` →
 `core` — e aparece no objeto de init que o `fetch` recebeu.
+
+> ⚠️ **O `keepalive` NÃO garante a entrega da última navegação, e é importante
+> não ler esta seção como se garantisse.** Ele protege uma requisição **já
+> iniciada**. A cadeia real na saída da página é:
+>
+> ```
+> descarregar({keepalive:true}) → enviarEventos → api()
+>   → await opts.resolverToken()      ← lib/api/core.ts:67
+>   → getAccessToken() → supabase.auth.getSession()
+>   → só ENTÃO fetch(..., {keepalive:true})
+> ```
+>
+> Entre o `pagehide` e o `fetch` existe um **`await` que espera o Supabase
+> resolver a sessão**. Se a página morrer nessa janela, não há requisição
+> iniciada para o `keepalive` proteger, e o evento se perde — em silêncio, como
+> toda perda desta fila. **E o teste não vê isso porque mocka o resolvedor de
+> token**, que é exatamente a peça que insere o `await`: o teste prova que a
+> opção chega ao `fetch`, não que o `fetch` chega a existir.
+>
+> **Isto está parqueado como decisão, não como conserto pendente de execução**
+> (pendência 9 do `CLAUDE.md`). As duas saídas — cache síncrono do token, ou
+> `sendBeacon` dentro de `lib/api/` — mexem em `lib/api/`, que toda tela usa, e
+> por isso a consequência é maior que esta seção. Enquanto não for decidido: a
+> última navegação da sessão é **melhor esforço**, não entrega garantida.
 
 **O lote é a unidade de perda.** `enviarEventos` engole qualquer erro de
 propósito (telemetria que derruba a tela do usuário é pior que telemetria
@@ -296,12 +369,26 @@ real. O `setTimeout(…, 0)` existe por isso, e a comparação é por identidade
 
 ## O que ainda não foi medido
 
-Honestidade primeiro: o protocolo está coberto por vitest em seis arquivos
+Honestidade primeiro: o protocolo está coberto por vitest em sete arquivos
 (`telemetry.test.tsx`, `telemetry-ancora-de-clique.test.tsx`,
 `telemetry-fim-de-navegacao.test.tsx`, `telemetry-fila.test.ts`,
-`telemetry-fila-keepalive.test.ts`, `telemetry-types.test.ts`, mais
-`query-boundary.test.tsx` do lado de quem reporta), e os testes provam **qual**
-rótulo sai e **quantas** linhas por navegação.
+`telemetry-fila-keepalive.test.ts`, `telemetry-types.test.ts` e
+`telemetry-contexto.test.tsx`), mais `query-boundary.test.tsx` do lado de quem
+reporta. Os testes provam **qual** rótulo sai e **quantas** linhas por
+navegação.
+
+> **Essa frase afirmava mais do que existia, até 12/09/2026.** Ela citava
+> `query-boundary.test.tsx` como cobertura do lado de quem reporta, e aquele
+> arquivo **não tinha sido tocado pela Seção 8**: não continha `anunciar`,
+> `reportar`, `principal` nem `ProntidaoDaTela` — o contrato novo do componente
+> que **oito telas vão copiar** era exercitado só indiretamente, pelos testes da
+> `TelemetriaDeTela`. Conferível com
+> `git log develop..HEAD -- ArchSmart-web/src/__tests__/query-boundary.test.tsx`,
+> que saía vazio. A revisão final acrescentou o teste direto (o anúncio sai uma
+> vez por montagem e **não** a cada mudança de desfecho; `principal` chega ao
+> report; e os dois lados da query desabilitada) e o
+> `telemetry-contexto.test.tsx`, que cobre o latch e o aviso de duas regiões
+> `principal`.
 
 **Eles não provam a grandeza do número.** Nenhuma navegação real com sessão
 gravou ainda uma linha em `product_events` para conferir que o `load_ms` de
