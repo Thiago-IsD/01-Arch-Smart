@@ -542,3 +542,209 @@ até os Secrets existirem no repositório**. Ver a nota da Seção 8 no
 > uma afirmação não medida, que é exatamente o que este repositório não admite.
 > Quem rodar confere os pedidos `state=CAPTURED` e, se vierem zero, aperta o
 > filtro no mesmo commit.
+
+
+## ✅ 12/09/2026, mais tarde — a parede caiu e os cinco números existem
+
+A seção imediatamente acima registrou que nada pôde ser medido porque a
+credencial do usuário de teste E2E estava sendo rejeitada. **Thiago corrigiu a
+credencial** (tinha um caractere sobrando) e as medições rodaram no mesmo dia.
+Esta seção substitui, na prática, a lista de "o que ficou por medir" acima — o
+texto dela fica de pé como histórico de por que o atraso existiu.
+
+Antes de qualquer medição, a credencial foi verificada direto no endpoint de
+auth do Supabase de staging: **`HTTP 200`**, token recebido,
+`email_confirmed_at: 2026-09-10T11:36:43Z`, usuário
+`ana.arquiteta@seed.arqsmart.local`. A senha não aparece em nenhum comando
+deste documento: ela é carregada de `ArchSmart-web/.env.e2e.local`
+(não versionado) com `set -a; . ./.env.e2e.local; set +a`, e o Playwright a lê
+de `process.env`.
+
+**Topologia, idêntica à de 10/09/2026** — é o que torna os dois números
+comparáveis: Playwright → `localhost:3000` (`npm run dev`) → API local em
+`localhost:8000` (`uvicorn app.main:app`) → banco de **staging** → Supabase de
+**staging**. O `ArchSmart-api/.env` foi conferido antes de subir a API: a
+`DATABASE_URL` ativa é a de staging (usuário `postgres.ipbhtqzybgdltewwnvnl`,
+pooler na **5432**), e a de produção (`postgres.wokgnojyrpzndtxzvfcz`) está
+comentada. Nenhum `alembic upgrade` foi rodado à mão.
+
+### 1. Mediana da Biblioteca depois da Seção 8 — **1415 ms**
+
+```bash
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; set +a
+npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line --timeout=180000
+```
+
+```
+AMOSTRAS=1390,1403,1415,1418,1422
+MEDIANA_MS=1415
+  1 passed (21.5s)
+```
+
+**Contra os 1454 ms de 10/09/2026 (antes da Seção 8): 39 ms a favor do código
+novo**, dentro da variação entre execuções. Não é ganho reivindicado — é
+**ausência de regressão**, que era a pergunta. `QueryBoundary` e o badge no
+prefetch entraram sem custo de tempo mensurável.
+
+> ⚠️ **Quatro execuções, e as três primeiras mentiriam.** No mesmo servidor,
+> em sequência: medianas de **2426 ms**, **1923 ms**, **1409 ms** e **1415 ms**.
+> O `next dev` compila sob demanda, e leva várias passagens para parar. Quem
+> subir o servidor e parar na primeira execução reporta uma regressão de ~1 s
+> que não existe. A quarta execução é a oficial porque é a única com dispersão
+> estreita (1390–1422, amplitude de 32 ms; a primeira foi 1406–3972).
+>
+> O `--timeout=180000` não altera o que é medido — as amostras são
+> `Date.now()` dentro do laço. Ele existe porque o orçamento padrão de **30 s
+> por teste** não cobre login + compilação de três rotas + 5 amostras na
+> primeira execução de uma sessão: a primeira tentativa desta medição morreu
+> exatamente assim, com `Test timeout of 30000ms exceeded` dentro do laço
+> (não no login). É o mesmo tropeco documentado na medição de 10/09/2026.
+
+### 2. A hidratação continua de pé — e o badge do inbox **também** parou de sair
+
+```bash
+npx playwright test e2e/hidratacao-biblioteca.spec.ts --reporter=line
+```
+
+Passou. E, com o spec instrumentado para listar **todos** os pedidos (e não só
+os da lista), três execuções consecutivas deram o mesmo:
+
+```
+PEDIDOS_TOTAL=0
+PEDIDOS_NORMALIZED=0
+PEDIDOS_CAPTURED=0
+```
+
+**Zero pedido a `/api/products` de qualquer tipo** sai do navegador no primeiro
+carregamento. Isso responde a pergunta que a nota no fim da seção anterior
+deixou aberta: o `state=CAPTURED` do badge do inbox **deixou de sair**, ou seja
+o prefetch que a Tarefa 7 da Seção 8 acrescentou (`Promise.all` em
+`LibraryData`) **está sendo aproveitado**. A lacuna aberta na Seção 5 e
+confirmada ao vivo na Seção 6 fechou.
+
+Por isso a asserção foi **apertada no mesmo commit**, como aquela nota mandava:
+o spec não filtra mais por `state=NORMALIZED` e exige `toHaveLength(0)` sobre
+todos os pedidos a `/api/products`. A discriminação entre lista e badge migrou
+para a **mensagem** de falha, que é onde ela serve — a primeira pergunta de
+quem investigar uma regressão aqui é "quem voltou a buscar, a lista ou o
+badge?".
+
+### 3. A prova viva do `screen_viewed` — o spec que nunca havia rodado **passou**
+
+```bash
+npx playwright test e2e/telemetria-biblioteca.spec.ts --reporter=line
+```
+
+```
+  1 passed (11.4s)
+```
+
+**Primeira execução da história deste spec, e ela passou** — mais duas
+repetições para descartar sorte (3/3). Ele afirma, sobre uma navegação por
+**clique** para `/library`: `medido_ate: "dados"`, `medido_de: "clique"`,
+`principal_declarada: true`, `is_empty: false`, e `load_ms` entre 200 ms e 10 s.
+Nenhuma asserção foi afrouxada para isso passar, e nenhum defeito de spec
+apareceu: o spec estava correto como escrito.
+
+### 4. A linha no banco — `load_ms` virou **dado utilizável**
+
+`product_events` tinha **0 linhas** quando a medição começou (medido, e não
+suposto) — coerente com a pendência 2 da Seção 7: nunca uma navegação real
+havia gravado um evento. Toda linha abaixo nasceu desta sessão.
+
+```bash
+cd ArchSmart-api
+python -c "from app.db.session import SessionLocal; from sqlalchemy import text; db=SessionLocal(); print(db.execute(text(\"select name, properties->>'screen', properties->>'medido_ate', properties->>'medido_de', properties->>'load_ms', created_at from product_events where name='screen_viewed' order by created_at desc limit 5\")).fetchall())"
+```
+
+Agregado por tela e por rótulo, que é o que permite afirmar ordem de grandeza:
+
+| `screen` | `medido_de` | `medido_ate` | n | mín | mediana | máx |
+|---|---|---|---|---|---|---|
+| `/library` | `clique` | `dados` | 21 | 871 | **1068** | 3607 |
+| `/library` | `commit` | `dados` | 3 | 1420 | 1749 | 1920 |
+| `/dashboard` | `commit` | `pintura` | 25 | 14 | 18 | 38 |
+
+**A mediana de 1068 ms está na mesma ordem de grandeza dos 1415 ms do E2E**, e
+é isso que fecha a pendência. Ser um pouco menor é o esperado, não uma
+discrepância: o E2E cronometra de antes do `page.click()` até o seletor ficar
+visível, incluindo o despacho do clique e a sondagem do seletor pelo
+Playwright; o `load_ms` cronometra dentro da página, do clique até a região
+principal reportar dados.
+
+O defeito da Seção 7 está morto: `is_empty` sai **`false`** nas 24 linhas de
+`/library` (era `null` em 100% dos eventos), `principal_declarada` sai **`true`**,
+e não existe `load_ms` de dezenas de milissegundos em tela com região de dados.
+
+> **A linha do `/dashboard` não é uma regressão, e precisa ser lida com
+> cuidado:** `load_ms` de 18 ms com `medido_ate: "pintura"`,
+> `principal_declarada: false` e `is_empty: null`. É a forma antiga do número —
+> mas agora **corretamente rotulada**, porque o Dashboard ainda não foi migrado
+> (a Seção 8 migrou a Biblioteca como piloto). Quem agregar a coluna
+> `load_ms` **tem de filtrar por `medido_ate = 'dados'`**; misturar as duas
+> populações produz uma média que não descreve tela nenhuma.
+
+### 5. P95 de `GET /api/products` — **634 ms**, acima do orçamento de 400 ms, e **não pela query**
+
+**Volume declarado** (P95 sem volume não significa nada): **300 produtos** na
+conta do usuário de teste — **90 `NORMALIZED`**, **107 `CAPTURED`**, o resto
+`INACTIVE`. É o volume de `tools/seed.py --biblioteca 300`, e ele **já estava no
+banco**; nada foi semeado nesta sessão. A requisição medida é a que a tela
+realmente faz, extraída do log do uvicorn:
+`GET /api/products/?page=1&size=15&sort_by=created_at_desc&state=NORMALIZED`
+(40 amostras, após 5 de aquecimento).
+
+| O que foi medido | P50 | P95 |
+|---|---|---|
+| `GET /api/products/` (a lista) | 470 ms | **634 ms** |
+| `GET /api/users/me` (rota autenticada que quase não faz trabalho) | 433 ms | 694 ms |
+| o SQL da página da lista, direto no pooler de staging | **16 ms** | **17 ms** |
+
+**Conforme a spec decidiu, nada foi otimizado — e a decomposição mostra que
+otimizar query seria trabalho no lugar errado.** A query custa **17 ms**. Uma
+rota autenticada que quase não faz trabalho custa praticamente o mesmo que a
+lista inteira, o que só é possível se o custo estiver **antes** do endpoint.
+
+A causa foi medida, não deduzida: o Supabase de staging assina o JWT com
+**ES256** — cabeçalho lido do token, `{"alg":"ES256","kid":"33477cd1-…"}` —
+enquanto a API valida com segredo compartilhado **HS256**
+(`SUPABASE_JWT_SECRET`). A validação local falha sempre, e
+`resolve_identity` (`ArchSmart-api/app/core/security.py:121`) cai no caminho
+remoto: **uma chamada HTTP a `…/auth/v1/user` em toda requisição
+autenticada**. 175 ocorrências no log desta sessão:
+
+```
+Validacao local do JWT falhou (The specified alg value is not allowed); tentando remota.
+```
+
+**Então a Tarefa 11 de backend precisa existir**, e o que ela tem para fazer não
+é índice nem `joinedload`: é verificar ES256 pela chave pública/JWKS do projeto
+em vez de cair no caminho remoto. O ganho não é de uma tela — é de **toda
+requisição autenticada da plataforma**, e explicaria boa parte dos 1415 ms da
+Biblioteca. O fenômeno já estava observado, **sem número**, na medição de
+06/09/2026 neste mesmo arquivo; o que esta seção acrescenta é o custo medido e
+a causa confirmada pelo cabeçalho do token.
+
+Dois números que **não** são o P95 do endpoint, registrados para ninguém os
+confundir com ele:
+
+- **Contra o Render de staging:** P50 2303 ms, P95 **2762 ms**, com cold start de
+  **52,8 s** na primeira chamada. Isso mede a ida e volta Brasil → Render free
+  tier mais a CPU do free tier — não a rota.
+- **Um `307` antes de todo `200`:** a tela chama `/api/products` sem barra final
+  e o FastAPI redireciona para `/api/products/`. Medido no log: 44
+  redirecionamentos para 44 respostas, nas duas queries (lista e badge) — duas
+  idas onde bastaria uma. Não foi mexido aqui; é candidato barato para a
+  Tarefa 11.
+
+### O que **não** fechou
+
+O item **6** de [`../modulos/library.md`](../modulos/library.md) continua
+aberto, e nada nesta seção o toca: **axe no navegador, navegação só por
+teclado, e as larguras de 390px e 1440px**. Depende de olho humano e de layout
+real; Playwright com credencial não substitui isso. Pela mesma razão, a
+**verificação visual da Seção 6** (pendência 1 da Seção 7) não é fechada por
+estas medições — agora ela é **executável**, porque a credencial funciona e
+`e2e/captura-visual-secao-6.spec.ts` existe, mas ninguém olhou as capturas
+nesta sessão.

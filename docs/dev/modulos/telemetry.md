@@ -390,21 +390,43 @@ navegação.
 > `telemetry-contexto.test.tsx`, que cobre o latch e o aviso de duas regiões
 > `principal`.
 
-**Eles não provam a grandeza do número.** Nenhuma navegação real com sessão
-gravou ainda uma linha em `product_events` para conferir que o `load_ms` de
-`medido_ate: "dados"` bate com a mediana medida no E2E — a credencial do usuário
-de teste estava sendo rejeitada pelo Supabase de staging em 11/09/2026
-(`HTTP 400, "Invalid login credentials"`). O instrumento que fecha isso existe e
-está escrito: `ArchSmart-web/e2e/telemetria-biblioteca.spec.ts`, rodado pelo job
-`e2e` do CI. **Até ele rodar, não tire média desta coluna sem olhar `medido_ate`
-e `principal_declarada` primeiro.**
+**Eles não provam a grandeza do número — e em 12/09/2026 ela passou a estar
+provada por outro caminho.** O que faltava era navegação real com sessão
+gravando linha em `product_events`; a credencial do usuário de teste, rejeitada
+pelo Supabase de staging em 11/09/2026, foi corrigida, e
+`ArchSmart-web/e2e/telemetria-biblioteca.spec.ts` **rodou pela primeira vez e
+passou** (três execuções consecutivas).
+
+**O `load_ms` de `medido_ate: "dados"` é dado utilizável.** Medido na Biblioteca:
+mediana de **1068 ms** (n=21, mín 871, máx 3607) contra a mediana de **1415 ms**
+do E2E da mesma tela — mesma ordem de grandeza, e o `load_ms` um pouco menor
+porque o E2E inclui o despacho do clique e a sondagem do seletor pelo
+Playwright, enquanto o `load_ms` conta dentro da página. As 24 linhas de
+`/library` saíram com `is_empty: false` e `principal_declarada: true`. Números,
+comandos e a decomposição em
+[`../medicoes/2026-09-06-biblioteca-depois.md`](../medicoes/2026-09-06-biblioteca-depois.md).
+
+**A ressalva de agregação não caiu — ela ficou mais concreta:** na mesma
+medição, `/dashboard` gravou `load_ms` de mediana **18 ms** com
+`medido_ate: "pintura"` e `principal_declarada: false`, porque a Seção 8 migrou
+só a Biblioteca. É a forma do antigo `load_ms: 28`, agora **corretamente
+rotulada** em vez de se passar por tempo até o dado. Então continua valendo, e
+com exemplo medido: **não tire média desta coluna sem filtrar `medido_ate` e
+olhar `principal_declarada`.**
 
 > ⚠️ **O corte entre o gatilho antigo e este é um EVENTO, não uma data: é o
-> deploy.** Enquanto a Seção 8 não chegar a staging, **toda** linha de
-> `product_events` lá é do gatilho antigo — inclusive as datadas depois de o
-> protocolo novo existir no repositório, porque código em branch não grava
-> nada. E a parede da credencial impediu até a navegação local, então não há
-> linha de lugar nenhum gravada pelo protocolo novo. Quem for consultar essa
-> coluna confere primeiro **se a Seção 8 chegou ao ambiente de onde a linha
-> veio**; uma data de corte convidaria a confiar em linha velha por ela ser
-> recente.
+> deploy.** Enquanto a Seção 8 não chegar a staging, **nenhuma** linha de
+> `product_events` escrita pelo *deployment* de staging é do protocolo novo —
+> inclusive as datadas depois de o protocolo novo existir no repositório,
+> porque código em branch não grava nada. Quem for consultar essa coluna
+> confere primeiro **de onde a linha veio**; uma data de corte convidaria a
+> confiar em linha velha por ela ser recente.
+>
+> **E existe agora um terceiro caso, que é justamente o mais fácil de ler
+> errado.** Em 12/09/2026 o banco de staging recebeu as **primeiras** linhas do
+> protocolo novo — `product_events` estava com **0 linhas** antes disso —, mas
+> elas **não vieram do deployment de staging**: vieram de front e API rodando
+> na máquina de desenvolvimento, com o código da Seção 8, apontados para o
+> **banco** de staging. Na prática: a tabela tem dado do protocolo novo
+> enquanto o ambiente de staging ainda serve a Seção 7. Quem cruzar "linha
+> recente" com "deploy de staging" conclui errado nas duas direções.
