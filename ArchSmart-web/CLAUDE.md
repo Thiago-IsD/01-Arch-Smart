@@ -77,11 +77,39 @@ Uma tela nova que soma outro `createClient()`/`getSession()`/header manual fora 
 
 ## Acessibilidade (Art. 6)
 
-Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível ao foco — proibido `tabIndex={-1}` em controle interativo (5 ocorrências hoje, nenhuma para imitar). Contraste AA (4.5:1 texto, 3:1 elemento gráfico) nos dois temas.
+Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível ao foco — proibido `tabIndex={-1}` em controle interativo (**3 ocorrências hoje**, nenhuma para imitar; eram 5 até a Tarefa 9 da Seção 8 tirar os dois da Biblioteca — `python tools/catraca.py`, medida `tabindex_negativo`). Contraste AA (4.5:1 texto, 3:1 elemento gráfico) nos dois temas.
+
+> Um controle que sai de `tabIndex={-1}` entra na ordem de tabulação e passa a
+> precisar de **nome acessível**: os dois `TooltipTrigger` da Biblioteca tinham
+> como único filho um ícone, e sem `aria-label` virariam violação `button-name`
+> do axe no lugar da violação que o `tabIndex` causava. Tirar o `tabIndex={-1}`
+> e dar nome ao controle são o mesmo conserto, não dois.
 
 ## Cor (Art. 7)
 
-Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover` (cada um com seu `-foreground`), mais `--border`, `--input` e `--ring` (sem par `-foreground`). **Não existem `--success`, `--warning` nem `--info`** — a Seção 6 os cria. Se a tela precisa de um estado que nenhum token cobre (aviso, sucesso), reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um `-amber-500` literal — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
+Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover` (cada um com seu `-foreground`), mais `--border`, `--input` e `--ring` (sem par `-foreground`).
+
+> **Correção em 11/09/2026, na Tarefa 9 da Seção 8.** Este parágrafo dizia
+> "**não existem `--success`, `--warning` nem `--info`** — a Seção 6 os cria", e
+> isso envelheceu: a Seção 6 os criou mesmo, nos **dois** temas, e eles estão
+> ligados a nome de classe utilitária no `tailwind.config.ts`. Então
+> `text-success`, `bg-warning/15` e afins renderizam hoje. Medido com:
+>
+> ```
+> grep -nE "^\s*--(success|warning|info)(-foreground)?:" ArchSmart-web/src/app/globals.css   # 12 linhas, 6 por tema
+> grep -n "success\|warning\|info" ArchSmart-web/tailwind.config.ts                          # 9 linhas
+> ```
+>
+> **Ressalva medida na mesma tarefa, antes de usar `--warning` para texto:** no
+> tema claro ele é `38 92% 55%`, que sobre `--background` dá **1,99:1** — pior
+> que o `-amber-600` literal que ele substituiu (**3,19:1**), e os dois reprovam
+> o 4.5:1 do Art. 6. `--success` não tem esse problema (**5,07:1** no claro,
+> contra 5,02:1 do `-green-700` que substituiu). E a catraca **não vê** esse
+> caso: `contraste_reprovado` mede só pares (cor, cor-foreground) de
+> `globals.css`, nunca token de texto sobre `--background`. Escurecer `--warning`
+> no claro é decisão de design, aberta — ver o relatório da Tarefa 9.
+
+Se a tela precisa de um estado que nenhum token cobre, reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um literal de paleta — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
 
 ## Convenções
 
