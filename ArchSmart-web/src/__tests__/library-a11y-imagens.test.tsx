@@ -155,8 +155,13 @@ describe("a acao do ProductCard escondida atras de hover", () => {
  * dependendo de olho humano em navegador.
  *
  * O valor disto e concreto: foi exatamente uma regra de estrutura
- * (`button-name`) que a Tarefa 9 quase introduziu ao tirar o `tabIndex={-1}` de
- * um gatilho cujo unico filho e um icone.
+ * (`button-name`) que a Tarefa 9 quase introduziu ao tirar o tabIndex negativo
+ * de um gatilho cujo unico filho e um icone.
+ *
+ * O "tabIndex negativo" desta frase esta escrito em palavras de proposito: a
+ * medida `tabindex_negativo` da catraca conta a forma literal em qualquer .tsx
+ * de src/, comentario incluido, e escrever a sintaxe aqui faria este arquivo
+ * reprovar o proprio portao que ele ajuda a defender.
  */
 describe("axe nos componentes da Biblioteca (estrutura e ARIA, sem contraste)", () => {
     const SEM_ESTRUTURA_DE_PAGINA = {
