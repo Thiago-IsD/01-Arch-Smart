@@ -2,7 +2,7 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query"
 import { apiServer } from "@/lib/api/server"
 import { queryKeys, type FiltrosDeProduto } from "@/lib/query/keys"
 import { criarQueryClientDoServidor, tentarPrefetch } from "@/lib/query/hydration"
-import { queryDeProdutos } from "@/features/library/api"
+import { queryDeProdutos, queryDoInbox } from "@/features/library/api"
 import type { ProductsResponse } from "@/features/library/types"
 import { LibraryContent } from "./LibraryContent"
 
@@ -20,9 +20,10 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
     // O badge do inbox ficou fora do prefetch na Secao 5, e por isso era a
     // UNICA requisicao que a Biblioteca disparava do navegador no primeiro
     // carregamento — foi ela que o load_ms quebrado da Secao 7 cronometrava.
-    // `useInboxCount` tem `select`, entao o que se prefetcha e a resposta CRUA,
-    // e o query tem de ser identico ao de `contarInbox` (features/library/api.ts):
-    // divergir nao da erro, so faz o prefetch virar custo puro.
+    // `useInboxCount` tem `select`, entao o que se prefetcha e a resposta CRUA.
+    // O query sai de `queryDoInbox()`, a MESMA funcao que `contarInbox` usa:
+    // escrito a mao aqui, ele era um literal duplicado, e divergir nao da erro
+    // nenhum — so faz o prefetch deixar de ser aproveitado e virar custo puro.
     //
     // Os dois em Promise.all, nao em sequencia: sao chamadas independentes, e em
     // serie elas somariam latencia dentro do <Suspense> — o oposto do que a
@@ -44,7 +45,7 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
                 queryFn: () =>
                     apiServer<ProductsResponse>("/api/products", {
                         signal,
-                        query: { page: 1, size: 1, state: "CAPTURED" },
+                        query: queryDoInbox(),
                     }),
             }),
         ),

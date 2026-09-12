@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test"
 
+import { esperarListaDaBiblioteca } from "./biblioteca"
+
 /**
  * Prova que o prefetch no servidor da Seção 5 está de fato hidratando: ao abrir
  * /library direto (navegação de servidor, não client-side), o navegador não
@@ -45,7 +47,7 @@ test("a lista da Biblioteca nao busca /api/products no navegador no primeiro car
 
     // Aquece a API: cold start do Render nao pode virar falha de hidratacao.
     await page.goto("/library")
-    await page.waitForSelector("[data-testid='product-grid'], [data-testid='library-empty']")
+    await esperarListaDaBiblioteca(page)
 
     const pedidos: string[] = []
     page.on("request", (r) => {
@@ -53,7 +55,7 @@ test("a lista da Biblioteca nao busca /api/products no navegador no primeiro car
     })
 
     await page.goto("/library")
-    await page.waitForSelector("[data-testid='product-grid'], [data-testid='library-empty']")
+    await esperarListaDaBiblioteca(page)
 
     // `state=NORMALIZED` e a chave da lista principal; `state=CAPTURED` e o
     // badge do inbox, prefetchado desde a Tarefa 7 da Secao 8 mas ainda nao

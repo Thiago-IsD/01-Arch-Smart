@@ -105,14 +105,21 @@ export function LibraryContent() {
                                         />
                                     ))}
                                 </div>
-                                {resposta.items.length > 0 && (
-                                    <PaginationControls
-                                        total={resposta.total}
-                                        page={resposta.page}
-                                        size={resposta.size}
-                                        pages={resposta.pages}
-                                    />
-                                )}
+                                {/*
+                                  * Sem `items.length > 0` na frente: aqui
+                                  * dentro a lista NUNCA esta vazia — o
+                                  * boundary desviou esse caso para `empty`
+                                  * antes de chamar este render. A guarda era
+                                  * resto da logica manual, e resto sem
+                                  * explicacao e o que as outras oito telas
+                                  * copiariam junto.
+                                  */}
+                                <PaginationControls
+                                    total={resposta.total}
+                                    page={resposta.page}
+                                    size={resposta.size}
+                                    pages={resposta.pages}
+                                />
                             </>
                         )}
                     </QueryBoundary>

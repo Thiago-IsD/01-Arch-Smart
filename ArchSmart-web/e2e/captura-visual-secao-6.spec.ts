@@ -2,6 +2,8 @@ import { test, expect, type Page } from "@playwright/test"
 import fs from "fs"
 import path from "path"
 
+import { esperarListaDaBiblioteca } from "./biblioteca"
+
 /**
  * Captura visual das três mudanças da Seção 6: `min-h-11` no
  * `DropdownMenuItem`, a cor do botão de fechar do toast destrutivo, e
@@ -198,9 +200,7 @@ test("captura visual das mudanças da Seção 6", async ({ page }) => {
     for (const largura of LARGURAS) {
         await page.setViewportSize({ width: largura.width, height: largura.height })
         await page.goto("/library")
-        await page.waitForSelector(
-            "[data-testid='product-grid'], [data-testid='library-empty']"
-        )
+        await esperarListaDaBiblioteca(page)
 
         const trigger = page.getByRole("button", { name: "Ações" }).first()
         if ((await trigger.count()) === 0) {
@@ -221,9 +221,7 @@ test("captura visual das mudanças da Seção 6", async ({ page }) => {
     for (const largura of LARGURAS) {
         await page.setViewportSize({ width: largura.width, height: largura.height })
         await page.goto("/library")
-        await page.waitForSelector(
-            "[data-testid='product-grid'], [data-testid='library-empty']"
-        )
+        await esperarListaDaBiblioteca(page)
 
         const trigger = page.getByRole("button", { name: "Ações" }).first()
         if ((await trigger.count()) === 0) {
