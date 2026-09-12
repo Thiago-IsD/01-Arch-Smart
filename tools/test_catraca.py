@@ -10,7 +10,7 @@ import io
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -612,17 +612,27 @@ class TestPiorasAceitas(unittest.TestCase):
     fail-closed de `registro_cobre_piora`.
     """
 
-    def _auditar(self, atual, base):
-        """Roda o modo de auditoria com dois catraca.json de mentira -> (codigo, saida)."""
+    def _auditar(self, atual, base, medicoes=None, argv_extra=()):
+        """Roda o modo de auditoria com dois catraca.json de mentira -> (codigo, saida).
+
+        `medicoes` substitui os medidores reais, para o teste fixar o que "a
+        medicao de hoje" devolve -- a quarta condicao de aceitacao confere o
+        baseline contra ela. Sem `medicoes`, os medidores de verdade rodam.
+        """
         with tempfile.TemporaryDirectory() as diretorio:
             atual_path = Path(diretorio) / "catraca.json"
             base_path = Path(diretorio) / "base.json"
             atual_path.write_text(json.dumps(atual), encoding="utf-8")
             base_path.write_text(json.dumps(base), encoding="utf-8")
             saida = io.StringIO()
-            with mock.patch.object(catraca, "BASELINE", atual_path):
-                with redirect_stdout(saida):
-                    codigo = catraca.main(["--comparar-baseline-com", str(base_path)])
+            argv = ["--comparar-baseline-com", str(base_path), *argv_extra]
+            with ExitStack() as pilha:
+                pilha.enter_context(mock.patch.object(catraca, "BASELINE", atual_path))
+                if medicoes is not None:
+                    medidores = {c: (lambda v=v: v) for c, v in medicoes.items()}
+                    pilha.enter_context(mock.patch.object(catraca, "MEDIDORES", medidores))
+                pilha.enter_context(redirect_stdout(saida))
+                codigo = catraca.main(argv)
         return codigo, saida.getvalue()
 
     def test_subida_com_registro_valido_passa(self):
@@ -632,6 +642,7 @@ class TestPiorasAceitas(unittest.TestCase):
                  "de": 518, "ate": 588, "commit": "0350895",
                  "motivo": "a regua passou a ver quatro furos"}}},
             {"cores_literais": 518},
+            medicoes={"cores_literais": 588},
         )
         self.assertEqual(codigo, 0)
         # O valor desta guarda e o revisor LER o motivo; aceitar em silencio
@@ -675,6 +686,7 @@ class TestPiorasAceitas(unittest.TestCase):
             {"cores_literais": 583,
              "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
             {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
         )
         self.assertEqual(codigo, 0)
         self.assertIn("583", saida)
@@ -684,6 +696,7 @@ class TestPiorasAceitas(unittest.TestCase):
             {"cores_literais": 588, "tabindex_negativo": 9,
              "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
             {"cores_literais": 518, "tabindex_negativo": 3},
+            medicoes={"cores_literais": 588, "tabindex_negativo": 9},
         )
         self.assertEqual(codigo, 1)
         self.assertIn("tabindex_negativo", saida.split("afrouxou")[1])
@@ -714,6 +727,7 @@ class TestPiorasAceitas(unittest.TestCase):
             {"cores_literais": 588,
              "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": ""}}},
             {"cores_literais": 518},
+            medicoes={"cores_literais": 588},
         )
         self.assertEqual(codigo, 0)
         self.assertIn("EM BRANCO", saida)
@@ -785,6 +799,112 @@ class TestPiorasAceitas(unittest.TestCase):
         self.assertEqual(registro["ate"], 600)
         self.assertEqual(registro["motivo"], "a regua mudou")
         self.assertIn("de=518", "\n".join(linhas))
+
+    # --- Quarta condicao: o baseline da medida com registro e conferido contra
+    # a medicao de hoje. Sem ela, o teto deixava um buraco do tamanho da
+    # diferenca entre o teto e a medicao: com `ate: 588` medindo 583, dava para
+    # editar o baseline a mao para 585 e os DOIS portoes passavam -- a auditoria
+    # porque 585 <= 588, e o portao principal porque a invariante dele e
+    # `medicao <= baseline` e ele lia isso como "baixou de 585 para 583".
+
+    def test_baseline_igual_a_medicao_passa(self):
+        codigo, saida = self._auditar(
+            {"cores_literais": 583,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertEqual(codigo, 0, saida)
+        # A saida tem que mostrar que a conferencia ACONTECEU; aceitar sem dizer
+        # contra o que conferiu seria indistinguivel de nao ter conferido.
+        self.assertIn("conferido contra a medicao de hoje: 583", saida)
+
+    def test_baseline_dentro_do_teto_mas_diferente_da_medicao_reprova(self):
+        # O caso 585: tres condicoes passam, a quarta mata.
+        codigo, saida = self._auditar(
+            {"cores_literais": 585,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertEqual(codigo, 1, saida)
+
+    def test_a_mensagem_do_descasamento_diz_que_ha_piora_aceita_e_a_diferenca(self):
+        # Quem le o log do CI tem que entender numa linha que o numero foi
+        # editado a mao -- nao cair no "afrouxou" genérico, que descreve outro
+        # defeito.
+        _, saida = self._auditar(
+            {"cores_literais": 585,
+             "_pioras_aceitas": {"cores_literais": {"de": 518, "ate": 588, "motivo": "x"}}},
+            {"cores_literais": 518},
+            medicoes={"cores_literais": 583},
+        )
+        self.assertIn("o baseline desta branch diz 585", saida)
+        self.assertIn("medicao de hoje da 583", saida)
+        self.assertIn("piora aceita", saida)
+        self.assertIn("+2", saida)
+        self.assertIn("editado a mao", saida)
+
+    def test_medida_sem_registro_nao_e_medida(self):
+        # A regra geral do modo continua sendo "nao mede nada": medir e trabalho
+        # do outro modo. So a medida que um registro LIBEROU e conferida. Este
+        # medidor estoura se for chamado.
+        def nunca():
+            raise AssertionError("medidor chamado para medida sem registro")
+
+        with mock.patch.dict(catraca.MEDIDORES, {"cores_literais": nunca}):
+            codigo, saida = self._auditar({"cores_literais": 583}, {"cores_literais": 583})
+        self.assertEqual(codigo, 0, saida)
+
+    def test_medida_sem_registro_que_subiu_reprova_sem_medir(self):
+        # Subida sem registro reprova pelo motivo de sempre, e tambem sem medir.
+        def nunca():
+            raise AssertionError("medidor chamado para medida sem registro")
+
+        with mock.patch.dict(catraca.MEDIDORES, {"cores_literais": nunca}):
+            codigo, saida = self._auditar({"cores_literais": 600}, {"cores_literais": 518})
+        self.assertEqual(codigo, 1)
+        self.assertIn("nao ha registro", saida)
+
+    def test_eslint_erros_com_registro_e_sem_relatorio_reprova(self):
+        # `eslint_erros` nao se mede a partir do repositorio: depende do
+        # relatorio que so o job `frontend` produz. Sem ele, a quarta condicao
+        # nao PODE ser conferida -- e aceitar por omissao devolveria o buraco.
+        codigo, saida = self._auditar(
+            {"eslint_erros": 90,
+             "_pioras_aceitas": {"eslint_erros": {"de": 85, "ate": 95, "motivo": "x"}}},
+            {"eslint_erros": 85},
+        )
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn("NAO DA PARA AUDITAR", saida)
+        self.assertIn("--eslint-json", saida)
+
+    def test_eslint_erros_com_registro_e_com_relatorio_confere(self):
+        # Com o relatorio, a conferencia acontece igual as outras: 90 no
+        # baseline e 90 no relatorio (dois arquivos, 45 erros cada) -> passa.
+        relatorio = [{"errorCount": 45}, {"errorCount": 45}]
+        with tempfile.TemporaryDirectory() as diretorio:
+            caminho = Path(diretorio) / "eslint.json"
+            caminho.write_text(json.dumps(relatorio), encoding="utf-8")
+            codigo, saida = self._auditar(
+                {"eslint_erros": 90,
+                 "_pioras_aceitas": {"eslint_erros": {"de": 85, "ate": 95, "motivo": "x"}}},
+                {"eslint_erros": 85},
+                argv_extra=("--eslint-json", str(caminho)),
+            )
+        self.assertEqual(codigo, 0, saida)
+        self.assertIn("conferido contra a medicao de hoje: 90", saida)
+
+    def test_chave_com_registro_e_sem_medidor_reprova(self):
+        # Registro para uma chave que `medir()` nao produz: nao da para conferir,
+        # entao reprova. Fail-closed, como as outras tres condicoes.
+        codigo, saida = self._auditar(
+            {"medida_inventada": 10,
+             "_pioras_aceitas": {"medida_inventada": {"de": 5, "ate": 20, "motivo": "x"}}},
+            {"medida_inventada": 5},
+        )
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn("nao existe medidor", saida)
 
     def test_catraca_json_do_repositorio_nao_afrouxou_contra_si_mesmo(self):
         # Guarda de sanidade do arquivo real: auditado contra ele mesmo, nada

@@ -356,20 +356,63 @@ def modulos_sem_doc(services: Path, features: Path | None, docs: Path) -> list[s
     return sorted(n for n in nomes if n not in documentados)
 
 
+class MedicaoIndisponivel(Exception):
+    """Esta medida nao pode ser coletada nesta execucao — nao conclua nada, reprove.
+
+    Existe para a quarta condicao de `_auditar_baseline`: se a medida que um
+    registro de piora aceita precisa conferir nao PODE ser medida aqui (lint sem
+    `--eslint-json`, chave sem medidor), aceitar por omissao seria aceitar o
+    numero sem a prova que o registro exige. Fail-closed, como as outras tres.
+    """
+
+
+# Uma medida por entrada, para `medir()` e para quem precisa de UMA so.
+# `_auditar_baseline` mede apenas as chaves com registro de piora aceita, e
+# precisa chamar o medidor daquela chave sem coletar as outras oito.
+# `eslint_erros` fica FORA desta tabela de proposito: ela nao se mede a partir do
+# repositorio, depende do relatorio que so o job `frontend` produz.
+MEDIDORES = {
+    "cores_literais": lambda: contar_cores(SRC_WEB),
+    "modulos_sem_doc": lambda: modulos_sem_doc(SERVICES_API, FEATURES_WEB, DOCS_MODULOS),
+    "fetch_fora_de_lib_api": lambda: contar_ocorrencias(SRC_WEB, RE_FETCH, (LIB_API_WEB,)),
+    "supabase_fora_de_lib_api": lambda: contar_ocorrencias(
+        SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
+    "contraste_reprovado": lambda: contraste.reprovados(),
+    "tabindex_negativo": lambda: contar_ocorrencias(SRC_WEB, RE_TABINDEX_NEGATIVO),
+    "hover_sem_focus": lambda: contar_hover_sem_focus(SRC_WEB),
+    "arquivos_acima_de_400": lambda: arquivos_grandes(SRC_WEB),
+}
+
+
+def medir_eslint(eslint_json: Path) -> int:
+    relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))
+    return sum(a.get("errorCount", 0) for a in relatorio)
+
+
+def medir_uma(chave: str, eslint_json: Path | None = None):
+    """Mede UMA medida. Estoura `MedicaoIndisponivel` quando nao da para medi-la aqui."""
+    if chave == "eslint_erros":
+        if eslint_json is None:
+            raise MedicaoIndisponivel(
+                "nao da para auditar piora aceita de lint sem o relatorio do eslint:"
+                " passe --eslint-json (quem o produz e o job `frontend` do CI)")
+        try:
+            return medir_eslint(eslint_json)
+        except (OSError, ValueError) as erro:
+            raise MedicaoIndisponivel(f"o relatorio do eslint nao pode ser lido: {erro}")
+    if chave not in MEDIDORES:
+        raise MedicaoIndisponivel(
+            f"nao existe medidor para `{chave}` em tools/catraca.py (MEDIDORES)")
+    try:
+        return MEDIDORES[chave]()
+    except DiretorioMedidoSumiu as erro:
+        raise MedicaoIndisponivel(str(erro))
+
+
 def medir(eslint_json: Path | None) -> dict:
-    medido = {
-        "cores_literais": contar_cores(SRC_WEB),
-        "modulos_sem_doc": modulos_sem_doc(SERVICES_API, FEATURES_WEB, DOCS_MODULOS),
-        "fetch_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_FETCH, (LIB_API_WEB,)),
-        "supabase_fora_de_lib_api": contar_ocorrencias(SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
-        "contraste_reprovado": contraste.reprovados(),
-        "tabindex_negativo": contar_ocorrencias(SRC_WEB, RE_TABINDEX_NEGATIVO),
-        "hover_sem_focus": contar_hover_sem_focus(SRC_WEB),
-        "arquivos_acima_de_400": arquivos_grandes(SRC_WEB),
-    }
+    medido = {chave: medidor() for chave, medidor in MEDIDORES.items()}
     if eslint_json is not None:
-        relatorio = json.loads(eslint_json.read_text(encoding="utf-8"))
-        medido["eslint_erros"] = sum(a.get("errorCount", 0) for a in relatorio)
+        medido["eslint_erros"] = medir_eslint(eslint_json)
     return medido
 
 
@@ -535,6 +578,10 @@ def pioras_detalhadas(baseline: dict, medido: dict,
 def registro_cobre_piora(registro: object, de: object, para: object) -> tuple[bool, str]:
     """(aceita, motivo_da_recusa) para um registro de `_pioras_aceitas`.
 
+    Cobre as tres primeiras condicoes de aceitacao. A QUARTA — o baseline desta
+    branch tem que ser igual a medicao de hoje — vive em `_auditar_baseline`,
+    porque exige medir, e esta funcao e pura. Ver o docstring de la.
+
     Fail-closed nas tres condicoes, e cada uma cobre um caso distinto:
 
     - **sem registro** -- e exatamente o cenario do docstring de
@@ -647,7 +694,7 @@ def registrar_pioras_aceitas(baseline: dict, medido: dict) -> list[str]:
     return linhas
 
 
-def _auditar_baseline(referencia: Path) -> int:
+def _auditar_baseline(referencia: Path, eslint_json: Path | None = None) -> int:
     """
     Audita o proprio catraca.json contra o da branch base.
 
@@ -666,8 +713,30 @@ def _auditar_baseline(referencia: Path) -> int:
     aqui com o diagnostico invertido de "o baseline afrouxou".
 
     Uma subida numerica passa **so** quando `_pioras_aceitas` (no catraca.json
-    desta branch) tem registro que a cubra, pelas tres condicoes de
-    `registro_cobre_piora`. Esse caminho nao afrouxa a comparacao: o cenario do
+    desta branch) tem registro que a cubra, por QUATRO condicoes: as tres de
+    `registro_cobre_piora` (existe registro; `de` igual ao valor da branch base;
+    valor desta branch `<= ate`) mais a quarta, que vive aqui porque exige medir
+    -- **o baseline desta branch tem que ser igual a medicao de hoje**.
+
+    A quarta condicao fecha o buraco que o teto deixava aberto. Com so as tres,
+    `cores_literais` aceito ate 588 e medindo 583 hoje permitia editar o
+    baseline a mao para qualquer valor ate 588: a auditoria aceitava (585 <= 588)
+    e o portao principal tambem, porque a invariante dele e `medicao <= baseline`
+    e ele dizia "baixou de 585 para 583", saida 0. Cinco cores literais novas
+    caberiam escondidas ali. O teto estreitou o buraco; a quarta condicao o
+    fecha, e quem a carrega tem que ser o registro, porque e ele que abre a
+    porta.
+
+    **Mede so as chaves que tem registro.** A regra geral do modo continua
+    valendo -- comparar baseline com baseline e o certo para o resto, e e o que
+    faz ele ser barato e independente do que `medir()` consegue coletar. O que
+    muda e so onde o registro relaxou a comparacao: porta aberta exige a prova
+    que a fecha. Se a medida com registro nao PUDER ser medida aqui
+    (`eslint_erros` sem `--eslint-json`, chave sem medidor, diretorio medido
+    ausente), reprova dizendo isso -- aceitar por omissao seria devolver o
+    buraco.
+
+    Esse caminho nao afrouxa a comparacao: o cenario do
     paragrafo acima -- numero subido na mao -- continua reprovando, porque
     registro nenhum o cobre. O que ele muda e onde a justificativa vive: dentro
     do arquivo, auditavel, em vez de so no corpo do PR, que nenhuma ferramenta
@@ -695,7 +764,7 @@ def _auditar_baseline(referencia: Path) -> int:
     if not isinstance(registros, dict):
         registros = {}
 
-    aceitas, recusadas = [], []
+    aceitas, recusadas, descasadas = [], [], []
     for piora in pioras:
         if not piora["numerica"]:
             # `_pioras_aceitas` tem `de`/`ate` numericos: um teto nao diz nada
@@ -711,27 +780,61 @@ def _auditar_baseline(referencia: Path) -> int:
             continue
         registro = registros.get(piora["chave"])
         cobre, motivo_da_recusa = registro_cobre_piora(registro, piora["de"], piora["para"])
-        if cobre:
-            aceitas.append((piora, registro))
-        else:
+        if not cobre:
             recusadas.append((piora, motivo_da_recusa))
+            continue
+        # Quarta condicao: o registro abriu a porta, entao este numero tem que
+        # bater com a realidade medida AGORA. Mede-se so esta chave -- as outras
+        # continuam auditadas baseline contra baseline.
+        try:
+            agora = medir_uma(piora["chave"], eslint_json)
+        except MedicaoIndisponivel as erro:
+            descasadas.append((piora, registro, None, str(erro)))
+            continue
+        if agora != piora["para"]:
+            descasadas.append((piora, registro, agora, None))
+            continue
+        aceitas.append((piora, registro, agora))
 
     # Imprime as aceitas ANTES de decidir a saida, e imprime mesmo quando o
     # comando vai reprovar por outra medida. O valor desta guarda nao esta em
     # sair 0: esta em o revisor ler por que aquele numero subiu.
-    for piora, registro in aceitas:
+    for piora, registro, agora in aceitas:
         print(f"[v] {piora['chave']}: SUBIU de {piora['de']} para {piora['para']},"
               f" e a subida esta registrada em {CHAVE_PIORAS_ACEITAS}")
-        print(f"    aceita ate: {registro['ate']}")
+        print(f"    aceita ate: {registro['ate']};"
+              f" conferido contra a medicao de hoje: {agora}")
         if registro.get("commit"):
             print(f"    commit: {registro['commit']}")
         motivo = (registro.get("motivo") or "").strip()
         print(f"    motivo: {motivo}" if motivo
               else "    motivo: EM BRANCO — quem gravou o registro precisa preencher")
 
-    if not recusadas:
+    # Bloco proprio, e nao uma linha no meio do "afrouxou": este caso nao e "o
+    # numero subiu", e "o numero nao corresponde a nada". Quem le o log de CI tem
+    # que entender numa linha que o baseline foi editado a mao.
+    for piora, registro, agora, indisponivel in descasadas:
+        chave = piora["chave"]
+        if indisponivel is not None:
+            print(f"[X] {chave}: NAO DA PARA AUDITAR a piora aceita desta medida")
+            print(f"    {indisponivel}")
+            print(f"    A medida tem piora aceita registrada em {CHAVE_PIORAS_ACEITAS}"
+                  f" (de={registro['de']}, ate={registro['ate']}), e por isso o baseline")
+            print("    dela e conferido contra a medicao -- sem a medicao, nao ha o que conferir.")
+            continue
+        print(f"[X] {chave}: o baseline desta branch diz {piora['para']},"
+              f" e a medicao de hoje da {agora}")
+        print(f"    A medida tem piora aceita registrada em {CHAVE_PIORAS_ACEITAS}"
+              f" (de={registro['de']}, ate={registro['ate']}), e por isso o baseline")
+        print(f"    dela e conferido contra a medicao: diferenca de"
+              f" {piora['para'] - agora:+d}. Numero editado a mao.")
+        print("    Rode `python tools/catraca.py --atualizar` e commite o resultado.")
+
+    if not recusadas and not descasadas:
         print(f"[v] tools/catraca.json nao afrouxou em relacao a {referencia}")
         return 0
+    if not recusadas:
+        return 1
     print("[X] o BASELINE afrouxou em relacao a branch base:")
     for piora, motivo_da_recusa in recusadas:
         print(f"  - {piora['descricao']}")
@@ -762,7 +865,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.comparar_baseline_com is not None:
-        return _auditar_baseline(args.comparar_baseline_com)
+        return _auditar_baseline(args.comparar_baseline_com, args.eslint_json)
 
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     medido = medir(args.eslint_json)
