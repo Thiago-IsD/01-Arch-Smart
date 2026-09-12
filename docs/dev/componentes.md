@@ -335,13 +335,35 @@ seu problema — e o sintoma é silencioso.
 Baseline em `tools/catraca.json`; medida por `python tools/catraca.py`. Cada
 número só pode descer. Ver o [ADR 0006](decisoes/0006-portoes-de-ci-com-catraca.md).
 
-| Medida | Hoje | Quem zera |
-|---|---|---|
-| `cores_literais` | 518 | Seção 8, tela a tela |
-| `contraste_reprovado` | 4 pares | decisão de identidade visual (fora de escopo) |
-| `tabindex_negativo` | 5 | Seção 8 |
-| `hover_sem_focus` | 8 | Seção 8 |
-| `arquivos_acima_de_400` | 8 arquivos | Seção 8 (e dois estão fora de escopo) |
+| Medida | Quando a Seção 8 começou | Hoje | Quem zera |
+|---|---|---|---|
+| `cores_literais` | 518 | **583** | as oito telas que faltam |
+| `contraste_reprovado` | 4 pares | **4 pares** | decisão de identidade visual (fora de escopo) |
+| `tabindex_negativo` | 5 | **3** | as oito telas que faltam |
+| `hover_sem_focus` | 8 | **8** | as oito telas que faltam |
+| `arquivos_acima_de_400` | 8 arquivos | **5 arquivos** | as oito telas que faltam |
+
+> **Corrigido em 12/09/2026.** Esta tabela dizia só "Hoje" e trazia os cinco
+> números de quando a Seção 6 a escreveu — afirmação viva com valor velho, que é
+> a forma exata de defeito que a seção seguinte inteira passou caçando. Duas
+> colunas agora, e o comando que produz a da direita:
+>
+> ```
+> python tools/catraca.py        # da raiz; compara com tools/catraca.json
+> ```
+>
+> **Dois números SUBIRAM antes de descer, e isso é de propósito.** A Tarefa 2 da
+> Seção 8 tapou quatro furos da régua **antes** de qualquer tela ser medida:
+> `cores_literais` foi de 518 para **588** e `hover_sem_focus` de 8 para **9**,
+> sem nenhum defeito novo ter entrado — era a régua passando a enxergar
+> `bg-white`/`text-white`/`-black` (68 ocorrências), hex fora de
+> `bg|text|border`, `ring-offset-<paleta>-<n>` e `invisible`/`hidden` com
+> `group-hover`. Depois a Biblioteca desceu os dois. Sem essa ordem, a queda de
+> cada tela seria parcialmente fictícia. Os valores intermediários conferem com
+> `git show 0350895:tools/catraca.json`.
+>
+> E "Seção 8" virou "as oito telas que faltam" porque a Seção 8 migrou **uma**:
+> a Biblioteca, que é o piloto de onde as outras copiam.
 
 **O ponto cego importa mais que o número.** Uma catraca mede o que a régua
 dela vê, e a régua é um regex:
