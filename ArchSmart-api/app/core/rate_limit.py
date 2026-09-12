@@ -6,7 +6,6 @@ quando houver mais de uma instancia, trocar o storage por Redis — o ponto
 de troca e apenas este arquivo.
 """
 import base64
-import binascii
 import json
 
 from fastapi import Request
@@ -47,17 +46,26 @@ def chave_por_conta(request: Request) -> str:
     assinatura. Isso so serve pra agrupar requisicoes do mesmo portador num
     mesmo balde; nao e autorizacao, e nunca deve virar uma — quem autoriza
     de fato continua sendo `get_repo`, que resolve a identidade contra o
-    Supabase depois que o limitador ja deixou passar. Por isso essa chave
-    nao fecha a porta pra um ataque de inundacao anonimo: um cliente sem
-    credencial real pode forjar um `sub` diferente a cada requisicao e abrir
-    um balde novo por tentativa, sem nunca aparecer aqui com o mesmo valor
-    duas vezes. Esse caminho nao fica livre, so passa por outro lugar: sem
-    token valido o resolvedor de identidade responde 401 antes de qualquer
-    escrita, e o balde por IP (get_remote_address, usado quando nao ha `sub`
-    decodificavel) continua de pe atras como segunda guarda contra esse
-    cenario. O que esta chave resolve e o caso comum — usuario legitimo
-    sendo silenciado pelo trafego de outro usuario legitimo —, nao o caso
-    adversarial.
+    Supabase.
+
+    Um chamador anonimo forjando um `sub` novo a cada tentativa nao chega a
+    abrir balde nenhum aqui, mas nao por nada que esta funcao faca: quem
+    declara `repo: ScopedRepository = Depends(get_repo)` e o endpoint
+    `receber_eventos`, que e o que o `@limiter.limit` decora direto. O
+    FastAPI resolve toda dependencia `Depends(...)` do endpoint antes de
+    chamar a funcao decorada, e a checagem de limite do slowapi roda
+    dentro dela (`sync_wrapper`, `slowapi/extension.py`) — ou seja,
+    `get_repo` ja rejeitou o token forjado com 401, contra o Supabase de
+    verdade, antes de esta funcao ser chamada. Nao e o balde por IP que
+    pega esse caso: o caso nem chega aqui. Essa ordem, porem, e detalhe de
+    implementacao do FastAPI/slowapi, nao um contrato que este arquivo
+    controla — se ela mudar um dia, uma `chave_por_conta` que estourasse
+    com corpo malformado passaria a ser alcancavel por um chamador sem
+    credencial nenhuma. Por isso ela continua endurecida contra JWT
+    ilegivel mesmo sem ninguem hoje conseguir provar esse caminho por fora.
+    O que esta chave resolve, no caminho que de fato a alcanca, e o caso
+    comum: usuario legitimo sendo silenciado pelo trafego de outro usuario
+    legitimo.
     """
     autorizacao = request.headers.get("authorization", "")
     if autorizacao.lower().startswith("bearer "):
@@ -73,12 +81,15 @@ def chave_por_conta(request: Request) -> str:
                 # null). So um dict tem ".get" — qualquer outra forma cai no
                 # IP, igual a um corpo ilegivel.
                 sub = payload.get("sub") if isinstance(payload, dict) else None
-            except (ValueError, binascii.Error, UnicodeDecodeError, RecursionError):
-                # RecursionError entra na lista porque json.loads recursa por
-                # nivel de aninhamento: um corpo tipo "[[[...]]]" com milhares
-                # de colchetes estoura o limite de recursao do Python antes
-                # de json.JSONDecodeError (que ja e ValueError) ter chance de
-                # ser levantado.
+            except (ValueError, RecursionError):
+                # ValueError ja cobre json.JSONDecodeError e, neste Python,
+                # binascii.Error e UnicodeDecodeError tambem sao subclasses
+                # dela — nao precisam de entrada propria na tupla.
+                # RecursionError e a excecao aqui: json.loads recursa por
+                # nivel de aninhamento, e um corpo tipo "[[[...]]]" com
+                # milhares de colchetes estoura o limite de recursao do
+                # Python antes de JSONDecodeError ter chance de ser
+                # levantado.
                 sub = None
             if sub:
                 return f"conta:{sub}"
