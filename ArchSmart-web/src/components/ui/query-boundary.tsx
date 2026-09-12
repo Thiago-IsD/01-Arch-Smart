@@ -91,10 +91,16 @@ export function QueryBoundary<T>({
 }: Props<T>): ReactElement {
     const prontidao = useProntidao()
 
-    // Identidade desta regiao para o canal: um objeto estavel por instancia.
-    // O canal conta regioes DISTINTAS, e e isto que impede o StrictMode — que
-    // roda o efeito duas vezes — de contar esta regiao duas vezes.
-    const origem = useRef({}).current
+    // Identidade desta regiao para o canal: o PROPRIO objeto da ref, estavel por
+    // instancia de componente. O canal conta regioes DISTINTAS, e e isto que
+    // impede o StrictMode — que roda o efeito duas vezes — de contar esta regiao
+    // duas vezes.
+    //
+    // E a ref, nao `.current`: ler `.current` no render e acesso a ref durante o
+    // render (`react-hooks/refs`, e a regra esta certa). Aqui nem e preciso — o
+    // canal so quer uma CHAVE estavel, e o objeto da ref ja e uma. Ninguem le o
+    // conteudo dele, nunca.
+    const origem = useRef(null)
 
     // Query desabilitada (`enabled: false`) fica `isPending` com `fetchStatus`
     // em `idle` indefinidamente. Ver o aviso no docstring: aqui isso serve para

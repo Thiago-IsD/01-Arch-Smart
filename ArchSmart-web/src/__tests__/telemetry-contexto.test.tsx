@@ -1,3 +1,5 @@
+import { useEffect } from "react"
+
 import { render } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -17,11 +19,21 @@ import {
  * vez de chamadas.
  */
 
-/** Captura o canal no render, antes de qualquer efeito de regiao. */
+/**
+ * Monta o provider e devolve o canal que ele entrega.
+ *
+ * A captura acontece num EFEITO, nao no render: reatribuir variavel de fora do
+ * componente durante o render e efeito colateral no meio de uma fase que o React
+ * pode repetir ou descartar (`react-hooks/globals`). `render` do Testing Library
+ * roda dentro de `act`, entao o efeito ja rodou quando esta funcao retorna.
+ */
 function montarCanal(): ProntidaoDaTela {
-    let canal: ProntidaoDaTela | null = null
+    const captura: { canal: ProntidaoDaTela | null } = { canal: null }
     function Captura() {
-        canal = useProntidao()
+        const canal = useProntidao()
+        useEffect(() => {
+            captura.canal = canal
+        }, [canal])
         return null
     }
     render(
@@ -29,8 +41,8 @@ function montarCanal(): ProntidaoDaTela {
             <Captura />
         </ProntidaoDaTelaProvider>,
     )
-    if (!canal) throw new Error("o provider nao entregou canal")
-    return canal
+    if (!captura.canal) throw new Error("o provider nao entregou canal")
+    return captura.canal
 }
 
 const reportDeDados = (origem: object, principal = false): Report => ({
