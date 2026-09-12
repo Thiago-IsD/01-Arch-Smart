@@ -12,7 +12,8 @@ evento sai.
 
 | Símbolo | Onde | O que faz |
 |---|---|---|
-| `useTrack()` | `hooks.ts` | Devolve `track(nome, propriedades?)`, estável entre renders. Manda um evento por vez; o contrato do servidor já é lote, então o buffer entra aqui se um dia fizer falta, sem mexer no servidor. |
+| `useTrack()` | `hooks.ts` | Devolve `track(nome, propriedades?)`, estável entre renders. **Não manda nada: enfileira.** Quem junta o lote e decide o momento de enviar é `fila.ts`. |
+| `enfileirar(evento)` / `descarregar(opcoes?)` | `fila.ts` | A fila. Junta a janela de 1 s num lote só, descarrega sozinha ao chegar a 20 eventos (o servidor aceita 50), e descarrega com `keepalive` no `pagehide` e na aba escondida. |
 | `<TelemetriaDeTela />` | `TelemetriaDeTela.tsx` | Emite `screen_viewed` uma vez por navegação. Não renderiza nada. |
 | `VazioDaTelaProvider` | `contexto.tsx` | O canal por onde o `QueryBoundary` conta que a tela está vazia. |
 | `useReportarVazio()` | `contexto.tsx` | O `QueryBoundary` chama. **No-op fora do provider** — a galeria `/dev/componentes` usa o boundary e não fica dentro de `(dashboard)`. |
@@ -129,10 +130,31 @@ no console de um cliente.
 > `app/core/rate_limit.py` documenta que por isso `get_remote_address`
 > resolve para o IP do proxy em toda requisição — as 60 requisições por
 > minuto somam **todos os usuários da plataforma**, não 60 por pessoa. Como
-> `useTrack()` manda uma requisição por evento e `screen_viewed` sai a cada
-> navegação, um punhado de usuários navegando ao mesmo tempo já encosta no
-> teto, e a perda pelo `429` é silenciosa — indistinguível de "ninguém
-> navegou".
+> `screen_viewed` sai a cada navegação, um punhado de usuários navegando ao
+> mesmo tempo já encostava no teto, e a perda pelo `429` é silenciosa —
+> indistinguível de "ninguém navegou".
+>
+> **A Seção 8 fechou o lado do cliente disso:** `fila.ts` junta a janela de
+> 1 s num lote só, então uma navegação que emitia três eventos gasta uma
+> requisição, não três. O balde continua sendo da plataforma enquanto o
+> uvicorn rodar sem `--forwarded-allow-ips`, e o `429` continua silencioso.
+
+**O lote que sai na saída da página vai com `keepalive`.** Um `fetch` comum
+disparado dentro de `pagehide` é tipicamente abortado no unload do documento, e
+é exatamente ali que sai a última navegação da sessão — a que diz onde o
+usuário parou. Duas armadilhas que isso tem, e que estão cobertas por teste:
+
+- **Ordem de ouvinte.** A fila registra o ouvinte de `pagehide` no carregamento
+  do módulo; a `TelemetriaDeTela` registra o dela num efeito de React, depois.
+  Logo a fila descarrega **antes** de a telemetria enfileirar a linha da saída.
+  Por isso existe a guarda de `saindo` em `enfileirar`: depois do `pagehide`
+  cada evento sai na hora, com `keepalive`, e um `pageshow` (volta do cache de
+  navegação) devolve o comportamento de lote.
+- **jsdom não destrói documento.** `dispatchEvent(new Event("pagehide"))` não
+  aborta `fetch` nenhum, então nenhum teste de comportamento consegue ver a
+  falha que o `keepalive` evita. O que `src/__tests__/telemetry-fila-keepalive.test.ts`
+  prova é que a opção percorre a cadeia inteira — fila → `enviarEventos` →
+  `api` → `core` — e aparece no objeto de init que o `fetch` recebeu.
 
 ## O que quebra se você mexer aqui
 
