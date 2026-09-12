@@ -58,7 +58,7 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                             value={r.name}
                             onChange={(e) => onUpdate(r.id, { name: e.target.value })}
                             className="h-8"
-                            aria-label="Nome do produto"
+                            aria-label={`Nome de ${r.name}`}
                         />
                         {blocked ? (
                             // Este aviso e CHIP PREENCHIDO, nao texto colorido, e isso e

@@ -115,12 +115,15 @@ export function ProductCard({
                         // para declarar em `images.remotePatterns` do next.config.ts. Sem
                         // isso o otimizador recusa o dominio e a imagem quebra em tempo de
                         // execucao, sem erro de build.
+                        //
+                        // Sem `sizes` de proposito: neste ramo o Next devolve
+                        // `sizes: undefined`, porque nao ha srcset para escolher. Um `sizes`
+                        // aqui sugeriria otimizacao responsiva que nao acontece.
                         <Image
                             src={image_url}
                             alt={name}
                             fill
                             unoptimized
-                            sizes="(max-width: 768px) 50vw, 20vw"
                             className="object-cover transition-transform group-hover:scale-105"
                         />
                     ) : (

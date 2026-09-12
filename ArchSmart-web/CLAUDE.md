@@ -85,6 +85,35 @@ Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível 
 > do axe no lugar da violação que o `tabIndex` causava. Tirar o `tabIndex={-1}`
 > e dar nome ao controle são o mesmo conserto, não dois.
 
+> ### ⚠️ `title` e `placeholder` não são rótulo — e o axe deixa passar
+>
+> Medido na Tarefa 9 da Seção 8: a regra `label` do axe **passa** por
+> `non-empty-title` e por `non-empty-placeholder`. Então um campo amarrado só em
+> `title=` ou só em `placeholder` sai **verde no axe com o Art. 6 descumprido** —
+> foi o caso dos três campos de dimensão do formulário de produto e da busca da
+> Biblioteca, o controle mais usado da tela. Rodar axe e ver verde não responde
+> esta pergunta; `getByLabelText` do testing-library responde, porque ele resolve
+> `<label htmlFor>`, `<label>` envolvente, `aria-label` e `aria-labelledby`, e
+> **não** `title`. O guarda está em `src/__tests__/library-rotulos.test.tsx`, cujo
+> primeiro teste prende essa diferença em vez de supô-la.
+>
+> Auditoria de rótulo solto, por diretório:
+>
+> ```
+> grep -rn "<label" ArchSmart-web/src/components/library/*.tsx   # todo hit precisa de htmlFor
+> ```
+>
+> **Legenda de grupo não é rótulo.** Um texto que descreve três campos ("Dimensões
+> (cm)") não pode ser `<label>`, porque `<label>` aponta para **um** controle;
+> é `<span>`, e cada campo ganha o rótulo próprio. Três violações da Biblioteca
+> eram exatamente isso.
+>
+> **E `FormControl` precisa envolver o `Input`, não a `<div>` que o posiciona.**
+> Ele é um Slot: põe `id`, `aria-invalid` e `aria-describedby` no primeiro filho.
+> Envolvendo uma div, o `id` vai para a div, o `FormLabel` aponta para um `id` que
+> não é de campo nenhum, e a mensagem de erro nunca é anunciada. Era o caso em
+> `NormalizationDimensionFields`, e o rótulo parecia certo no código.
+
 ## Cor (Art. 7)
 
 Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover` (cada um com seu `-foreground`), mais `--border`, `--input` e `--ring` (sem par `-foreground`).
@@ -100,33 +129,53 @@ Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, 
 > grep -n "success\|warning\|info" ArchSmart-web/tailwind.config.ts                          # 9 linhas
 > ```
 >
-> ### ⚠️ `--warning` não serve como cor de texto. Use chip preenchido.
+> ### ⚠️ Token de estado é chip preenchido, nunca cor de texto
 >
 > **Regra, decidida na Tarefa 9 da Seção 8 e medida com `tools/contraste.py`** —
-> a própria ferramenta que a catraca usa, no tema claro sobre `--background`:
+> a própria ferramenta que a catraca usa. Vale para `--warning` **e** para
+> `--success`: nenhum dos dois serve como cor de texto.
 >
-> | Uso | Contraste (claro) | Art. 6 |
-> |---|---|---|
-> | `text-warning` como cor de texto | **1,99:1** | reprova |
-> | `-amber-600` literal, que existia antes | 3,19:1 | reprova |
-> | **`bg-warning` + `text-warning-foreground`** | **4,91:1** | **passa** |
+> | Uso | Claro | Escuro | Art. 6 |
+> |---|---|---|---|
+> | `text-warning` como cor de texto | **1,99:1** | 10,83:1 | **reprova** |
+> | `text-success` sobre `bg-success/15` dentro de `bg-muted/50` | **3,97:1** | 6,72:1 | **reprova** |
+> | **`bg-warning` + `text-warning-foreground`** | **4,91:1** | 10,83:1 | **passa** |
+> | **`bg-success` + `text-success-foreground`** | **5,07:1** | 10,17:1 | **passa** |
 >
-> No tema escuro o par do chip dá 10,83:1. Então **aviso é chip preenchido**
-> (`bg-warning` com `text-warning-foreground`), nunca `text-warning` sobre o
-> fundo da tela. O exemplo vivo está em
-> `src/components/library/BatchNormalizeRow.tsx` — copie de lá.
+> Exemplos vivos: `src/components/library/BatchNormalizeRow.tsx` (aviso) e
+> `src/components/library/ClipperOnboarding.tsx` (sucesso) — copie de lá.
 >
-> **E não "conserte" escurecendo `--warning`:** `--warning-foreground` é escuro,
-> então um `--warning` escuro quebraria o par do chip nos dois temas, e mexeria em
-> toda superfície de aviso do produto.
+> **E não "conserte" escurecendo o token:** `--warning-foreground` e
+> `--success-foreground` são projetados como texto **sobre** a cor, então
+> escurecer a cor quebra o par do chip nos dois temas — além de mexer em toda
+> superfície de aviso ou de sucesso do produto.
 >
-> `--success` **não** tem esse problema como cor de texto: **5,07:1** no claro
-> (contra 5,02:1 do `-green-700` que substituiu), e passa.
+> **Cuidado com o hover herdado.** A variante `default` do `Badge` traz
+> `hover:bg-primary/80`; um chip que não sobrescreva isso muda de cor no hover. E
+> um `hover:bg-success/90` sobre `bg-muted/50` cai para **4,25:1** e reprova só
+> no hover. Fixe o mesmo tom (`hover:bg-success`) quando o chip for indicador de
+> status, que não é clicável.
 >
-> **A catraca não protege isso.** `contraste_reprovado` mede só pares
-> (cor, cor-foreground) de `globals.css` — nunca um token de **texto** sobre
-> `--background`. Quem escrever `text-warning` numa tela nova não vai ser
-> reprovado por ferramenta nenhuma; é esta regra escrita que segura.
+> ### A lição que gerou as duas correções: meça o par que RENDERIZA
+>
+> As duas vezes que isto escapou — e escapou duas vezes, em rodadas seguidas — o
+> erro foi o mesmo: medir o token sobre `--background` em vez de sobre o fundo
+> que realmente aparece atrás dele. `text-success` dá 5,07:1 sobre
+> `--background`, e esse número é **irrelevante**: o badge renderiza sobre
+> `bg-success/15` dentro de um `bg-muted/50`, e ali dá 3,97:1. Então:
+>
+> - **componha o alfa.** `bg-<token>/15` sobre `bg-muted/50` sobre `--background`
+>   é uma pilha de três camadas, e o contraste se mede contra o resultado dela,
+>   não contra a primeira;
+> - **meça os estados**, hover incluído, não só o repouso;
+> - **meça nos dois temas.** A troca que corrigiu o verde não foi neutra: melhorou
+>   o escuro de 2,72:1 para 6,72:1 e piorou o claro de 4,24:1 para 3,97:1. Um
+>   número só esconde isso.
+>
+> **A catraca não protege nada disto.** `contraste_reprovado` mede só pares
+> (cor, cor-foreground) de `globals.css` — nunca token de texto sobre um fundo
+> composto. Quem escrever `text-success` numa tela nova não vai ser reprovado por
+> ferramenta nenhuma; é esta regra escrita que segura.
 
 Se a tela precisa de um estado que nenhum token cobre, reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um literal de paleta — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
 

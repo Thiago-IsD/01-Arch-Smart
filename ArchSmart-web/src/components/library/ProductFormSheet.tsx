@@ -337,7 +337,10 @@ export function ProductFormSheet({ isOpen, productToEdit }: ProductFormSheetProp
                         />
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Dimensões (cm)</label>
+                            {/* Legenda do grupo, e por isso um span: ela nao rotula UM controle — os
+                                tres campos tem FormLabel proprio em ProductDimensionFields.
+                                Um rotulo sem htmlFor aqui violava o Art. 6 (Tarefa 9). */}
+                            <span className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Dimensões (cm)</span>
                             <ProductDimensionFields control={form.control} />
                         </div>
 
