@@ -280,7 +280,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                             <FormLabel>Preço (R$)</FormLabel>
                                             <TooltipProvider delayDuration={300}>
                                                 <Tooltip>
-                                                    <TooltipTrigger type="button" tabIndex={-1} className="cursor-help">
+                                                    <TooltipTrigger type="button" aria-label="Ajuda sobre o preço" className="cursor-help">
                                                         <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
                                                     </TooltipTrigger>
                                                     <TooltipContent side="top" className="max-w-[250px] text-center">
@@ -309,7 +309,7 @@ export function NormalizationSheet({ isOpen, productToNormalize }: Normalization
                                         <FormLabel>Rendimento (Caixa / Unidade)</FormLabel>
                                         <TooltipProvider delayDuration={300}>
                                             <Tooltip>
-                                                <TooltipTrigger type="button" tabIndex={-1} className="cursor-help">
+                                                <TooltipTrigger type="button" aria-label="Ajuda sobre o rendimento" className="cursor-help">
                                                     <Info className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
                                                 </TooltipTrigger>
                                                 <TooltipContent side="top" className="max-w-[250px] text-center">

@@ -1,6 +1,7 @@
 "use client"
 
 import { ExternalLink } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 
 interface NormalizationProductPreviewProps {
@@ -18,9 +19,15 @@ export function NormalizationProductPreview({ product }: NormalizationProductPre
     return (
         <div className="flex gap-4 mb-6 p-4 border rounded-lg bg-muted/50">
             {product.image_url ? (
-                <img
+                // `unoptimized`: a imagem vem da loja raspada pelo Web Clipper, de dominio
+                // arbitrario, que nao da para declarar em `images.remotePatterns`. Ver o
+                // comentario no ProductCard.
+                <Image
                     src={product.image_url}
                     alt={product.name}
+                    width={96}
+                    height={96}
+                    unoptimized
                     className="w-24 h-24 object-cover rounded-md"
                 />
             ) : (

@@ -25,6 +25,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -109,16 +110,24 @@ export function ProductCard({
             <Card className="overflow-hidden group hover:shadow-lg transition-shadow">
                 <div className="aspect-square relative bg-muted flex items-center justify-center overflow-hidden">
                     {image_url ? (
-                        <img
+                        // `unoptimized`: a imagem do produto vem da loja que o Web Clipper
+                        // raspou, entao a origem e qualquer dominio da internet e nao da
+                        // para declarar em `images.remotePatterns` do next.config.ts. Sem
+                        // isso o otimizador recusa o dominio e a imagem quebra em tempo de
+                        // execucao, sem erro de build.
+                        <Image
                             src={image_url}
                             alt={name}
-                            className="object-cover w-full h-full transition-transform group-hover:scale-105"
+                            fill
+                            unoptimized
+                            sizes="(max-width: 768px) 50vw, 20vw"
+                            className="object-cover transition-transform group-hover:scale-105"
                         />
                     ) : (
                         <ImageIcon className="h-10 w-10 text-muted-foreground" />
                     )}
 
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="secondary" size="icon" className="h-8 w-8">

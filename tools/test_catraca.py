@@ -335,7 +335,13 @@ class TestMainAtualizarIgnoraChaveDeDocumentacao(unittest.TestCase):
 
 class TestMedidasDeAcessibilidade(unittest.TestCase):
     def test_conta_tabindex_negativo(self):
-        self.assertEqual(catraca.medir(None)["tabindex_negativo"], 5)
+        # Caiu de 5 para 3 na Tarefa 9 da Secao 8: os dois TooltipTrigger da
+        # Biblioteca (NormalizationSheet) tinham `tabIndex={-1}` com
+        # `cursor-help` -- informacao que so existia para quem usa mouse. Eles
+        # voltaram para a ordem de tabulacao, e ganharam `aria-label` no mesmo
+        # conserto, porque controle focavel cujo unico filho e um icone nao tem
+        # nome acessivel. Medido, nao suposto -- ver task-9-report.md.
+        self.assertEqual(catraca.medir(None)["tabindex_negativo"], 3)
 
     def test_conta_hover_sem_focus(self):
         # Subiu de 8 para 9 na Tarefa 2 da Secao 8: a regua passou a ver
@@ -344,7 +350,11 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
         # sempre existiu e a regua nao via. Nao e defeito novo entrando; e a
         # regua vendo mais do que sempre esteve la. Medido, nao suposto -- ver
         # tools/catraca.py (RE_INVISIVEL) e task-2-report.md.
-        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 9)
+        #
+        # Voltou a 8 na Tarefa 9 da mesma secao: a acao do ProductCard escondida
+        # atras de hover ganhou `group-focus-within:opacity-100`. O que sobra sao
+        # 8 ocorrencias em telas que a Secao 8 ainda nao migrou.
+        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 8)
 
     def test_linha_com_focus_within_nao_conta(self):
         self.assertEqual(

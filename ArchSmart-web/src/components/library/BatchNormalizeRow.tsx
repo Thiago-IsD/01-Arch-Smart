@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertTriangle } from "lucide-react"
+import Image from "next/image"
 import { CATEGORIES, Row, rowHasDims } from "./batch-normalize-types"
 
 interface BatchNormalizeRowProps {
@@ -38,8 +39,17 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
             <TableCell>
                 <div className="flex items-center gap-2">
                     {r.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.image_url} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
+                        // `unoptimized`: a imagem vem da loja raspada pelo Web Clipper, de
+                        // dominio arbitrario, que nao da para declarar em
+                        // `images.remotePatterns`. Ver o comentario no ProductCard.
+                        <Image
+                            src={r.image_url}
+                            alt=""
+                            width={36}
+                            height={36}
+                            unoptimized
+                            className="w-9 h-9 rounded object-cover shrink-0"
+                        />
                     ) : (
                         <div className="w-9 h-9 rounded bg-muted shrink-0" />
                     )}
@@ -48,9 +58,17 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                             value={r.name}
                             onChange={(e) => onUpdate(r.id, { name: e.target.value })}
                             className="h-8"
+                            aria-label="Nome do produto"
                         />
                         {blocked ? (
-                            <p className="text-[11px] text-amber-600 mt-0.5 truncate">
+                            // `text-warning` e o token de aviso (Art. 7), no lugar da classe
+                            // literal de ambar que estava aqui. Ressalva medida na Tarefa 9:
+                            // no tema claro o token e MAIS claro que aquela classe, e o
+                            // contraste deste aviso de 11px cai de 3,19:1 para 1,99:1 — os
+                            // dois reprovam 4.5:1, e a catraca nao ve esse par. Escurecer
+                            // `--warning` no claro e decisao de design; nao volte pela
+                            // classe literal.
+                            <p className="text-[11px] text-warning mt-0.5 truncate">
                                 A loja bloqueou o acesso — confira os dados
                             </p>
                         ) : r.store && (
@@ -64,7 +82,9 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
             </TableCell>
             <TableCell>
                 <Select value={r.category || undefined} onValueChange={(v) => onUpdate(r.id, { category: v })}>
-                    <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectTrigger className="h-8" aria-label={`Categoria de ${r.name}`}>
+                        <SelectValue placeholder="—" />
+                    </SelectTrigger>
                     <SelectContent>
                         {CATEGORIES.map((c) => (
                             <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -77,6 +97,7 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                     type="number" step="0.01" className="h-8"
                     value={r.price}
                     onChange={(e) => onUpdate(r.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
+                    aria-label={`Preço de ${r.name}`}
                 />
             </TableCell>
             <TableCell>
@@ -84,6 +105,7 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                     type="number" step="0.1" className="h-8"
                     value={r.width}
                     onChange={(e) => onUpdate(r.id, { width: e.target.value === "" ? "" : Number(e.target.value) })}
+                    aria-label={`Largura de ${r.name}`}
                 />
             </TableCell>
             <TableCell>
@@ -91,6 +113,7 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                     type="number" step="0.1" className="h-8"
                     value={r.height}
                     onChange={(e) => onUpdate(r.id, { height: e.target.value === "" ? "" : Number(e.target.value) })}
+                    aria-label={`Altura de ${r.name}`}
                 />
             </TableCell>
             <TableCell>
@@ -98,6 +121,7 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                     type="number" step="0.1" className="h-8"
                     value={r.depth}
                     onChange={(e) => onUpdate(r.id, { depth: e.target.value === "" ? "" : Number(e.target.value) })}
+                    aria-label={`Profundidade de ${r.name}`}
                 />
             </TableCell>
             <TableCell>
@@ -105,6 +129,7 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                     type="number" step="0.01" className="h-8"
                     value={r.yield_factor}
                     onChange={(e) => onUpdate(r.id, { yield_factor: e.target.value === "" ? "" : Number(e.target.value) })}
+                    aria-label={`Rendimento de ${r.name}`}
                 />
             </TableCell>
         </TableRow>

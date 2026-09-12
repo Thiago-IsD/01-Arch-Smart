@@ -45,7 +45,7 @@ export function ClipperOnboarding() {
                     <span className="text-sm font-medium">Status da Conexão:</span>
                     {status === "loading" && <Badge variant="secondary">Verificando...</Badge>}
                     {status === "connected" && (
-                        <Badge className="bg-green-500/15 text-green-700 hover:bg-green-500/25 border-green-500/20 gap-1.5">
+                        <Badge className="bg-success/15 text-success hover:bg-success/25 border-success/20 gap-1.5">
                             <CheckCircle2 className="h-3 w-3" />
                             Conta Pronta para Conexão
                         </Badge>
