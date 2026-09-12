@@ -16,10 +16,17 @@ import { QueryBoundary } from "@/components/ui/query-boundary"
 
 const eventos: EventoDeProduto[] = []
 
-vi.mock("@/lib/api/telemetry", () => ({
-    enviarEventos: async (lote: EventoDeProduto[]) => {
-        eventos.push(...lote)
+// Intercepta a FILA, nao o envio. O que estes testes medem e quando o evento e
+// emitido e com que conteudo; o lote e a janela de 1s sao assunto de
+// `telemetry-fila.test.ts`. Mockar o envio punha a janela da fila dentro do
+// prazo padrao do `waitFor` — 1000 ms, o mesmo numero — e quem decidiria se o
+// teste passa seria o relogio.
+vi.mock("@/features/telemetry/fila", () => ({
+    enfileirar: (evento: EventoDeProduto) => {
+        eventos.push(evento)
     },
+    descarregar: () => {},
+    _zerarFila: () => {},
 }))
 
 let caminhoAtual = "/library"
