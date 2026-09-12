@@ -13,6 +13,10 @@ import type { EventoDeProduto } from "./types"
  *
  * Nao chama `fetch`: chama `enviarEventos`, que chama o cliente de
  * `lib/api/` (Art. 4).
+ *
+ * O lote tambem virou a unidade de PERDA: `enviarEventos` engole qualquer erro
+ * de proposito, e agora um erro engolido leva o lote inteiro em vez de um
+ * evento. Ver a docstring de `lib/api/telemetry.ts`.
  */
 const JANELA_MS = 1000
 const TAMANHO_MAXIMO = 20
