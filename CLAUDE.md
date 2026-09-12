@@ -11,7 +11,7 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 12/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8 em andamento: a fundação e a primeira tela estão prontas, 1/9** — branch `secao-8-fundacao-e-biblioteca`, 10 tarefas, 12/09/2026. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que **reprova até os Secrets existirem** — ver "Portões de CI". ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. Nada da Seção 8 foi mergeado ainda. Seção 9 pendente. Produção ainda não recebeu: `main` está na Seção 3.
+Estado em 12/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8 em andamento: a fundação e a primeira tela estão prontas, 1/9** — branch `secao-8-fundacao-e-biblioteca`, 10 tarefas, 12/09/2026. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que roda **sob demanda** (`workflow_dispatch`, em `.github/workflows/e2e.yml`) e não no gatilho de PR, porque nasceria e permaneceria vermelho — ver "Portões de CI" para a razão e a condição de promoção. ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. Nada da Seção 8 foi mergeado ainda. Seção 9 pendente. Produção ainda não recebeu: `main` está na Seção 3.
 
 > **A metade backend da Seção 7 foi verificada de fora, e essa é a primeira vez nesta série que isso dá certo.** Em 11/09/2026, contra `https://arqsmart-staging.onrender.com`: `POST /api/telemetry/events` sem token responde **422** — o mesmo status que o teste da Tarefa 4 fixou, e prova de que a rota existe —, e o `openapi.json` lista **58 rotas** (eram 57 antes desta seção), com `/api/telemetry/events` entre elas. `/health` → `200` e `/health/db` → `{"status":"ok","db":"up"}`. Pela [ADR 0007](docs/dev/decisoes/0007-migracao-no-start-do-container.md) o uvicorn só sobe se a receita de migrações passou, então o schema de staging está no head que a branch levou. **A metade frontend continua não verificada de fora**: o preview de staging responde `302` para o SSO da Vercel, como nas Seções 5 e 6.
 
@@ -268,13 +268,16 @@ que os fechou; os dois que sobram são pauta das oito telas que faltam:
   ocorrências em 3 arquivos (`grep -rn "archsmart:" ArchSmart-web/src`).
   Renomear é mudança de contrato entre emissor e ouvinte — mexer só nos
   emissores quebra o rodapé de totais **em silêncio**.
-- ~~**`e2e/` não roda em portão nenhum.**~~ **Fechada em 12/09/2026, na Seção 8:
-  existe o job `E2E — Playwright contra staging`**, que roda os specs de guarda
-  (incluindo `hidratacao-biblioteca.spec.ts`) em todo PR. Duas ressalvas que
-  continuam valendo: o `vitest.config.ts` segue excluindo `e2e/**`, que é
-  correto — são suítes diferentes —, e **o job reprova até os Secrets existirem**
-  (ver "Portões de CI"), então "existe o portão" ainda não é "o portão já mediu
-  alguma coisa".
+- **`e2e/` continua sem rodar em portão automático — e isto é meia-pendência,
+  não uma fechada.** A Seção 8 escreveu o job `E2E — Playwright contra staging`,
+  que roda os specs de guarda por nome (incluindo `hidratacao-biblioteca.spec.ts`),
+  **mas ele não roda em PR**: está em `.github/workflows/e2e.yml` sob
+  `workflow_dispatch`, porque nasceria vermelho e permaneceria vermelho (ver
+  "Portões de CI" para a razão e a condição de promoção). Então **o portão
+  existe escrito e ainda não mediu nada** — o que fecha de verdade é a
+  credencial voltar a funcionar e os cinco valores existirem. O
+  `vitest.config.ts` segue excluindo `e2e/**`, o que é correto: são suítes
+  diferentes.
 - ~~**O badge do inbox (`useInboxCount()`) nunca é prefetchado**~~ — pendência
   da Seção 5, confirmada ao vivo na Seção 6, **fechada em 11/09/2026 na Tarefa 7
   da Seção 8**: `LibraryData` prefetcha a lista e o badge em `Promise.all`, pelas
@@ -340,7 +343,7 @@ existe e está escrito** — o que falta é uma credencial viva, e isso é de Th
    escreveu `ArchSmart-web/e2e/telemetria-biblioteca.spec.ts`, que afirma
    `medido_ate: "dados"`, `medido_de: "clique"`, `principal_declarada: true` e um
    `load_ms` em faixa generosa — o piso existe para reprovar o `load_ms: 28`.
-   **Esse spec nunca foi executado**, e está no quarto job do CI: é lá, ou à mão
+   **Esse spec nunca foi executado**, e está no quarto job do CI — que hoje roda sob demanda (`gh workflow run e2e.yml`): é lá, ou à mão
    com credencial viva, que ele roda pela primeira vez. O texto original:
    A telemetria automática está montada e coberta por
    vitest, mas ninguém navegou pela Biblioteca com sessão real para confirmar
@@ -469,7 +472,8 @@ as oito telas seguintes, não só a Biblioteca.
    11/09/2026. Enquanto durar: nenhuma tela consegue fechar os três itens da
    definição de pronto que exigem navegador (axe, teclado, 390px/1440px), nem o
    orçamento de performance, nem a prova viva do `screen_viewed`; e o job de E2E
-   do CI reprova. **Não é uma pendência de documentação — é a parede.** Só
+   do CI reprovaria — foi por isso que ele saiu do gatilho de PR e passou a
+   rodar sob demanda (ver "Portões de CI"). **Não é uma pendência de documentação — é a parede.** Só
    Thiago resolve: redefinir a senha do usuário, ou recriar o usuário pelo
    roteiro de
    [`docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md`](docs/dev/medicoes/2026-09-09-usuario-de-teste-e2e.md).
@@ -568,27 +572,52 @@ as oito telas seguintes, não só a Biblioteca.
 
 ## Portões de CI
 
-Desde a Seção 3, `.github/workflows/ci.yml` roda em todo PR — **quatro** jobs
-desde a Seção 8, que acrescentou o último:
+Desde a Seção 3, `.github/workflows/ci.yml` roda **três** jobs em todo PR:
 
 ```
 Backend — testes contra Postgres real
 Frontend — tipos, testes e catraca
 Repositorio — progresso, links e sincronia
-E2E — Playwright contra staging
 ```
 
-> ⚠️ **O job de E2E reprova hoje, e não por defeito de código: faltam os
-> Secrets e Variables do repositório.** Ele precisa de `E2E_EMAIL`,
-> `E2E_PASSWORD` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` em **Secrets**, e de
-> `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_SUPABASE_URL` em **Variables** — as três
+E existe um **quarto, que não roda em PR**: `E2E — Playwright contra staging`,
+em `.github/workflows/e2e.yml`, com gatilho `workflow_dispatch`.
+
+```
+gh workflow run e2e.yml --ref <branch>
+```
+
+> ⚠️ **O job de E2E saiu do gatilho de PR em 12/09/2026, e isso é decisão
+> tomada — não é skip silencioso.** Ele existe, roda inteiro sob demanda, e não
+> tem `continue-on-error` escondendo nada.
+>
+> O motivo é que ele nasceria vermelho e **permaneceria** vermelho, por duas
+> razões medidas no mesmo dia: `gh secret list` e `gh variable list` voltam
+> **vazios** — nenhum dos cinco valores existe —, e mesmo com os cinco ele
+> continuaria reprovando, porque a **credencial do usuário de teste é rejeitada**
+> pelo Supabase de staging (`HTTP 400`, 11/09/2026; pendência 1 da Seção 8).
+>
+> Um quarto X permanente em todo PR não diria nada sobre o PR, e o custo não é
+> só ruído: branch protection **não está ligada**, então o único mecanismo de
+> qualidade em pé é uma pessoa lendo os checks sob a regra *"um X vermelho é
+> defeito real, não ruído"*. Um X que é sempre vermelho treina exatamente o
+> reflexo contrário, e leva junto a credibilidade dos três que dizem a verdade.
+> É o que a [ADR 0006](docs/dev/decisoes/0006-portoes-de-ci-com-catraca.md) diz
+> com todas as letras: um portão que nasce vermelho é desligado na primeira
+> semana, e aí não existe portão nenhum.
+>
+> Também não ficou em `ci.yml` com um `if:`: um job condicional aparece como
+> check **cinza** no PR, e o próprio workflow já registrava que check cinza é
+> lido como "não há nada aqui", não como "não mediu".
+>
+> **A condição de promoção está escrita no `e2e.yml` e é esta: ele volta ao
+> gatilho de `pull_request`/`push` no dia em que (a) a credencial do usuário de
+> teste logar em staging e (b) os cinco valores existirem** — `E2E_EMAIL`,
+> `E2E_PASSWORD` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` em **Secrets**,
+> `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_SUPABASE_URL` em **Variables**. As três
 > `NEXT_PUBLIC_*` porque `playwright.config.ts` sobe o próprio `npm run dev` e
 > `src/lib/env.ts` valida as três com Zod na primeira página carregada. Só
-> Thiago cria isso, e **não** há `continue-on-error` escondendo a reprovação: a
-> regra da casa é que falha é falha — e esta é uma falha real, com causa de uma
-> linha e dono: **reprova por falta de Secret, dono Thiago**. Não leia o X dele
-> como ruído nem como "é assim mesmo"; ele apaga no dia em que os cinco valores
-> existirem, e até lá os outros três jobs continuam dizendo a verdade sobre o PR.
+> Thiago cria isso.
 >
 > Ele roda os specs de **guarda** por nome (`auth`, `dashboard`,
 > `hidratacao-biblioteca`, `telemetria-biblioteca`), nunca `npx playwright test`
@@ -610,8 +639,9 @@ E2E — Playwright contra staging
 >
 > Em 26/08/2026 Thiago decidiu manter assim, sem GitHub Pro e sem tornar o
 > repositório público. **Então a esteira é um conselheiro, e quem mergeia é o
-> portão.** Antes de mergear, olhe os três checks; um X vermelho ali é um
-> defeito real, não ruído.
+> portão.** Antes de mergear, olhe os três checks do PR; um X vermelho ali é um
+> defeito real, não ruído. (São três mesmo: o quarto job, o de E2E, roda sob
+> demanda e não aparece no PR — ver o bloco acima.)
 >
 > ⚠️ **Em 30/08/2026 o repositório foi tornado público** (`gh repo view --json
 > visibility` → `PUBLIC`), para destravar a Vercel, que recusava deploy de

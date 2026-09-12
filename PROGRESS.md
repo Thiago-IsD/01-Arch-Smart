@@ -1057,7 +1057,9 @@ _Última atualização: 2026-09-12_
 > próprio (rótulos de Art. 6, e o chip de `success` medido sobre a pilha real de
 > fundos, não sobre `--background`).
 >
-> **O quarto job de CI existe: `E2E — Playwright contra staging`.** Roda os
+> **O quarto job de CI existe: `E2E — Playwright contra staging`** — em
+> `.github/workflows/e2e.yml`, com gatilho **`workflow_dispatch`**, fora do
+> `pull_request`/`push` (`gh workflow run e2e.yml --ref <branch>`). Roda os
 > specs de **guarda** por nome — `auth`, `dashboard`, `hidratacao-biblioteca` e
 > o novo `telemetria-biblioteca` —, nunca `npx playwright test` sem filtro: os
 > dois **instrumentos** da pasta (`medicao-biblioteca`,
@@ -1066,11 +1068,22 @@ _Última atualização: 2026-09-12_
 > `playwright.config.ts` levanta os timeouts quando `CI` está ligado, porque os
 > 30 s padrão do Playwright ficam **abaixo** do cold start do Render (41,9 s).
 >
-> ⚠️ **Esse job reprova até Thiago criar os Secrets e Variables do
-> repositório** — `E2E_EMAIL`, `E2E_PASSWORD` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-> em Secrets; `NEXT_PUBLIC_API_URL` e `NEXT_PUBLIC_SUPABASE_URL` em Variables
-> (sem as três `NEXT_PUBLIC_*`, `src/lib/env.ts` derruba a primeira página com
-> erro do Zod). **Não** recebeu `continue-on-error`: falha é falha.
+> ⚠️ **Ele roda sob demanda, e não em PR — decidido na revisão final da
+> seção, em 12/09/2026.** No gatilho de PR ele nasceria vermelho e
+> permaneceria vermelho: `gh secret list` e `gh variable list` voltam
+> **vazios**, e mesmo com os cinco valores a credencial do usuário de teste é
+> rejeitada por staging (`HTTP 400`). Um quarto X permanente treinaria o
+> reflexo de ignorar X vermelho, que é o único mecanismo em pé no lugar da
+> branch protection — e a ADR 0006 diz que portão que nasce vermelho é
+> desligado na primeira semana. **Não** recebeu `continue-on-error`: falha é
+> falha, e job que reporta verde sem medir é pior que job que não roda.
+>
+> **Volta ao gatilho de PR** quando a credencial logar em staging **e** os
+> cinco valores existirem — `E2E_EMAIL`, `E2E_PASSWORD` e
+> `NEXT_PUBLIC_SUPABASE_ANON_KEY` em Secrets; `NEXT_PUBLIC_API_URL` e
+> `NEXT_PUBLIC_SUPABASE_URL` em Variables (sem as três `NEXT_PUBLIC_*`,
+> `src/lib/env.ts` derruba a primeira página com erro do Zod). A condição
+> está escrita no próprio `e2e.yml`.
 >
 > ### Três itens da definição de pronto NÃO foram verificados
 >
