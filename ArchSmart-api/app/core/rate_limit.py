@@ -67,8 +67,18 @@ def chave_por_conta(request: Request) -> str:
             try:
                 corpo = partes[1]
                 corpo += "=" * (-len(corpo) % 4)
-                sub = json.loads(base64.urlsafe_b64decode(corpo)).get("sub")
-            except (ValueError, binascii.Error, UnicodeDecodeError):
+                payload = json.loads(base64.urlsafe_b64decode(corpo))
+                # payload e JSON decodificado de entrada nao confiavel: pode
+                # ser um JSON valido que nao e objeto (numero, lista, string,
+                # null). So um dict tem ".get" — qualquer outra forma cai no
+                # IP, igual a um corpo ilegivel.
+                sub = payload.get("sub") if isinstance(payload, dict) else None
+            except (ValueError, binascii.Error, UnicodeDecodeError, RecursionError):
+                # RecursionError entra na lista porque json.loads recursa por
+                # nivel de aninhamento: um corpo tipo "[[[...]]]" com milhares
+                # de colchetes estoura o limite de recursao do Python antes
+                # de json.JSONDecodeError (que ja e ValueError) ter chance de
+                # ser levantado.
                 sub = None
             if sub:
                 return f"conta:{sub}"
