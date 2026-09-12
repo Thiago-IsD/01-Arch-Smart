@@ -61,14 +61,20 @@ export function BatchNormalizeRow({ row: r, blocked, onUpdate }: BatchNormalizeR
                             aria-label="Nome do produto"
                         />
                         {blocked ? (
-                            // `text-warning` e o token de aviso (Art. 7), no lugar da classe
-                            // literal de ambar que estava aqui. Ressalva medida na Tarefa 9:
-                            // no tema claro o token e MAIS claro que aquela classe, e o
-                            // contraste deste aviso de 11px cai de 3,19:1 para 1,99:1 — os
-                            // dois reprovam 4.5:1, e a catraca nao ve esse par. Escurecer
-                            // `--warning` no claro e decisao de design; nao volte pela
-                            // classe literal.
-                            <p className="text-[11px] text-warning mt-0.5 truncate">
+                            // Este aviso e CHIP PREENCHIDO, nao texto colorido, e isso e
+                            // deliberado: `--warning` e claro demais para virar cor de texto.
+                            // Medido com tools/contraste.py, no tema claro sobre
+                            // `--background`: `text-warning` da 1,99:1 e reprova o 4.5:1 do
+                            // Art. 6 (a classe literal de ambar que existia aqui antes dava
+                            // 3,19:1 e tambem reprovava). Como fundo, o mesmo token passa:
+                            // `bg-warning` com `text-warning-foreground` da **4,91:1** no
+                            // claro e 10,83:1 no escuro.
+                            //
+                            // Nao "simplifique" de volta para texto colorido, e nao escureca
+                            // `--warning` para consertar o texto: `--warning-foreground` e
+                            // escuro, entao um `--warning` escuro quebraria o par do chip nos
+                            // dois temas -- e mexeria em toda superficie de aviso do produto.
+                            <p className="text-[11px] bg-warning text-warning-foreground mt-0.5 truncate rounded px-1.5 py-0.5 w-fit max-w-full">
                                 A loja bloqueou o acesso — confira os dados
                             </p>
                         ) : r.store && (

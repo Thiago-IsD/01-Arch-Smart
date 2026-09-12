@@ -100,14 +100,33 @@ Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, 
 > grep -n "success\|warning\|info" ArchSmart-web/tailwind.config.ts                          # 9 linhas
 > ```
 >
-> **Ressalva medida na mesma tarefa, antes de usar `--warning` para texto:** no
-> tema claro ele é `38 92% 55%`, que sobre `--background` dá **1,99:1** — pior
-> que o `-amber-600` literal que ele substituiu (**3,19:1**), e os dois reprovam
-> o 4.5:1 do Art. 6. `--success` não tem esse problema (**5,07:1** no claro,
-> contra 5,02:1 do `-green-700` que substituiu). E a catraca **não vê** esse
-> caso: `contraste_reprovado` mede só pares (cor, cor-foreground) de
-> `globals.css`, nunca token de texto sobre `--background`. Escurecer `--warning`
-> no claro é decisão de design, aberta — ver o relatório da Tarefa 9.
+> ### ⚠️ `--warning` não serve como cor de texto. Use chip preenchido.
+>
+> **Regra, decidida na Tarefa 9 da Seção 8 e medida com `tools/contraste.py`** —
+> a própria ferramenta que a catraca usa, no tema claro sobre `--background`:
+>
+> | Uso | Contraste (claro) | Art. 6 |
+> |---|---|---|
+> | `text-warning` como cor de texto | **1,99:1** | reprova |
+> | `-amber-600` literal, que existia antes | 3,19:1 | reprova |
+> | **`bg-warning` + `text-warning-foreground`** | **4,91:1** | **passa** |
+>
+> No tema escuro o par do chip dá 10,83:1. Então **aviso é chip preenchido**
+> (`bg-warning` com `text-warning-foreground`), nunca `text-warning` sobre o
+> fundo da tela. O exemplo vivo está em
+> `src/components/library/BatchNormalizeRow.tsx` — copie de lá.
+>
+> **E não "conserte" escurecendo `--warning`:** `--warning-foreground` é escuro,
+> então um `--warning` escuro quebraria o par do chip nos dois temas, e mexeria em
+> toda superfície de aviso do produto.
+>
+> `--success` **não** tem esse problema como cor de texto: **5,07:1** no claro
+> (contra 5,02:1 do `-green-700` que substituiu), e passa.
+>
+> **A catraca não protege isso.** `contraste_reprovado` mede só pares
+> (cor, cor-foreground) de `globals.css` — nunca um token de **texto** sobre
+> `--background`. Quem escrever `text-warning` numa tela nova não vai ser
+> reprovado por ferramenta nenhuma; é esta regra escrita que segura.
 
 Se a tela precisa de um estado que nenhum token cobre, reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um literal de paleta — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
 
