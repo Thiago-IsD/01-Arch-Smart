@@ -22,17 +22,19 @@ import { esperarListaDaBiblioteca } from "./biblioteca"
  * sem ele reprovaria para sempre pelo motivo já conhecido, o que a regra da
  * casa contra "é esperado que falhe" não permite deixar em pé.
  *
- * **A Tarefa 7 da Seção 8 fechou essa lacuna**: `LibraryData` agora prefetcha
- * a lista e o badge em `Promise.all`, então o `state=CAPTURED` também deve
- * deixar de sair do navegador. O filtro continua aqui porque ninguém rodou
- * este spec depois daquela mudança — apertar a asserção sem ter rodado é
- * escrever uma afirmação não medida. Quem rodar com credencial de teste
- * confere os pedidos `state=CAPTURED` e, se vierem zero, aperta o filtro.
- * O que este teste garante hoje segue estreito e é o que importa: se a
- * hidratação da LISTA quebrar (a chave não bater, o timeout do prefetch
- * estourar), esta asserção acende.
+ * **A Tarefa 7 da Seção 8 fechou essa lacuna, e em 12/09/2026 isso foi
+ * MEDIDO:** `LibraryData` prefetcha a lista e o badge em `Promise.all`, e o
+ * `state=CAPTURED` também parou de sair do navegador. Três execuções
+ * consecutivas com credencial real mediram `PEDIDOS_TOTAL=0` — nenhum pedido
+ * a `/api/products` de nenhum tipo no primeiro carregamento.
+ *
+ * Por isso a asserção foi **apertada** na mesma ocasião: ela não filtra mais
+ * por `state=NORMALIZED`, e exige zero pedido a `/api/products`. O filtro
+ * antigo existia só porque o badge vazava por motivo conhecido; com o vazamento
+ * fechado, filtrar seria deixar de olhar justamente o que a Tarefa 7 entregou.
+ * Se a hidratação da lista OU do badge regredir, esta asserção acende.
  */
-test("a lista da Biblioteca nao busca /api/products no navegador no primeiro carregamento", async ({ page }) => {
+test("a Biblioteca nao busca /api/products no navegador no primeiro carregamento (lista e badge)", async ({ page }) => {
     const email = process.env.E2E_EMAIL
     const password = process.env.E2E_PASSWORD
     if (!email || !password) {
@@ -57,13 +59,16 @@ test("a lista da Biblioteca nao busca /api/products no navegador no primeiro car
     await page.goto("/library")
     await esperarListaDaBiblioteca(page)
 
-    // `state=NORMALIZED` e a chave da lista principal; `state=CAPTURED` e o
-    // badge do inbox, prefetchado desde a Tarefa 7 da Secao 8 mas ainda nao
-    // medido ao vivo — ver o comentario do teste, acima.
-    const pedidosDaLista = pedidos.filter((url) => url.includes("state=NORMALIZED"))
+    // Discrimina na MENSAGEM, nao na asserção: saber se quem vazou foi a lista
+    // (`state=NORMALIZED`) ou o badge do inbox (`state=CAPTURED`) e a primeira
+    // pergunta de quem for investigar uma regressão aqui.
+    const daLista = pedidos.filter((url) => url.includes("state=NORMALIZED"))
+    const doBadge = pedidos.filter((url) => url.includes("state=CAPTURED"))
 
     expect(
-        pedidosDaLista,
-        `a lista da Biblioteca pediu /api/products no navegador: ${pedidosDaLista.join(", ")}`,
+        pedidos,
+        "o primeiro carregamento de /library pediu /api/products no navegador " +
+        `(lista: ${daLista.length}, badge do inbox: ${doBadge.length}) — ` +
+        `o prefetch do servidor nao esta sendo aproveitado: ${pedidos.join(", ")}`,
     ).toHaveLength(0)
 })
