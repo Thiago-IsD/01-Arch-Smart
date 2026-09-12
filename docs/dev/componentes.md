@@ -358,10 +358,10 @@ dela vê, e a régua é um regex:
     > dois números e nenhuma reconciliação é como um número errado entra.** A
     > diferença é a **lista de prefixos**: o grep desta linha cobre cinco
     > (`bg|text|border|ring|ring-offset`), e o `RE_BRANCO_PRETO` de
-    > `tools/catraca.py` cobre os **16** de `_PREFIXOS` — os mesmos do
+    > `tools/catraca.py` cobre os **17** de `_PREFIXOS` — os mesmos do
     > `RE_PALETA`. A 68ª é **`from-black`**, em
     > `ArchSmart-web/src/app/portal/[uuid]/components/EnvironmentGallery.tsx:62`.
-    > A régua da catraca é a dos 16; quem for conferir o baseline use **ela**:
+    > A régua da catraca é a dos 17; quem for conferir o baseline use **ela**:
     >
     > ```
     > cd ArchSmart-web
