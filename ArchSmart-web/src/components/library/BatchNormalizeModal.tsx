@@ -9,25 +9,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { Loader2, Sparkles, AlertTriangle } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
     NORMALIZE_CONCURRENCY,
@@ -37,38 +20,8 @@ import {
 } from "@/lib/normalize-product"
 import { listarInboxCompleto } from "@/features/library/api"
 import { useBatchApprove } from "@/features/library/hooks"
-
-const CATEGORIES = [
-    "Mobiliário",
-    "Iluminação",
-    "Decoração",
-    "Revestimentos",
-    "Marcenaria",
-    "Paisagismo",
-    "Outros",
-]
-
-// Campos numéricos aceitam string vazia para permitir apagar o valor no input.
-type NumField = number | ""
-
-interface Row {
-    id: string
-    name: string
-    store?: string
-    image_url?: string | null
-    source_url: string
-    category: string
-    price: NumField
-    width: NumField
-    height: NumField
-    depth: NumField
-    yield_factor: NumField
-    selected: boolean
-}
-
-const toNum = (v: NumField): number => (v === "" ? 0 : Number(v))
-const rowHasDims = (r: Row): boolean =>
-    toNum(r.width) > 0 && toNum(r.height) > 0 && toNum(r.depth) > 0
+import { Row, rowHasDims, toNum } from "./batch-normalize-types"
+import { BatchNormalizeTable } from "./BatchNormalizeTable"
 
 interface BatchNormalizeModalProps {
     isOpen: boolean
@@ -292,125 +245,14 @@ export function BatchNormalizeModal({ isOpen, onOpenChange }: BatchNormalizeModa
                 </div>
 
                 <div className="flex-1 overflow-auto border rounded-lg min-h-[200px]">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-20 text-muted-foreground">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : rows.length === 0 ? (
-                        <div className="flex items-center justify-center py-20 text-muted-foreground">
-                            Nenhum produto no inbox.
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                                <TableRow>
-                                    <TableHead className="w-[40px]">
-                                        <Checkbox
-                                            checked={allChecked}
-                                            onCheckedChange={(v) => setRows((prev) => prev.map((r) => ({ ...r, selected: !!v })))}
-                                            aria-label="Selecionar todos"
-                                        />
-                                    </TableHead>
-                                    <TableHead className="min-w-[220px]">Produto</TableHead>
-                                    <TableHead className="w-[150px]">Categoria</TableHead>
-                                    <TableHead className="w-[110px]">Preço (R$)</TableHead>
-                                    <TableHead className="w-[80px]">L (cm)</TableHead>
-                                    <TableHead className="w-[80px]">A (cm)</TableHead>
-                                    <TableHead className="w-[80px]">P (cm)</TableHead>
-                                    <TableHead className="w-[90px]">Rend.</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rows.map((r) => {
-                                    const missing = r.selected && !rowHasDims(r)
-                                    const blocked = blockedIds.has(r.id)
-                                    return (
-                                        <TableRow key={r.id} className={missing ? "bg-destructive/5" : undefined}>
-                                            <TableCell>
-                                                <Checkbox
-                                                    checked={r.selected}
-                                                    onCheckedChange={(v) => update(r.id, { selected: !!v })}
-                                                    aria-label={`Selecionar ${r.name}`}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {r.image_url ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={r.image_url} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
-                                                    ) : (
-                                                        <div className="w-9 h-9 rounded bg-muted shrink-0" />
-                                                    )}
-                                                    <div className="min-w-0 flex-1">
-                                                        <Input
-                                                            value={r.name}
-                                                            onChange={(e) => update(r.id, { name: e.target.value })}
-                                                            className="h-8"
-                                                        />
-                                                        {blocked ? (
-                                                            <p className="text-[11px] text-amber-600 mt-0.5 truncate">
-                                                                A loja bloqueou o acesso — confira os dados
-                                                            </p>
-                                                        ) : r.store && (
-                                                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{r.store}</p>
-                                                        )}
-                                                    </div>
-                                                    {missing && (
-                                                        <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-label="Faltam dimensões" />
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select value={r.category || undefined} onValueChange={(v) => update(r.id, { category: v })}>
-                                                    <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        {CATEGORIES.map((c) => (
-                                                            <SelectItem key={c} value={c}>{c}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number" step="0.01" className="h-8"
-                                                    value={r.price}
-                                                    onChange={(e) => update(r.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number" step="0.1" className="h-8"
-                                                    value={r.width}
-                                                    onChange={(e) => update(r.id, { width: e.target.value === "" ? "" : Number(e.target.value) })}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number" step="0.1" className="h-8"
-                                                    value={r.height}
-                                                    onChange={(e) => update(r.id, { height: e.target.value === "" ? "" : Number(e.target.value) })}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number" step="0.1" className="h-8"
-                                                    value={r.depth}
-                                                    onChange={(e) => update(r.id, { depth: e.target.value === "" ? "" : Number(e.target.value) })}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number" step="0.01" className="h-8"
-                                                    value={r.yield_factor}
-                                                    onChange={(e) => update(r.id, { yield_factor: e.target.value === "" ? "" : Number(e.target.value) })}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })}
-                            </TableBody>
-                        </Table>
-                    )}
+                    <BatchNormalizeTable
+                        rows={rows}
+                        loading={loading}
+                        blockedIds={blockedIds}
+                        allChecked={allChecked}
+                        onUpdate={update}
+                        onToggleAll={(checked) => setRows((prev) => prev.map((r) => ({ ...r, selected: checked })))}
+                    />
                 </div>
 
                 <DialogFooter className="flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
