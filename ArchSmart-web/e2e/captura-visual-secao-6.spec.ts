@@ -3,45 +3,45 @@ import fs from "fs"
 import path from "path"
 
 /**
- * Captura visual das tres mudancas da Secao 6: `min-h-11` no
- * `DropdownMenuItem`, a cor do botao de fechar do toast destrutivo, e
+ * Captura visual das três mudanças da Seção 6: `min-h-11` no
+ * `DropdownMenuItem`, a cor do botão de fechar do toast destrutivo, e
  * `aria-hidden` no `Skeleton`.
  *
- * Instrumento, nao guarda permanente — como `medicao-biblioteca.spec.ts`.
+ * Instrumento, não guarda permanente — como `medicao-biblioteca.spec.ts`.
  * Precisa de `CAPTURAS_DIR` no ambiente (nunca escreve dentro do
- * repositorio) e de `E2E_EMAIL`/`E2E_PASSWORD`, lidos de `process.env` — a
+ * repositório) e de `E2E_EMAIL`/`E2E_PASSWORD`, lidos de `process.env` — a
  * senha nunca passa por nada que o agente escreva.
  *
- * Tres correcoes em relacao ao brief original (Tarefa 1 da Secao 8), medidas
- * por grep/leitura antes de escrever este spec, nao deduzidas:
+ * Três correções em relação ao brief original (Tarefa 1 da Seção 8), medidas
+ * por grep/leitura antes de escrever este spec, não deduzidas:
  *
- * 1. `/dev/componentes` NAO esta fora de `ROTAS_PUBLICAS` (confirmado em
- *    `src/proxy.ts`) — exige sessao como qualquer outra rota, exatamente a
- *    pendencia 1 da Secao 7 registrada em `../CLAUDE.md`. Por isso o login
- *    acontece ANTES da galeria aqui, nao depois.
- * 2. O alvo "alternador de tema" nao esta em `/dashboard`. O `Header` do
- *    dashboard tem um botao Sol/Lua simples (sem `DropdownMenu`). O
+ * 1. `/dev/componentes` NÃO está fora de `ROTAS_PUBLICAS` (confirmado em
+ *    `src/proxy.ts`) — exige sessão como qualquer outra rota, exatamente a
+ *    pendência 1 da Seção 7 registrada em `../CLAUDE.md`. Por isso o login
+ *    acontece ANTES da galeria aqui, não depois.
+ * 2. O alvo "alternador de tema" não está em `/dashboard`. O `Header` do
+ *    dashboard tem um botão Sol/Lua simples (sem `DropdownMenu`). O
  *    `ModeToggle` de `src/components/theme-toggle.tsx` — o que de fato usa
- *    `DropdownMenuItem` — so e renderizado pelo `Navbar` publico (`/`, e as
- *    paginas de auth/landing). Capturado em `/`, que continua acessivel
- *    depois do login (so `/auth/login` redireciona o usuario autenticado).
- *    Na largura mobile o `ModeToggle` vive dentro do menu hamburguer do
+ *    `DropdownMenuItem` — só é renderizado pelo `Navbar` público (`/`, e as
+ *    páginas de auth/landing). Capturado em `/`, que continua acessível
+ *    depois do login (só `/auth/login` redireciona o usuário autenticado).
+ *    Na largura mobile o `ModeToggle` vive dentro do menu hambúrguer do
  *    `Navbar` (`hidden ... group-data-[state=active]:block`) — o spec abre
- *    esse menu antes de procurar o botao.
- * 3. O alvo "toast destrutivo" nao tem gatilho em `/dev/componentes` — a
- *    galeria nao tem secao de Toast (confirmado por leitura de
- *    `galeria.tsx`). O componente `Toaster` e global (montado em
- *    `src/app/layout.tsx`), entao o CSS medido nao depende da rota. Disparado
- *    em `/library`, interceptando a requisicao DELETE do produto para
- *    forcar erro sem tocar em dado real (a rota nunca chega ao backend).
+ *    esse menu antes de procurar o botão.
+ * 3. O alvo "toast destrutivo" não tem gatilho em `/dev/componentes` — a
+ *    galeria não tem seção de Toast (confirmado por leitura de
+ *    `galeria.tsx`). O componente `Toaster` é global (montado em
+ *    `src/app/layout.tsx`), então o CSS medido não depende da rota. Disparado
+ *    em `/library`, interceptando a requisição DELETE do produto para
+ *    forçar erro sem tocar em dado real (a rota nunca chega ao backend).
  */
 
 function capturasDir(): string {
     const dir = process.env.CAPTURAS_DIR
     if (!dir) {
         throw new Error(
-            "CAPTURAS_DIR nao esta definido no ambiente. Defina um diretorio de " +
-            "destino (fora do repositorio) antes de rodar, ex.: " +
+            "CAPTURAS_DIR não está definido no ambiente. Defina um diretório de " +
+            "destino (fora do repositório) antes de rodar, ex.: " +
             "CAPTURAS_DIR=/caminho/de/scratch npx playwright test e2e/captura-visual-secao-6.spec.ts"
         )
     }
@@ -54,15 +54,15 @@ const LARGURAS = [
     { nome: "desktop-1440x900", width: 1440, height: 900 },
 ] as const
 
-/** Le `min-height` computado de cada `[role="menuitem"]` visivel na pagina. */
+/** Lê `min-height` computado de cada `[role="menuitem"]` visível na página. */
 async function minHeightsDosItens(page: Page): Promise<string[]> {
     return page.getByRole("menuitem").evaluateAll((els) =>
         els.map((el) => getComputedStyle(el).minHeight)
     )
 }
 
-test("captura visual das mudancas da Secao 6", async ({ page }) => {
-    // Muitas navegacoes + duas larguras; o default de 30s do Playwright nao
+test("captura visual das mudanças da Seção 6", async ({ page }) => {
+    // Muitas navegações + duas larguras; o default de 30s do Playwright não
     // cabe mesmo no caminho feliz. O tempo real de cada passo fica nos logs.
     test.setTimeout(180_000)
 
@@ -71,21 +71,21 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
     const password = process.env.E2E_PASSWORD
     if (!email || !password) {
         throw new Error(
-            "E2E_EMAIL e/ou E2E_PASSWORD nao estao definidos no ambiente. " +
+            "E2E_EMAIL e/ou E2E_PASSWORD não estão definidos no ambiente. " +
             "Carregue-os de .env.e2e.local (set -a; . ./.env.e2e.local; set +a) antes de rodar."
         )
     }
 
-    // --- Alvo: alternador de tema — corrigido para "/" (ModeToggle e publico) ---
-    // Roda ANTES da tentativa de login: "/" nao exige sessao, e se o login
-    // falhar abaixo, este alvo continua sendo evidencia valida por si so.
+    // --- Alvo: alternador de tema — corrigido para "/" (ModeToggle é público) ---
+    // Roda ANTES da tentativa de login: "/" não exige sessão, e se o login
+    // falhar abaixo, este alvo continua sendo evidência válida por si só.
     for (const largura of LARGURAS) {
         await page.setViewportSize({ width: largura.width, height: largura.height })
         await page.goto("/")
         await page.waitForLoadState("networkidle")
 
         // Abaixo do breakpoint `lg` (1024px) o ModeToggle vive dentro do menu
-        // hamburguer do Navbar, escondido por `hidden` ate o menu abrir.
+        // hambúrguer do Navbar, escondido por `hidden` até o menu abrir.
         if (largura.width < 1024) {
             await page.getByRole("button", { name: "Abrir menu" }).click()
         }
@@ -101,8 +101,8 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
     }
 
     // --- Login real via UI, mesmo caminho de medicao-biblioteca.spec.ts ---
-    // So o status da resposta de login e logado (nunca o corpo) — o suficiente
-    // para diagnosticar falha de login sem expor nada sensivel.
+    // Só o status da resposta de login é logado (nunca o corpo) — o suficiente
+    // para diagnosticar falha de login sem expor nada sensível.
     let autenticado = false
     page.on("response", (res) => {
         if (res.url().includes("/api/auth/login")) {
@@ -117,10 +117,10 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
         await page.waitForURL("**/dashboard", { timeout: 20000 })
         autenticado = true
     } catch (erro) {
-        // Regra 6 do brief: reportar a mensagem exata, nao tentar rota
-        // alternativa de credencial. Os alvos que exigem sessao ficam sem
-        // evidencia, registrados individualmente abaixo, e o erro.png dessa
-        // tentativa tambem nao e mantido, por poder conter o valor do campo
+        // Regra 6 do brief: reportar a mensagem exata, não tentar rota
+        // alternativa de credencial. Os alvos que exigem sessão ficam sem
+        // evidência, registrados individualmente abaixo, e o erro.png dessa
+        // tentativa também não é mantido, por poder conter o valor do campo
         // de senha no DOM (risco medido nesta mesma tarefa).
         console.log(`LOGIN_FALHOU=${erro instanceof Error ? erro.message : String(erro)}`)
     }
@@ -128,7 +128,7 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
     if (!autenticado) {
         const alvosNaoAlcancados = [
             "galeria de componentes (/dev/componentes)",
-            "menu do cabecalho (/dashboard)",
+            "menu do cabeçalho (/dashboard)",
             "card de produto (/library)",
             "toast destrutivo (/library)",
             "tabela financeira (/finance)",
@@ -147,7 +147,7 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
         await page.goto("/dev/componentes")
         await page.waitForLoadState("networkidle")
 
-        // Skeleton: aria-hidden e a classe que o CSS compilado exige.
+        // Skeleton: aria-hidden é a classe que o CSS compilado exige.
         const skeletons = await page.locator(".animate-pulse").evaluateAll((els) =>
             els.map((el) => ({
                 ariaHidden: el.getAttribute("aria-hidden"),
@@ -161,11 +161,12 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
             fullPage: true,
         })
 
-        // Bonus: a propria galeria tem um DropdownMenu ("Acoes"), um dos 6
-        // arquivos com DropdownMenuItem — medir tambem, nao so capturar a pagina.
+        // Bônus: a própria galeria tem um DropdownMenu ("Acoes", sem acento no
+        // próprio texto-fonte), um dos 6 arquivos com DropdownMenuItem — medir
+        // também, não só capturar a página.
         const triggerGaleria = page.getByRole("button", { name: "Acoes" })
         if ((await triggerGaleria.count()) === 0) {
-            console.log(`GALERIA_DROPDOWN[${largura.nome}]=gatilho "Acoes" nao encontrado por esse nome`)
+            console.log(`GALERIA_DROPDOWN[${largura.nome}]=gatilho "Acoes" não encontrado por esse nome`)
         } else {
             await triggerGaleria.click()
             const alturas = await minHeightsDosItens(page)
@@ -177,7 +178,7 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
         }
     }
 
-    // --- Alvo: menu do cabecalho (/dashboard) ---
+    // --- Alvo: menu do cabeçalho (/dashboard) ---
     for (const largura of LARGURAS) {
         await page.setViewportSize({ width: largura.width, height: largura.height })
         await page.goto("/dashboard")
@@ -203,7 +204,7 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
 
         const trigger = page.getByRole("button", { name: "Ações" }).first()
         if ((await trigger.count()) === 0) {
-            console.log(`CARD_PRODUTO[${largura.nome}]=nenhum cartao de produto encontrado (biblioteca vazia?)`)
+            console.log(`CARD_PRODUTO[${largura.nome}]=nenhum cartão de produto encontrado (biblioteca vazia?)`)
         } else {
             await trigger.hover()
             await trigger.click()
@@ -216,7 +217,7 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
         }
     }
 
-    // --- Alvo: toast destrutivo — corrigido para /library (galeria nao tem gatilho) ---
+    // --- Alvo: toast destrutivo — corrigido para /library (galeria não tem gatilho) ---
     for (const largura of LARGURAS) {
         await page.setViewportSize({ width: largura.width, height: largura.height })
         await page.goto("/library")
@@ -226,19 +227,19 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
 
         const trigger = page.getByRole("button", { name: "Ações" }).first()
         if ((await trigger.count()) === 0) {
-            console.log(`TOAST_DESTRUTIVO[${largura.nome}]=nenhum cartao de produto para disparar o fluxo de exclusao`)
+            console.log(`TOAST_DESTRUTIVO[${largura.nome}]=nenhum cartão de produto para disparar o fluxo de exclusão`)
             continue
         }
 
-        // Intercepta o DELETE antes de clicar: a requisicao nunca chega ao
-        // backend, nenhum dado real e tocado — so o caminho de erro do
-        // cliente e exercitado, para o toast destrutivo aparecer de verdade.
+        // Intercepta o DELETE antes de clicar: a requisição nunca chega ao
+        // backend, nenhum dado real é tocado — só o caminho de erro do
+        // cliente é exercitado, para o toast destrutivo aparecer de verdade.
         await page.route("**/api/products/**", (route) => {
             if (route.request().method() === "DELETE") {
                 route.fulfill({
                     status: 500,
                     contentType: "application/json",
-                    body: JSON.stringify({ detail: "Erro forcado pela captura visual (Tarefa 1, Secao 8)" }),
+                    body: JSON.stringify({ detail: "Erro forçado pela captura visual (Tarefa 1, Seção 8)" }),
                 })
             } else {
                 route.continue()
@@ -280,7 +281,7 @@ test("captura visual das mudancas da Secao 6", async ({ page }) => {
 
         const trigger = page.getByRole("button", { name: "Abrir menu" }).first()
         if ((await trigger.count()) === 0) {
-            console.log(`TABELA_FINANCEIRA[${largura.nome}]=nenhuma linha com menu encontrada (sem movimentacoes no periodo?)`)
+            console.log(`TABELA_FINANCEIRA[${largura.nome}]=nenhuma linha com menu encontrada (sem movimentações no período?)`)
         } else {
             await trigger.click()
             const alturas = await minHeightsDosItens(page)

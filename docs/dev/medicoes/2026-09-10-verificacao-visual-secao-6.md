@@ -305,7 +305,7 @@ diverge da senha real, se o usuário foi removido/alterado no Supabase, ou
 outra causa — qualquer uma dessas é decisão/diagnóstico de Thiago, não desta
 tarefa.
 
-### Achado de segurança: exposição remediada nesta tarefa (o snapshot de acessibilidade do Playwright expõe a senha em texto puro), causa raiz não corrigida
+### O que o Playwright grava em disco quando o campo de senha já está preenchido
 
 Numa tentativa anterior desta mesma sessão (antes do ajuste de timeout
 descrito acima), o teste estourou o timeout com o campo de senha já
@@ -313,22 +313,49 @@ preenchido. Playwright grava, a cada falha, um `error-context.md` com um
 "page snapshot" em formato de árvore de acessibilidade — e essa árvore lê o
 atributo `value` do DOM, não a renderização visual mascarada (`type="password"`
 mascara na tela, não no `value`). O arquivo gerado continha a senha em texto
-puro, dentro de `ArchSmart-web/test-results/`, um diretório que **não estava
-no `.gitignore`** (`grep -n "test-results" ArchSmart-web/.gitignore` → sem
-saída). Cada ocorrência foi apagada assim que percebida
-(`rm -rf ArchSmart-web/test-results`), antes de qualquer commit, e o valor
-nunca foi copiado para este documento, para o relatório da tarefa, ou para
-qualquer commit. **Isto não ficou versionado em nenhum momento** — mas é uma
-exposição real que qualquer novo spec de Playwright que preencha senha e
-estoure timeout volta a criar, e o repositório não tem rede de proteção
-nenhuma contra ela hoje (nem `.gitignore`, nem aviso). Registrado aqui como
-achado — **não corrigido nesta tarefa**, porque o único arquivo de
-configuração que esta tarefa está autorizada a tocar é este documento e o
-spec de captura, e adicionar `test-results/`/`playwright-report/` ao
-`.gitignore` do `ArchSmart-web` é mudança de escopo maior (afeta todo `e2e/`,
-não só este spec). Recomendação para quem pegar isso a seguir: adicionar
-`test-results/` e `playwright-report/` ao `.gitignore` do `ArchSmart-web`
-antes que outro spec de Playwright volte a gerar esse arquivo.
+puro, dentro de `ArchSmart-web/test-results/`. Cada ocorrência foi apagada
+assim que percebida (`rm -rf ArchSmart-web/test-results`), antes de qualquer
+commit, e o valor nunca foi copiado para este documento, para o relatório da
+tarefa, ou para qualquer commit.
+
+> **Correção em 11/09/2026 (round 1 de revisão da Tarefa 1):** o parágrafo
+> original desta seção afirmava que `ArchSmart-web/test-results/` "não estava
+> no `.gitignore`", citando `grep -n "test-results" ArchSmart-web/.gitignore`
+> → sem saída, e concluía daí que a causa raiz continuava aberta, com uma
+> recomendação para adicionar `test-results/`/`playwright-report/` ao
+> `.gitignore` do `ArchSmart-web`.
+>
+> **Isso é falso.** O diretório está ignorado, e sempre esteve, pelo
+> `.gitignore` da **raiz** do repositório (não o de `ArchSmart-web/`):
+>
+> ```
+> sed -n '20,23p' .gitignore
+> # Test artifacts
+> playwright-report
+> test-results
+>
+> git check-ignore -v ArchSmart-web/test-results/foo/error-context.md
+> .gitignore:22:test-results	ArchSmart-web/test-results/foo/error-context.md
+> ```
+>
+> **Por que o erro passou:** a medição original olhou só o `.gitignore` do
+> subdiretório (`ArchSmart-web/.gitignore`) e concluiu sobre o repositório
+> inteiro — os dois arquivos existem e um padrão sem `/` no início casa em
+> qualquer profundidade, então bastava checar com `git check-ignore`, que fala
+> pela ferramenta de verdade, em vez de grep num único `.gitignore` entre
+> vários. É a classe de erro que o `CLAUDE.md` deste repositório lista como
+> recorrente: conclusão tirada de medição incompleta, publicada como fato.
+>
+> **O que sobra de verdadeiro, sem alarme:** o Playwright grava o valor de
+> campo preenchido no `error-context.md` do snapshot de acessibilidade, então
+> a senha aparece em texto puro **em disco**, num diretório não versionado —
+> a mesma classe do próprio `.env.e2e.local`, que existe fora do controle de
+> versão por desenho. Não é uma exposição nova, e não tem causa raiz aberta:
+> o `.gitignore` da raiz já cobre `test-results/`. Apagar o diretório
+> manualmente, como esta tarefa fez, foi o cuidado certo mesmo assim — o
+> arquivo continua existindo em disco, só não versionado, e ele carrega a
+> senha em texto puro até alguém apagar. Nenhuma recomendação de mudar
+> `.gitignore` continua de pé.
 
 ### O que foi capturado, de verdade, nesta tentativa
 
