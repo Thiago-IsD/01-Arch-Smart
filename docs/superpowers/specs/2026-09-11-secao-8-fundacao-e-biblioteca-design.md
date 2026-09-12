@@ -175,6 +175,23 @@ e o boundary deixa de importar. Hoje funciona só porque o `TelemetriaDeTela`
 aparece antes do `AppShell` na árvore (`app/(dashboard)/layout.tsx:20`), o que é
 acidente de posição e não garantia.
 
+> **Corrigido em 12/09/2026, na correção residual antes do merge.** O latch
+> foi implementado (`contexto.tsx`, `ultimoReport` numa `ref` com replay em
+> `assinar`, verificado por mutação), e ele protege o caso comum: um report
+> que chegue antes de a região assinar não se perde mais. Mas o parágrafo
+> acima diz mais do que isso — "a ordem […] deixa de importar" — e isso não é
+> verdade. `TelemetriaDeTela` chama `limpar()` no início do mesmo efeito em
+> que assina, e `limpar()` apaga o latch. Os dois — o `limpar()` da tela
+> anterior e a assinatura da tela atual — moram no mesmo efeito, então a
+> ordem entre irmãos continua decidindo **qual dos dois roda primeiro**: se
+> `TelemetriaDeTela` não vier antes do `AppShell` na árvore, as regiões da
+> tela nova latcham um report antes de `limpar()` existir, e o `limpar()`
+> apaga esse report em vez do da tela anterior. O comentário em
+> `ArchSmart-web/src/app/(dashboard)/layout.tsx` (acima do `return`) já diz o
+> que sobra de motivo para a ordem, e é este: não mais segurar a existência
+> da assinatura, mas garantir que `limpar()` rode antes de a tela nova
+> reportar.
+
 **O início da navegação.** O orçamento da spec-mãe diz "clique → dados na tela
 < 1,5 s", e o commit da rota já aconteceu depois do clique. Entra um ouvinte de
 clique em fase de captura, instalado uma vez, que marca o instante quando o

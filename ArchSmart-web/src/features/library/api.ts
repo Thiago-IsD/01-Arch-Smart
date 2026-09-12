@@ -43,10 +43,24 @@ export function listarProdutos(
     })
 }
 
+/**
+ * A forma unica do query do badge do inbox, pelo mesmo motivo de
+ * `queryDeProdutos`: `contarInbox` (cliente) e `LibraryData` (prefetch no
+ * servidor) montam por aqui. Duas montagens da MESMA chave de cache
+ * (`queryKeys.products.inboxCount()`) divergem em silencio — e divergir aqui
+ * nao da erro nenhum, so faz o prefetch deixar de ser aproveitado e virar custo
+ * puro. Foi escrito duas vezes na Tarefa 7 da Secao 8 e unificado na revisao.
+ *
+ * `size: 1` porque o que se le da resposta e o `total`, nao os itens.
+ */
+export function queryDoInbox() {
+    return { page: 1, size: 1, state: "CAPTURED" }
+}
+
 export function contarInbox(signal?: AbortSignal): Promise<ProductsResponse> {
     return api<ProductsResponse>("/api/products", {
         signal,
-        query: { page: 1, size: 1, state: "CAPTURED" },
+        query: queryDoInbox(),
     })
 }
 

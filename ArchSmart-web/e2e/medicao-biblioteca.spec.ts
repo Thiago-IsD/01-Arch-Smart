@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test"
 
+import { esperarListaDaBiblioteca } from "./biblioteca"
+
 /**
  * Mede "do clique até os dados na tela" na Biblioteca.
  *
@@ -38,7 +40,7 @@ test("mede o tempo até a grade da Biblioteca ter dados", async ({ page }) => {
 
     // Aquece: descarta a primeira, que pode pagar cold start da API.
     await page.goto("/library")
-    await page.waitForSelector("[data-testid='product-grid'], [data-testid='library-empty']")
+    await esperarListaDaBiblioteca(page)
 
     for (let i = 0; i < REPETICOES; i++) {
         await page.goto("/dashboard")
@@ -46,7 +48,7 @@ test("mede o tempo até a grade da Biblioteca ter dados", async ({ page }) => {
 
         const inicio = Date.now()
         await page.click("a[href='/library']")
-        await page.waitForSelector("[data-testid='product-grid'], [data-testid='library-empty']")
+        await esperarListaDaBiblioteca(page)
         amostras.push(Date.now() - inicio)
     }
 

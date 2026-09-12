@@ -117,6 +117,18 @@ RE_SUPABASE = re.compile(r"\bcreate(Browser|Server)Client\s*\(")
 
 RE_TABINDEX_NEGATIVO = re.compile(r"tabIndex=\{\s*-\s*1\s*\}")
 RE_OPACITY_ZERO = re.compile(r"\bopacity-0\b")
+# `invisible group-hover:visible` e `hidden group-hover:block` sao o MESMO
+# defeito que `opacity-0 group-hover:opacity-100`: o elemento so existe para
+# quem tem mouse. A regua via um e nao via os outros dois.
+#
+# O `(?<!-)` na frente nao e bonus: sem ele, `\bhidden\b` casa "hidden" DENTRO
+# de `aria-hidden="true"`, porque "-" nao e caractere de palavra e por isso
+# satisfaz \b sozinho. Na pratica isso inflava o numero -- `app/page.tsx:261`
+# tem `aria-hidden="true"` na mesma linha de um `group-hover:` de animacao sem
+# nada a ver com visibilidade, e a regua contava como defeito. Medido ao
+# rodar esta medida pela primeira vez: o numero saiu 10, nao os 9 esperados,
+# e a diferenca era exatamente esse falso positivo (ver commit desta medida).
+RE_INVISIVEL = re.compile(r"(?<!-)\b(invisible|hidden)\b")
 # Casa `group-hover:` E a forma nomeada do Tailwind, `group-hover/<nome>:`
 # (letras, digitos, `_` ou `-` no nome) -- usada em tres linhas de
 # MainBudgetArea.tsx (`group-hover/opt:`, `group-hover/prod:`,
@@ -143,12 +155,23 @@ RE_GROUP_HOVER = re.compile(r"\bgroup-hover(/[A-Za-z0-9_-]+)?:")
 # problema antes de existir, nao esta consertando nada agora.
 RE_FOCUS = re.compile(r"\bfocus(-within)?(/[A-Za-z0-9_-]+)?:")
 
-_PREFIXOS = ("bg|text|border|ring|from|to|via|fill|stroke|outline|decoration"
-             "|shadow|accent|caret|divide|placeholder")
+# `ring-offset` vem ANTES de `ring` na alternancia: com `ring` primeiro, a
+# alternancia casa so `ring` em `ring-offset-slate-900`, exige `-<paleta>` logo
+# depois, encontra `-offset` e desiste -- o furo continua aberto com a regra
+# "corrigida". Ver test_conta_ring_offset_de_paleta.
+_PREFIXOS = (
+    "ring-offset|ring|bg|text|border|from|to|via|fill|stroke|outline|"
+    "decoration|shadow|accent|caret|divide|placeholder"
+)
 _PALETAS = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green"
             "|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose")
 RE_PALETA = re.compile(rf"\b({_PREFIXOS})-({_PALETAS})-[0-9]{{2,3}}\b")
-RE_ARBITRARIA = re.compile(r"\b(bg|text|border)-\[#[0-9a-fA-F]{3,8}\]")
+# `white` e `black` nao tem sufixo numerico e por isso nunca casaram com
+# RE_PALETA. Sao cor literal igual: `bg-white` no lugar de `bg-background` e a
+# forma mais comum de violar o Art. 7 sem a regua notar.
+RE_BRANCO_PRETO = re.compile(rf"\b({_PREFIXOS})-(white|black)\b")
+# Qualquer prefixo, nao so bg|text|border: `shadow-[#F88379]` e cor literal.
+RE_ARBITRARIA = re.compile(r"\b[a-z]+(-[a-z]+)*-\[#[0-9a-fA-F]{3,8}\]")
 
 LIMITE_DE_LINHAS = 400
 
@@ -203,7 +226,11 @@ def contar_cores(raiz: Path) -> int:
         if caminho.suffix not in (".ts", ".tsx") or not caminho.is_file():
             continue
         texto = caminho.read_text(encoding="utf-8", errors="ignore")
-        total += len(RE_PALETA.findall(texto)) + len(RE_ARBITRARIA.findall(texto))
+        total += (
+            len(RE_PALETA.findall(texto))
+            + len(RE_BRANCO_PRETO.findall(texto))
+            + len(RE_ARBITRARIA.findall(texto))
+        )
     return total
 
 
@@ -225,16 +252,19 @@ def contar_ocorrencias(raiz: Path, padrao: re.Pattern, isentos: tuple[Path, ...]
 
 
 def contar_hover_sem_focus_no_texto(texto: str) -> int:
-    """Linhas que escondem em opacity-0 e so revelam no hover do grupo.
+    """Linhas que escondem em opacity-0/invisible/hidden e so revelam no hover
+    do grupo.
 
-    Conta por LINHA, nao por arquivo: o par (opacity-0, group-hover:) tem que
-    estar na mesma className para ser o defeito. Uma linha que ja revele por
-    foco esta consertada e nao conta -- e assim que a medida desce quando
-    alguem conserta, em vez de exigir que o arquivo inteiro suma.
+    Conta por LINHA, nao por arquivo: o par (opacity-0 OU invisible/hidden,
+    group-hover:) tem que estar na mesma className para ser o defeito. Uma
+    linha que ja revele por foco esta consertada e nao conta -- e assim que a
+    medida desce quando alguem conserta, em vez de exigir que o arquivo
+    inteiro suma.
     """
     total = 0
     for linha in texto.splitlines():
-        if (RE_OPACITY_ZERO.search(linha) and RE_GROUP_HOVER.search(linha)
+        if ((RE_OPACITY_ZERO.search(linha) or RE_INVISIVEL.search(linha))
+                and RE_GROUP_HOVER.search(linha)
                 and not RE_FOCUS.search(linha)):
             total += 1
     return total

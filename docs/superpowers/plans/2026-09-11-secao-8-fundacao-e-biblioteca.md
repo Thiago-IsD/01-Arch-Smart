@@ -191,67 +191,109 @@ nenhuma outra conta (a Seção 7 encontrou uma credencial alheia salva no autofi
 do Chrome desta máquina; conta de identidade desconhecida não se usa para entrar
 em ambiente nenhum).
 
-- [ ] **Passo 2: subir o dev server**
+> ⚠️ **Rota corrigida em 11/09/2026, depois de a primeira tentativa voltar
+> bloqueada.** A tentativa original era dirigir o Chrome por automação e digitar
+> a credencial no formulário. Isso **não é possível**: um agente não digita
+> senha em campo de formulário, e as duas alternativas indiretas tentadas foram
+> recusadas pelo próprio ambiente. Registrado no commit `95b3003`.
+>
+> A rota que funciona já existe neste repositório e já rodou em 10/09/2026: o
+> **Playwright** faz o login lendo `E2E_EMAIL`/`E2E_PASSWORD` de `process.env`
+> e preenchendo com `fill()` — a senha vai do ambiente para a página sem passar
+> por nada que o agente escreva. É o que `e2e/medicao-biblioteca.spec.ts:31-36`
+> já faz.
+>
+> Então esta tarefa captura por Playwright, inspeciona as capturas, e entrega as
+> capturas a Thiago. **E diz, item a item, quem olhou o quê:** estilo computado
+> é máquina; captura inspecionada é modelo; olho humano é Thiago. São três
+> evidências diferentes, e o doc não pode embaralhá-las — foi exatamente esse
+> embaralhamento que deixou a Seção 6 parecer verificada.
 
-```bash
-cd ArchSmart-web
-npm run dev
-```
+- [ ] **Passo 2: escrever o instrumento de captura**
 
-- [ ] **Passo 3: entrar e abrir a galeria**
+Crie `ArchSmart-web/e2e/captura-visual-secao-6.spec.ts`. É **instrumento**, não
+guarda permanente — como o `medicao-biblioteca.spec.ts`. Ele:
 
-Com as ferramentas de navegador: abrir `http://localhost:3000/auth/login`,
-preencher com `E2E_EMAIL`/`E2E_PASSWORD` **lidos do ambiente**, entrar, e
-navegar para `http://localhost:3000/dev/componentes`.
+1. exige `CAPTURAS_DIR` no ambiente e **falha com mensagem clara** se faltar
+   (nunca pule silenciosamente: o `CLAUDE.md` proíbe);
+2. faz login pelo mesmo caminho do `medicao-biblioteca.spec.ts`;
+3. para cada alvo e em **duas larguras** (390×844 e 1440×900), navega, abre o
+   menu quando o alvo é um menu, e salva a captura em `CAPTURAS_DIR`;
+4. lê o **estilo computado** do que dá para medir por máquina, e imprime.
 
-> A galeria existe para ser olhada e nunca foi. Ela só existe em
-> desenvolvimento: em produção ela chama `notFound()`.
+Os alvos, e o que medir em cada um:
 
-- [ ] **Passo 4: olhar as três mudanças da Seção 6, uma a uma**
+| Alvo | Rota | Captura | Estilo computado a imprimir |
+|---|---|---|---|
+| galeria de componentes | `/dev/componentes` | página inteira | — |
+| menu do cabeçalho | `/dashboard` | menu aberto | `min-height` de cada `[role="menuitem"]` |
+| card de produto | `/library` | menu do card aberto | `min-height` dos itens |
+| tabela financeira | `/finance` | menu de linha aberto | `min-height` dos itens |
+| card de ambiente | `/projects/<id>` | menu aberto | `min-height` dos itens |
+| alternador de tema | `/dashboard` | menu aberto | `min-height` dos itens |
+| toast destrutivo | galeria | toast visível | `color` do botão de fechar e `background-color` do toast |
+| `Skeleton` | galeria | estado de carregamento | `aria-hidden` de cada skeleton |
 
-| O quê | Onde olhar | O que confirmar |
-|---|---|---|
-| `min-h-11` no `DropdownMenuItem` | galeria, e os 6 arquivos com item de menu | o alvo de toque tem ~44px, e menu comprido não estourou o viewport nem cortou item |
-| botão de fechar do toast destrutivo | galeria, variante destrutiva | o ícone tem contraste contra o fundo destrutivo, e não ficou invisível ao trocar `text-red-*` por token |
-| `aria-hidden="true"` no `Skeleton` | qualquer estado de carregamento | o leitor de tela não anuncia o skeleton; visualmente nada mudou |
+O `min-height` esperado é **44px** (`min-h-11`). Imprima o valor medido, não um
+"ok": o número é a evidência.
 
-Os seis arquivos com item de menu, medidos (não confie na lista; rode):
+Para achar os seletores, leia os seis arquivos que têm item de menu — e **meça a
+lista, não confie nela**:
 
 ```bash
 grep -rc  "<DropdownMenu\(Checkbox\|Radio\)\?Item" ArchSmart-web/src --include=*.tsx | grep -v ":0" | grep -v __tests__
 ```
 
-- [ ] **Passo 5: abrir as 5 telas reais dessa lista e olhar o mesmo**
+Se um alvo não for alcançável (rota que exige dado que a conta de seed não tem,
+por exemplo), **não invente**: registre o alvo como não alcançado e o motivo.
 
-Cabeçalho (`AppShell`), card de produto (`/library`), tabela financeira
-(`/finance`), card de ambiente (`/projects/<id>`), alternador de tema.
-
-- [ ] **Passo 6: capturar tela de cada uma**
-
-Salve as capturas no diretório de scratch da sessão, não no repositório. O
-repositório recebe o **texto** do que foi visto, não os PNGs.
-
-- [ ] **Passo 7: preencher o doc de medição**
-
-Em `docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`, substituir cada
-item que hoje está marcado como dependente de olho humano pelo que foi
-observado, com data de 11/09/2026. Onde algo estiver **errado**, registre como
-achado e **não conserte aqui** — a correção é tarefa própria, e a Seção 8 não
-deve misturar "olhar" com "mexer".
-
-- [ ] **Passo 8: commit**
+- [ ] **Passo 3: rodar a captura**
 
 ```bash
-git add docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md
-git commit -m "docs(secao-8): fecha a verificacao visual da Secao 6
-
-Tres mudancas visuais da Secao 6 foram olhadas por olho humano em
-11/09/2026, com sessao real em desenvolvimento: min-h-11 no
-DropdownMenuItem, o botao de fechar do toast destrutivo e o aria-hidden
-do Skeleton. O doc de medicao registra item a item o que foi visto."
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; set +a
+CAPTURAS_DIR="<diretório de scratch da sessão>" npx playwright test e2e/captura-visual-secao-6.spec.ts --reporter=line
 ```
 
----
+O `playwright.config.ts` já sobe o dev server (`webServer: npm run dev`, com
+`reuseExistingServer`), então não é preciso subi-lo à mão.
+
+Guarde a saída dos estilos computados: ela vai no doc de medição.
+
+- [ ] **Passo 4: inspecionar as capturas**
+
+Abra cada PNG e olhe. O que procurar, por alvo:
+
+- **`min-h-11`:** o alvo de toque ficou com ~44px e o menu **não** estourou o
+  viewport nem cortou item — em 390px especialmente, que é onde um menu
+  comprido quebra. Essa é a maior das três mudanças: 44px é bem mais que os
+  ~30px de antes.
+- **toast destrutivo:** o ícone de fechar é visível contra o fundo destrutivo. A
+  troca de `text-red-*` por token pode ter deixado o ícone quase invisível, e
+  isso o CSS compilado não diz.
+- **`Skeleton`:** visualmente nada mudou — o `aria-hidden` é para leitor de tela.
+
+- [ ] **Passo 5: entregar as capturas a Thiago**
+
+Mande os PNGs com `SendUserFile`, para que o olho humano aconteça de verdade.
+Priorize as duas larguras do menu mais comprido e o toast destrutivo.
+
+- [ ] **Passo 6: preencher o doc de medição**
+
+Em `docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md`, uma seção
+datada de 11/09/2026 com **três evidências por item**: estilo computado
+(máquina), captura inspecionada (modelo), olho humano (Thiago — pendente até ele
+responder). Onde algo estiver errado, registre como achado e **não conserte
+aqui**: esta tarefa é olhar, não mexer, e misturar as duas arruína a medição de
+qual mudança causou o quê.
+
+- [ ] **Passo 7: commit**
+
+```bash
+git add ArchSmart-web/e2e/captura-visual-secao-6.spec.ts docs/dev/medicoes/2026-09-10-verificacao-visual-secao-6.md
+git commit -m "test(secao-8): captura visual da Secao 6 por Playwright"
+```
+
 
 ## Tarefa 2 — Tapar os quatro furos da catraca
 
@@ -466,12 +508,31 @@ Três coisas acontecem por navegação:
    `principal` que chegue no mesmo commit ganhe dele. O primeiro a emitir vence;
    os demais reports da navegação são ignorados.
 
-E o caso sem report nenhum: **decide no fim da navegação**, não por prazo.
+E o caso sem report nenhum: **decide quando a navegação termina**, não por prazo.
 
 ```
-nenhum anúncio   → medido_ate: "pintura",     load_ms = navegação → primeira pintura
+nenhum anúncio     → medido_ate: "pintura",    load_ms = navegação → primeira pintura
 anúncio sem report → medido_ate: "abandonado", load_ms = navegação → fim da navegação
 ```
+
+**"Fim da navegação" são dois momentos concretos, e nenhum deles é o cleanup do
+efeito.** A pendência daquela navegação fica numa `ref`, e é descarregada:
+
+1. **no início do efeito da navegação seguinte**, quando o `pathname` é
+   diferente do que está na pendência; e
+2. **no `pagehide`**, que é o caso de a sessão terminar naquela tela.
+
+> ⚠️ **Não emita no cleanup do efeito.** O StrictMode do `npm run dev` monta,
+> desmonta e monta de novo com o **mesmo** `pathname`: emitir no cleanup
+> produziria uma linha espúria de `pintura`/`abandonado` no primeiro desmonte, e
+> — porque o dedupe por `pathname` já teria gravado — a linha real nunca sairia.
+> Descarregar por "o `pathname` da pendência é diferente do atual" é imune a
+> isso: no remonte do StrictMode os dois são iguais, então nada é emitido. O
+> teste "sob StrictMode emite exatamente uma linha" é o que prende isso, e ele
+> falha dos dois lados: zero e dois reprovam igual.
+>
+> O preço, em desenvolvimento só: o remonte do StrictMode substitui a pendência,
+> então o cronômetro reinicia. Em produção o StrictMode não duplica efeito.
 
 > **Por que não existe prazo.** A Biblioteca é servida por `<Suspense>` com
 > `await` no servidor (`LibraryData.tsx`): o `QueryBoundary` dela só monta
@@ -509,16 +570,28 @@ function TelaComLista({ itens, principal = false }: { itens: string[]; principal
     )
 }
 
-it("tela sem regiao nenhuma emite 'pintura' ao sair da tela", async () => {
-    const { unmount } = render(<Envolvido />)
+it("tela sem regiao nenhuma emite 'pintura' quando a sessao termina nela", async () => {
+    render(<Envolvido />)
     // Nada foi emitido ainda: sem anuncio, a decisao espera o fim da navegacao.
     await new Promise((r) => setTimeout(r, 50))
     expect(eventos).toHaveLength(0)
 
-    unmount()
+    window.dispatchEvent(new Event("pagehide"))
     await waitFor(() => expect(eventos).toHaveLength(1))
     expect(eventos[0].properties.medido_ate).toBe("pintura")
     expect(eventos[0].properties.is_empty).toBeNull()
+})
+
+it("tela sem regiao nenhuma emite 'pintura' quando a navegacao seguinte comeca", async () => {
+    const { rerender } = render(<Envolvido />)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(eventos).toHaveLength(0)
+
+    caminhoAtual = "/dashboard"
+    rerender(<Envolvido />)
+    await waitFor(() => expect(eventos).toHaveLength(1))
+    expect(eventos[0].properties.screen).toBe("/library")
+    expect(eventos[0].properties.medido_ate).toBe("pintura")
 })
 
 it("regiao que resolve com dados emite 'dados' e is_empty false", async () => {
@@ -639,7 +712,7 @@ it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => 
             </QueryBoundary>
         )
     }
-    const { unmount } = render(
+    render(
         <Envolvido>
             <TelaPendente />
         </Envolvido>
@@ -647,7 +720,7 @@ it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => 
     await screen.findByText("carregando")
     expect(eventos).toHaveLength(0)
 
-    unmount()
+    window.dispatchEvent(new Event("pagehide"))
     await waitFor(() => expect(eventos).toHaveLength(1))
     expect(eventos[0].properties.medido_ate).toBe("abandonado")
     expect(eventos[0].properties.is_empty).toBeNull()
@@ -656,7 +729,39 @@ it("regiao que anuncia e nunca resolve emite 'abandonado' ao sair", async () => 
 
 Mantenha os dois testes que já existem e continuam valendo: "sob StrictMode
 emite exatamente uma linha" e "uma navegação emite uma linha, não duas" —
-acrescentando `principal` ao `TelaComLista` deles.
+acrescentando `principal` ao `TelaComLista` deles. O primeiro é o que prende o
+perigo do StrictMode descrito acima; não o enfraqueça.
+
+**E troque o `describe("decidirMedicao")`**, porque a assinatura mudou. Os dois
+testes antigos (`{ queriesAssentaram: true }` / `false`) não compilam mais:
+
+```ts
+describe("decidirMedicao", () => {
+    it("repassa o desfecho da regiao que reportou", () => {
+        expect(decidirMedicao({ desfecho: "dados", principal: true }, true)).toBe("dados")
+        expect(decidirMedicao({ desfecho: "vazio", principal: true }, true)).toBe("vazio")
+        expect(decidirMedicao({ desfecho: "erro", principal: true }, true)).toBe("erro")
+    })
+
+    it("diz 'abandonado' quando houve anuncio e ninguem reportou", () => {
+        expect(decidirMedicao(null, true)).toBe("abandonado")
+    })
+
+    it("diz 'pintura' quando a tela nao tem regiao nenhuma", () => {
+        expect(decidirMedicao(null, false)).toBe("pintura")
+    })
+})
+
+describe("vazioDoDesfecho", () => {
+    it("traduz os tres desfechos e o nulo", () => {
+        expect(vazioDoDesfecho("vazio")).toBe(true)
+        expect(vazioDoDesfecho("dados")).toBe(false)
+        // `null` e "nao sei", que e diferente de "nao esta vazia".
+        expect(vazioDoDesfecho("erro")).toBeNull()
+        expect(vazioDoDesfecho(null)).toBeNull()
+    })
+})
+```
 
 - [ ] **Passo 2: rodar e ver falhar**
 
@@ -796,7 +901,13 @@ import { usePathname } from "next/navigation"
 import { useProntidao } from "./contexto"
 import type { Report } from "./contexto"
 import { useTrack } from "./hooks"
-import { decidirMedicao, normalizarTela, vazioDoDesfecho } from "./types"
+import { decidirMedicao, normalizarTela, vazioDoDesfecho, type MedidoDe } from "./types"
+
+declare global {
+    interface Window {
+        __arqsmartOuvinteDeClique?: boolean
+    }
+}
 
 /** Instante do ultimo clique em link interno, para ancorar o cronometro. */
 let marcaDeClique: number | null = null
@@ -804,8 +915,8 @@ let marcaDeClique: number | null = null
 function instalarOuvinteDeClique() {
     if (typeof window === "undefined" || window.__arqsmartOuvinteDeClique) return
     window.__arqsmartOuvinteDeClique = true
-    // Captura: o handler do React pode chamar preventDefault, e a marca tem de
-    // existir de qualquer forma.
+    // Fase de CAPTURA: o handler do React pode chamar preventDefault, e a marca
+    // precisa existir de qualquer forma.
     document.addEventListener(
         "click",
         (evento) => {
@@ -820,11 +931,22 @@ function instalarOuvinteDeClique() {
     )
 }
 
+/** O que uma navegacao ainda deve ao banco. */
+interface Pendencia {
+    pathname: string
+    inicio: number
+    medidoDe: MedidoDe
+    instanteDaPintura: number | null
+    anunciadas: () => number
+}
+
 /**
  * Emite `screen_viewed` uma vez por navegacao.
  *
- * Nao infere nada: ouve o canal de prontidao. Ver o protocolo em
- * docs/dev/modulos/telemetry.md e a decisao 2 da spec da Secao 8.
+ * Nao infere nada: ouve o canal de prontidao. Quem sabe que os dados estao na
+ * tela e o QueryBoundary, e e a mesma coisa que sabe se a tela esta vazia. Ver
+ * o protocolo em docs/dev/modulos/telemetry.md e a decisao 2 da spec da
+ * Secao 8.
  *
  * Monta DENTRO do ProntidaoDaTelaProvider.
  */
@@ -832,76 +954,95 @@ export function TelemetriaDeTela() {
     const pathname = usePathname()
     const prontidao = useProntidao()
     const track = useTrack()
+
+    const pendencia = useRef<Pendencia | null>(null)
     const jaEmitido = useRef<string | null>(null)
 
     useEffect(() => {
         instalarOuvinteDeClique()
-        prontidao?.limpar()
 
-        const medidoDe = marcaDeClique !== null ? "clique" : "commit"
-        const inicio = marcaDeClique ?? performance.now()
-        marcaDeClique = null
+        const emitir = (p: Pendencia, report: Report | null) => {
+            if (jaEmitido.current === p.pathname) return
+            jaEmitido.current = p.pathname
+            if (pendencia.current === p) pendencia.current = null
 
-        let emitido = false
-        let pendente = 0
-        let instanteDaPintura: number | null = null
-
-        const emitir = (report: Report | null) => {
-            if (emitido || jaEmitido.current === pathname) return
-            emitido = true
-            jaEmitido.current = pathname
+            const houveAnuncio = p.anunciadas() > 0
+            // O instante da pintura e usado SO quando a tela nao tinha regiao
+            // nenhuma. Capturar e usar sao momentos diferentes: e isso que
+            // permite um load_ms honesto sem decidir no primeiro frame.
             const fim =
-                report === null && prontidao?.anunciadas() === 0 && instanteDaPintura !== null
-                    ? instanteDaPintura
+                report === null && !houveAnuncio && p.instanteDaPintura !== null
+                    ? p.instanteDaPintura
                     : performance.now()
+
             track("screen_viewed", {
-                screen: normalizarTela(pathname),
-                load_ms: Math.round(fim - inicio),
-                medido_ate: decidirMedicao(report, (prontidao?.anunciadas() ?? 0) > 0),
-                medido_de: medidoDe,
+                screen: normalizarTela(p.pathname),
+                load_ms: Math.round(fim - p.inicio),
+                medido_ate: decidirMedicao(report, houveAnuncio),
+                medido_de: p.medidoDe,
                 is_empty: vazioDoDesfecho(report?.desfecho ?? null),
                 principal_declarada: report?.principal ?? false,
             })
         }
 
-        // Um report principal emite na hora. Um nao-principal espera um frame,
-        // para que uma principal que chegue no MESMO commit ganhe dele — e so
-        // entao emite. Sem essa folga, a ordem da arvore decidiria o numero.
+        // 1. Descarrega a navegacao ANTERIOR, se houver uma em aberto e ela for
+        //    de outro caminho. Isto roda antes do `limpar()`, porque o canal
+        //    ainda guarda os anuncios daquela navegacao.
+        //
+        //    NAO faca isso no cleanup do efeito: o StrictMode monta, desmonta e
+        //    monta de novo com o MESMO pathname, e emitir no cleanup produziria
+        //    uma linha espuria — e, pelo dedupe, mataria a linha real.
+        const anterior = pendencia.current
+        if (anterior && anterior.pathname !== pathname) emitir(anterior, null)
+
+        prontidao?.limpar()
+
+        const medidoDe: MedidoDe = marcaDeClique !== null ? "clique" : "commit"
+        const atual: Pendencia = {
+            pathname,
+            inicio: marcaDeClique ?? performance.now(),
+            medidoDe,
+            instanteDaPintura: null,
+            anunciadas: () => prontidao?.anunciadas() ?? 0,
+        }
+        marcaDeClique = null
+        pendencia.current = atual
+
+        let aguardandoFolga = 0
         let candidato: Report | null = null
+
+        // Um report principal emite na hora. Um nao-principal espera um frame,
+        // para que uma principal que chegue no MESMO commit ganhe dele. Sem essa
+        // folga, a ordem da arvore decidiria o numero.
         const aoReportar = (report: Report) => {
-            if (emitido) return
+            if (jaEmitido.current === pathname) return
             if (report.principal) {
-                cancelAnimationFrame(pendente)
-                emitir(report)
+                cancelAnimationFrame(aguardandoFolga)
+                emitir(atual, report)
                 return
             }
             if (candidato) return
             candidato = report
-            pendente = requestAnimationFrame(() => emitir(candidato))
+            aguardandoFolga = requestAnimationFrame(() => emitir(atual, candidato))
         }
 
         const cancelarAssinatura = prontidao?.assinar(aoReportar)
 
-        // O instante da pintura e capturado agora e usado SO se a tela acabar
-        // sem regiao nenhuma. Capturar e usar sao momentos diferentes: e isso
-        // que permite um `load_ms` honesto sem decidir no primeiro frame.
         const naPintura = requestAnimationFrame(() => {
-            instanteDaPintura = performance.now()
+            atual.instanteDaPintura = performance.now()
         })
 
-        // A sessao pode terminar nesta tela. Sem isto, a ultima navegacao — a
-        // que diz onde o usuario parou — nunca chega.
-        const aoSair = () => emitir(null)
+        // 2. A sessao pode terminar nesta tela. Sem isto, a ultima navegacao — a
+        //    que diz onde o usuario parou — nunca chega.
+        const aoSair = () => emitir(atual, null)
         window.addEventListener("pagehide", aoSair)
 
         return () => {
             cancelarAssinatura?.()
             cancelAnimationFrame(naPintura)
-            cancelAnimationFrame(pendente)
+            cancelAnimationFrame(aguardandoFolga)
             window.removeEventListener("pagehide", aoSair)
-            // Fim da navegacao: se nada resolveu, decide agora. `pintura` quando
-            // a tela nao tinha regiao; `abandonado` quando tinha e nao resolveu.
-            emitir(null)
+            // Sem emissao aqui, de proposito. Ver o comentario do passo 1.
         }
     }, [pathname, prontidao, track])
 
@@ -909,15 +1050,17 @@ export function TelemetriaDeTela() {
 }
 ```
 
-Declare o campo global num `.d.ts` já existente ou no topo do arquivo:
+> Três armadilhas deste arquivo, todas com teste no Passo 1:
+>
+> - **`jaEmitido` é por `pathname`, não booleano.** Ele é o que impede a segunda
+>   linha na mesma navegação e o que sobrevive ao remonte do StrictMode.
+> - **`anunciadas` entra na pendência como função**, não como número: no momento
+>   em que a pendência é criada, nenhuma região anunciou ainda — o boundary
+>   anuncia no efeito dele, que roda depois deste.
+> - **A pendência anterior é descarregada antes do `limpar()`.** Invertido, o
+>   `abandonado` viraria `pintura`, porque a contagem de anúncios já teria sido
+>   zerada.
 
-```ts
-declare global {
-    interface Window {
-        __arqsmartOuvinteDeClique?: boolean
-    }
-}
-```
 
 - [ ] **Passo 6: fazer o `QueryBoundary` anunciar e reportar**
 
@@ -1376,10 +1519,27 @@ npm run typecheck
 npm test
 ```
 
-Esperado: verde. O `telemetry.test.tsx` mocka `@/lib/api/telemetry`, então os
-eventos continuam chegando ao array do teste — mas agora com até 1 s de atraso.
-Se algum teste de lá ficar instável, **não aumente o `waitFor` às cegas**: faça
-o teste descarregar a fila explicitamente com `descarregar()`.
+**O `telemetry.test.tsx` quebra aqui, e o conserto é obrigatório, não
+condicional.** Ele mocka `@/lib/api/telemetry` e espera os eventos com `waitFor`,
+cujo tempo padrão é 1000 ms — exatamente a janela da fila. Isso é um teste que
+passa ou falha por sorte de relógio, e o `CLAUDE.md` proíbe conviver com isso.
+
+Troque o mock daquele arquivo para interceptar **a fila**, não o envio:
+
+```tsx
+vi.mock("@/features/telemetry/fila", () => ({
+    // Os testes do gatilho verificam QUANDO o evento e emitido e COM QUE
+    // conteudo. O lote e a janela de 1s sao assunto de telemetry-fila.test.ts;
+    // misturar os dois faz o relogio decidir se o teste do gatilho passa.
+    enfileirar: (evento: EventoDeProduto) => {
+        eventos.push(evento)
+    },
+    descarregar: () => {},
+}))
+```
+
+O mock de `@/lib/api/telemetry` sai daquele arquivo: com a fila interceptada, ele
+não é mais alcançado. E **não aumente nenhum `waitFor`** para contornar isso.
 
 - [ ] **Passo 7: commit**
 

@@ -77,11 +77,141 @@ Uma tela nova que soma outro `createClient()`/`getSession()`/header manual fora 
 
 ## Acessibilidade (Art. 6)
 
-Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível ao foco — proibido `tabIndex={-1}` em controle interativo (5 ocorrências hoje, nenhuma para imitar). Contraste AA (4.5:1 texto, 3:1 elemento gráfico) nos dois temas.
+Todo `<label>` ligado por `htmlFor`/`id`. Tudo clicável é focável e visível ao foco — proibido `tabIndex={-1}` em controle interativo (**3 ocorrências hoje**, nenhuma para imitar; eram 5 até a Tarefa 9 da Seção 8 tirar os dois da Biblioteca — `python tools/catraca.py`, medida `tabindex_negativo`). Contraste AA (4.5:1 texto, 3:1 elemento gráfico) nos dois temas.
+
+> Um controle que sai de `tabIndex={-1}` entra na ordem de tabulação e passa a
+> precisar de **nome acessível**: os dois `TooltipTrigger` da Biblioteca tinham
+> como único filho um ícone, e sem `aria-label` virariam violação `button-name`
+> do axe no lugar da violação que o `tabIndex` causava. Tirar o `tabIndex={-1}`
+> e dar nome ao controle são o mesmo conserto, não dois.
+
+> ### ⚠️ `title` e `placeholder` não são rótulo — e o axe deixa passar
+>
+> Medido na Tarefa 9 da Seção 8: a regra `label` do axe **passa** por
+> `non-empty-title` e por `non-empty-placeholder`. Então um campo amarrado só em
+> `title=` ou só em `placeholder` sai **verde no axe com o Art. 6 descumprido** —
+> foi o caso dos três campos de dimensão do formulário de produto e da busca da
+> Biblioteca, o controle mais usado da tela. Rodar axe e ver verde não responde
+> esta pergunta; `getByLabelText` do testing-library responde, porque ele resolve
+> `<label htmlFor>`, `<label>` envolvente, `aria-label` e `aria-labelledby`, e
+> **não** `title`. O guarda está em `src/__tests__/library-rotulos.test.tsx`, cujo
+> primeiro teste prende essa diferença em vez de supô-la.
+>
+> Auditoria de rótulo solto, por diretório:
+>
+> ```
+> grep -rn "<label" ArchSmart-web/src/components/library/*.tsx   # todo hit precisa de htmlFor
+> ```
+>
+> **Legenda de grupo não é rótulo.** Um texto que descreve três campos ("Dimensões
+> (cm)") não pode ser `<label>`, porque `<label>` aponta para **um** controle;
+> é `<span>`, e cada campo ganha o rótulo próprio. Três violações da Biblioteca
+> eram exatamente isso.
+>
+> **E `FormControl` precisa envolver o `Input`, não a `<div>` que o posiciona.**
+> Ele é um Slot: põe `id`, `aria-invalid` e `aria-describedby` no primeiro filho.
+> Envolvendo uma div, o `id` vai para a div, o `FormLabel` aponta para um `id` que
+> não é de campo nenhum, e a mensagem de erro nunca é anunciada. Era o caso em
+> `NormalizationDimensionFields`, e o rótulo parecia certo no código.
 
 ## Cor (Art. 7)
 
-Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover` (cada um com seu `-foreground`), mais `--border`, `--input` e `--ring` (sem par `-foreground`). **Não existem `--success`, `--warning` nem `--info`** — a Seção 6 os cria. Se a tela precisa de um estado que nenhum token cobre (aviso, sucesso), reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um `-amber-500` literal — o desvio que esta regra existe para evitar. Hoje há 510 classes de cor nomeada (`bg-emerald-600`, `bg-slate-100` e afins) em 39 arquivos, mais 11 hex arbitrário (`bg-[#F88379]` e afins) fora do padrão. Não acrescente o 511º.
+Token semântico sempre. Tokens que existem hoje em `globals.css`: `--primary`, `--secondary`, `--destructive`, `--muted`, `--accent`, `--card`, `--popover` (cada um com seu `-foreground`), mais `--border`, `--input` e `--ring` (sem par `-foreground`).
+
+> **Correção em 11/09/2026, na Tarefa 9 da Seção 8.** Este parágrafo dizia
+> "**não existem `--success`, `--warning` nem `--info`** — a Seção 6 os cria", e
+> isso envelheceu: a Seção 6 os criou mesmo, nos **dois** temas, e eles estão
+> ligados a nome de classe utilitária no `tailwind.config.ts`. Então
+> `text-success`, `bg-warning/15` e afins renderizam hoje. Medido com:
+>
+> ```
+> grep -nE "^\s*--(success|warning|info)(-foreground)?:" ArchSmart-web/src/app/globals.css   # 12 linhas, 6 por tema
+> grep -n "success\|warning\|info" ArchSmart-web/tailwind.config.ts                          # 9 linhas
+> ```
+>
+> ### ⚠️ Token de estado é chip preenchido, nunca cor de texto
+>
+> **Regra, decidida na Tarefa 9 da Seção 8 e medida com `tools/contraste.py`** —
+> a própria ferramenta que a catraca usa. Vale para `--warning` **e** para
+> `--success`: nenhum dos dois serve como cor de texto.
+>
+> | Uso | Claro | Escuro | Art. 6 |
+> |---|---|---|---|
+> | `text-warning` como cor de texto | **1,99:1** | 10,83:1 | **reprova** |
+> | `text-success` sobre `bg-success/15` dentro de `bg-muted/50` | **3,97:1** | 6,72:1 | **reprova** |
+> | **`bg-warning` + `text-warning-foreground`** | **4,91:1** | 10,83:1 | **passa** |
+> | **`bg-success` + `text-success-foreground`** | **5,07:1** | 10,17:1 | **passa** |
+>
+> Exemplos vivos: `src/components/library/BatchNormalizeRow.tsx` (aviso) e
+> `src/components/library/ClipperOnboarding.tsx` (sucesso) — copie de lá.
+>
+> **E não "conserte" escurecendo o token:** `--warning-foreground` e
+> `--success-foreground` são projetados como texto **sobre** a cor, então
+> escurecer a cor quebra o par do chip nos dois temas — além de mexer em toda
+> superfície de aviso ou de sucesso do produto.
+>
+> **Cuidado com o hover herdado.** A variante `default` do `Badge` traz
+> `hover:bg-primary/80`; um chip que não sobrescreva isso muda de cor no hover. E
+> um `hover:bg-success/90` sobre `bg-muted/50` cai para **4,25:1** e reprova só
+> no hover. Fixe o mesmo tom (`hover:bg-success`) quando o chip for indicador de
+> status, que não é clicável.
+>
+> ### A lição que gerou as duas correções: meça o par que RENDERIZA
+>
+> As duas vezes que isto escapou — e escapou duas vezes, em rodadas seguidas — o
+> erro foi o mesmo: medir o token sobre `--background` em vez de sobre o fundo
+> que realmente aparece atrás dele. `text-success` dá 5,07:1 sobre
+> `--background`, e esse número é **irrelevante**: o badge renderiza sobre
+> `bg-success/15` dentro de um `bg-muted/50`, e ali dá 3,97:1. Então:
+>
+> - **componha o alfa.** `bg-<token>/15` sobre `bg-muted/50` sobre `--background`
+>   é uma pilha de três camadas, e o contraste se mede contra o resultado dela,
+>   não contra a primeira;
+> - **meça os estados**, hover incluído, não só o repouso;
+> - **meça nos dois temas.** A troca que corrigiu o verde não foi neutra: melhorou
+>   o escuro de 2,72:1 para 6,72:1 e piorou o claro de 4,24:1 para 3,97:1. Um
+>   número só esconde isso.
+>
+> **A catraca não protege nada disto.** `contraste_reprovado` mede só pares
+> (cor, cor-foreground) de `globals.css` — nunca token de texto sobre um fundo
+> composto. Quem escrever `text-success` numa tela nova não vai ser reprovado por
+> ferramenta nenhuma; é esta regra escrita que segura.
+
+Se a tela precisa de um estado que nenhum token cobre, reaproveite o token semanticamente mais próximo (`--destructive` para negativo, `--accent` para neutro) em vez de escrever a classe: `border-warning` sem token não renderiza nada, e o passo seguinte costuma ser um hex ou um literal de paleta — o desvio que esta regra existe para evitar.
+
+O tamanho da dívida, medido em 12/09/2026 com **os regexes da régua**, que é o que a catraca de verdade conta:
+
+| O que a régua vê | Quantas | Regex |
+|---|---|---|
+| classe de paleta nomeada (`bg-emerald-600`, `bg-slate-100`) | **502** | `RE_PALETA` |
+| `bg-white` / `text-white` / `-black`, sem sufixo numérico | **68** | `RE_BRANCO_PRETO` |
+| hex arbitrário, com prefixo qualquer (`bg-[#F88379]`, `shadow-[#F88379]`) | **13** | `RE_ARBITRARIA` |
+| **total — é este o `cores_literais` do baseline** | **583** | soma dos três |
+
+São **46** arquivos `.ts`/`.tsx` de `src/` com alguma das três. **Não acrescente a 584ª.**
+
+Meça importando a régua, nunca com um grep improvisado — os três regexes têm sutilezas que um grep de vizinhança erra (`ring-offset` antes de `ring` na alternância; `white`/`black` não têm sufixo numérico; `RE_ARBITRARIA` aceita prefixo qualquer, não só `bg|text|border`):
+
+```
+python - <<'EOF'
+import sys; sys.path.insert(0, "tools")
+from pathlib import Path
+import catraca
+raiz = Path("ArchSmart-web/src")
+p = b = a = 0; arquivos = set()
+for c in raiz.rglob("*"):
+    if c.suffix not in (".ts", ".tsx") or not c.is_file(): continue
+    t = c.read_text(encoding="utf-8", errors="ignore")
+    n = (len(catraca.RE_PALETA.findall(t)), len(catraca.RE_BRANCO_PRETO.findall(t)),
+         len(catraca.RE_ARBITRARIA.findall(t)))
+    p += n[0]; b += n[1]; a += n[2]
+    if any(n): arquivos.add(c)
+print(p, b, a, p + b + a, len(arquivos))
+EOF
+# 502 68 13 583 46
+```
+
+> ⚠️ **Este parágrafo dizia "510 classes em 39 arquivos, mais 11 hex" e os três números estavam errados** — corrigidos em 12/09/2026, na revisão final da Seção 8. Dois motivos, e os dois são a própria seção mexendo na régua: a Tarefa 2 **ensinou a régua a ver** `bg-white`/`text-white`/`-black`, e essas 68 ocorrências simplesmente não apareciam na frase; e o `RE_ARBITRARIA` passou a enxergar prefixo qualquer, o que levou o hex de 11 para 13 (em `develop` o regex era só `bg|text|border`; confira com `git show develop:tools/catraca.py | grep RE_ARBITRARIA`). O 510 de paleta, por sua vez, baixou para 502 porque a Tarefa 9 migrou a Biblioteca. Quem somasse 510 + 11 chegava a 521, que não é o `cores_literais` de lugar nenhum: o baseline era **518** em `develop` e é **583** aqui.
 
 ## Convenções
 
@@ -93,7 +223,7 @@ Componentes `PascalCase.tsx`, tipos `PascalCase`, instâncias e métodos `camelC
 `tsc --noEmit`). Os dois são o que o job **Frontend** do CI executa; rode-os
 antes de abrir PR.
 
-A suíte sai limpa: `Test Files 11 passed (11)` e `Tests 63 passed (63)` (a Seção 5 acrescentou os testes de `lib/api/`, `lib/query/` e `features/*`; eram 4 arquivos/7 testes antes dela). **Um
+A suíte sai limpa: `Test Files 29 passed (29)` e `Tests 236 passed (236)` (medido em 12/09/2026, na revisão final da Seção 8; eram 11 arquivos/63 testes depois da Seção 5, e 4/7 antes dela — o número sobe quando uma seção acrescenta testes, então **meça, não copie daqui**). **Um
 `failed` em qualquer das duas linhas é um teste realmente quebrado.** Até a
 Seção 3, o `vitest.config.ts` não excluía `e2e/` e o Vitest tentava coletar
 dois specs do Playwright, reportando `2 failed` de forma permanente — a

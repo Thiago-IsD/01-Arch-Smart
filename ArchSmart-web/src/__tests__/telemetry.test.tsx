@@ -1,55 +1,32 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { StrictMode, type ReactNode } from "react"
-import { render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
-import { normalizarTela, decidirMedicao } from "@/features/telemetry/types"
 import type { EventoDeProduto } from "@/features/telemetry/types"
 import { TelemetriaDeTela } from "@/features/telemetry/TelemetriaDeTela"
-import { VazioDaTelaProvider } from "@/features/telemetry/contexto"
+import { ProntidaoDaTelaProvider } from "@/features/telemetry/contexto"
 import { QueryBoundary } from "@/components/ui/query-boundary"
 
-describe("normalizarTela", () => {
-    it("troca uuid por [id]", () => {
-        expect(normalizarTela("/projects/3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6a7b")).toBe(
-            "/projects/[id]"
-        )
-    })
-
-    it("troca cada uuid de um caminho aninhado", () => {
-        const caminho =
-            "/projects/3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6a7b/presentation/" +
-            "8e7d6c5b-4a39-2817-6f5e-4d3c2b1a0987"
-        expect(normalizarTela(caminho)).toBe("/projects/[id]/presentation/[id]")
-    })
-
-    it("deixa caminho sem id intacto", () => {
-        expect(normalizarTela("/library")).toBe("/library")
-    })
-})
-
-describe("decidirMedicao", () => {
-    it("diz 'dados' quando alguma query da rota assentou", () => {
-        expect(decidirMedicao({ queriesAssentaram: true })).toBe("dados")
-    })
-
-    it("diz 'pintura' quando a tela nao tem query nenhuma", () => {
-        expect(decidirMedicao({ queriesAssentaram: false })).toBe("pintura")
-    })
-})
-
-// --- TelemetriaDeTela: o gatilho do `screen_viewed` ---------------------------
+// --- TelemetriaDeTela: o desfecho que a linha carrega -----------------------
 //
-// A parte com mais chance de errar da tarefa e QUANDO o evento sai. Estes
-// testes prendem as tres situacoes que decidem `medido_ate` e o dedupe por
-// navegacao. Eles nao substituem a prova viva (um `load_ms` real contra o
-// banco), mas prendem o comportamento do gatilho.
+// QUAL rotulo sai, e que sai UMA linha por navegacao. Os outros dois lados estao
+// separados: de onde o cronometro parte e quando ele fecha ficam em
+// `telemetry-ancora-de-clique.test.tsx` e `telemetry-fim-de-navegacao.test.tsx`.
+// Nenhum destes substitui a prova viva (um `load_ms` real contra o banco).
 
 const eventos: EventoDeProduto[] = []
 
-vi.mock("@/lib/api/telemetry", () => ({
-    enviarEventos: async (lote: EventoDeProduto[]) => {
-        eventos.push(...lote)
+// Intercepta a FILA, nao o envio. O que estes testes medem e quando o evento e
+// emitido e com que conteudo; o lote e a janela de 1s sao assunto de
+// `telemetry-fila.test.ts`. Mockar o envio punha a janela da fila dentro do
+// prazo padrao do `waitFor` — 1000 ms, o mesmo numero — e quem decidiria se o
+// teste passa seria o relogio.
+vi.mock("@/features/telemetry/fila", () => ({
+    enfileirar: (evento: EventoDeProduto) => {
+        eventos.push(evento)
     },
+    descarregar: () => {},
+    _zerarFila: () => {},
 }))
 
 let caminhoAtual = "/library"
@@ -61,20 +38,20 @@ function clienteDeTeste() {
     return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
+let cliente = clienteDeTeste()
+
 function Envolvido({ children }: { children?: ReactNode }) {
     return (
         <QueryClientProvider client={cliente}>
-            <VazioDaTelaProvider>
+            <ProntidaoDaTelaProvider>
                 <TelemetriaDeTela />
                 {children}
-            </VazioDaTelaProvider>
+            </ProntidaoDaTelaProvider>
         </QueryClientProvider>
     )
 }
 
-let cliente = clienteDeTeste()
-
-function TelaComLista({ itens }: { itens: string[] }) {
+function TelaComLista({ itens, principal = false }: { itens: string[]; principal?: boolean }) {
     const query = useQuery({
         queryKey: ["tela-de-teste", itens.length],
         queryFn: async () => itens,
@@ -82,6 +59,7 @@ function TelaComLista({ itens }: { itens: string[] }) {
     return (
         <QueryBoundary
             query={query}
+            principal={principal}
             skeleton={<p>carregando</p>}
             empty={<p>vazio</p>}
             error={() => <p>erro</p>}
@@ -91,71 +69,153 @@ function TelaComLista({ itens }: { itens: string[] }) {
     )
 }
 
-describe("TelemetriaDeTela", () => {
+describe("TelemetriaDeTela — desfechos", () => {
     beforeEach(() => {
         eventos.length = 0
         caminhoAtual = "/library"
         cliente = clienteDeTeste()
     })
 
-    it("tela sem query nenhuma emite medido_ate 'pintura' e is_empty null", async () => {
-        render(<Envolvido />)
-        await waitFor(() => expect(eventos).toHaveLength(1))
-        expect(eventos[0].name).toBe("screen_viewed")
-        expect(eventos[0].properties.screen).toBe("/library")
-        expect(eventos[0].properties.medido_ate).toBe("pintura")
-        // null, nao false: ninguem reportou vazio nenhum nesta tela.
-        expect(eventos[0].properties.is_empty).toBeNull()
+    // O desmonte agenda a decisao do evento para o tick seguinte (ver o cleanup
+    // do TelemetriaDeTela). O desmonte automatico do RTL roda DEPOIS do teste,
+    // entao sem drenar esse tick aqui a linha de um teste cairia dentro do
+    // proximo — e o `beforeEach` limparia o array antes de ela chegar.
+    afterEach(async () => {
+        cleanup()
+        await new Promise((r) => setTimeout(r, 0))
     })
 
-    it("tela que busca dados espera a query assentar e emite 'dados'", async () => {
+    it("regiao que resolve com dados emite 'dados' e is_empty false", async () => {
         render(
             <Envolvido>
-                <TelaComLista itens={["a", "b"]} />
+                <TelaComLista itens={["a", "b"]} principal />
             </Envolvido>
         )
         await screen.findByText("2 itens")
         await waitFor(() => expect(eventos).toHaveLength(1))
         expect(eventos[0].properties.medido_ate).toBe("dados")
         expect(eventos[0].properties.is_empty).toBe(false)
+        expect(eventos[0].properties.principal_declarada).toBe(true)
     })
 
-    it("lista vazia chega na telemetria como is_empty true", async () => {
+    it("lista vazia emite 'vazio' e is_empty true", async () => {
         render(
             <Envolvido>
-                <TelaComLista itens={[]} />
+                <TelaComLista itens={[]} principal />
             </Envolvido>
         )
         await screen.findByText("vazio")
         await waitFor(() => expect(eventos).toHaveLength(1))
+        expect(eventos[0].properties.medido_ate).toBe("vazio")
         expect(eventos[0].properties.is_empty).toBe(true)
     })
 
-    // A tela anterior deixou entrada no cache — que e o estado normal da
-    // segunda navegacao em diante, e o caso que o gatilho original errava:
-    // perguntando ao cache GLOBAL se ele tem alguma entrada, uma tela sem query
-    // nenhuma nunca pegava o caminho da pintura e ficava esperando um evento de
-    // cache que so chega no gcTime. Resultado: nenhum evento, ou um `load_ms`
-    // de minutos rotulado `dados`.
-    it("tela sem query emite mesmo com o cache quente da tela anterior", async () => {
-        cliente.setQueryData(["tela-anterior"], ["deixado pela tela de antes"])
-        expect(cliente.getQueryCache().getAll()).toHaveLength(1)
-
-        render(<Envolvido />)
+    // Este e o caso que o gatilho antigo errava: a regiao existe mas o dado veio
+    // de hidratacao, sem requisicao do navegador. O antigo caia em "pintura" no
+    // primeiro frame; este exige "dados".
+    it("regiao servida por cache quente (sem requisicao) emite 'dados'", async () => {
+        cliente.setQueryData(["tela-de-teste", 2], ["a", "b"])
+        render(
+            <Envolvido>
+                <TelaComLista itens={["a", "b"]} principal />
+            </Envolvido>
+        )
+        await screen.findByText("2 itens")
         await waitFor(() => expect(eventos).toHaveLength(1))
-        expect(eventos[0].properties.medido_ate).toBe("pintura")
+        expect(eventos[0].properties.medido_ate).toBe("dados")
+    })
+
+    it("regiao em erro emite 'erro' e is_empty null", async () => {
+        function TelaQueFalha() {
+            const query = useQuery({
+                queryKey: ["falha"],
+                queryFn: async () => {
+                    throw new Error("estourou")
+                },
+                retry: false,
+            })
+            return (
+                <QueryBoundary
+                    query={query}
+                    principal
+                    skeleton={<p>carregando</p>}
+                    empty={<p>vazio</p>}
+                    error={() => <p>erro</p>}
+                >
+                    {() => <p>nunca</p>}
+                </QueryBoundary>
+            )
+        }
+        render(
+            <Envolvido>
+                <TelaQueFalha />
+            </Envolvido>
+        )
+        await screen.findByText("erro")
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        expect(eventos[0].properties.medido_ate).toBe("erro")
+        expect(eventos[0].properties.is_empty).toBeNull()
+    })
+
+    it("com duas regioes, quem decide e a principal, e sai uma linha so", async () => {
+        render(
+            <Envolvido>
+                <TelaComLista itens={[]} />
+                <TelaComLista itens={["a", "b", "c"]} principal />
+            </Envolvido>
+        )
+        await screen.findByText("3 itens")
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        await new Promise((r) => setTimeout(r, 50))
+        expect(eventos).toHaveLength(1)
+        // A lista vazia tambem reportou; quem manda no is_empty e a principal.
+        expect(eventos[0].properties.is_empty).toBe(false)
+        expect(eventos[0].properties.principal_declarada).toBe(true)
+    })
+
+    it("sem nenhuma principal declarada, vale o primeiro report, e o evento diz isso", async () => {
+        render(
+            <Envolvido>
+                <TelaComLista itens={["a"]} />
+            </Envolvido>
+        )
+        await screen.findByText("1 itens")
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        expect(eventos[0].properties.medido_ate).toBe("dados")
+        expect(eventos[0].properties.principal_declarada).toBe(false)
+    })
+
+    // A Biblioteca e as duas coisas de uma vez: StrictMode em `npm run dev` E
+    // dado servido por hidratacao, que ja esta no cache no PRIMEIRO commit.
+    // Ai o report sai dentro do passe 1 do StrictMode, antes do remonte — o
+    // caminho em que um dedupe mal posto produz duas linhas ou nenhuma. O teste
+    // acima nao cobre isto: nele a query e fria e so resolve depois do remonte.
+    it("sob StrictMode, com cache quente, ainda emite exatamente uma linha", async () => {
+        cliente.setQueryData(["tela-de-teste", 2], ["a", "b"])
+        render(
+            <StrictMode>
+                <Envolvido>
+                    <TelaComLista itens={["a", "b"]} principal />
+                </Envolvido>
+            </StrictMode>
+        )
+        await screen.findByText("2 itens")
+        await waitFor(() => expect(eventos).toHaveLength(1))
+        await new Promise((r) => setTimeout(r, 50))
+        expect(eventos).toHaveLength(1)
+        expect(eventos[0].properties.medido_ate).toBe("dados")
     })
 
     // O StrictMode do `npm run dev` monta o efeito, desmonta e monta de novo.
     // Este teste pede EXATAMENTE uma linha, e falha dos dois lados: zero (a
     // emissao morreu no cleanup) e dois (a tela contou dobrado) reprovam
     // igual. O `next.config.ts` nao desliga Strict Mode e o default do Next 16
-    // e `true`, entao este e o modo em que a prova viva do Passo 10 vai rodar.
+    // e `true`, entao este e o modo em que a prova viva vai rodar.
     it("sob StrictMode emite exatamente uma linha", async () => {
         render(
             <StrictMode>
                 <Envolvido>
-                    <TelaComLista itens={["a", "b"]} />
+                    <TelaComLista itens={["a", "b"]} principal />
                 </Envolvido>
             </StrictMode>
         )
@@ -170,7 +230,7 @@ describe("TelemetriaDeTela", () => {
     it("uma navegacao emite uma linha, nao duas", async () => {
         const { rerender } = render(
             <Envolvido>
-                <TelaComLista itens={["a"]} />
+                <TelaComLista itens={["a"]} principal />
             </Envolvido>
         )
         await screen.findByText("1 itens")
@@ -178,7 +238,7 @@ describe("TelemetriaDeTela", () => {
 
         rerender(
             <Envolvido>
-                <TelaComLista itens={["a"]} />
+                <TelaComLista itens={["a"]} principal />
             </Envolvido>
         )
         await new Promise((r) => setTimeout(r, 50))

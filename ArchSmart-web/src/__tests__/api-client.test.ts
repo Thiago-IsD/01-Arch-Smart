@@ -58,6 +58,20 @@ describe("criarCliente", () => {
         expect(params.has("q")).toBe(false)
     })
 
+    it("propaga keepalive ao fetch, e so quando pedido", async () => {
+        // A telemetria descarrega a fila no `pagehide`, e sem `keepalive` o
+        // navegador aborta a requisição no unload do documento — perda
+        // silenciosa. jsdom não destrói documento, então o que dá para provar é
+        // que a opção chega ao init do fetch.
+        const comKeepalive = clienteDeTeste(json({ ok: true }))
+        await comKeepalive.cliente("/api/telemetry/events", { method: "POST", body: {}, keepalive: true })
+        expect(comKeepalive.fetchFalso.mock.calls[0][1].keepalive).toBe(true)
+
+        const semKeepalive = clienteDeTeste(json({ ok: true }))
+        await semKeepalive.cliente("/api/products")
+        expect(semKeepalive.fetchFalso.mock.calls[0][1].keepalive).toBeUndefined()
+    })
+
     it("propaga o AbortSignal do chamador", async () => {
         const { cliente, fetchFalso } = clienteDeTeste(json({ ok: true }))
         const controller = new AbortController()

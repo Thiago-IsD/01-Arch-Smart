@@ -74,13 +74,25 @@ const FormItemContext = React.createContext<FormItemContextValue | null>(null)
 
 const FormItem = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & {
+    /**
+     * Marca `data-private` para telemetria e session replay nunca capturarem
+     * o valor. Mora aqui, e nao na tela, porque "este campo e sensivel" e
+     * decisao de produto — deixa-la na tela e como ela some.
+     */
+    sensivel?: boolean
+  }
+>(({ className, sensivel = false, ...props }, ref) => {
   const id = React.useId()
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div ref={ref} className={cn("space-y-2", className)} {...props} />
+      <div
+        ref={ref}
+        data-private={sensivel ? "true" : undefined}
+        className={cn("space-y-2", className)}
+        {...props}
+      />
     </FormItemContext.Provider>
   )
 })
