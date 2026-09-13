@@ -63,9 +63,24 @@ def entitlements_da_conta(db: Session, account_id: UUID) -> dict[str, Any]:
     )
     if linha is None:
         return dict(PADRAO)
+    return entitlements_de(*linha)
 
-    status, limits = linha
-    if status == SubscriptionStatus.CANCELED:
+
+def entitlements_de(status: SubscriptionStatus | None, limits: Any) -> dict[str, Any]:
+    """
+    A regra, separada da consulta que busca a linha.
+
+    Existe porque ha DOIS jeitos de chegar a essa linha e a regra tem que ser
+    uma so: `entitlements_da_conta` busca por `account_id`, e o caminho
+    compartilhado de `get_context` busca a assinatura no mesmo SELECT que
+    resolve o usuario (`app/core/security.py`), para nao pagar uma segunda ida
+    a rede em toda requisicao autenticada. Duplicar o `if CANCELED` nos dois
+    lugares e como um deles envelhece sozinho.
+
+    `status is None` e a linha sem assinatura nenhuma — o outer join do
+    caminho compartilhado devolve isso em vez de `None`.
+    """
+    if status is None or status == SubscriptionStatus.CANCELED:
         return dict(PADRAO)
 
     limites = limits or {}
