@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 50/64 (78%)**
-`████████████████░░░░`
+**Progresso geral: 50/65 (77%)**
+`███████████████░░░░░`
 
-_Última atualização: 2026-09-12_
+_Última atualização: 2026-09-13_
 
 ---
 
@@ -971,12 +971,25 @@ _Última atualização: 2026-09-12_
 > plataforma inteira.
 
 ## Seção 8 · Migração das telas
-**1/9 (11%)** `██░░░░░░░░░░░░░░░░░░`
+**1/10 (10%)** `██░░░░░░░░░░░░░░░░░░`
 
 > Cada tela migrada aqui converte também as **cores literais** e as **imagens**
 > dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
 > não duas. São 521 cores em 39 arquivos e 25 `<img>` (medido em 09/09/2026).
 > Não são caixas próprias; são parte da migração de cada tela.
+
+> **A primeira caixa não é tela, e está ali de propósito (13/09/2026).** A
+> Seção 8 mediu o P95 de `/api/products` em **634 ms** contra o orçamento de
+> **400 ms**, e a spec já tinha decidido que estourar o orçamento abre tarefa de
+> backend própria em vez de virar otimização de passagem. A medição de 13/09
+> mostrou que o custo **não é da query** (17 ms) nem só do JWT (~0,28 s): uma
+> requisição autenticada custa **~2,3 s** na API implantada, e duas rotas que
+> fazem trabalhos diferentes custam o mesmo — o custo está no caminho
+> compartilhado, e **ninguém mediu onde**. A tarefa é medir primeiro. Descrição,
+> números e o que **não** fazer em
+> [`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md).
+> Enquanto ela não fechar, cada tela migrada mede o mesmo custo e parece lenta
+> por conta própria.
 
 > **Pendência de Art. 8 que a Tarefa 9 da Seção 6 encontrou e não corrigiu de
 > passagem (10/09/2026):** o Orçamento usa um evento de janela com a marca
@@ -996,6 +1009,7 @@ _Última atualização: 2026-09-12_
 > `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
 > silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
+- [ ] **Custo da requisição autenticada** (não é tela; precede as oito)
 - [x] Biblioteca
 - [ ] Dashboard
 - [ ] Projetos (lista + detalhe)
