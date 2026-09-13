@@ -1,9 +1,13 @@
 # O custo de uma requisição autenticada — medido em 13/09/2026
 
-> **A metade de medir está feita.** A tarefa foi descrita em 13/09/2026, por
-> decisão de Thiago, para preceder o Dashboard — e **executada no mesmo dia**:
-> os números estão em "Onde vão os ~1,5 s", no meio deste arquivo. O que
-> continua aberto é **o conserto**, e a escolha dele é de Thiago.
+> **A metade de medir está feita, e quatro correções de código já entraram.**
+> A tarefa foi descrita em 13/09/2026, por decisão de Thiago, para preceder o
+> Dashboard — e **executada no mesmo dia**: os números estão em "Onde vão os
+> ~1,5 s", no meio deste arquivo. Thiago então escolheu "as baratas primeiro, a
+> distância depois", e o que entrou está em "O que foi consertado". **O que
+> continua aberto é a distância até o banco** — a única saída que sozinha cabe
+> no orçamento — **e a medição do que já foi consertado, que só existe depois
+> do deploy.**
 >
 > Leia até o fim antes de escolher o trabalho. **A primeira hipótese estava
 > errada** — a seção "O que eu afirmei e a medição desmentiu" diz em quê — e a
@@ -372,6 +376,64 @@ decide é esta: **somadas, todas as correções de código deixam a chamada em
 ~1,2 s**, ainda três vezes o orçamento; **só encurtar a distância até o banco
 cabe nos 400 ms**, e isso é troca de topologia ou de fornecedor, porque o Render
 não tem região na América do Sul. **É decisão de Thiago, não de quem executa.**
+
+## O que foi consertado em 13/09/2026, e o que ainda não foi medido
+
+Thiago escolheu "as baratas primeiro, a distância depois". Quatro correções
+entraram na branch `custo-da-requisicao-autenticada`, cada uma com o teste que
+reprova a volta do defeito:
+
+| Correção | Commit | O que mudou, medido |
+|---|---|---|
+| Barra final nas duas rotas que a exigem | `7ed0ac5` | 6 chamadas do front deixaram de pagar um `307` de 0,29 s; a Biblioteca pagava **dois** |
+| `joinedload` em `state` e `origin` da lista | `5fb707e` | a chamada da Biblioteca foi de **8 para 4** consultas |
+| Usuário e entitlements numa consulta só | `302c19c` | o caminho compartilhado foi de **2 para 1**; a chamada da Biblioteca, de 4 para **3** |
+| Validação local do ES256 por JWKS | `7daf7ae` | a ida remota a `/auth/v1/user` **sumiu** do caminho quente |
+
+**As contagens são medidas, contra o banco de staging**, com o mesmo contador de
+"Como reproduzir". A chamada que a Biblioteca faz saiu de **8 consultas** para
+**3** — `users`, a contagem, e a página.
+
+A ida remota do JWT sumiu de verdade, e isso é observável no log: a linha
+`Validacao local do JWT falhou (The specified alg value is not allowed);
+tentando remota` e o `GET .../auth/v1/user` que vinha atrás dela **não aparecem
+mais**. No lugar delas, um `GET .../auth/v1/.well-known/jwks.json` **uma vez por
+processo**. O preço assumido: a primeira requisição autenticada de cada processo
+paga essa busca; as seguintes, nenhuma.
+
+### O que isso deve dar na API implantada — **previsão, não medição**
+
+Pelo modelo desta página, a chamada que a Biblioteca faz sai de **2,55 s** (o
+`307` mais a requisição) para:
+
+```
+0,29  rede ate o Render + app
+0,00  JWT remoto (era 0,24)
+1,02  0,17 × (3 de protocolo + 3 consultas)
+----
+1,31 s
+```
+
+Cerca de **metade**. E, exatamente como a tabela "As saídas" antecipava, **ainda
+é três vezes o orçamento de 400 ms** — o que sobra é distância, e distância não
+se conserta com código.
+
+> ⚠️ **Nada disso foi medido contra a API implantada, porque o código ainda não
+> está implantado.** Staging serve a branch `staging`; enquanto a branch de
+> conserto não chegar lá, o número real não existe. O comando que produz esse
+> número é o mesmo de "Como reproduzir", e o resultado dele é o que fecha a
+> primeira caixa da Seção 8 — não esta previsão.
+
+### O que ficou de fora, de propósito
+
+- **O N+1 de `/api/projects`** (12 consultas numa página de 5 projetos:
+  `environments` e `clients` por linha). Não estava na escolha de Thiago, e é a
+  próxima economia óbvia de código — vale ~1,0 s naquela rota. Quem migrar a
+  tela de Projetos encontra isso pela frente.
+- **`pool_pre_ping`**, que vale 0,17 s por requisição. Desligá-lo troca latência
+  por risco de servir conexão morta, e a decisão não é de quem executa.
+- **As três idas de protocolo** (pre-ping, `BEGIN`, `ROLLBACK`) continuam as
+  três.
 
 ### O que não fazer
 
