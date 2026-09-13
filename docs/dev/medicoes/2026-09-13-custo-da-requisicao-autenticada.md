@@ -1,11 +1,14 @@
 # O custo de uma requisição autenticada — medido em 13/09/2026
 
-> **Isto é a descrição da tarefa que precede a migração da próxima tela**, e a
-> evidência que a justifica. Ela **não** foi executada: foi descrita, por decisão
-> de Thiago em 13/09/2026, para começar antes do Dashboard.
+> **A metade de medir está feita.** A tarefa foi descrita em 13/09/2026, por
+> decisão de Thiago, para preceder o Dashboard — e **executada no mesmo dia**:
+> os números estão em "Onde vão os ~1,5 s", no meio deste arquivo. O que
+> continua aberto é **o conserto**, e a escolha dele é de Thiago.
 >
 > Leia até o fim antes de escolher o trabalho. **A primeira hipótese estava
-> errada**, e a seção "O que eu afirmei e a medição desmentiu" diz em quê.
+> errada** — a seção "O que eu afirmei e a medição desmentiu" diz em quê — e a
+> segunda estava incompleta: a medição encontrou uma causa maior que o JWT, e
+> "O que esta medição corrige" diz qual.
 
 ## Por que esta tarefa existe
 
@@ -56,6 +59,11 @@ token inválido (0,55 s) e a rota sem autenticação (0,27 s): esse caminho não
 toca o banco, não monta contexto, e só faz a ida ao Supabase que volta
 "inválido". O diagnóstico da Seção 8 está confirmado — e o algoritmo também:
 
+> Este 0,28 s veio de 3 a 6 amostras. A medição da tarde do mesmo dia repetiu a
+> conta com **9 amostras de cada lado** e fechou em **0,240 s** (0,527 − 0,287).
+> É o mesmo fenômeno com amostra maior; use **0,240 s**, que é o número que a
+> seção "Cada parcela, isolada" sustenta.
+
 ```bash
 # o cabeçalho do JWT que staging emite
 # -> {"alg": "ES256", "kid": "...", "typ": "JWT"}
@@ -90,30 +98,280 @@ sem isolá-la**. A diferença entre `/health` e uma rota autenticada estava
 medida; a atribuição dessa diferença ao JWT era inferência. Bastou um token
 inválido para separar as duas.
 
-## A tarefa
+## Onde vão os ~1,5 s — medido em 13/09/2026
 
-**Primeiro medir onde vão os ~1,5 s, depois consertar.** Escolher o conserto
-antes da medição é repetir o erro acima, com mais confiança.
+### O método: fazer o número de consultas variar
 
-O que a medição precisa separar, porque cada um tem conserto diferente:
+Medir por dentro exigiria instrumentar e implantar. Não foi preciso, porque a
+própria API oferece uma alavanca: **`GET /api/projects` tem N+1** — carrega
+`environments` e `clients` por projeto —, então o número de consultas muda com
+o tamanho da página sem mudar mais nada. Com o número de consultas conhecido
+para cada rota, o tempo medido de fora vira um sistema de equações.
 
-- **quantas idas ao banco** uma requisição autenticada faz antes de chegar ao
-  endpoint. O resolvedor de identidade busca usuário, conta e entitlements; se
-  forem consultas sequenciais contra o pooler em `sa-east-1`, cada ida custa
-  latência de rede, e o total é multiplicação, não soma;
-- **quanto custa a ida remota do JWT** dentro do total (já medido isolado: ~0,28 s);
-- **quanto é do Render free tier** — instância pequena, e o
-  [ADR 0009](../decisoes/0009-prefetch-dentro-de-suspense.md) já registra cold
-  start de 41,9 s. O contêiner foi aquecido antes destas medições, mas "aquecido"
-  não é "rápido";
-- **quanto é do desvio 307.** `/api/products` sem barra final responde 307 para
-  `/api/products/`, e o navegador paga as duas idas. Não é o grosso, mas é
-  gratuito de consertar e está em rota que toda tela usa.
+Duas condições precisam valer para a contagem feita aqui descrever o que a API
+implantada executa, e as duas foram verificadas antes:
 
-Só depois disso escolher entre: verificação local do JWT por JWKS (recupera os
-~0,28 s e tira a dependência do Supabase do caminho quente), reduzir as idas ao
-banco na montagem do contexto, cache de contexto por requisição, ou instância
-maior.
+```bash
+git log --oneline origin/staging..HEAD -- ArchSmart-api   # vazio: e o mesmo codigo
+```
+
+e a contagem roda contra o **banco de staging**, que é o mesmo que a API
+implantada usa (bloco ativo do `ArchSmart-api/.env`).
+
+A contagem, com `before_cursor_execute` ligado no engine (script em "Como
+reproduzir"):
+
+| Rota | Consultas | Quais |
+|---|---:|---|
+| caminho compartilhado, antes de qualquer endpoint | **2** | `users` (resolvedor de identidade) + `subscriptions⋈plans` (entitlements) |
+| `/health/db` | 1 | `SELECT 1` |
+| `/api/products/?size=1` | 6 | as 2 + contagem + página + `product_states` + `product_origins` |
+| `/api/products/?size=15` — **a chamada que a Biblioteca faz** | 8 | as 2 + contagem + página + `product_states` + `product_origins` ×3 |
+| `/api/projects?size=1` | 6 | as 2 + contagem + página + `environments` + `clients` |
+| `/api/projects?size=20` | **12** | as 2 + contagem + página + `environments` ×5 + `clients` ×3 — **N+1** |
+| `/api/users/me` | 6 | repete `users` e os entitlements que o caminho compartilhado já tinha buscado |
+
+### O tempo, medido de fora contra a API implantada
+
+Medianas de 7 amostras, descartada a rodada de aquecimento, com o contêiner
+quente — a primeira chamada do dia custou **41,8 s** de cold start ([ADR
+0009](../decisoes/0009-prefetch-dentro-de-suspense.md)):
+
+| Rota | Consultas | Mediana | Faixa |
+|---|---:|---:|---|
+| `/health` | 0 | **0,294 s** | 0,269 – 0,682 |
+| `/health/db` | 1 | **0,990 s** | 0,968 – 1,426 |
+| `/api/products/?size=1` | 6 | **2,013 s** | 1,931 – 2,598 |
+| `/api/products/?size=15` (a da tela) | 8 | **2,29 s** | 2,280 – 2,900 |
+| `/api/products/?size=20` | 8 | **2,319 s** | 2,280 – 4,842 |
+| `/api/projects?size=20` | 12 | **3,037 s** | 3,011 – 3,563 |
+| `/api/users/me` com token **inválido** | 0 | **0,527 s** | 0,473 – 0,965 (n=9) |
+
+### O modelo que sai desses números
+
+Mínimos quadrados sobre os três pontos autenticados (6, 8 e 12 consultas) dá
+**0,172 s por consulta** e um custo fixo de 0,966 s. As duas rotas sem
+autenticação caem na mesma reta se o custo fixo incluir **três idas de
+protocolo** além das consultas:
+
+```
+tempo ≈ 0,29 s  (rede ate o Render + app)
+      + 0,24 s  (so se autenticado: a validacao remota do JWT)
+      + 0,17 s × (3 + numero de consultas)
+      + 0,29 s  (so se a chamada vier sem a barra final: o 307)
+```
+
+| Rota | Previsto | Medido | Resíduo |
+|---|---:|---:|---:|
+| `/health/db` | 0,98 s | 0,99 s | +0,01 |
+| `/api/products/?size=1` | 2,09 s | 2,01 s | −0,08 |
+| `/api/products/?size=15` | 2,42 s | 2,29 s | −0,13 |
+| `/api/projects?size=20` | 3,10 s | 3,04 s | −0,06 |
+
+O resíduo é negativo e cresce com o número de consultas: a consulta marginal
+custa um pouco **menos** que 0,17 s, e o modelo superestima na casa de 5%. Ele
+não é teoria — é o ajuste de três séries independentes, e cada parcela dele foi
+medida **separada** abaixo.
+
+### Cada parcela, isolada
+
+**1. Uma ida ao banco custa 0,17 s a partir do contêiner — e 0,016 s deste
+notebook.** O coeficiente sai de dois segmentos independentes:
+(2,319−2,013)/2 = 0,153 e (3,037−2,319)/4 = 0,180. O mesmo pooler, consultado
+direto daqui, responde um `SELECT 1` em **15,6 ms** (mediana de 10). A API está
+cerca de **onze vezes mais longe do banco** do que um notebook no Brasil está.
+
+**2. São três idas de protocolo por requisição, além das consultas.** Um ciclo
+de sessão com o pool **já quente** — abrir `SessionLocal`, um `SELECT 1`,
+fechar — custa **64,7 ms** aqui, contra os 15,6 ms do round trip cru: **4,1
+idas para uma consulta só**. O log com `sqlalchemy.pool` em DEBUG nomeia as
+outras três:
+
+```
+Pool pre-ping on connection ...   <- pool_pre_ping=True, 1 ida
+BEGIN (implicit)                  <- 1 ida
+SELECT 1                          <- a consulta
+ROLLBACK                          <- db.close(), 1 ida
+```
+
+A 0,17 s cada, isso é **~0,52 s por requisição que não é consulta nenhuma** — e
+bate com o custo fixo que o ajuste externo encontrou (0,966 − 0,29 − 0,24 =
+0,44 s, mesma ordem). Abrir a conexão física, quando é preciso, custa **412 ms**
+daqui.
+
+**3. A validação remota do JWT custa 0,240 s.** É a diferença entre
+`/api/users/me` com token inválido (0,527 s) e `/health` (0,287 s), medianas de
+9 amostras cada. Esse caminho não toca o banco: o `get_db` só abre conexão na
+primeira consulta, e ela não acontece. O diagnóstico da Seção 8 continua certo
+— staging assina em ES256 e `app/core/security.py:81` aceita só HS256 — e agora
+tem tamanho: **12% do custo da chamada da Biblioteca**.
+
+**4. O desvio 307 custa 0,29 s, e a Biblioteca o paga duas vezes.** O `307`
+sozinho mede 0,285 s, igual ao `/health`, porque não toca banco nem token.
+`LibraryData.tsx:36` e `:46` chamam `/api/products` **sem** a barra final, então
+a lista e o badge pagam um ida-e-volta cada antes de a requisição de verdade
+começar.
+
+**5. Não é a CPU do free tier.** Oito requisições de 12 consultas em paralelo —
+96 idas ao banco — terminaram em **4,11 s de parede**, cada uma levando ~3,8 s
+contra 3,4 s sozinha. Se o custo fosse CPU serializada seriam ~24 s. **O tempo é
+espera, não cálculo.**
+
+### O que esta medição corrige
+
+- **"Isso mede a ida e volta Brasil → Render free tier mais a CPU do free
+  tier"** — a nota de 12/09 em
+  [`2026-09-06-biblioteca-depois.md`](2026-09-06-biblioteca-depois.md) sobre os
+  2762 ms medidos contra staging. A ida e volta até o Render mede **0,29 s**, e a
+  CPU não é o gargalo (leitura 5). O que sobra é o trecho **Render → banco**, que
+  ninguém tinha medido.
+- **"O imposto do JWT é ~420 ms"**, que eu escrevi em 12/09: são **240 ms**.
+- **Os dois números da Seção 8 estão certos, e medem ambientes diferentes.** O
+  P95 de 634 ms foi medido contra a API **local**, onde uma ida ao banco custa
+  16 ms e o JWT remoto domina — foi por isso que a conclusão de lá apontou para
+  JWKS. Na API **implantada**, o mesmo endpoint custa 2,29 s e quem domina é a
+  distância até o banco. As duas leituras são verdadeiras; a implantada é a que o
+  usuário sente.
+
+### As saídas, e o que cada uma tem para dar
+
+Estimativas **derivadas do modelo acima**, não medições — a medição vem depois
+do conserto. Referência: a chamada que a Biblioteca faz, **2,29 s**, com 8
+consultas e 11 idas ao banco.
+
+| Saída | Ganho estimado | O que custa |
+|---|---:|---|
+| Barra final na chamada do front (mata o 307) | **−0,29 s** ×2 chamadas | uma linha em `LibraryData.tsx`; sem risco |
+| Validar ES256 localmente por JWKS | **−0,24 s** | tarefa de backend; tira o Supabase do caminho quente |
+| Unir as 2 consultas do caminho compartilhado em 1 | −0,17 s | um join em `get_context` |
+| `joinedload` em `product_states`/`product_origins` | −0,5 s | some com 3 das 8 consultas da lista |
+| Matar o N+1 de `/api/projects` | −1,0 s naquela rota | 12 consultas → 4 |
+| Desligar `pool_pre_ping` | −0,17 s | troca latência por risco de servir conexão morta |
+| **Encurtar a distância até o banco** | **−1,8 s** | ver abaixo — é a única que sozinha cabe no orçamento |
+
+Somando **tudo menos a última**, a chamada cairia para ~1,2 s: ainda **três
+vezes** o orçamento de 400 ms. A distância é o multiplicador; o resto é adição.
+
+**E a distância tem uma restrição que muda as opções:** o Render **não tem
+região na América do Sul** — Oregon, Ohio, Virgínia, Frankfurt e Singapura — e
+**não permite trocar a região de um serviço existente**; a saída dele é recriar
+o serviço em outra região ([render.com/docs/regions](https://render.com/docs/regions),
+lido em 13/09/2026). O banco está em `aws-0-sa-east-1` e os usuários também
+estão no Brasil. As três formas de encurtar a distância não são equivalentes:
+
+1. **Mover a API para um host com São Paulo** (Fly.io `gru`, Cloud Run
+   `southamerica-east1`, AWS `sa-east-1`): fica perto do banco **e** dos
+   usuários. É a única que melhora as duas pontas.
+2. **Mover o banco para a região da API**: aproxima os dois, mas afasta o Auth do
+   Supabase dos usuários, e trocar de projeto Supabase é recriar Auth e dados —
+   barato em staging, caro em produção.
+3. **Recriar o serviço Render na Virgínia**: mais perto que Oregon, sem trocar de
+   fornecedor; ganho parcial e não medido.
+
+**Nenhuma das três é decisão de quem executa**: é troca de fornecedor ou de
+topologia, e é de Thiago.
+
+> **Um fato que falta, e que só o painel do Render tem:** em que região o
+> serviço de staging está. Nada aqui depende dele — a distância foi medida, não
+> deduzida —, mas ele diz qual das três saídas é a mais curta. `docs/dev/`
+> registra a região do banco e do frontend, e **não** a do Render.
+
+### Como reproduzir
+
+```bash
+# 1. token do usuario de teste
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; . ./.env.local; set +a
+TOKEN=$(python -c "
+import json,os,urllib.request
+url=os.environ['NEXT_PUBLIC_SUPABASE_URL'].rstrip('/')+'/auth/v1/token?grant_type=password'
+c=json.dumps({'email':os.environ['E2E_EMAIL'],'password':os.environ['E2E_PASSWORD']}).encode()
+r=urllib.request.Request(url,data=c,method='POST',headers={'apikey':os.environ['NEXT_PUBLIC_SUPABASE_ANON_KEY'],'Content-Type':'application/json'})
+print(json.load(urllib.request.urlopen(r,timeout=45))['access_token'])")
+
+# 2. a serie de tempos. A PRIMEIRA chamada do dia paga ~42 s de cold start:
+#    descarte a rodada de aquecimento antes de tirar mediana.
+API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
+for n in $(seq 8); do
+  for u in "$API/health" "$API/health/db" "$API/api/products/?page=1&size=1" \
+           "$API/api/products/?page=1&size=20" "$API/api/projects?page=1&size=20"; do
+    curl -s -o /dev/null -w "$u %{time_total}\n" --max-time 120 -H "$H" "$u"
+  done
+done
+
+# 3. a ida remota do JWT, isolada por um token invalido (nao toca o banco)
+curl -s -o /dev/null -w "%{http_code} %{time_total}\n" \
+  -H "Authorization: Bearer nao.e.jwt" "$API/api/users/me"
+
+# 4. o custo do 307: sem barra final contra com barra final
+curl -s -o /dev/null -w "%{http_code} %{time_total}\n" -H "$H" "$API/api/products?page=1&size=20"
+curl -s -o /dev/null -w "%{http_code} %{time_total}\n" -H "$H" "$API/api/products/?page=1&size=20"
+
+# 5. nao e CPU: oito pesadas em paralelo (~4 s de parede, nao ~24 s)
+for i in $(seq 8); do curl -s -o /dev/null -w "p$i=%{time_total}\n" -H "$H" \
+  "$API/api/projects?page=1&size=20" & done; wait
+
+# 6. o round trip cru ate o mesmo pooler, deste notebook: mediana 15,6 ms
+cd ../ArchSmart-api && ./venv/Scripts/python.exe -c "
+import os,time,statistics,psycopg2
+from dotenv import load_dotenv; load_dotenv('.env')
+c=psycopg2.connect(os.environ['DATABASE_URL']); cur=c.cursor()
+a=[]
+for _ in range(10):
+    t=time.perf_counter(); cur.execute('SELECT 1'); cur.fetchone(); a.append((time.perf_counter()-t)*1000)
+print('SELECT 1 mediana', round(statistics.median(a),1), 'ms')"
+```
+
+A contagem de consultas por rota, contra o banco de staging (só leitura), com o
+`venv` da API e o `TOKEN` acima no ambiente:
+
+```python
+# rode de ArchSmart-api
+import time
+from sqlalchemy import event
+from app.db.session import engine
+from app.main import app
+from fastapi.testclient import TestClient
+
+q = []
+event.listen(engine, "before_cursor_execute",
+             lambda c, cur, s, p, ctx, m: c.info.__setitem__("_t0", time.perf_counter()))
+event.listen(engine, "after_cursor_execute",
+             lambda c, cur, s, p, ctx, m: q.append(((time.perf_counter() - c.info["_t0"]) * 1000, s)))
+
+r = TestClient(app).get("/api/products/?page=1&size=15",
+                        headers={"Authorization": f"Bearer {TOKEN}"})
+print(r.status_code, "consultas:", len(q), "soma_sql:", round(sum(ms for ms, _ in q)), "ms")
+```
+
+As três idas de protocolo aparecem com os dois loggers do SQLAlchemy em DEBUG —
+`sqlalchemy.pool` imprime o pre-ping, `sqlalchemy.engine` imprime `BEGIN` e
+`ROLLBACK` — num ciclo de sessão feito **depois** de o pool já estar quente.
+
+## A tarefa — o que sobrou dela
+
+**Primeiro medir onde vão os ~1,5 s, depois consertar.** A primeira metade está
+feita, e as quatro perguntas que ela tinha que separar têm resposta medida:
+
+- ~~**quantas idas ao banco**~~ → **duas antes do endpoint** (usuário e
+  entitlements), **oito** na chamada que a Biblioteca faz, e **mais três de
+  protocolo** por requisição (pre-ping, `BEGIN`, `ROLLBACK`). E era
+  multiplicação mesmo: **0,17 s cada**, contra 0,016 s deste notebook para o
+  mesmo pooler.
+- ~~**quanto custa a ida remota do JWT**~~ → **0,240 s**, 12% do total da
+  chamada da Biblioteca.
+- ~~**quanto é do Render free tier**~~ → a ida e volta até ele mede **0,29 s**, e
+  a **CPU não é o gargalo**: oito requisições de 12 consultas em paralelo
+  terminam em **4,11 s** de parede, não nos ~24 s que a CPU serializada exigiria.
+- ~~**quanto é do desvio 307**~~ → **0,29 s**, e a Biblioteca o paga **duas
+  vezes** (`LibraryData.tsx:36` e `:46`).
+
+**O que sobrou é a escolha do conserto.** As opções, com o ganho estimado de
+cada uma, estão em "As saídas, e o que cada uma tem para dar" — e a conta que
+decide é esta: **somadas, todas as correções de código deixam a chamada em
+~1,2 s**, ainda três vezes o orçamento; **só encurtar a distância até o banco
+cabe nos 400 ms**, e isso é troca de topologia ou de fornecedor, porque o Render
+não tem região na América do Sul. **É decisão de Thiago, não de quem executa.**
 
 ### O que não fazer
 

@@ -990,6 +990,25 @@ _Última atualização: 2026-09-13_
 > [`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md).
 > Enquanto ela não fechar, cada tela migrada mede o mesmo custo e parece lenta
 > por conta própria.
+>
+> ✅ **A metade de medir fechou em 13/09/2026, e o "onde" tem número.** O custo é
+> **distância multiplicada por idas ao banco**: uma ida custa **0,17 s** a partir
+> do contêiner, contra **0,016 s** deste notebook para o mesmo pooler, e a chamada
+> que a Biblioteca faz gasta **11 idas** — 8 consultas mais 3 de protocolo
+> (pre-ping, `BEGIN`, `ROLLBACK`). O caminho compartilhado são **2** dessas
+> consultas (usuário e entitlements). O JWT remoto é **0,240 s** (12%), o `307` é
+> **0,29 s** e a Biblioteca o paga **duas vezes**, e a **CPU do free tier não é o
+> gargalo**: oito requisições de 12 consultas em paralelo terminam em **4,11 s**
+> de parede, não nos ~24 s que a CPU serializada exigiria. O modelo que ajusta as
+> três séries: `0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`.
+>
+> **A caixa continua aberta de propósito: o conserto é decisão de Thiago.**
+> Somadas, **todas** as correções de código (barra final, JWKS, menos consultas,
+> `pool_pre_ping`) deixam a chamada em ~1,2 s — ainda **três vezes** o orçamento
+> de 400 ms. Só encurtar a distância até o banco cabe nele, e isso é topologia ou
+> fornecedor: o Render **não tem região na América do Sul** e não troca a região
+> de um serviço existente. As saídas, com o ganho estimado de cada uma, estão no
+> mesmo arquivo.
 
 > **Pendência de Art. 8 que a Tarefa 9 da Seção 6 encontrou e não corrigiu de
 > passagem (10/09/2026):** o Orçamento usa um evento de janela com a marca
