@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
+from app.core.jwks import CacheDeJwks
 from app.db.session import get_db
 from app.models.all_models import Plan, Subscription, User
 from app.services.auth_service import auth_service
@@ -68,11 +69,45 @@ def _segredo_em_bytes(segredo: str) -> bytes:
     return base64.b64decode(limpo + "=" * (-len(limpo) % 4))
 
 
-def claims_do_token(token: str) -> tuple[Optional[str], Optional[str]]:
+# Os dois jeitos de o projeto Supabase assinar, e nada alem deles. A lista e
+# fechada de proposito: `alg` vem do token, ou seja, do cliente — aceitar o que
+# ele mandar e como o `alg: none` entra.
+ALGORITMOS_ASSIMETRICOS = ("ES256", "RS256")
+
+_jwks = CacheDeJwks()
+
+
+async def claims_do_token(token: str) -> tuple[Optional[str], Optional[str]]:
     """
     Devolve (supabase_id, email) do token, validando a assinatura localmente.
-    Levanta `jose.JWTError` se o token for invalido ou expirado.
+    Levanta se o token for invalido, expirado, ou assinado de um jeito que este
+    projeto nao usa.
+
+    Dois caminhos, escolhidos pelo `alg` do cabecalho:
+
+    - **ES256/RS256** — chave publica do JWKS do projeto, buscada uma vez e
+      guardada (`app/core/jwks.py`). E o que staging e producao emitem hoje.
+    - **HS256** — segredo compartilhado. Continua aqui porque projeto Supabase
+      mais antigo assina assim, e porque e o que os testes de contexto usam.
+
+    O `alg` sai do cabecalho do token, que e dado do cliente — por isso ele so
+    escolhe o CAMINHO, e o `algorithms=` passado ao `jwt.decode` e sempre um
+    literal deste modulo. Passar o `alg` do token para o `decode` seria deixar
+    o portador escolher como o proprio token e verificado.
     """
+    cabecalho = jwt.get_unverified_header(token)
+    algoritmo = cabecalho.get("alg")
+
+    if algoritmo in ALGORITMOS_ASSIMETRICOS:
+        chave = await _jwks.chave(cabecalho.get("kid"))
+        payload = jwt.decode(
+            token,
+            chave,
+            algorithms=list(ALGORITMOS_ASSIMETRICOS),
+            options={"verify_aud": False},
+        )
+        return payload.get("sub"), payload.get("email")
+
     if not settings.SUPABASE_JWT_SECRET:
         raise ValueError("SUPABASE_JWT_SECRET ausente")
     payload = jwt.decode(
@@ -153,7 +188,7 @@ async def resolve_identity(token: str, db: Session) -> tuple[User, dict[str, Any
     assinatura nao bater, cai no caminho remoto do `auth_service`.
     """
     try:
-        supabase_id, email = claims_do_token(token)
+        supabase_id, email = await claims_do_token(token)
     except Exception as erro:
         logger.info("Validacao local do JWT falhou (%s); tentando remota.", erro)
         dados = await auth_service.get_user(token)
