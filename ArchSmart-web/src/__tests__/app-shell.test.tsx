@@ -61,7 +61,7 @@ beforeEach(() => {
     fetchMock.mockImplementation((url: string) =>
         Promise.resolve({
             ok: true,
-            json: async () => (String(url).endsWith("/api/notifications") ? respostaDaLista : {}),
+            json: async () => (String(url).endsWith("/api/notifications/") ? respostaDaLista : {}),
         }),
     )
     vi.stubGlobal("fetch", fetchMock)
