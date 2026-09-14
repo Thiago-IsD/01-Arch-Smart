@@ -1,9 +1,8 @@
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query"
 import { apiServer } from "@/lib/api/server"
-import { queryKeys, type FiltrosDeProduto } from "@/lib/query/keys"
-import { criarQueryClientDoServidor, tentarPrefetch } from "@/lib/query/hydration"
-import { queryDeProdutos, queryDoInbox } from "@/features/library/api"
-import type { ProductsResponse } from "@/features/library/types"
+import type { FiltrosDeProduto } from "@/lib/query/keys"
+import { clienteComSinal, criarQueryClientDoServidor, tentarPrefetch } from "@/lib/query/hydration"
+import { queryDaListaDeProdutos, queryDoBadgeDoInbox } from "@/features/library/queries"
 import { LibraryContent } from "./LibraryContent"
 
 /**
@@ -21,33 +20,28 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
     // UNICA requisicao que a Biblioteca disparava do navegador no primeiro
     // carregamento — foi ela que o load_ms quebrado da Secao 7 cronometrava.
     // `useInboxCount` tem `select`, entao o que se prefetcha e a resposta CRUA.
-    // O query sai de `queryDoInbox()`, a MESMA funcao que `contarInbox` usa:
-    // escrito a mao aqui, ele era um literal duplicado, e divergir nao da erro
-    // nenhum — so faz o prefetch deixar de ser aproveitado e virar custo puro.
+    // Chave e payload dos dois vem das fabricas de `features/library/queries.ts`
+    // — a MESMA fonte que os hooks (`useProducts`, `useInboxCount`) usam do lado
+    // do cliente. Ate a Tarefa 1 da Secao 8 cada lado montava a chave a mao, e
+    // divergir nao dava erro nenhum — so fazia o prefetch deixar de ser
+    // aproveitado e virar custo puro.
+    //
+    // `clienteComSinal` embrulha `apiServer` para abortar tambem quando o teto
+    // de `tentarPrefetch` abortar: a `queryFn` da fabrica recebe o `signal` do
+    // React Query, nao o do teto, e sem o embrulho um cold start voltaria a
+    // pendurar a conexao ate a API responder.
     //
     // Os dois em Promise.all, nao em sequencia: sao chamadas independentes, e em
     // serie elas somariam latencia dentro do <Suspense> — o oposto do que a
     // ADR 0009 buscava.
     await Promise.all([
         tentarPrefetch((signal) =>
-            queryClient.prefetchQuery({
-                queryKey: queryKeys.products.list(filtros),
-                queryFn: () =>
-                    apiServer<ProductsResponse>("/api/products/", {
-                        signal,
-                        query: queryDeProdutos(filtros),
-                    }),
-            }),
+            queryClient.prefetchQuery(
+                queryDaListaDeProdutos(clienteComSinal(apiServer, signal), filtros),
+            ),
         ),
         tentarPrefetch((signal) =>
-            queryClient.prefetchQuery({
-                queryKey: queryKeys.products.inboxCount(),
-                queryFn: () =>
-                    apiServer<ProductsResponse>("/api/products/", {
-                        signal,
-                        query: queryDoInbox(),
-                    }),
-            }),
+            queryClient.prefetchQuery(queryDoBadgeDoInbox(clienteComSinal(apiServer, signal))),
         ),
     ])
 
