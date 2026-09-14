@@ -33,10 +33,11 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
+from app.core.jwks import CacheDeJwks
 from app.db.session import get_db
-from app.models.all_models import User
+from app.models.all_models import Plan, Subscription, User
 from app.services.auth_service import auth_service
-from app.services.entitlements import entitlements_da_conta
+from app.services.entitlements import entitlements_de
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +69,45 @@ def _segredo_em_bytes(segredo: str) -> bytes:
     return base64.b64decode(limpo + "=" * (-len(limpo) % 4))
 
 
-def claims_do_token(token: str) -> tuple[Optional[str], Optional[str]]:
+# Os dois jeitos de o projeto Supabase assinar, e nada alem deles. A lista e
+# fechada de proposito: `alg` vem do token, ou seja, do cliente — aceitar o que
+# ele mandar e como o `alg: none` entra.
+ALGORITMOS_ASSIMETRICOS = ("ES256", "RS256")
+
+_jwks = CacheDeJwks()
+
+
+async def claims_do_token(token: str) -> tuple[Optional[str], Optional[str]]:
     """
     Devolve (supabase_id, email) do token, validando a assinatura localmente.
-    Levanta `jose.JWTError` se o token for invalido ou expirado.
+    Levanta se o token for invalido, expirado, ou assinado de um jeito que este
+    projeto nao usa.
+
+    Dois caminhos, escolhidos pelo `alg` do cabecalho:
+
+    - **ES256/RS256** — chave publica do JWKS do projeto, buscada uma vez e
+      guardada (`app/core/jwks.py`). E o que staging e producao emitem hoje.
+    - **HS256** — segredo compartilhado. Continua aqui porque projeto Supabase
+      mais antigo assina assim, e porque e o que os testes de contexto usam.
+
+    O `alg` sai do cabecalho do token, que e dado do cliente — por isso ele so
+    escolhe o CAMINHO, e o `algorithms=` passado ao `jwt.decode` e sempre um
+    literal deste modulo. Passar o `alg` do token para o `decode` seria deixar
+    o portador escolher como o proprio token e verificado.
     """
+    cabecalho = jwt.get_unverified_header(token)
+    algoritmo = cabecalho.get("alg")
+
+    if algoritmo in ALGORITMOS_ASSIMETRICOS:
+        chave = await _jwks.chave(cabecalho.get("kid"))
+        payload = jwt.decode(
+            token,
+            chave,
+            algorithms=list(ALGORITMOS_ASSIMETRICOS),
+            options={"verify_aud": False},
+        )
+        return payload.get("sub"), payload.get("email")
+
     if not settings.SUPABASE_JWT_SECRET:
         raise ValueError("SUPABASE_JWT_SECRET ausente")
     payload = jwt.decode(
@@ -84,20 +119,41 @@ def claims_do_token(token: str) -> tuple[Optional[str], Optional[str]]:
     return payload.get("sub"), payload.get("email")
 
 
-def resolve_identity_por_claims(
+def resolver_identidade_e_entitlements(
     db: Session, *, supabase_id: Optional[str], email: Optional[str]
-) -> User:
+) -> tuple[User, dict[str, Any]]:
     """
-    Resolve o usuario a partir dos claims ja validados.
+    Resolve o usuario E os entitlements da conta dele numa consulta so.
 
-    So o `supabase_id` decide. O `email` entra apenas no log de diagnostico —
-    ele NAO e criterio de busca, e essa e a correcao de seguranca da Secao 4.
+    So o `supabase_id` decide quem e o usuario. O `email` entra apenas no log
+    de diagnostico — ele NAO e criterio de busca, e essa e a correcao de
+    seguranca da Secao 4.
+
+    Por que os dois juntos: este caminho roda em TODA requisicao autenticada, e
+    cada consulta e uma ida a rede — **0,17 s** a partir do conteiner
+    implantado, medido em 13/09/2026
+    (`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`). Eram
+    duas idas sequenciais; sao uma.
+
+    Os dois `outerjoin` preservam o que o LEFT JOIN garante e o INNER nao:
+    usuario sem assinatura continua resolvendo, com `status` nulo, e caindo no
+    PADRAO por `entitlements_de`. O `order_by(Subscription.id)` e o mesmo de
+    `entitlements_da_conta`, pela mesma razao: nao ha unique em
+    `subscriptions.account_id`, entao sem ordem explicita o Postgres devolve
+    uma linha arbitraria quando a conta tem mais de uma.
     """
     if not supabase_id:
         raise IdentidadeNaoResolvida("token sem `sub`")
 
-    usuario = db.query(User).filter(User.supabase_id == supabase_id).first()
-    if usuario is None:
+    linha = (
+        db.query(User, Subscription.status, Plan.limits)
+        .outerjoin(Subscription, Subscription.account_id == User.account_id)
+        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+        .filter(User.supabase_id == supabase_id)
+        .order_by(Subscription.id)
+        .first()
+    )
+    if linha is None:
         logger.warning(
             "Token valido sem usuario correspondente. supabase_id=%s email=%s",
             supabase_id,
@@ -106,24 +162,40 @@ def resolve_identity_por_claims(
         raise IdentidadeNaoResolvida(
             f"nenhum usuario com supabase_id={supabase_id}"
         )
+
+    usuario, status, limits = linha
+    return usuario, entitlements_de(status, limits)
+
+
+def resolve_identity_por_claims(
+    db: Session, *, supabase_id: Optional[str], email: Optional[str]
+) -> User:
+    """
+    O usuario, so ele. Fica como a face estreita da funcao acima — e nao como
+    uma segunda consulta — para que os testes de seguranca que apontam para
+    este nome continuem exercitando o caminho que a producao roda.
+    """
+    usuario, _ = resolver_identidade_e_entitlements(
+        db, supabase_id=supabase_id, email=email
+    )
     return usuario
 
 
-async def resolve_identity(token: str, db: Session) -> User:
+async def resolve_identity(token: str, db: Session) -> tuple[User, dict[str, Any]]:
     """
-    Valida o token e devolve o `User`. Tenta a validacao local (sem ida a
-    rede); se o segredo nao estiver configurado ou a assinatura nao bater, cai
-    no caminho remoto do `auth_service`.
+    Valida o token e devolve o `User` mais os entitlements da conta. Tenta a
+    validacao local (sem ida a rede); se o segredo nao estiver configurado ou a
+    assinatura nao bater, cai no caminho remoto do `auth_service`.
     """
     try:
-        supabase_id, email = claims_do_token(token)
+        supabase_id, email = await claims_do_token(token)
     except Exception as erro:
         logger.info("Validacao local do JWT falhou (%s); tentando remota.", erro)
         dados = await auth_service.get_user(token)
         supabase_id, email = dados["id"], dados.get("email")
 
     return await run_in_threadpool(
-        resolve_identity_por_claims, db, supabase_id=supabase_id, email=email
+        resolver_identidade_e_entitlements, db, supabase_id=supabase_id, email=email
     )
 
 
@@ -139,7 +211,7 @@ async def get_context(
     token = authorization[len("Bearer ") :]
 
     try:
-        usuario = await resolve_identity(token, db)
+        usuario, entitlements = await resolve_identity(token, db)
     except IdentidadeNaoResolvida:
         # 401, nao 404: para quem chama, "esse token nao vale aqui". Dizer
         # "usuario nao encontrado" confirmaria a existencia de contas.
@@ -150,9 +222,6 @@ async def get_context(
         logger.warning("Falha ao validar token: %s", erro, exc_info=True)
         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
-    entitlements = await run_in_threadpool(
-        entitlements_da_conta, db, usuario.account_id
-    )
     return RequestContext(
         user_id=usuario.id,
         account_id=usuario.account_id,

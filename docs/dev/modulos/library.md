@@ -159,35 +159,69 @@ nada, e o cliente busca — o pior caso nunca fica pior que o de antes.
 
 ## Os números medidos, e os que faltam
 
-**Esta seção está incompleta, e o item "`docs/dev/modulos/<modulo>.md` escrita,
-com o número medido" da definição de pronto não está fechado.** O motivo é um
-só: em 11/09/2026 a credencial do usuário de teste E2E passou a ser rejeitada
-pelo Supabase de staging (`HTTP 400, "Invalid login credentials"`), e toda
-medição desta tela exige sessão. Nenhum número foi estimado para preencher a
-lacuna.
+**Medido em 12/09/2026.** A credencial do usuário de teste E2E voltou a
+funcionar — verificada direto no endpoint de auth do Supabase de staging antes
+de qualquer medição (`HTTP 200`, token recebido,
+`email_confirmed_at: 2026-09-10T11:36:43Z`, usuário
+`ana.arquiteta@seed.arqsmart.local`). Dos seis itens que faltavam, **cinco
+fecharam**; o item 6 (olho humano) continua aberto.
+
+Topologia de todas as medições de 12/09/2026, **idêntica à de 10/09/2026** — é
+isso que torna os dois números comparáveis: Playwright → `localhost:3000`
+(`npm run dev`) → API local em `localhost:8000` (`uvicorn app.main:app`) →
+banco de **staging** → Supabase de **staging**.
 
 ### O que existe
 
 | Número | Valor | Quando |
 |---|---|---|
-| mediana clique → dados na grade | **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`) | 10/09/2026, Tarefa 1 da Seção 6 — **antes** das mudanças da Seção 8 |
+| mediana clique → dados na grade | **1415 ms** (`AMOSTRAS=1390,1403,1415,1418,1422`) | **12/09/2026, depois da Seção 8** |
+| mediana clique → dados na grade | 1454 ms (`AMOSTRAS=1434,1445,1454,1469,1948`) | 10/09/2026, Tarefa 1 da Seção 6 — **antes** da Seção 8 |
+| `load_ms` do `screen_viewed` de `/library` (clique → dados) | mediana **1068 ms**, n=21, mín 871, máx 3607 | 12/09/2026, lido de `product_events` em staging |
+| P95 de `GET /api/products/` (300 produtos na conta, 90 `NORMALIZED`) | **634 ms** — acima do orçamento de 400 ms, e **não por causa da query** | 12/09/2026, API local |
+| SQL puro da página da lista | P50 **16 ms**, P95 **17 ms** | 12/09/2026, direto no pooler de staging |
 | referência externa de agosto | 3,6 s | rotulada como externa; o "antes" do código nunca foi medido |
-| cold start da API (free tier do Render) | 41,9 s na primeira chamada, 0,46 s nas seguintes | 06/09/2026 (ADR 0009); 41,4 s em 08/09/2026 |
+| cold start da API (free tier do Render) | 41,9 s na primeira chamada, 0,46 s nas seguintes | 06/09/2026 (ADR 0009); 41,4 s em 08/09/2026; **52,8 s** em 12/09/2026 |
 
-### O que falta, item a item, com o comando de cada um
+**A Seção 8 não piorou a Biblioteca:** 1415 ms contra 1454 ms é uma diferença de
+39 ms a favor do código novo, dentro da variação entre execuções — não é ganho
+reivindicado, é ausência de regressão. `QueryBoundary` e o badge no prefetch
+entraram sem custo de tempo mensurável.
 
-**1. A mediana depois da Seção 8.** A de 1454 ms é de antes de a tela passar a
-usar `QueryBoundary` e de o badge entrar no prefetch. Uma piora grande aqui é
-defeito desta seção, não ruído.
+> ⚠️ **O `npm run dev` precisa estar quente, e isso domina o número.** Três
+> execuções seguidas do mesmo comando, no mesmo servidor, deram medianas de
+> **2426 ms**, **1923 ms** e **1409 ms**, nessa ordem — o `next dev` compila sob
+> demanda e só para de compilar depois de algumas passagens. A quarta execução
+> (1415 ms, amostras entre 1390 e 1422) é a que está na tabela, porque é a única
+> com dispersão estreita. Quem repetir a medição num servidor recém-subido e
+> parar na primeira execução vai reportar uma regressão que não existe. A
+> medição de 10/09/2026 tropeçou na mesma pedra, e está registrada em
+> [`../medicoes/2026-09-06-biblioteca-depois.md`](../medicoes/2026-09-06-biblioteca-depois.md).
+
+### Os itens que fecharam, com o comando de cada um
+
+**1. A mediana depois da Seção 8 — FECHOU: 1415 ms.** Contra 1454 ms de antes.
+O `--timeout` aparece porque o orçamento padrão de 30 s por teste não cobre
+login, compilação sob demanda de três rotas e as 5 amostras na primeira
+execução de uma sessão; ele não altera nada do que é medido (as amostras são
+`Date.now()` dentro do laço).
 
 ```
 cd ArchSmart-web
 set -a; . ./.env.e2e.local; set +a
-npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line
+npx playwright test e2e/medicao-biblioteca.spec.ts --reporter=line --timeout=180000
+# AMOSTRAS=1390,1403,1415,1418,1422
+# MEDIANA_MS=1415
 ```
 
-**2. A hidratação continua de pé.** Guarda, não instrumento: se o prefetch
-quebrar, a lista volta a buscar do navegador e ninguém vê erro nenhum.
+**2. A hidratação continua de pé — FECHOU, e a asserção foi apertada.** Três
+execuções consecutivas mediram **zero** pedido a `/api/products` saindo do
+navegador no primeiro carregamento — `PEDIDOS_TOTAL=0`,
+`PEDIDOS_NORMALIZED=0`, `PEDIDOS_CAPTURED=0`. Ou seja: o prefetch do badge do
+inbox, que a Tarefa 7 da Seção 8 acrescentou, **está sendo aproveitado**, e a
+lacuna aberta desde a Seção 5 fechou de fato. Por isso o spec deixou de filtrar
+por `state=NORMALIZED` e passou a exigir zero pedido de qualquer tipo, na mesma
+ocasião em que isso foi medido.
 
 ```
 cd ArchSmart-web
@@ -195,7 +229,11 @@ set -a; . ./.env.e2e.local; set +a
 npx playwright test e2e/hidratacao-biblioteca.spec.ts --reporter=line
 ```
 
-**3. O `load_ms` real do `screen_viewed`.** O spec existe e nunca rodou.
+**3. O `load_ms` real do `screen_viewed` — FECHOU.** O spec
+`e2e/telemetria-biblioteca.spec.ts`, que **nunca havia sido executado**, rodou
+pela primeira vez em 12/09/2026 e **passou**, em três execuções consecutivas.
+Ele afirma `medido_ate: "dados"`, `medido_de: "clique"`,
+`principal_declarada: true`, `is_empty: false` e `load_ms` entre 200 ms e 10 s.
 
 ```
 cd ArchSmart-web
@@ -203,21 +241,64 @@ set -a; . ./.env.e2e.local; set +a
 npx playwright test e2e/telemetria-biblioteca.spec.ts --reporter=line
 ```
 
-**4. A linha no banco.** É o que fecha a pendência 2 da Seção 7 de fora, e não
-por vitest. Com a `DATABASE_URL` de **staging** (confira qual bloco do `.env`
-está ativo antes):
+**4. A linha no banco — FECHOU, e é o que encerra a pendência 2 da Seção 7.**
+`product_events` estava com **0 linhas** antes desta medição (medido); depois
+das execuções, as linhas de `/library` saem com `medido_ate=dados`,
+`medido_de=clique`, `is_empty=false` e `load_ms` de mediana **1068 ms** — mesma
+ordem de grandeza dos 1415 ms do E2E, e longe do `load_ms: 28` que a Seção 7
+produzia. O `load_ms` **virou dado utilizável**; ver [`telemetry.md`](telemetry.md)
+para a ressalva de como agregar a coluna.
 
 ```
 cd ArchSmart-api
-python -c "from app.db.session import SessionLocal; from sqlalchemy import text; db=SessionLocal(); print(db.execute(text(\"select name, properties->>'screen', properties->>'medido_ate', properties->>'load_ms' from product_events where name='screen_viewed' order by created_at desc limit 5\")).fetchall())"
+python -c "from app.db.session import SessionLocal; from sqlalchemy import text; db=SessionLocal(); print(db.execute(text(\"select name, properties->>'screen', properties->>'medido_ate', properties->>'medido_de', properties->>'load_ms', created_at from product_events where name='screen_viewed' order by created_at desc limit 5\")).fetchall())"
 ```
 
-**5. O P95 de `/api/products` contra staging, com dado realista.** O orçamento
-da spec é **400 ms**; acima disso, abre-se tarefa de backend em vez de otimizar
-query de passagem. O volume precisa vir do seed de volume
-(`ArchSmart-api/tools/seed.py`, com os parâmetros da própria docstring), e o
-número medido vai nesta tabela junto com **o volume com que foi medido** — P95
-sem volume declarado não significa nada.
+**5. O P95 de `/api/products` — MEDIDO, e ele estoura o orçamento: 634 ms
+contra 400 ms. A causa não é a query, e por isso nada foi otimizado aqui.**
+Volume declarado: **300 produtos** na conta de seed (a do usuário de teste),
+dos quais **90 `NORMALIZED`** e **107 `CAPTURED`** — é o volume que
+`tools/seed.py --biblioteca 300` produz, e ele já estava no banco. A requisição
+medida é a que a tela realmente faz:
+`GET /api/products/?page=1&size=15&sort_by=created_at_desc&state=NORMALIZED`.
+
+A decomposição é o achado:
+
+| O que foi medido | P50 | P95 |
+|---|---|---|
+| `GET /api/products/` (a lista, 300 produtos na conta) | 470 ms | **634 ms** |
+| `GET /api/users/me` (rota autenticada que quase não faz trabalho) | 433 ms | 694 ms |
+| o SQL da página da lista, direto no pooler | 16 ms | **17 ms** |
+
+**A query custa 17 ms. O resto é autenticação.** Uma rota autenticada trivial
+custa praticamente o mesmo que a lista inteira, o que só é possível se o custo
+estiver antes do endpoint. E está: o Supabase de staging assina o JWT com
+**ES256** (cabeçalho medido: `{"alg":"ES256","kid":"33477cd1-…"}`), enquanto a
+API valida com segredo compartilhado HS256 (`SUPABASE_JWT_SECRET`). A validação
+local falha e `resolve_identity` (`app/core/security.py:121`) cai no caminho
+remoto — **uma chamada HTTP a `…/auth/v1/user` em toda requisição
+autenticada**, 175 ocorrências no log desta sessão:
+
+```
+Validacao local do JWT falhou (The specified alg value is not allowed); tentando remota.
+```
+
+Então **a Tarefa 11 de backend precisa existir**, como a spec decidiu — e o que
+ela tem para fazer não é índice nem `joinedload`: é fazer a API verificar ES256
+(chave pública/JWKS do projeto) em vez de cair no caminho remoto. O ganho não é
+de uma tela, é de toda requisição autenticada da plataforma. O fenômeno não
+nasceu na Seção 8: está observado, sem número, na medição de 06/09/2026.
+
+> Dois números que **não** servem como P95 do endpoint, registrados para
+> ninguém os confundir com ele. Contra o Render de staging, o mesmo script deu
+> P50 2303 ms e P95 **2762 ms** — isso mede a ida e volta Brasil → Render free
+> tier somada à CPU do free tier, não a rota. E toda chamada da tela a
+> `/api/products` (sem barra final) leva um **`307` antes do `200`**: medido no
+> log, 44 redirecionamentos para 44 respostas, nas duas queries (lista e
+> badge). São duas idas onde bastaria uma; não foi mexido aqui, e é candidato
+> barato para a Tarefa 11.
+
+### O que continua faltando
 
 **6. axe no navegador, navegação só por teclado, e as larguras de 390px e
 1440px.** Os três itens da definição de pronto que dependem de olho humano e de

@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 50/64 (78%)**
-`████████████████░░░░`
+**Progresso geral: 50/65 (77%)**
+`███████████████░░░░░`
 
-_Última atualização: 2026-09-12_
+_Última atualização: 2026-09-13_
 
 ---
 
@@ -971,12 +971,56 @@ _Última atualização: 2026-09-12_
 > plataforma inteira.
 
 ## Seção 8 · Migração das telas
-**1/9 (11%)** `██░░░░░░░░░░░░░░░░░░`
+**1/10 (10%)** `██░░░░░░░░░░░░░░░░░░`
 
 > Cada tela migrada aqui converte também as **cores literais** e as **imagens**
 > dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
 > não duas. São 521 cores em 39 arquivos e 25 `<img>` (medido em 09/09/2026).
 > Não são caixas próprias; são parte da migração de cada tela.
+
+> **A primeira caixa não é tela, e está ali de propósito (13/09/2026).** A
+> Seção 8 mediu o P95 de `/api/products` em **634 ms** contra o orçamento de
+> **400 ms**, e a spec já tinha decidido que estourar o orçamento abre tarefa de
+> backend própria em vez de virar otimização de passagem. A medição de 13/09
+> mostrou que o custo **não é da query** (17 ms) nem só do JWT (~0,28 s): uma
+> requisição autenticada custa **~2,3 s** na API implantada, e duas rotas que
+> fazem trabalhos diferentes custam o mesmo — o custo está no caminho
+> compartilhado, e **ninguém mediu onde**. A tarefa é medir primeiro. Descrição,
+> números e o que **não** fazer em
+> [`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md).
+> Enquanto ela não fechar, cada tela migrada mede o mesmo custo e parece lenta
+> por conta própria.
+>
+> ✅ **A metade de medir fechou em 13/09/2026, e o "onde" tem número.** O custo é
+> **distância multiplicada por idas ao banco**: uma ida custa **0,17 s** a partir
+> do contêiner, contra **0,016 s** deste notebook para o mesmo pooler, e a chamada
+> que a Biblioteca faz gasta **11 idas** — 8 consultas mais 3 de protocolo
+> (pre-ping, `BEGIN`, `ROLLBACK`). O caminho compartilhado são **2** dessas
+> consultas (usuário e entitlements). O JWT remoto é **0,240 s** (12%), o `307` é
+> **0,29 s** e a Biblioteca o paga **duas vezes**, e a **CPU do free tier não é o
+> gargalo**: oito requisições de 12 consultas em paralelo terminam em **4,11 s**
+> de parede, não nos ~24 s que a CPU serializada exigiria. O modelo que ajusta as
+> três séries: `0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`.
+>
+> ✅ **Quatro correções de código entraram em 13/09/2026**, na branch
+> `custo-da-requisicao-autenticada`, depois de Thiago escolher "as baratas
+> primeiro, a distância depois": barra final nas duas rotas que a exigem (mata o
+> `307` em 6 chamadas), `joinedload` de `state`/`origin` na lista, usuário e
+> entitlements numa consulta só, e **validação local do ES256 pelo JWKS** — a
+> ida remota a `/auth/v1/user` sumiu do caminho quente, verificada no log. A
+> chamada que a Biblioteca faz saiu de **8 consultas para 3**, medido contra o
+> banco de staging. Cada correção tem o teste que reprova a volta do defeito.
+> **A previsão do modelo é 2,55 s → ~1,31 s, e é previsão: o código ainda não
+> está implantado**, então o número real não existe. É ele, e não a previsão,
+> que fecha esta caixa.
+>
+> **A caixa continua aberta de propósito: a distância é decisão de Thiago.**
+> Somadas, **todas** as correções de código (barra final, JWKS, menos consultas,
+> `pool_pre_ping`) deixam a chamada em ~1,2 s — ainda **três vezes** o orçamento
+> de 400 ms. Só encurtar a distância até o banco cabe nele, e isso é topologia ou
+> fornecedor: o Render **não tem região na América do Sul** e não troca a região
+> de um serviço existente. As saídas, com o ganho estimado de cada uma, estão no
+> mesmo arquivo.
 
 > **Pendência de Art. 8 que a Tarefa 9 da Seção 6 encontrou e não corrigiu de
 > passagem (10/09/2026):** o Orçamento usa um evento de janela com a marca
@@ -996,6 +1040,7 @@ _Última atualização: 2026-09-12_
 > `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
 > silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
+- [ ] **Custo da requisição autenticada** (não é tela; precede as oito)
 - [x] Biblioteca
 - [ ] Dashboard
 - [ ] Projetos (lista + detalhe)
@@ -1120,6 +1165,95 @@ _Última atualização: 2026-09-12_
 > [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md),
 > na nota de 12/09/2026.
 >
+> ### ✅ 12/09/2026, mais tarde — a parede caiu e quatro dos cinco números fecharam
+>
+> **Thiago corrigiu a credencial** — tinha um caractere sobrando — e as
+> medições que esta seção deixou parqueadas rodaram no mesmo dia. Antes de
+> medir, a credencial foi verificada direto no endpoint de auth do Supabase de
+> staging: **`HTTP 200`**, token recebido,
+> `email_confirmed_at: 2026-09-10T11:36:43Z`. A senha nunca entrou em linha de
+> comando: vive em `ArchSmart-web/.env.e2e.local` (não versionado), carregada
+> com `set -a; . ./.env.e2e.local; set +a` e lida pelo Playwright de
+> `process.env`. Topologia **idêntica à de 10/09/2026**, que é o que torna os
+> números comparáveis: Playwright → `localhost:3000` → API local em
+> `localhost:8000` → banco de **staging**. O `.env` da API foi conferido antes
+> de subir: `DATABASE_URL` ativa é a de staging
+> (`postgres.ipbhtqzybgdltewwnvnl`, pooler na 5432), produção comentada.
+>
+> | # | O que | Resultado |
+> |---|---|---|
+> | 1 | mediana da Biblioteca **depois** da Seção 8 | **1415 ms** (`AMOSTRAS=1390,1403,1415,1418,1422`) contra 1454 ms de antes — **sem regressão** |
+> | 2 | hidratação de pé | passou; **`PEDIDOS_TOTAL=0`** em 3 execuções — o `state=CAPTURED` do badge **também** parou de sair |
+> | 3 | prova viva do `screen_viewed` | o spec que **nunca havia rodado passou**, 3/3, sem afrouxar asserção |
+> | 4 | a linha no banco | `product_events` de **0 linhas** para linhas com `medido_ate=dados`, `medido_de=clique`, `is_empty=false`, `load_ms` de mediana **1068 ms** |
+> | 5 | P95 de `/api/products` | **634 ms**, acima do orçamento de 400 ms — e **não pela query**, que custa 17 ms |
+>
+> **1. A mediana não piorou, e isso era a pergunta.** 1415 ms contra 1454 ms é
+> uma diferença de 39 ms a favor do código novo — ausência de regressão, não
+> ganho reivindicado. `QueryBoundary` e o badge no prefetch entraram sem custo de
+> tempo mensurável. ⚠️ **Quatro execuções foram necessárias, e as três
+> primeiras mentiriam:** 2426 ms, 1923 ms, 1409 ms, 1415 ms, nessa ordem, no
+> mesmo servidor — o `next dev` compila sob demanda e leva várias passagens
+> para parar. Quem subir o servidor e parar na primeira execução reporta uma
+> regressão de ~1 s que não existe.
+>
+> **2. O badge do inbox fechou de verdade.** Com o spec instrumentado para listar
+> **todos** os pedidos e não só os da lista, três execuções deram
+> `PEDIDOS_TOTAL=0` / `PEDIDOS_NORMALIZED=0` / `PEDIDOS_CAPTURED=0`. A asserção
+> foi **apertada no mesmo commit**, como a pendência mandava: o spec deixou de
+> filtrar por `state=NORMALIZED` e exige zero pedido a `/api/products` de
+> qualquer tipo, com a distinção lista/badge movida para a mensagem de falha.
+>
+> **3 e 4. A pendência 2 da Seção 7 fechou, e o `load_ms` virou dado
+> utilizável.** A mediana de 1068 ms (n=21, mín 871) está na mesma ordem de
+> grandeza dos 1415 ms do E2E — um pouco menor porque o E2E inclui o despacho
+> do clique e a sondagem do seletor, enquanto o `load_ms` conta dentro da
+> página. O `load_ms: 28` da Seção 7 está morto, e `is_empty` saiu **`false`**
+> nas 24 linhas de `/library` (era `null` em 100% dos eventos).
+> ⚠️ **Duas ressalvas que a própria medição produziu:** (a) `/dashboard`, que
+> esta seção não migrou, grava mediana de **18 ms** com `medido_ate=pintura` e
+> `principal_declarada=false` — é a forma do número antigo, agora
+> **corretamente rotulada**, e quem agregar a coluna **tem de filtrar
+> `medido_ate`**; (b) as linhas estão no **banco** de staging mas **não vieram
+> do deployment de staging** — vieram da máquina de desenvolvimento rodando o
+> código da Seção 8 contra aquele banco. Quem cruzar "linha recente" com
+> "deploy de staging" erra nas duas direções.
+>
+> **5. O orçamento de performance estourou, e a spec decidiu o que fazer: não
+> otimizar query aqui.** Volume declarado — P95 sem volume não significa nada:
+> **300 produtos** na conta do usuário de teste, **90 `NORMALIZED`** e
+> **107 `CAPTURED`**, o volume de `tools/seed.py --biblioteca 300`, que **já
+> estava no banco** (nada foi semeado). A decomposição é o achado: a lista custa
+> P95 **634 ms**, uma rota autenticada trivial (`/api/users/me`) custa P95
+> **694 ms**, e o SQL da página direto no pooler custa P95 **17 ms**. **A query
+> não é o problema; a autenticação é.** Causa medida, não deduzida: o Supabase
+> de staging assina em **ES256** (cabeçalho do token: `{"alg":"ES256","kid":…}`)
+> e a API valida em HS256 com `SUPABASE_JWT_SECRET`, então a validação local
+> falha sempre e `resolve_identity` (`app/core/security.py:121`) cai numa ida
+> remota a `/auth/v1/user` **em toda requisição autenticada** — 175
+> ocorrências no log da sessão. **Então a Tarefa 11 de backend precisa
+> existir**, e o trabalho dela não é índice nem `joinedload`: é verificar ES256
+> pela chave pública/JWKS. O ganho é de toda a plataforma, não de uma tela.
+> Dois números que **não** são o P95 do endpoint: contra o Render de staging deu
+> P95 2762 ms (mede Brasil → free tier, não a rota), e toda chamada da tela leva
+> um **`307` antes do `200`** porque o front pede `/api/products` sem barra
+> final — 44 redirecionamentos para 44 respostas, medido no log; candidato
+> barato para a mesma tarefa.
+>
+> #### O que **não** fechou, e continua aberto
+>
+> Os **três itens de olho humano** — axe em navegador, navegação por teclado,
+> 390px/1440px — não foram tocados: Playwright com credencial não substitui
+> olho. Pela mesma razão a **verificação visual da Seção 6** continua aberta e
+> a caixa dela segue **desmarcada** — agora ela é **executável**, porque
+> `e2e/captura-visual-secao-6.spec.ts` existe e a credencial funciona, mas
+> ninguém olhou captura nenhuma nesta sessão. Os **Secrets do repositório**
+> continuam sem existir, então o job `e2e` do CI segue sob demanda.
+>
+> Números, comandos e a decomposição completa em
+> [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md)
+> e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md).
+>
 > ### Correção de uma afirmação da Seção 7 que circulou como garantia
 >
 > A pendência 3 daquela seção está escrita como se o balde do rate limit fosse
@@ -1135,9 +1269,13 @@ _Última atualização: 2026-09-12_
 >
 > ### O que a Seção 8 ainda deve, para as oito telas que faltam
 >
-> 1. **A credencial de teste, viva.** Sem ela, nenhuma das oito telas seguintes
->    consegue fechar os mesmos três itens da definição de pronto — o bloqueio é
->    da seção inteira, não da Biblioteca.
+> 1. ~~**A credencial de teste, viva.**~~ ✅ **Resolvida em 12/09/2026** — a
+>    credencial voltou a funcionar (`HTTP 200` no endpoint de auth) e as
+>    medições rodaram; ver a seção ✅ acima. O que **continua** devendo para as
+>    oito telas seguintes é o que a credencial não resolve: os **três itens de
+>    olho humano** (axe em navegador, teclado, 390px/1440px), que agora estão
+>    **executáveis** mas não executados, e os **Secrets do repositório**, sem os
+>    quais o job `e2e` do CI não volta ao gatilho de PR.
 > 2. **O `@limiter.limit("60/minute")` continua apertado para telemetria.** A
 >    chave por conta resolveu o contágio entre usuários; o teto por pessoa
 >    continua o mesmo, e cada tela migrada acrescenta evento de interação.
