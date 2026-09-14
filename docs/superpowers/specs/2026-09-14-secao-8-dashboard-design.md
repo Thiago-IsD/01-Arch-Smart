@@ -100,8 +100,9 @@ O que isso muda, e o que não muda:
   requisições por carregamento. Carregar a distância adiante não é licença para
   deixar consulta a mais.
 - O alvo de **"queries por carregamento < 8"** da spec-mãe **continua valendo
-  inteiro** — ele não depende da distância. Um carregamento do Dashboard são
-  **duas** requisições, e o alvo é a **soma** das duas: hoje 8 + 5 = **13**.
+  inteiro** — ele não depende da distância. Hoje um carregamento do Dashboard
+  são **duas** requisições, somando 8 + 5 = **13**; com a decisão 5, passa a ser
+  **uma**, e o alvo é alcançado com **5**.
 
 ### 2. Escopo: paridade total
 
@@ -146,13 +147,44 @@ teste escrito à mão para cada par. `select` continua no hook, porque o que se
 prefetcha é a resposta crua — a mesma regra que a Biblioteca aprendeu com o badge
 do inbox.
 
-**A Biblioteca migra para o mecanismo neste mesmo plano, e `features/account`
-também.** Deixar o piloto no mecanismo antigo faria as sete telas seguintes
-copiarem o errado; deixar `useMe` fora faria a segunda query do Dashboard ser
-exatamente a divergência que o mecanismo existe para impedir. A prova de que a
+**A Biblioteca migra para o mecanismo neste mesmo plano.** Deixar o piloto no
+mecanismo antigo faria as sete telas seguintes copiarem o errado.
+`features/account` **não** migra aqui: com a decisão 5 o Dashboard deixa de
+prefetchar `useMe`, e quem prefetcha `/api/users/me` hoje é Projetos, que migra
+em seguida. A prova de que a
 Biblioteca não mudou de comportamento é a que já existe:
 `hidratacao-biblioteca.spec.ts` exige **zero** pedido a `/api/products` no
 primeiro carregamento.
+
+### 5. O limite de projetos vem de `/api/dashboard/lean`, e a tela faz uma requisição só
+
+> **Decidida por Thiago em 14/09/2026, depois de a spec ter sido aprovada**, e
+> por causa de um erro de conta nela: a primeira versão dizia que as três
+> reduções levavam `lean` a 4. Levam a **5** — cada uma tira uma consulta, e
+> 8 − 3 = 5. Somada às 3 de `/api/users/me`, a tela ficava em **8**, e o alvo de
+> "< 8" era inalcançável pelo caminho que a spec descrevia.
+
+O Dashboard chamava `/api/users/me` **só** para ler `project_limit`. E
+`/api/dashboard/lean` **já devolve `plan_limit`**, calculado do mesmo
+`repo.ctx.entitlements` no servidor (`_get_plan_limit` em
+`app/api/endpoints/projects.py`). A tela fazia uma requisição inteira para
+buscar um número que já recebia na outra.
+
+**Decidido: o card lê `plan_limit` da resposta de `lean`.** O carregamento cai
+para **uma** requisição e **5** consultas — o alvo de "< 8" é atingido —, e o
+modelo de 13/09 estima ~1,3 s a menos na API implantada, por uma requisição
+inteira que deixa de existir.
+
+**Isto abre uma exceção escrita à regra da Seção 5**, que fixou
+`useEntitlements()` como fonte única de limite de plano no front. A regra
+continua sendo a regra; a exceção é esta e só esta: **quando o endpoint da tela
+já traz o entitlement, calculado dos mesmos entitlements da sessão no servidor,
+a tela lê de lá.** O Art. 3 continua inteiro — o número é decidido no servidor,
+nenhum limite é fixado no front, e nenhum número é inventado enquanto o dado não
+chega.
+
+`/api/users/me` 5 → 3 **continua no plano**: Billing, Perfil e Projetos
+continuam consumindo a rota.
 
 ## A tela
 
@@ -160,12 +192,17 @@ primeiro carregamento.
 `components/types.ts`), `queries.ts` e `hooks.ts`. A chave entra em
 `queryKeys.dashboard.lean()`.
 
-**`page.tsx` vira Server Component.** O shell renderiza na hora — só
-`QuickActions`, que é o único bloco sem dado; o `GreetingBanner` **depende** de
-`user_first_name`, que vem de `/api/dashboard/lean`, e fica dentro da região — e
-um `<Suspense>` envolve `DashboardData`,
-que prefetcha **as duas queries em `Promise.all`** (`queryDoDashboard` e
-`queryDoMe`) e entrega por `HydrationBoundary`. É o desenho da
+**`page.tsx` vira Server Component**, e um `<Suspense>` envolve `DashboardData`,
+que prefetcha **`queryDoDashboard`** e entrega por `HydrationBoundary`.
+
+A primeira versão desta spec punha `QuickActions` fora do `Suspense`, no shell.
+**Não dá sem quebrar a paridade:** na tela, as ações rápidas ficam **entre** a
+grade de métricas e as três colunas, e as duas dependem de dado. Renderizá-las
+antes mudaria a ordem da página. A página inteira fica dentro da região; o
+fallback do `Suspense` é o `DashboardSkeleton` que já existe, com um
+`data-testid` **diferente** do skeleton do `QueryBoundary` — a lição da
+Biblioteca, onde os dois tinham o mesmo e um teste passava sem nunca chegar ao
+boundary. É o desenho da
 [ADR 0009](../../dev/decisoes/0009-prefetch-dentro-de-suspense.md): prefetch
 bloqueante transformaria o cold start de ~50 s numa tela em branco.
 
@@ -174,9 +211,15 @@ Somem da tela: `useEffect`, `fetch`, `getAccessToken`, e o
 a rota renderizar.
 
 **Os cinco estados via `QueryBoundary`**, com a região `principal` e a definição
-de vazio da decisão 3. O card de limite continua lendo `useEntitlements()` e
-mostrando skeleton enquanto `undefined` — já está certo hoje (Art. 3) e não
-muda.
+de vazio da decisão 3. **O estado vazio renderiza a mesma página que o estado
+com dados** — as três colunas já têm suas mensagens de vazio, e a paridade é
+total. O que o vazio muda é o `is_empty` que a telemetria grava, não o que o
+usuário vê.
+
+Para a decisão 3 ser exata, `lean` passa a devolver `financial_entries_count`:
+"zero lançamentos" não se deduz de somas zeradas — lançamentos que se anulam
+somam zero. A contagem sai **de graça** da agregação financeira única (um
+`count` a mais no mesmo `SELECT`), então não acrescenta consulta.
 
 **O erro deixa de ser `toast` e vira estado na tela**, com ação de tentar de
 novo. **Isso quebra paridade de propósito**: um toast some sozinho e deixa a tela
@@ -199,7 +242,7 @@ entra com o teste de contagem que reprova a volta, no formato de
 `tests/api/test_produtos_sem_n_mais_um.py`: **a constância carrega a garantia**,
 e o teto fixa o custo de hoje com folga de 1.
 
-### `/api/dashboard/lean`: 8 → 4
+### `/api/dashboard/lean`: 8 → 5
 
 - **`repo.get(User, ctx.user_id)` para ler `full_name`** é uma ida inteira para
   um usuário que o caminho compartilhado acabou de carregar. A identity map não
@@ -212,21 +255,26 @@ e o teto fixa o custo de hoje com folga de 1.
   custo de legibilidade couber. Se não couber, ficam em duas e o plano escreve
   por quê.
 
-> **Esta terceira redução decide o alvo da spec-mãe, e por isso ela não é
-> enfeite.** Com as duas primeiras, `lean` fica em 5 e `me` em 3: **8** por
-> carregamento — que **não** é < 8. Só com a terceira `lean` vai a 4 e o
-> carregamento a **7**. Se a legibilidade vencer, o Dashboard fecha com 8,
-> registrado como "a um do alvo", com a razão ao lado — nunca arredondado para
-> atingido.
+> **A conta, corrigida:** cada redução tira uma consulta, então as três levam
+> `lean` a **5**. Se a terceira ficar de fora por legibilidade, `lean` fica em
+> **6** — ainda < 8, porque pela decisão 5 a tela faz uma requisição só.
+
+**A contagem na janela muda uma semântica, e isso fica escrito no código:**
+`count(*) OVER ()` sobre o `JOIN` com `clients` conta projetos ativos **cujo
+cliente é da mesma conta**, enquanto a consulta de hoje conta todo projeto
+ativo. Os dois conjuntos só divergem num estado que o schema permite e nenhum
+caminho de escrita produz — o mesmo que o comentário do `JOIN` já descreve.
 
 Previsão pelo modelo de 13/09, **rotulada como previsão até o deploy**:
-`0,29 + 0,17 × (3 + 5) ≈ 1,65 s` com 5 consultas, `≈ 1,48 s` com 4, contra
-~2,05 s medidos.
+`0,29 + 0,17 × (3 + 5) ≈ 1,65 s`, contra ~2,05 s medidos — e a tela deixa de
+pagar a segunda requisição inteira.
 
 ### `/api/users/me`: 5 → 3
 
-Ela relê `users` e recalcula entitlements que o `RequestContext` já traz. O
-ganho vale para as **quatro** telas que a consomem.
+Ela relê `users`, recalcula entitlements que o `RequestContext` já traz, e
+busca `plans` numa consulta separada quando a assinatura tem plano. O ganho vale
+para as **três** telas que continuam consumindo a rota: Billing, Perfil e
+Projetos.
 
 **Ponto cego declarado:** a rota assina a URL do logo no Supabase Storage
 quando `accounts.logo_url` é um caminho privado — **uma ida remota** que não
@@ -264,11 +312,12 @@ O N+1 de `/api/projects` (12 consultas numa página de 5 projetos) **não** entr
 
 ## As tarefas, nesta ordem
 
-1. **`queryOptions`** — fábricas em `features/library/queries.ts` e
-   `features/account/queries.ts`; Biblioteca e `useMe` migrados. Sem mudança
+1. **`queryOptions`** — fábricas em `features/library/queries.ts`; a
+   Biblioteca migrada. Sem mudança
    visível: `hidratacao-biblioteca.spec.ts` e a suíte provam.
-2. **Backend** — `/api/dashboard/lean` 8 → 4 (ou 5, com a razão escrita) e
-   `/api/users/me` 5 → 3, cada um com teste de contagem.
+2. **Backend** — `/api/users/me` 5 → 3 e `/api/dashboard/lean` 8 → 5 com
+   `financial_entries_count`, cada um com teste de contagem e, o de `lean`, com
+   caracterização dos valores escrita **antes** da mudança.
 3. **`features/dashboard` e a tela** — Server Component, `Suspense`,
    `QueryBoundary`, os cinco estados, erro como estado.
 4. **Cores, imagem e acessibilidade** dos componentes, com a catraca descendo no
@@ -291,8 +340,7 @@ de API é registrado e **não** marcado como atingido (decisão 1):
 - `features/dashboard/hooks.ts` consumido, **zero** `fetch` na tela;
 - os cinco estados via `QueryBoundary`;
 - isolamento: o teste existente continua verde;
-- **consultas por carregamento < 8**, somando as duas rotas — alcançável só com
-  a terceira redução de `lean`; sem ela, registrado como "8, a um do alvo";
+- **consultas por carregamento < 8** — uma requisição, 5 consultas;
 - axe sem violação **em navegador**, contraste AA nos dois temas, navegação só
   por teclado;
 - nenhuma cor, URL, id ou limite literal;
@@ -304,10 +352,10 @@ deixando de ser os 18 ms de `pintura`.
 
 ## Riscos
 
-- **O `hidratacao` do Dashboard pode reprovar pela query de `useMe`**, se a
-  política de cache `conta` fizer o cliente refazer a busca na montagem. A
-  Biblioteca não tinha essa segunda query. O spec existe para pegar exatamente
-  isso, e o conserto é na política, não no spec.
+- **A exceção à regra da Seção 5 pode virar precedente frouxo.** Ela está
+  escrita com a condição exata ("o endpoint da tela já traz o entitlement,
+  calculado dos mesmos entitlements da sessão"); uma tela que calcule limite de
+  outro jeito não está coberta por ela.
 - **A passada de navegador pode achar defeito na Biblioteca.** É o propósito
   dela; o risco é a tentação de consertar de passagem. Regra da decisão acima:
   registra, e conserta só com ok.
