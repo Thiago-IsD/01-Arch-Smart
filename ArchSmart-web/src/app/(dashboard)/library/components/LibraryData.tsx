@@ -33,7 +33,7 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
             queryClient.prefetchQuery({
                 queryKey: queryKeys.products.list(filtros),
                 queryFn: () =>
-                    apiServer<ProductsResponse>("/api/products", {
+                    apiServer<ProductsResponse>("/api/products/", {
                         signal,
                         query: queryDeProdutos(filtros),
                     }),
@@ -43,7 +43,7 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
             queryClient.prefetchQuery({
                 queryKey: queryKeys.products.inboxCount(),
                 queryFn: () =>
-                    apiServer<ProductsResponse>("/api/products", {
+                    apiServer<ProductsResponse>("/api/products/", {
                         signal,
                         query: queryDoInbox(),
                     }),

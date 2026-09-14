@@ -60,7 +60,7 @@ export function ProductPickerModal({ isOpen, onOpenChange, targetItemId }: Produ
             try {
                 const token = (await getAccessToken()) || ""
 
-                const res = await fetch(apiUrl("/api/products"), {
+                const res = await fetch(apiUrl("/api/products/"), {
                     headers: { "Authorization": `Bearer ${token}` }
                 })
 

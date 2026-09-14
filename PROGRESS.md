@@ -1002,7 +1002,19 @@ _Última atualização: 2026-09-13_
 > de parede, não nos ~24 s que a CPU serializada exigiria. O modelo que ajusta as
 > três séries: `0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`.
 >
-> **A caixa continua aberta de propósito: o conserto é decisão de Thiago.**
+> ✅ **Quatro correções de código entraram em 13/09/2026**, na branch
+> `custo-da-requisicao-autenticada`, depois de Thiago escolher "as baratas
+> primeiro, a distância depois": barra final nas duas rotas que a exigem (mata o
+> `307` em 6 chamadas), `joinedload` de `state`/`origin` na lista, usuário e
+> entitlements numa consulta só, e **validação local do ES256 pelo JWKS** — a
+> ida remota a `/auth/v1/user` sumiu do caminho quente, verificada no log. A
+> chamada que a Biblioteca faz saiu de **8 consultas para 3**, medido contra o
+> banco de staging. Cada correção tem o teste que reprova a volta do defeito.
+> **A previsão do modelo é 2,55 s → ~1,31 s, e é previsão: o código ainda não
+> está implantado**, então o número real não existe. É ele, e não a previsão,
+> que fecha esta caixa.
+>
+> **A caixa continua aberta de propósito: a distância é decisão de Thiago.**
 > Somadas, **todas** as correções de código (barra final, JWKS, menos consultas,
 > `pool_pre_ping`) deixam a chamada em ~1,2 s — ainda **três vezes** o orçamento
 > de 400 ms. Só encurtar a distância até o banco cabe nele, e isso é topologia ou

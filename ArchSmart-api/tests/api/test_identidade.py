@@ -5,13 +5,15 @@ Os dois primeiros testes sao a regressao da pendencia de seguranca registrada
 em docs/dev/arquitetura.md — o auto-link por e-mail e o auto-create. Eles
 falham enquanto app/api/users.py resolver identidade por e-mail.
 """
+import asyncio
 import dataclasses
 import uuid
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
-from app.core.security import RequestContext, resolve_identity_por_claims
+from app.core.security import RequestContext, get_context, resolve_identity_por_claims
 from app.models.all_models import Account, Plan, Subscription, SubscriptionStatus, User
 from app.services.auth_service import auth_service
 from app.services.entitlements import PADRAO, entitlements_da_conta
@@ -150,6 +152,65 @@ def test_get_context_devolve_401_para_token_que_nao_resolve(
     assert str(conta_a[0].id) not in corpo
     assert str(conta_a[1].id) not in corpo
     assert conta_a[1].email not in corpo
+
+
+class _ContadorDeQueries:
+    def __init__(self, conexao):
+        self.conexao = conexao
+        self.sqls: list[str] = []
+
+    def __enter__(self):
+        event.listen(self.conexao, "before_cursor_execute", self._registrar)
+        return self
+
+    def __exit__(self, *_):
+        event.remove(self.conexao, "before_cursor_execute", self._registrar)
+
+    def _registrar(self, conn, cursor, sql, params, context, executemany):
+        self.sqls.append(sql)
+
+    def __len__(self):
+        return len(self.sqls)
+
+
+def test_o_caminho_compartilhado_gasta_uma_consulta_so(db: Session, conta_a, monkeypatch):
+    """
+    `get_context` roda em TODA requisicao autenticada da plataforma, e cada
+    consulta dele e uma ida a rede: **0,17 s** a partir do conteiner
+    implantado (medido em 13/09/2026, ver
+    docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md). Ele
+    buscava o usuario e os entitlements em duas idas sequenciais.
+
+    O teste passa pelo `get_context` de verdade — nao pela sobreposicao de
+    dependencia — com a validacao remota stubada para SUCEDER com o `sub` de
+    um usuario que existe. E a mesma tecnica do teste do 401 acima, com o
+    sinal trocado: la o `sub` nao resolvia, aqui resolve.
+    """
+    conta, usuario = conta_a
+    _assinatura(db, conta, SubscriptionStatus.ACTIVE, {"project_limit": 25})
+    monkeypatch.setattr("app.core.security.settings.SUPABASE_JWT_SECRET", None)
+
+    async def _resolve_para_o_usuario(token):
+        return {"id": usuario.supabase_id, "email": usuario.email}
+
+    monkeypatch.setattr(auth_service, "get_user", _resolve_para_o_usuario)
+
+    with _ContadorDeQueries(db.connection()) as contador:
+        ctx = asyncio.run(get_context(authorization="Bearer qualquer", db=db))
+
+    assert ctx.account_id == conta.id
+    assert ctx.user_id == usuario.id
+    # O contexto continua trazendo os entitlements de verdade — o mesmo que a
+    # consulta separada devolveria. Sem esta asserção, "uma consulta so" seria
+    # satisfeito por um contexto que parou de resolver os entitlements.
+    assert ctx.entitlements["project_limit"] == 25
+    assert ctx.entitlements["can_use_ai"] == PADRAO["can_use_ai"]
+
+    assert len(contador) == 1, (
+        f"{len(contador)} consultas no caminho compartilhado; cada uma custa "
+        "0,17 s na API implantada. Busque usuario e entitlements numa ida so:\n  "
+        + "\n  ".join(" ".join(sql.split())[:80] for sql in contador.sqls)
+    )
 
 
 def _assinatura(

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 import time
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from app.core.errors import ValidacaoDeDominio
 from app.db.repository import ScopedRepository, get_repo
 from app.models.all_models import Product, ProductState, ProductStateStatus, ProductOrigin, ProductOriginType, AiUsageLog
@@ -58,8 +59,20 @@ def get_products(
         query = query.order_by(Product.created_at.desc())
 
     # Pagination
+    #
+    # `joinedload` nos dois aninhados do ProductResponse: sem ele, o Pydantic
+    # toca `state` e `origin` na serializacao e a sessao emite uma consulta por
+    # valor distinto na pagina — 4 das 8 consultas que `?size=15` gastava. Sao
+    # duas many-to-one, entao o join nao multiplica linha e a paginacao
+    # continua valendo. Aplicado DEPOIS do `query.count()` de proposito: a
+    # contagem nao precisa dos joins.
     skip = (page - 1) * size
-    products = query.offset(skip).limit(size).all()
+    products = (
+        query.options(joinedload(Product.state), joinedload(Product.origin))
+        .offset(skip)
+        .limit(size)
+        .all()
+    )
     
     # Calculate total pages
     import math

@@ -37,7 +37,7 @@ export function listarProdutos(
     filtros: FiltrosDeProduto,
     signal?: AbortSignal,
 ): Promise<ProductsResponse> {
-    return api<ProductsResponse>("/api/products", {
+    return api<ProductsResponse>("/api/products/", {
         signal,
         query: queryDeProdutos(filtros),
     })
@@ -58,7 +58,7 @@ export function queryDoInbox() {
 }
 
 export function contarInbox(signal?: AbortSignal): Promise<ProductsResponse> {
-    return api<ProductsResponse>("/api/products", {
+    return api<ProductsResponse>("/api/products/", {
         signal,
         query: queryDoInbox(),
     })

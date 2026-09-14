@@ -40,7 +40,7 @@ export function AppShell({ children }: AppShellProps) {
                     headers["Authorization"] = `Bearer ${token}`;
                 }
 
-                const res = await fetch(apiUrl("/api/notifications"), {
+                const res = await fetch(apiUrl("/api/notifications/"), {
                     headers
                 });
 
