@@ -7,10 +7,10 @@ import { ArrowRight, FolderGit2, FolderIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
-import type { DashboardLeanResponse } from "./types"
+import type { DashboardLean } from "@/features/dashboard/types"
 
 /** Coluna 1 do grid secundario: "Continuar Trabalhando". */
-export function RecentProjectsColumn({ data }: { data: DashboardLeanResponse | null }) {
+export function RecentProjectsColumn({ data }: { data: DashboardLean }) {
     const router = useRouter()
 
     return (
@@ -24,7 +24,7 @@ export function RecentProjectsColumn({ data }: { data: DashboardLeanResponse | n
                         </Button>
                     </div>
                     
-                    {!data?.recent_projects || data.recent_projects.length === 0 ? (
+                    {data.recent_projects.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed text-muted-foreground bg-muted/20">
                             <FolderIcon className="h-10 w-10 mb-3 text-muted-foreground/40" />
                             <p className="mb-4 text-sm font-medium">Você ainda não tem projetos ativos.</p>
@@ -35,18 +35,22 @@ export function RecentProjectsColumn({ data }: { data: DashboardLeanResponse | n
                     ) : (
                         <div className="flex flex-col gap-3">
                             {data.recent_projects.map((proj) => (
-                                <Link key={proj.id} href={`/projects/${proj.id}`}>
-                                    <Card className="hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-300 cursor-pointer group">
+                                <Link
+                                    key={proj.id}
+                                    href={`/projects/${proj.id}`}
+                                    className="group rounded-xl ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                                >
+                                    <Card className="hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-300 cursor-pointer">
                                         <CardContent className="p-4 flex items-center justify-between">
                                             <div>
-                                                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{proj.name}</h3>
+                                                <h3 className="font-semibold text-foreground group-hover:text-primary group-focus-within:text-primary transition-colors">{proj.name}</h3>
                                                 {proj.client_name ? (
                                                     <p className="text-xs text-muted-foreground mt-0.5">Cliente: {proj.client_name}</p>
                                                 ) : (
                                                     <p className="text-xs text-muted-foreground mt-0.5">Sem cliente vinculado</p>
                                                 )}
                                             </div>
-                                            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 group-focus-within:translate-x-0" />
                                         </CardContent>
                                     </Card>
                                 </Link>

@@ -5,10 +5,10 @@ import { TrendingDown, TrendingUp, Wallet } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 import { formatCurrency } from "./format"
-import type { DashboardLeanResponse } from "./types"
+import type { DashboardLean } from "@/features/dashboard/types"
 
 /** Saldo, receitas e despesas — os tres primeiros cards da grade de metricas. */
-export function FinancialMetricCards({ data }: { data: DashboardLeanResponse | null }) {
+export function FinancialMetricCards({ data }: { data: DashboardLean }) {
     return (
         <>
                 {/* Metrica 1: Saldo */}
@@ -16,19 +16,24 @@ export function FinancialMetricCards({ data }: { data: DashboardLeanResponse | n
                     <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <span className="text-sm font-medium text-muted-foreground">Saldo Realizado</span>
-                        <div className={`p-2 rounded-lg ${(data?.financial_balance ?? 0) >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' : 'bg-red-50 text-red-600 dark:bg-red-950/30'}`}>
+                        <div className={`p-2 rounded-lg ${data.financial_balance >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
                             <Wallet className="h-4 w-4" />
                         </div>
                     </CardHeader>
                     <CardContent className="pt-2">
-                        <div className={`text-2xl font-bold tracking-tight ${(data?.financial_balance ?? 0) >= 0 ? 'text-foreground' : 'text-red-500'}`}>
-                            {formatCurrency(data?.financial_balance ?? 0)}
+                        {/* text-red-500: NAO migrado de proposito. text-destructive como texto
+                            grande mede 2,00:1 no tema escuro (tools/contraste.py, destructive
+                            sobre card/background), abaixo do piso de 3:1 do Art. 6 -- numero e
+                            comando em docs/dev/medicoes/2026-09-14-passada-de-navegador.md,
+                            item 7 de "O que continua aberto". */}
+                        <div className={`text-2xl font-bold tracking-tight ${data.financial_balance >= 0 ? 'text-foreground' : 'text-red-500'}`}>
+                            {formatCurrency(data.financial_balance)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-                            {(data?.financial_balance ?? 0) >= 0 ? (
-                                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                            {data.financial_balance >= 0 ? (
+                                <TrendingUp className="h-3 w-3 text-success" />
                             ) : (
-                                <TrendingDown className="h-3 w-3 text-red-500" />
+                                <TrendingDown className="h-3 w-3 text-destructive" />
                             )}
                             Saldo acumulado geral realizado
                         </p>
@@ -37,16 +42,16 @@ export function FinancialMetricCards({ data }: { data: DashboardLeanResponse | n
 
                 {/* Metrica 2: Receitas */}
                 <Card className="bg-card shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+                    <div className="absolute top-0 left-0 w-1 h-full bg-success" />
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <span className="text-sm font-medium text-muted-foreground">Receitas deste Mês</span>
-                        <div className="p-2 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 rounded-lg">
+                        <div className="p-2 bg-success/10 text-success rounded-lg">
                             <TrendingUp className="h-4 w-4" />
                         </div>
                     </CardHeader>
                     <CardContent className="pt-2">
-                        <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(data?.financial_income ?? 0)}
+                        <div className="text-2xl font-bold tracking-tight text-success">
+                            {formatCurrency(data.financial_income)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5">
                             Previsão + Realizado do mês
@@ -56,16 +61,19 @@ export function FinancialMetricCards({ data }: { data: DashboardLeanResponse | n
 
                 {/* Metrica 3: Despesas */}
                 <Card className="bg-card shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+                    <div className="absolute top-0 left-0 w-1 h-full bg-destructive" />
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <span className="text-sm font-medium text-muted-foreground">Despesas deste Mês</span>
-                        <div className="p-2 bg-red-50 text-red-600 dark:bg-red-950/30 rounded-lg">
+                        <div className="p-2 bg-destructive/10 text-destructive rounded-lg">
                             <TrendingDown className="h-4 w-4" />
                         </div>
                     </CardHeader>
                     <CardContent className="pt-2">
+                        {/* text-red-600 dark:text-red-400: NAO migrado de proposito. Mesma
+                            razao do saldo acima -- numero e comando em
+                            docs/dev/medicoes/2026-09-14-passada-de-navegador.md, item 7. */}
                         <div className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">
-                            {formatCurrency(data?.financial_expense ?? 0)}
+                            {formatCurrency(data.financial_expense)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5">
                             Previsão + Realizado do mês

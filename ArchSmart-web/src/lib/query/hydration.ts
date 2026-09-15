@@ -1,5 +1,7 @@
 import { QueryClient } from "@tanstack/react-query"
 
+import type { ClienteApi } from "@/lib/api/core"
+
 /**
  * QueryClient por requisicao, para o servidor.
  *
@@ -52,4 +54,24 @@ export async function tentarPrefetch(
     } finally {
         clearTimeout(timer)
     }
+}
+
+/**
+ * Um cliente que aborta quando o teto de `tentarPrefetch` aborta.
+ *
+ * Existe por causa das fabricas de `features/<dominio>/queries.ts`: la a
+ * `queryFn` recebe o `signal` do REACT QUERY, nao o do teto. Antes delas o
+ * `LibraryData` repassava o sinal do teto a mao para `apiServer`; sem este
+ * embrulho, a fabrica perderia isso e um cold start voltaria a pendurar a
+ * conexao ate a API responder — o custo que `tentarPrefetch` documenta.
+ *
+ * `AbortSignal.any` aborta quando QUALQUER um aborta: o teto, ou o proprio
+ * React Query cancelando a query.
+ */
+export function clienteComSinal(cliente: ClienteApi, sinal: AbortSignal): ClienteApi {
+    return (path, req = {}) =>
+        cliente(path, {
+            ...req,
+            signal: req.signal ? AbortSignal.any([req.signal, sinal]) : sinal,
+        })
 }

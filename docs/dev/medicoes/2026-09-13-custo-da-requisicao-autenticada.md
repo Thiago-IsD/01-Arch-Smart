@@ -1,13 +1,18 @@
 # O custo de uma requisição autenticada — medido em 13/09/2026
 
-> **A metade de medir está feita, e quatro correções de código já entraram.**
+> **Medida, consertada em quatro pontos, e medida de novo depois do deploy.**
 > A tarefa foi descrita em 13/09/2026, por decisão de Thiago, para preceder o
-> Dashboard — e **executada no mesmo dia**: os números estão em "Onde vão os
-> ~1,5 s", no meio deste arquivo. Thiago então escolheu "as baratas primeiro, a
-> distância depois", e o que entrou está em "O que foi consertado". **O que
-> continua aberto é a distância até o banco** — a única saída que sozinha cabe
-> no orçamento — **e a medição do que já foi consertado, que só existe depois
-> do deploy.**
+> Dashboard, e executada no mesmo dia: os números do diagnóstico estão em "Onde
+> vão os ~1,5 s". Thiago escolheu "as baratas primeiro, a distância depois"; o
+> que entrou está em "O que foi consertado", e o efeito **medido contra a API
+> implantada em 14/09/2026** está logo abaixo daquilo: a chamada da Biblioteca
+> caiu **48%**, de 2,29 s para **1,175 s**.
+>
+> **O que continua aberto é a distância até o banco.** O P95 da rota é
+> **1613 ms** contra um orçamento de **400 ms** — quatro vezes acima —, e as
+> 6 idas ao banco que sobraram custam 0,17 s cada porque a API e o banco estão
+> longe um do outro. Nenhuma correção de código alcança isso; as três saídas
+> estão em "As saídas", e a escolha é de Thiago.
 >
 > Leia até o fim antes de escolher o trabalho. **A primeira hipótese estava
 > errada** — a seção "O que eu afirmei e a medição desmentiu" diz em quê — e a
@@ -401,9 +406,9 @@ mais**. No lugar delas, um `GET .../auth/v1/.well-known/jwks.json` **uma vez por
 processo**. O preço assumido: a primeira requisição autenticada de cada processo
 paga essa busca; as seguintes, nenhuma.
 
-### O que isso deve dar na API implantada — **previsão, não medição**
+### O que isso devia dar na API implantada — a previsão que foi escrita antes
 
-Pelo modelo desta página, a chamada que a Biblioteca faz sai de **2,55 s** (o
+Pelo modelo desta página, a chamada que a Biblioteca faz sairia de **2,55 s** (o
 `307` mais a requisição) para:
 
 ```
@@ -414,15 +419,77 @@ Pelo modelo desta página, a chamada que a Biblioteca faz sai de **2,55 s** (o
 1,31 s
 ```
 
-Cerca de **metade**. E, exatamente como a tabela "As saídas" antecipava, **ainda
-é três vezes o orçamento de 400 ms** — o que sobra é distância, e distância não
-se conserta com código.
+Ela fica registrada porque foi escrita **antes** do deploy, e porque a medição
+que veio depois a julga: deu **1,175 s** — a previsão era pessimista em 11%.
 
-> ⚠️ **Nada disso foi medido contra a API implantada, porque o código ainda não
-> está implantado.** Staging serve a branch `staging`; enquanto a branch de
-> conserto não chegar lá, o número real não existe. O comando que produz esse
-> número é o mesmo de "Como reproduzir", e o resultado dele é o que fecha a
-> primeira caixa da Seção 8 — não esta previsão.
+### Medido contra a API implantada, em 14/09/2026 — depois do deploy
+
+O PR #10 (`develop` → `staging`, merge `057085a`) subiu os quatro consertos. A
+primeira chamada depois do deploy custou **6,4 s** (contêiner subindo); a
+seguinte, **1,18 s**. Medianas de 7 amostras, descartada a rodada de
+aquecimento, com o contêiner quente:
+
+| Rota | Consultas antes → depois | Antes | Depois | |
+|---|---|---:|---:|---|
+| `/health` | 0 | 0,294 s | 0,323 s | controle |
+| `/health/db` | 1 → 1 | 0,990 s | **0,990 s** | controle |
+| `/api/users/me`, token **inválido** | 0 → 0 | 0,527 s | **0,524 s** | controle |
+| `/api/products/?size=1` | 6 → 3 | 2,013 s | **1,170 s** | |
+| `/api/products/?size=15` — a da tela | 8 → 3 | 2,29 s | **1,175 s** | P50, n=40 |
+| `/api/products/?size=20` | 8 → 3 | 2,319 s | **1,177 s** | |
+| `/api/projects?size=20` | 12 → 11 | 3,037 s | **2,575 s** | |
+
+**Os três controles são o que separa "o código melhorou" de "a rede estava
+boa hoje".** `/health/db` não passa por autenticação e continua fazendo uma
+consulta: mediu **0,990 s** nos dois dias, o mesmo número. O token inválido não
+consegue ser validado localmente e continua pagando a ida remota: **0,527 →
+0,524 s**. Nada no ambiente mudou; o que mudou foi o que a requisição faz.
+
+E o ajuste concorda: refazendo os mínimos quadrados com as contagens novas
+(3 e 11 consultas), a **inclinação continua 0,175 s por consulta** — era 0,172 —
+e o **custo fixo caiu de 0,966 s para 0,652 s**. A queda de 0,314 s é a ida
+remota do JWT (0,240 s) somada ao ruído do dia. A distância não mudou, e não
+tinha como mudar: nenhum dos quatro consertos a toca.
+
+**A chamada que a Biblioteca faz caiu 48%**: 2,29 s → 1,175 s. A previsão do
+modelo era 1,31 s — pessimista em 11%.
+
+### O orçamento, e por que ele continua estourado
+
+**Volume declarado**: 300 produtos na conta do usuário de teste, 90
+`NORMALIZED` — o mesmo volume da medição da Seção 8, para os números serem
+comparáveis. 40 amostras, após 5 de aquecimento.
+
+```
+P50 = 1175 ms      P95 = 1613 ms      orcamento = 400 ms
+```
+
+**P95 quatro vezes acima do orçamento.** Era ~5,7× antes (2,29 s de mediana).
+Cada uma das 6 idas ao banco que sobraram custa 0,17 s porque a API e o banco
+estão longe um do outro — e essa é a parte que código não conserta.
+
+### A tela, no mesmo arranjo da Seção 8
+
+```
+AMOSTRAS=958,980,992,1003,1174
+MEDIANA_MS=992
+```
+
+Contra **1415 ms** medidos em 12/09/2026 — **−423 ms**, mesma máquina, mesmo
+comando, mesmo banco. O ganho aqui é menor que o da API implantada porque este
+arranjo roda a **API local**, onde uma ida ao banco custa 16 ms em vez de
+170 ms: localmente quase todo o ganho é a ida remota do JWT que sumiu.
+
+> **Duas armadilhas que custaram duas execuções, para quem for repetir isto.**
+> `medicao-biblioteca.spec.ts` sobe o `npm run dev`, e o front lê
+> `NEXT_PUBLIC_API_URL` de `.env.local`, que aponta para **`http://localhost:8000`**
+> — sem a API local de pé, o login falha com `ERR_CONNECTION_REFUSED` e o spec
+> morre em `waitForURL` sem dizer por quê. É por isso que este número **não** é
+> comparável ao da API implantada: os 1415 ms da Seção 8 foram medidos com API
+> local, e este também. E o `timeout` local do `playwright.config.ts` é de 30 s
+> (120 s só no CI), o que não cobre a primeira compilação das rotas pelo dev
+> server — rode com `--timeout=180000` ou aqueça as rotas antes.
+
 
 ### O que ficou de fora, de propósito
 
@@ -447,6 +514,16 @@ se conserta com código.
   restantes vai medir o mesmo custo compartilhado e parecer lenta por conta
   própria, e você terá oito medições contaminadas pela mesma causa sem nenhuma
   delas apontando para ela.
+
+  > ✅ **Decidido em 14/09/2026, por escrito: carregada adiante.** Thiago
+  > decidiu não bloquear a próxima tela nesta decisão — ver decisão 1 de
+  > [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](../../superpowers/specs/2026-09-14-secao-8-dashboard-design.md).
+  > O Dashboard migrou em 14/09/2026 sem o conserto do caminho compartilhado, e
+  > registra o orçamento de API como **"não atingido, por distância, não pela
+  > tela"** em vez de marcado como atingido. O aviso acima continua valendo
+  > para a leitura do número: as oito telas restantes vão medir o mesmo custo
+  > compartilhado, e cada uma precisa repetir esse rótulo em vez de reivindicar
+  > o orçamento como cumprido.
 
 ## Como saber que fechou
 

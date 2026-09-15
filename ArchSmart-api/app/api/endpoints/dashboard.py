@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import and_, desc, func, extract
+from sqlalchemy import and_, case, desc, extract, func
 from typing import Any
 from datetime import datetime
 
 from app.db.repository import ScopedRepository, get_repo
-from app.models.all_models import Project, Product, Client, Event, FinancialEntry, User
+from app.models.all_models import Project, Product, Client, Event, FinancialEntry
 from app.schemas.dashboard_schema import DashboardLeanResponse
 from app.api.endpoints.projects import _get_plan_limit
 
@@ -21,7 +21,18 @@ def get_dashboard_lean(
     - Métricas financeiras e de projetos
     - Próximos compromissos
     """
-    # 1. Projetos Recentes (Top 4 ordenados por data de criação)
+    now = datetime.now()
+
+    # 1. Projetos recentes E a contagem de ativos, numa ida so.
+    #
+    # `count(*) OVER ()` e calculado ANTES do LIMIT: cada uma das ate 4 linhas
+    # carrega o total de ativos. Era uma consulta separada, e cada consulta
+    # custa 0,17 s na API implantada.
+    #
+    # ⚠️ Semantica: conta projetos ativos CUJO CLIENTE E DA MESMA CONTA, porque
+    # a contagem agora passa pelo JOIN abaixo. A consulta anterior contava todo
+    # projeto ativo. Os dois conjuntos so divergem num estado que o schema
+    # permite e nenhum caminho de escrita produz — o descrito a seguir.
     #
     # O `Client.account_id == repo.ctx.account_id` no ON e obrigatorio, e nao
     # redundante. `repo.query(Project)` escopa PROJECT; o `with_entities` traz
@@ -32,7 +43,7 @@ def get_dashboard_lean(
     # cliente por `repo.obter`/`repo.get` antes, mas isso e disciplina de
     # codigo, nao invariante de schema. Mesmo padrao de
     # `financial.py::list_financial_entries`.
-    projects_query = (
+    linhas_de_projeto = (
         repo.query(Project)
         .join(
             Client,
@@ -43,23 +54,15 @@ def get_dashboard_lean(
         )
         .filter(Project.status == "ACTIVE")
         .order_by(desc(Project.created_at))
-        .with_entities(Project, Client)
+        .with_entities(Project.id, Project.name, Client.name, func.count().over())
         .limit(4)
         .all()
     )
-
-    recent_projects = []
-    for proj, client in projects_query:
-        recent_projects.append({
-            "id": proj.id,
-            "name": proj.name,
-            "client_name": client.name
-        })
-
-    # Contagem de projetos ativos
-    active_projects_count = repo.query(Project).filter(
-        Project.status == "ACTIVE"
-    ).count()
+    recent_projects = [
+        {"id": pid, "name": nome, "client_name": cliente}
+        for pid, nome, cliente, _ in linhas_de_projeto
+    ]
+    active_projects_count = linhas_de_projeto[0][3] if linhas_de_projeto else 0
 
     # Limite de projetos do plano da assinatura (dinâmico)
     plan_limit = _get_plan_limit(repo)
@@ -79,46 +82,44 @@ def get_dashboard_lean(
             "store": prod.store
         })
 
-    # 3. Métricas Financeiras
-    # Saldo em Caixa Realizado (tudo REALIZED de INCOME menos EXPENSE)
-    balance_query = (
+    # 3. Metricas financeiras numa agregacao so.
+    #
+    # Eram duas: o saldo (so REALIZED, qualquer data) e o mes (qualquer status,
+    # so o mes corrente). A soma condicional separa as duas no mesmo SELECT, e o
+    # `count` sai de graca para a definicao de "Dashboard vazio" (decisao 3 da
+    # spec do Dashboard). `test_lean_devolve_os_mesmos_valores` foi escrito
+    # verde contra a versao de duas consultas antes desta troca.
+    do_mes = and_(
+        extract("month", FinancialEntry.due_date) == now.month,
+        extract("year", FinancialEntry.due_date) == now.year,
+    )
+    linhas_financeiras = (
         repo.query(FinancialEntry)
-        .filter(FinancialEntry.status == "REALIZED")
-        .with_entities(func.sum(FinancialEntry.amount).label("total"), FinancialEntry.type)
+        .with_entities(
+            FinancialEntry.type,
+            func.coalesce(
+                func.sum(case((FinancialEntry.status == "REALIZED", FinancialEntry.amount), else_=0.0)),
+                0.0,
+            ),
+            func.coalesce(func.sum(case((do_mes, FinancialEntry.amount), else_=0.0)), 0.0),
+            func.count(FinancialEntry.id),
+        )
         .group_by(FinancialEntry.type)
         .all()
     )
 
     financial_balance = 0.0
-    for total, f_type in balance_query:
-        if f_type == "INCOME":
-            financial_balance += (total or 0.0)
-        elif f_type == "EXPENSE":
-            financial_balance -= (total or 0.0)
-
-    # Entradas e Saídas do Mês Atual (PREDICTED e REALIZED)
-    now = datetime.now()
-    month = now.month
-    year = now.year
-
-    monthly_query = (
-        repo.query(FinancialEntry)
-        .filter(
-            extract('month', FinancialEntry.due_date) == month,
-            extract('year', FinancialEntry.due_date) == year,
-        )
-        .with_entities(func.sum(FinancialEntry.amount).label("total"), FinancialEntry.type)
-        .group_by(FinancialEntry.type)
-        .all()
-    )
-
     financial_income = 0.0
     financial_expense = 0.0
-    for total, f_type in monthly_query:
-        if f_type == "INCOME":
-            financial_income = (total or 0.0)
-        elif f_type == "EXPENSE":
-            financial_expense = (total or 0.0)
+    financial_entries_count = 0
+    for tipo, realizado, do_mes_total, quantos in linhas_financeiras:
+        financial_entries_count += quantos
+        if tipo == "INCOME":
+            financial_balance += realizado
+            financial_income = do_mes_total
+        elif tipo == "EXPENSE":
+            financial_balance -= realizado
+            financial_expense = do_mes_total
 
     # 4. Próximos Eventos da Agenda (a partir de hoje)
     #
@@ -154,12 +155,14 @@ def get_dashboard_lean(
             "project_name": pj_name
         })
 
-    # RequestContext carrega identidade e entitlements, nao o perfil inteiro
-    # do usuario (Art. 1: so o servidor resolve identidade, mas o contrato de
-    # RequestContext e deliberadamente minimo) — full_name ainda vem de uma
-    # leitura de User, agora por repo.get() em vez do current_user injetado.
-    usuario = repo.get(User, repo.ctx.user_id)
-    full_name = usuario.full_name if usuario else None
+    # `repo.usuario()` custa zero consultas porque o caminho compartilhado
+    # (`resolver_identidade_e_entitlements`, app/core/security.py) guarda o
+    # User numa referencia FORTE em `db.info[USUARIO_DA_SESSAO]` -- a identity
+    # map sozinha so guarda referencia fraca e nao bastaria (ver docstring de
+    # `ScopedRepository.usuario` em app/db/repository.py). Vale a mesma ressalva
+    # de nao rodar depois de um commit nesta funcao (o objeto expiraria e
+    # custaria um refresh).
+    full_name = repo.usuario().full_name
 
     return {
         "user_first_name": full_name or "Usuário",
@@ -170,5 +173,6 @@ def get_dashboard_lean(
         "financial_balance": financial_balance,
         "financial_income": financial_income,
         "financial_expense": financial_expense,
+        "financial_entries_count": financial_entries_count,
         "upcoming_events": upcoming_events
     }

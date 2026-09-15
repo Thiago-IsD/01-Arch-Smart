@@ -354,7 +354,16 @@ class TestMedidasDeAcessibilidade(unittest.TestCase):
         # Voltou a 8 na Tarefa 9 da mesma secao: a acao do ProductCard escondida
         # atras de hover ganhou `group-focus-within:opacity-100`. O que sobra sao
         # 8 ocorrencias em telas que a Secao 8 ainda nao migrou.
-        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 8)
+        #
+        # Desceu para 7 no commit ed40e8f (Tarefa 4 do plano do Dashboard,
+        # Secao 8): o `ArrowRight` de RecentProjectsColumn.tsx tinha
+        # `opacity-0 group-hover:opacity-100` sem escape de foco -- o mesmo
+        # defeito, numa tela que essa tarefa migrou -- e ganhou
+        # `group-focus-within:opacity-100` na mesma passada que tirou as cores
+        # literais do Dashboard. Medido, nao suposto -- esta asserção estava
+        # descasada da medicao real desde aquele commit, achado ao rodar a
+        # suite na Tarefa 7 (docs/deploy) da mesma migracao.
+        self.assertEqual(catraca.medir(None)["hover_sem_focus"], 7)
 
     def test_linha_com_focus_within_nao_conta(self):
         self.assertEqual(

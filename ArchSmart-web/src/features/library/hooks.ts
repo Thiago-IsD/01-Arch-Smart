@@ -1,12 +1,14 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { api } from "@/lib/api/client"
 import { queryKeys, cachePolicy, type FiltrosDeProduto } from "@/lib/query/keys"
 import {
-    aprovarEmLote, aprovarProduto, atualizarProduto, contarInbox, criarProduto, excluirProduto,
-    listarAmbientes, listarProdutos, listarProjetos, moverParaProjeto, obterProduto,
+    aprovarEmLote, aprovarProduto, atualizarProduto, criarProduto, excluirProduto,
+    listarAmbientes, listarProjetos, moverParaProjeto, obterProduto,
     type PayloadDeProduto,
 } from "./api"
+import { queryDaListaDeProdutos, queryDoBadgeDoInbox } from "./queries"
 import { RESPOSTA_VAZIA } from "./types"
 
 /**
@@ -18,22 +20,18 @@ import { RESPOSTA_VAZIA } from "./types"
  */
 export function useProducts(filtros: FiltrosDeProduto, opcoes: { ativo?: boolean } = {}) {
     return useQuery({
-        queryKey: queryKeys.products.list(filtros),
-        queryFn: ({ signal }) => listarProdutos(filtros, signal),
+        ...queryDaListaDeProdutos(api, filtros),
         enabled: opcoes.ativo ?? true,
         // Mantem a lista anterior visivel enquanto a nova carrega: sem isso a
         // grade pisca em branco a cada pagina e a cada filtro.
         placeholderData: (anterior) => anterior,
-        ...cachePolicy.transacional,
     })
 }
 
 export function useInboxCount() {
     return useQuery({
-        queryKey: queryKeys.products.inboxCount(),
-        queryFn: ({ signal }) => contarInbox(signal),
+        ...queryDoBadgeDoInbox(api),
         select: (resposta) => resposta.total,
-        ...cachePolicy.transacional,
     })
 }
 

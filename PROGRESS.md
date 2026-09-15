@@ -1010,9 +1010,19 @@ _Última atualização: 2026-09-13_
 > ida remota a `/auth/v1/user` sumiu do caminho quente, verificada no log. A
 > chamada que a Biblioteca faz saiu de **8 consultas para 3**, medido contra o
 > banco de staging. Cada correção tem o teste que reprova a volta do defeito.
-> **A previsão do modelo é 2,55 s → ~1,31 s, e é previsão: o código ainda não
-> está implantado**, então o número real não existe. É ele, e não a previsão,
-> que fecha esta caixa.
+> ✅ **Medido contra a API implantada em 14/09/2026**, depois do PR #10
+> (`develop` → `staging`, merge `057085a`): a chamada da Biblioteca caiu **48%**,
+> de **2,29 s** para **1,175 s** (P50, n=40; P95 **1613 ms**), e a tela, no mesmo
+> arranjo da Seção 8, foi de **1415 ms** para **992 ms**
+> (`AMOSTRAS=958,980,992,1003,1174`). A previsão do modelo era 1,31 s —
+> pessimista em 11%. **Três controles separam "o código melhorou" de "a rede
+> estava boa hoje"**: `/health/db` mediu 0,990 s nos dois dias, o token inválido
+> 0,527 → 0,524 s, e a inclinação do ajuste continua 0,175 s por consulta
+> enquanto o custo fixo caiu 0,314 s — que é a ida remota do JWT.
+>
+> ⚠️ **O orçamento continua estourado: P95 de 1613 ms contra 400 ms, quatro
+> vezes acima.** Era ~5,7×. O que sobra são 6 idas ao banco a 0,17 s cada, e isso
+> é distância — código não alcança.
 >
 > **A caixa continua aberta de propósito: a distância é decisão de Thiago.**
 > Somadas, **todas** as correções de código (barra final, JWKS, menos consultas,
@@ -1040,7 +1050,10 @@ _Última atualização: 2026-09-13_
 > `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
 > silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
-- [ ] **Custo da requisição autenticada** (não é tela; precede as oito)
+- [ ] **Custo da requisição autenticada** (não é tela; precede as oito) —
+      decisão do conserto carregada adiante em 14/09/2026, por escrito (decisão
+      1 de [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md));
+      a caixa não é marcada porque a decisão foi adiar, não fechar
 - [x] Biblioteca
 - [ ] Dashboard
 - [ ] Projetos (lista + detalhe)
