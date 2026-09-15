@@ -49,8 +49,12 @@ def get_projects(
     search: str = None
 ) -> Any:
     """
-    Lista os projetos da conta. Custo fixo de 4 consultas, qualquer que seja o
-    tamanho da pagina (tests/api/test_projetos_sem_n_mais_um.py).
+    Lista os projetos da conta. Custo fixo de 5 consultas, qualquer que seja o
+    tamanho da pagina — 4 deste endpoint (contagem, pagina com join do
+    cliente, contagem agregada de ambientes, active_count) mais 1 de
+    contexto/entitlements, resolvida antes de chegar aqui pelo caminho
+    compartilhado (Depends(get_repo) -> get_context), nao por este codigo
+    (tests/api/test_projetos_sem_n_mais_um.py).
     """
     query = repo.query(Project)
 
