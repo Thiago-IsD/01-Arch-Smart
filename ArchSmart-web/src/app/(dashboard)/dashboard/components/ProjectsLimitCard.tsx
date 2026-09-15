@@ -2,11 +2,15 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
 
 // ---------------------------------------------------------------------------
-// Card "Projetos Ativos" — separado para nao renderizar limite nenhum
-// enquanto `entitlements` (Art. 3) nao chegou.
+// Card "Projetos Ativos" — separado por composicao, nao por espera de dado.
+// `activeProjectsCount`/`planLimit` chegam prontos de `/api/dashboard/lean`
+// (decisao 5 da spec do Dashboard): e a excecao a regra da Secao 5 de ler
+// limite so por `useEntitlements()` -- ver "A excecao a regra da Secao 5" em
+// docs/dev/modulos/dashboard.md. Nao ha estado de "entitlements ainda nao
+// chegou" aqui: quem espera e o `QueryBoundary` da tela, antes deste card
+// existir.
 // ---------------------------------------------------------------------------
 
 export function ProjectsLimitCard({
@@ -23,7 +27,7 @@ export function ProjectsLimitCard({
             <div className="absolute top-0 left-0 w-1 h-full bg-secondary" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <span className="text-sm font-medium text-muted-foreground">Projetos Ativos</span>
-                <Badge variant="secondary" className="text-[10px] font-semibold bg-secondary/10 text-secondary border-secondary/20">
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-secondary/10 text-foreground border-secondary/20">
                     Plano Solo
                 </Badge>
             </CardHeader>
@@ -45,21 +49,6 @@ export function ProjectsLimitCard({
                 <p className="text-[11px] text-muted-foreground">
                     {projectPercentage >= 100 ? "Limite de projetos atingido" : `${planLimit - activeProjectsCount} espaço(s) livre(s)`}
                 </p>
-            </CardContent>
-        </Card>
-    )
-}
-
-export function ProjectsLimitCardSkeleton() {
-    return (
-        <Card className="bg-card shadow-sm relative overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-8 rounded-lg" />
-            </CardHeader>
-            <CardContent className="pt-2 space-y-2">
-                <Skeleton className="h-7 w-28" />
-                <Skeleton className="h-3 w-40" />
             </CardContent>
         </Card>
     )

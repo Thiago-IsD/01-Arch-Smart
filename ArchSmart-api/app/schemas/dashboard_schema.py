@@ -37,4 +37,5 @@ class DashboardLeanResponse(BaseModel):
     financial_balance: float
     financial_income: float
     financial_expense: float
+    financial_entries_count: int
     upcoming_events: List[UpcomingEvent]

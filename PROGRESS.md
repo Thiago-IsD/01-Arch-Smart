@@ -1050,7 +1050,10 @@ _Última atualização: 2026-09-13_
 > `ProductPickerModal`). Renomear só os emissores quebra o rodapé de totais em
 > silêncio: ele para de recalcular e ninguém vê erro nenhum.
 
-- [ ] **Custo da requisição autenticada** (não é tela; precede as oito)
+- [ ] **Custo da requisição autenticada** (não é tela; precede as oito) —
+      decisão do conserto carregada adiante em 14/09/2026, por escrito (decisão
+      1 de [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md));
+      a caixa não é marcada porque a decisão foi adiar, não fechar
 - [x] Biblioteca
 - [ ] Dashboard
 - [ ] Projetos (lista + detalhe)

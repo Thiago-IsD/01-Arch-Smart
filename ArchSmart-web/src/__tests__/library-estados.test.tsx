@@ -25,17 +25,19 @@ import { TelemetriaDeTela } from "@/features/telemetry/TelemetriaDeTela"
 import { RESPOSTA_VAZIA, type ProductsResponse } from "@/features/library/types"
 import type { EventoDeProduto } from "@/features/telemetry/types"
 
-// A rede entra pelas DUAS funcoes que a tela usa de fato, e o resto do modulo
-// continua o de verdade: mockar `@/lib/api/client` deixaria a forma do query
-// fora do teste, e mockar os hooks deixaria de fora justamente o que se quer
-// provar (que a tela le `isPending`/`isError` por meio do boundary).
+// A rede entra por `@/lib/api/client` — desde a Tarefa 1 da Secao 8, a fabrica
+// de `features/library/queries.ts` chama o `cliente` recebido direto na
+// `queryFn`, sem passar por `listarProdutos`/`contarInbox`; mockar essas duas
+// funcoes deixou de ter efeito. O resto do modulo `@/features/library/api`
+// continua o de verdade: e `queryDeProdutos`/`queryDoInbox` que discriminam,
+// pelo formato do `query`, qual das duas chamadas e a lista e qual e o badge —
+// so a lista tem `sort_by` na forma que `queryDeProdutos` monta.
 let listaFalsa: () => Promise<ProductsResponse>
 let inboxFalso: () => Promise<ProductsResponse>
 
-vi.mock("@/features/library/api", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("@/features/library/api")>()),
-    listarProdutos: () => listaFalsa(),
-    contarInbox: () => inboxFalso(),
+vi.mock("@/lib/api/client", () => ({
+    api: (_path: string, req?: { query?: Record<string, unknown> }) =>
+        req?.query && "sort_by" in req.query ? listaFalsa() : inboxFalso(),
 }))
 
 // `ClipperOnboarding` e importado estaticamente pela tela (ele e a aba

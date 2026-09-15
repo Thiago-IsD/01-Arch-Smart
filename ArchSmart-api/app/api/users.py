@@ -23,7 +23,7 @@ async def get_current_user_profile(
     Get current authenticated user's profile.
     Returns user data with account and subscription information.
     """
-    usuario = repo.obter(User, repo.ctx.user_id)
+    usuario = repo.usuario()
     db = repo.db
 
     # `accounts` e a unica tabela sem account_id — ela E a conta. Chegar nela
@@ -34,28 +34,23 @@ async def get_current_user_profile(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Subscription tem account_id: converte de verdade.
-    #
-    # `order_by(Subscription.id)` pelo MESMO motivo que
-    # `entitlements_da_conta` (app/services/entitlements.py) ja usava, e
-    # tem que ser a MESMA ordenacao: nao ha unique constraint em
-    # `subscriptions.account_id`, e esta resposta carrega os dois campos
-    # juntos. Com uma conta de duas linhas e ordenacoes diferentes, o
-    # `subscription_status`/`plan_name` daqui e o `entitlements` de la
-    # sairiam de assinaturas DIFERENTES na mesma resposta — incoerencia
-    # silenciosa, e o cliente nao tem como notar.
-    subscription = repo.query(Subscription).order_by(Subscription.id).first()
-    plan_name = None
+    # Assinatura e nome do plano num JOIN so. `plans` e catalogo global, sem
+    # account_id: o escopo vem da `subscriptions` do `repo.query`, e o
+    # outerjoin traz o nome sem uma segunda ida. `order_by(Subscription.id)`
+    # e a MESMA ordem de `entitlements_de` no caminho compartilhado
+    # (app/core/security.py) — status/plano daqui e entitlements dali tem de
+    # sair da MESMA linha quando a conta tem mais de uma assinatura.
+    linha = (
+        repo.query(Subscription)
+        .outerjoin(Plan, Plan.id == Subscription.plan_id)
+        .order_by(Subscription.id)
+        .with_entities(Subscription.status, Plan.name)
+        .first()
+    )
     subscription_status = "BETA"  # Default
-
-    if subscription:
-        subscription_status = subscription.status
-        if subscription.plan_id:
-            # `plans` e catalogo global, sem account_id: repo.query(Plan)
-            # levantaria EscopoImpossivel.
-            plan = db.query(Plan).filter(Plan.id == subscription.plan_id).first()
-            if plan:
-                plan_name = plan.name
+    plan_name = None
+    if linha is not None:
+        subscription_status, plan_name = linha
 
     # Generate Signed URL for logo if it's a private path
     logo_response_url = account.logo_url
@@ -86,7 +81,10 @@ async def get_current_user_profile(
         avatar_url=None,  # TODO: Implement avatar storage
         role="admin" if account.is_active else "user",  # Simplified role logic
         account=account_info,
-        entitlements=entitlements_da_conta(db, repo.ctx.account_id)
+        # Ja resolvidos pelo caminho compartilhado (get_context), da mesma
+        # linha de assinatura que decidiu subscription_status/plan_name acima
+        # — sem recalcular aqui.
+        entitlements=dict(repo.ctx.entitlements)
     )
 
 
