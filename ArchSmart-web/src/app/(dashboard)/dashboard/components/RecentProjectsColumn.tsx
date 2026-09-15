@@ -35,18 +35,22 @@ export function RecentProjectsColumn({ data }: { data: DashboardLean }) {
                     ) : (
                         <div className="flex flex-col gap-3">
                             {data.recent_projects.map((proj) => (
-                                <Link key={proj.id} href={`/projects/${proj.id}`}>
-                                    <Card className="hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-300 cursor-pointer group">
+                                <Link
+                                    key={proj.id}
+                                    href={`/projects/${proj.id}`}
+                                    className="group rounded-xl ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                                >
+                                    <Card className="hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-300 cursor-pointer">
                                         <CardContent className="p-4 flex items-center justify-between">
                                             <div>
-                                                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{proj.name}</h3>
+                                                <h3 className="font-semibold text-foreground group-hover:text-primary group-focus-within:text-primary transition-colors">{proj.name}</h3>
                                                 {proj.client_name ? (
                                                     <p className="text-xs text-muted-foreground mt-0.5">Cliente: {proj.client_name}</p>
                                                 ) : (
                                                     <p className="text-xs text-muted-foreground mt-0.5">Sem cliente vinculado</p>
                                                 )}
                                             </div>
-                                            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 group-focus-within:translate-x-0" />
                                         </CardContent>
                                     </Card>
                                 </Link>

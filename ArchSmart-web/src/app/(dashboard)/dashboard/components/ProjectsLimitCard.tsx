@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
 
 // ---------------------------------------------------------------------------
 // Card "Projetos Ativos" — separado para nao renderizar limite nenhum
@@ -45,21 +44,6 @@ export function ProjectsLimitCard({
                 <p className="text-[11px] text-muted-foreground">
                     {projectPercentage >= 100 ? "Limite de projetos atingido" : `${planLimit - activeProjectsCount} espaço(s) livre(s)`}
                 </p>
-            </CardContent>
-        </Card>
-    )
-}
-
-export function ProjectsLimitCardSkeleton() {
-    return (
-        <Card className="bg-card shadow-sm relative overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-8 rounded-lg" />
-            </CardHeader>
-            <CardContent className="pt-2 space-y-2">
-                <Skeleton className="h-7 w-28" />
-                <Skeleton className="h-3 w-40" />
             </CardContent>
         </Card>
     )
