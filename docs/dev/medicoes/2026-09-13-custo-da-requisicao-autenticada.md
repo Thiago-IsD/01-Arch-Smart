@@ -515,6 +515,16 @@ arranjo roda a **API local**, onde uma ida ao banco custa 16 ms em vez de
   própria, e você terá oito medições contaminadas pela mesma causa sem nenhuma
   delas apontando para ela.
 
+  > ✅ **Decidido em 14/09/2026, por escrito: carregada adiante.** Thiago
+  > decidiu não bloquear a próxima tela nesta decisão — ver decisão 1 de
+  > [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](../../superpowers/specs/2026-09-14-secao-8-dashboard-design.md).
+  > O Dashboard migrou em 14/09/2026 sem o conserto do caminho compartilhado, e
+  > registra o orçamento de API como **"não atingido, por distância, não pela
+  > tela"** em vez de marcado como atingido. O aviso acima continua valendo
+  > para a leitura do número: as oito telas restantes vão medir o mesmo custo
+  > compartilhado, e cada uma precisa repetir esse rótulo em vez de reivindicar
+  > o orçamento como cumprido.
+
 ## Como saber que fechou
 
 O orçamento da spec: **P95 de API < 400 ms**. Meça com o mesmo comando desta

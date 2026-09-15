@@ -142,6 +142,15 @@ zero, e deduzir "sem lançamentos" de "saldo zero" mentiria justamente aí — �
 por isso que `/api/dashboard/lean` passou a devolver essa contagem (ver
 "O backend que a tela consome").
 
+**"Zero projetos" na decisão 3 da spec quer dizer zero projetos ATIVOS, não
+zero projetos.** `active_projects_count` só conta `Project.status == "ACTIVE"`
+(`app/api/endpoints/dashboard.py`) — uma conta com projetos, todos arquivados,
+e nenhum lançamento/captura/compromisso lê como vazia para a telemetria, com
+`is_empty: true`, mesmo tendo dado de projeto. A lógica não foi mudada: é a
+definição de "vazio" que precisa desta ressalva escrita, para quem for medir
+onboarding por `is_empty` mais adiante não confundir "conta nova" com "conta
+com projetos todos arquivados".
+
 **Isto decide só o `is_empty` da telemetria, não o que a tela mostra**: o
 estado `empty` do `QueryBoundary` renderiza o **mesmo** `Painel` que o estado
 com dados — as três colunas já têm mensagem de vazio própria, então a paridade
@@ -187,10 +196,14 @@ e vale só sob esta condição exata** (decisão 5 da spec do Dashboard):
 > Quando o endpoint da tela já traz o entitlement, calculado dos mesmos
 > entitlements da sessão no servidor, a tela lê de lá.
 
-`/api/dashboard/lean` calcula `plan_limit` com a mesma função que
-`/api/users/me` usa para o mesmo número (`_get_plan_limit`,
-`app/api/endpoints/projects.py`), a partir de `repo.ctx.entitlements` —
-nenhum limite é decidido no front, e o Art. 3 continua inteiro. A exceção
+`/api/dashboard/lean` calcula `plan_limit` com `_get_plan_limit`
+(`app/api/endpoints/projects.py`), que lê `repo.ctx.entitlements["project_limit"]`.
+**Correção:** `/api/users/me` não chama essa função — ele devolve
+`dict(repo.ctx.entitlements)` inteiro (`app/api/users.py`), sem passar por
+`_get_plan_limit`. Os dois números batem porque os dois saem do mesmo
+`repo.ctx.entitlements` da sessão, não porque compartilham a mesma função.
+Nenhum limite é decidido no front, e o Art. 3 continua inteiro — é essa parte
+que sustenta a exceção. A exceção
 **não** cobre uma tela que calcule limite de outro jeito, ou que precise de um
 entitlement que o endpoint dela não devolve: essa tela continua obrigada a
 `useEntitlements()`.
@@ -289,6 +302,14 @@ cd ArchSmart-api
 python -c "from app.db.session import SessionLocal; from sqlalchemy import text; db=SessionLocal(); print(db.execute(text(\"select properties->>'medido_ate', properties->>'medido_de', properties->>'load_ms', created_at from product_events where name='screen_viewed' and properties->>'screen'='/dashboard' order by created_at desc limit 10\")).fetchall())"
 ```
 
+> ⚠️ **`SessionLocal` lê `DATABASE_URL` de `ArchSmart-api/.env`** — a mesma
+> regra de `../../../CLAUDE.md`: staging e produção estão os dois nesse
+> arquivo, produção comentada. **Confira qual bloco está ativo antes de rodar
+> este comando** — é um banco gerenciado de verdade, não um banco de teste. A
+> consulta acima é só leitura (`select`), então não há risco de escrita mesmo
+> apontando para o bloco errado, mas ler o ambiente errado mede a coisa errada
+> em silêncio.
+
 ## O que a passada de navegador já mediu, e o que ela deixou aberto
 
 [`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](../medicoes/2026-09-14-passada-de-navegador.md)
@@ -300,4 +321,4 @@ depende de julgamento humano (hierarquia, perceptibilidade do anel,
 legibilidade) foi marcado como fechado ali. Para o Dashboard, o que ficou em
 aberto de propósito: `text-red-500` do saldo negativo (a conta de teste tem
 saldo zero), o par `secondary` do botão de compromisso (defeito de token, fora
-do escopo desta migração) e o nome de plano fixo em `ProjectsLimitCard.tsx:25`.
+do escopo desta migração) e o nome de plano fixo em `ProjectsLimitCard.tsx:26`.

@@ -640,12 +640,84 @@ autenticada**. Consertar mexe em toda tela, por isso não entrou de passagem.
    `contraste_reprovado` da catraca). O axe não o viu porque a conta de teste não
    tem compromisso — o botão não renderizou. Não consertado: é defeito do
    **token** (o coral da marca), e mexer em `globals.css` é decisão de design.
-6. **"Plano Solo" fixo em `ProjectsLimitCard.tsx:25`** — nome de plano escrito
+6. **"Plano Solo" fixo em `ProjectsLimitCard.tsx:26`** — nome de plano escrito
    no front, possível violação do Art. 3 (limite e plano vêm dos `entitlements`
    da API).
-7. **`text-red-500` do saldo negativo não medido**: a conta tem saldo zero.
+7. **`text-red-500`/`text-red-600 dark:text-red-400` do saldo e da despesa
+   negativos, medido.** A conta de teste tem saldo zero, então o axe nunca viu
+   esses nós — a medida abaixo é do token, direto de `globals.css`, não de nó
+   renderizado. `FinancialMetricCards.tsx:24-26` e `:70-71` apontavam para
+   `task-5-report.md`, que está em `.superpowers/` (gitignored) e não existe
+   neste repositório para quem ler o comentário depois. Reproduzido com
+   `tools/contraste.py` (`luminancia`/`contraste`), contra `--card` e
+   `--background` dos dois temas:
+
+   ```
+   python3 -c "
+   import sys; sys.path.insert(0, 'tools')
+   import contraste
+   claro, escuro = contraste.tokens_dos_temas()
+   for rotulo, tema in (('claro', claro), ('escuro', escuro)):
+       d = tema['destructive']
+       for fundo in ('card', 'background'):
+           print(rotulo, fundo, f'{contraste.contraste(d, tema[fundo]):.2f}:1')
+   "
+   ```
+
+   ```
+   claro card 3.76:1
+   claro background 3.76:1
+   escuro card 2.00:1
+   escuro background 2.00:1
+   ```
+
+   No tema escuro, `destructive` como texto grande mede **2,00:1** — abaixo do
+   piso de 3:1 do Art. 6 para texto grande, e é essa a medida que os dois
+   comentários citam (o número bate com o que estava escrito, `2,00:1`; a
+   revisão final tinha calculado ~1,97:1 por outra via e não foi reproduzido
+   aqui — o comando acima é o que este repositório agora tem para conferir).
+   `text-red-500`/`text-red-600 dark:text-red-400` continuam a substituição
+   deliberada enquanto o token não muda — mexer em `globals.css` é decisão de
+   design, a mesma razão do item 5 acima.
+
+   Aberto e não corrigido nesta passada (achado novo, não deste branch): no
+   tema escuro, `text-destructive` também é usado para **ícones** a ~2:1 — o
+   chip do cabeçalho "Despesas", o chip do `Wallet` e o `TrendingDown` quando o
+   saldo é negativo em `FinancialMetricCards.tsx`, e o `AlertCircle` de
+   `DashboardComErro.tsx:21`. Antes deste branch eram `text-red-600` sobre
+   `dark:bg-red-950/30`. Como os ícones duplicam um rótulo de texto ao lado
+   (não são a única pista), isto é discutivelmente fora do critério 1.4.11 —
+   e o axe não avalia contraste de ícone. Registrado como aberto; as classes
+   não foram alteradas.
 8. **"Próximos Compromissos" quebra em duas linhas em 1440** — se é defeito é
    julgamento visual.
+
+### Pré-existentes, não deste branch
+
+Achados na revisão final desta passada, e nenhum dos dois nasceu na migração
+do Dashboard — os dois mexem em código que qualquer tela migrada compartilha.
+Nenhum foi corrigido aqui.
+
+a. **`prefetchQuery` engole erro, e o `console.warn` de `tentarPrefetch` nunca
+   dispara num timeout de `AbortSignal`.** `tentarPrefetch`
+   (`ArchSmart-web/src/lib/query/hydration.ts`) chama
+   `queryClient.prefetchQuery(...).catch((erro) => console.warn(...))` — mas o
+   [contrato do `prefetchQuery`](https://tanstack.com/query/v5/docs/reference/QueryClient#queryclientprefetchquery)
+   já engole o erro da `queryFn` internamente (ele só relança se não houver
+   dado em cache), então o `.catch` encadeado por cima quase nunca tem o que
+   capturar. Na prática, um timeout de prefetch — a `queryFn` abortando por
+   `signal` — não aparece em log nenhum, nem no servidor nem no navegador: o
+   prefetch falha em silêncio nas duas telas que já usam este mecanismo
+   (Biblioteca e Dashboard), e todas as próximas que copiarem o padrão herdam o
+   mesmo ponto cego.
+b. **`ProjectsLimitCard` divide por `planLimit` sem checar zero.**
+   `activeProjectsCount / planLimit` em
+   `ArchSmart-web/src/app/(dashboard)/dashboard/components/ProjectsLimitCard.tsx`
+   — um plano com limite `0` (entitlement zerado, por engano de dado ou por um
+   plano novo sem limite configurado) produz `NaN`, propagado para
+   `Math.min(NaN, 100)` (que também é `NaN`) e para a barra de progresso.
+   `_get_plan_limit` (`app/api/endpoints/projects.py`) não impede `0` — só lê
+   `repo.ctx.entitlements["project_limit"]` como veio.
 
 ### Biblioteca
 
