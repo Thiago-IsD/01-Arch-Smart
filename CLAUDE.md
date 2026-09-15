@@ -527,6 +527,24 @@ as oito telas seguintes, não só a Biblioteca.
    Seção 8 em `PROGRESS.md` e em
    [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md).
 
+   > **Parcialmente endereçada em 14/09/2026, na Tarefa 6 da migração do
+   > Dashboard — não fechada.** A passada de navegador
+   > ([`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](docs/dev/medicoes/2026-09-14-passada-de-navegador.md))
+   > rodou os três instrumentos contra `/library` de verdade, com sessão e
+   > Chromium do Playwright: axe achou `aria-valid-attr-value` (1),
+   > `button-name` (8), `color-contrast` (15–19, os três pares já conhecidos
+   > de [`componentes.md`](docs/dev/componentes.md)), `page-has-heading-one`
+   > (1) e `region` (6, do shell); a largura em 390px **estoura 42px**, nos
+   > dois temas, com a causa isolada por experimento de DOM (o `p-8` da raiz
+   > de `library/page.tsx:14`, não os dois riscos do item 3 abaixo); e o
+   > teclado alcança e aciona tudo o que foi medido. **Mas, como o próprio
+   > registro afirma em destaque: tudo ali foi verificado por agente sobre
+   > captura de tela e medição no DOM, não por olho humano** — nenhuma pessoa
+   > abriu a tela, e o julgamento humano que a definição de pronto pede
+   > (hierarquia, ordem de leitura, perceptibilidade do anel, legibilidade de
+   > menu aberto) segue **não verificado**. Os três itens continuam sem
+   > fechar por essa razão, não por falta de dado.
+
 3. **Dois riscos localizados por leitura, que só o navegador decide.**
    `LibraryToolbar.tsx:167` não quebra linha abaixo de `md` e `:180` é um
    `SelectTrigger` de `w-[160px]` fixo ao lado de um input `w-full` sem
@@ -536,6 +554,18 @@ as oito telas seguintes, não só a Biblioteca.
    comportamento: jsdom não aplica Tailwind. Nenhum dos dois foi mexido, de
    propósito — alterar layout que ninguém pode ver é como se introduz regressão
    visual.
+
+   > **Medidos por agente em 14/09/2026, na mesma passada — não corrigidos.**
+   > Os dois riscos **não** causam o estouro de 390px (a causa é outra, ver o
+   > item 2 acima), mas o primeiro se confirmou como aperto real: em 390px a
+   > ordenação encolhe de 160 para 104px e o filtro de 40 para 23px de
+   > largura, abaixo do alvo de toque de 44px; `flex-wrap` na linha devolve os
+   > dois ao tamanho original, medido por injeção de estilo, não aplicado ao
+   > código. O segundo deixou de ser só classe na árvore: o wrapper mede
+   > `opacity: 1` com o foco, nas duas larguras, e `Espaço`/`Escape` abrem e
+   > fecham o menu. Nenhum dos dois foi corrigido — a regra continua sendo
+   > "registra, conserta só com ok de Thiago", e a legibilidade do menu aberto
+   > é pergunta de olho humano, não desta medição.
 
 4. **O teto de 60/minuto do endpoint de telemetria continua o mesmo, agora por
    pessoa.** A chave por conta acabou com o contágio entre usuários e a fila
@@ -548,6 +578,16 @@ as oito telas seguintes, não só a Biblioteca.
    `principal_declarada` denuncia quando ninguém declarou), mas "vazio" numa tela
    com lista e painel lateral é pergunta de produto, não de código. A primeira
    tela com duas regiões a encontra.
+
+   > **Decidida para o Dashboard em 14/09/2026 — não é a resposta geral.** A
+   > decisão 3 da spec do Dashboard define "vazio" como conta **sem nada
+   > ainda**: zero projetos ativos, zero produtos recentes, zero compromissos
+   > futuros e zero lançamentos (`dashboardVazio`, em
+   > `features/dashboard/vazio.ts`). Isso resolveu o caso porque o Dashboard
+   > tem **uma** requisição e **uma** região `principal` — a pergunta de uma
+   > tela com várias regiões foi evitada por construção, não respondida em
+   > geral. A primeira tela com duas requisições de verdade (Projetos) ainda
+   > encontra a pergunta original.
 
 6. **O aviso essencial preso num tooltip, na Biblioteca.** *"Sempre confira o
    valor!"*, sobre preço que o sistema admite poder extrair errado, só existe
@@ -595,8 +635,20 @@ as oito telas seguintes, não só a Biblioteca.
    síncrono de token, ou `sendBeacon` dentro de `lib/api/`. As duas mexem em
    `lib/api/`, que toda tela usa.
 
-10. **O prefetch pareado é garantido por teste escrito à mão, uma query de cada
-    vez.** Nada liga o `prefetchQuery` do servidor à `useQuery` do cliente: se
+10. ~~O prefetch pareado é garantido por teste escrito à mão, uma query de cada
+    vez.~~ **Fechada em 14/09/2026, na migração do Dashboard.** Cada query virou
+    uma fábrica `queryOptions` em `features/<domínio>/queries.ts`
+    (`queryDoDashboard` para o Dashboard; `queryDaListaDeProdutos` e
+    `queryDoBadgeDoInbox`, migradas no mesmo commit, para a Biblioteca), que
+    recebe o cliente (`api` no navegador, `apiServer` no servidor) e devolve
+    chave, `queryFn` e política de cache num lugar só. Divergir de chave entre
+    servidor e cliente deixa de ser possível por construção, em vez de proibido
+    por um teste escrito à mão para cada par — a Biblioteca **migrou** para o
+    mecanismo neste mesmo plano, para as sete telas seguintes não copiarem o
+    padrão antigo do piloto. Detalhe em
+    [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md), seção "O
+    que o prefetch entrega". O texto original: Nada liga o `prefetchQuery` do
+    servidor à `useQuery` do cliente: se
     as chaves ou as opções divergirem, o prefetch vira **custo puro sem erro
     nenhum** — o modo de falha é silencioso, e o próprio piloto errou isso uma
     vez. São oito telas × N queries pela frente. A decisão que falta é qual
@@ -668,9 +720,12 @@ gh workflow run e2e.yml --ref <branch>
 > Thiago cria isso.
 >
 > Ele roda os specs de **guarda** por nome (`auth`, `dashboard`,
-> `hidratacao-biblioteca`, `telemetria-biblioteca`), nunca `npx playwright test`
+> `hidratacao-biblioteca`, `telemetria-biblioteca`, `hidratacao-dashboard`,
+> `telemetria-dashboard` — as duas últimas acrescentadas pela Tarefa 6 da
+> migração do Dashboard, na Seção 8), nunca `npx playwright test`
 > sem filtro: `e2e/` também tem **instrumentos** (`medicao-biblioteca`,
-> `captura-visual-secao-6`), que produzem número e imagem, exigem variável que o
+> `medicao-dashboard`, `captura-visual-secao-6`), que produzem número e imagem,
+> exigem variável que o
 > CI não tem, e cuja saída barata seria um `skip` silencioso. **Spec novo de
 > guarda precisa ser acrescentado naquela linha do workflow** — criar o arquivo
 > não basta. E o `playwright.config.ts` levanta os timeouts quando `CI` está

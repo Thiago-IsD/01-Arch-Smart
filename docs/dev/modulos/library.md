@@ -301,8 +301,46 @@ nasceu na Seção 8: está observado, sem número, na medição de 06/09/2026.
 ### O que continua faltando
 
 **6. axe no navegador, navegação só por teclado, e as larguras de 390px e
-1440px.** Os três itens da definição de pronto que dependem de olho humano e de
-layout real. O que foi entregue sem sessão: axe em **jsdom**
+1440px — ganharam medição por agente em 14/09/2026, e continuam sem fechar.**
+Os três itens da definição de pronto que dependem de olho humano e de layout
+real. [`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](../medicoes/2026-09-14-passada-de-navegador.md)
+(Tarefa 6 da migração do Dashboard) rodou os três contra `/library` de
+verdade, com sessão, Chromium do Playwright e o Tailwind compilado — mas,
+exatamente como o próprio registro afirma em destaque, **tudo ali foi
+verificado por agente sobre captura de tela e medição no DOM, não por olho
+humano**. Nenhuma pessoa abriu a tela. Por isso estes três itens **não
+fecham** com essa passada: o que ela produz substitui a lacuna de sessão, não
+o julgamento humano que a definição de pronto pede (hierarquia, ordem de
+leitura, perceptibilidade do anel, legibilidade de menu aberto — tudo isso
+segue **não verificado** no registro).
+
+O que a passada mediu, e deixou aberto, para a Biblioteca especificamente:
+
+- **axe em navegador**: `aria-valid-attr-value` (1 — aba ativa aponta
+  `aria-controls` para um `TabsContent` inexistente), `button-name` (8 — 3 da
+  tela: ordenação, filtro, itens por página; 5 do shell, comuns ao
+  Dashboard), `color-contrast` (15 a 19, conforme tema/largura — os três pares
+  já conhecidos de [`componentes.md`](../componentes.md): `secondary` no badge
+  "Normalizado" em todo card, `muted` nas abas inativas, `destructive` no
+  badge do Inbox), `page-has-heading-one` (1 — o título é `h2`, sem `h1`), e
+  `region` (6, do shell).
+- **Largura em 390px — estoura 42px, nos dois temas**
+  (`scrollWidth: 432` contra `innerWidth: 390`). A causa foi isolada por
+  experimento de DOM, injetando estilo em tempo de execução sem tocar no
+  código: **não** é o risco do `LibraryToolbar` suspeitado abaixo — é o
+  `p-8` da raiz da página (`library/page.tsx:14`) somado ao `p-6` do `main`,
+  que deixa só 278px de área útil para "Adicionar Produto" (182px) mais a
+  lista de abas (295px). Reduzir a raiz para `p-4` sozinho já leva o
+  `scrollWidth` a 400; somado a `flex-wrap` na linha do título, a 390 exato.
+  **Não aplicado** — a regra desta tarefa era registrar, e mexer em layout de
+  tela já migrada sem ok de Thiago fica para commit próprio.
+- **Teclado**: alcance e ordem, o anel de foco pintado (`box-shadow` com
+  opacidade efetiva 1) em todos os elementos da tela, e `Espaço`/`Escape` no
+  menu do card medidos e funcionando. Perceptibilidade do anel e se a ordem
+  "segue a leitura": não verificado, como em toda a passada.
+
+Em 1440px, sem estouro medido. O que foi entregue **sem** sessão, antes desta
+passada, continua valendo como primeira camada: axe em **jsdom**
 (`src/__tests__/library-a11y-imagens.test.tsx`), que cobre estrutura e ARIA e
 **não** cobre contraste — a regra `color-contrast` cai em `incomplete`, nunca em
 `violations`, porque o Tailwind não é compilado em jsdom.
@@ -331,16 +369,23 @@ Ou **2)** instale a extensão **axe DevTools** no navegador e use a aba dela, qu
 real, com o Tailwind compilado — que é a diferença que importa: em jsdom a regra
 `color-contrast` cai em `incomplete`, nunca em `violations`.
 
-Dois riscos já localizados por leitura, que só o navegador decide:
+Os dois riscos que este documento apontava como "só o navegador decide" —
+**medidos por agente em 14/09/2026**, na mesma passada (verificado por agente
+sobre captura de tela e medição no DOM, não por olho humano):
 
-- **`LibraryToolbar.tsx:167`** é `flex flex-1 items-center gap-2 md:justify-end`
-  — não quebra linha abaixo de `md`, e `:180` é um `SelectTrigger` de
-  `w-[160px]` fixo ao lado de um input `w-full` sem `min-w-0`. Em 390px sobram
-  ~358px úteis. Suspeita fundamentada, não medição; as saídas baratas, se
-  confirmar, são `flex-wrap` em `:167` ou `min-w-0` em `:168`;
-- **`group-focus-within:opacity-100` no `ProductCard`** está provado como
-  **classe na árvore**, não como comportamento: jsdom não aplica Tailwind, então
-  nada garante hoje que a ação escondida de fato apareça ao receber foco.
+- **`LibraryToolbar.tsx:167`/`:180`, em 390px, nos dois temas**: não causam o
+  estouro (a causa é o padding da raiz, acima), mas **espremem** — a linha cai
+  para 320px, a busca para 177px, a ordenação encolhe de 160 para **104px**
+  (captura mostra "Mais..." truncado) e o filtro de 40 para **23px** de
+  largura, abaixo do alvo de toque de 44px. Com `flex-wrap` na linha, os dois
+  voltam ao tamanho original — confirmado por injeção de estilo, não
+  aplicado ao código;
+- **`group-focus-within:opacity-100` no `ProductCard`**: deixou de ser só
+  "classe na árvore". O wrapper (`opacity: 0` em repouso) foi medido chegando a
+  `opacity: 1` com o foco, nas duas larguras (`getComputedStyle` depois de
+  `Tab` até o gatilho); `Espaço` abriu o menu de 3 itens e `Escape` devolveu o
+  foco. O comportamento existe — a pergunta que sobra (legibilidade do menu
+  aberto, se a transição é perceptível) é de olho humano.
 
 ## Acessibilidade e tokens: o que a Seção 8 mudou aqui
 

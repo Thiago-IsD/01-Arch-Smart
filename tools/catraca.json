@@ -9,11 +9,11 @@
     }
   },
   "eslint_erros": 85,
-  "cores_literais": 583,
+  "cores_literais": 553,
   "modulos_sem_doc": [
     "auth_service"
   ],
-  "fetch_fora_de_lib_api": 75,
+  "fetch_fora_de_lib_api": 74,
   "supabase_fora_de_lib_api": 0,
   "contraste_reprovado": [
     "claro:destructive",
@@ -22,7 +22,7 @@
     "escuro:secondary"
   ],
   "tabindex_negativo": 3,
-  "hover_sem_focus": 8,
+  "hover_sem_focus": 7,
   "arquivos_acima_de_400": [
     "ArchSmart-web/src/app/(dashboard)/projects/[id]/presentation/[presentation_id]/builder/components/BuilderClient.tsx",
     "ArchSmart-web/src/app/(dashboard)/settings/page.tsx",
