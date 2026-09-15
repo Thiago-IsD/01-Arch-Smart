@@ -640,7 +640,7 @@ autenticada**. Consertar mexe em toda tela, por isso não entrou de passagem.
    `contraste_reprovado` da catraca). O axe não o viu porque a conta de teste não
    tem compromisso — o botão não renderizou. Não consertado: é defeito do
    **token** (o coral da marca), e mexer em `globals.css` é decisão de design.
-6. **"Plano Solo" fixo em `ProjectsLimitCard.tsx:26`** — nome de plano escrito
+6. **"Plano Solo" fixo em `ProjectsLimitCard.tsx:31`** — nome de plano escrito
    no front, possível violação do Art. 3 (limite e plano vêm dos `entitlements`
    da API).
 7. **`text-red-500`/`text-red-600 dark:text-red-400` do saldo e da despesa
@@ -684,7 +684,7 @@ autenticada**. Consertar mexe em toda tela, por isso não entrou de passagem.
    tema escuro, `text-destructive` também é usado para **ícones** a ~2:1 — o
    chip do cabeçalho "Despesas", o chip do `Wallet` e o `TrendingDown` quando o
    saldo é negativo em `FinancialMetricCards.tsx`, e o `AlertCircle` de
-   `DashboardComErro.tsx:21`. Antes deste branch eram `text-red-600` sobre
+   `DashboardComErro.tsx:22`. Antes deste branch eram `text-red-600` sobre
    `dark:bg-red-950/30`. Como os ícones duplicam um rótulo de texto ao lado
    (não são a única pista), isto é discutivelmente fora do critério 1.4.11 —
    e o axe não avalia contraste de ícone. Registrado como aberto; as classes

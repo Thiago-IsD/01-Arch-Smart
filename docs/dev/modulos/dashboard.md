@@ -240,21 +240,62 @@ acima).
 O isolamento entre contas já tinha teste antes desta migração, reaproveitado:
 `tests/isolation/test_join_entre_contas.py::test_dashboard_nao_devolve_cliente_nem_projeto_de_outra_conta`.
 
-## Os números medidos, e os que faltam
+## Os números medidos
 
-**Nada nesta seção existe ainda.** Esta tarefa (7) foi dividida em duas partes
-pela mesma regra que rege todo este repositório — número afirmado sem medição é
-número errado —, e o código não pode ser medido contra a API implantada antes
-de o merge chegar a `staging`. O que segue são os comandos exatos que vão
-produzir cada número, depois do deploy; nenhum valor foi estimado no lugar
-deles.
+Medidos em **15/09/2026**, depois do PR #11 (`develop` → `staging`, merge
+`f912096`). A primeira pergunta foi se o contêiner servia o código desta
+migração, e a resposta veio de um campo que só ele tem: `GET /api/dashboard/lean`
+passou a devolver `financial_entries_count`. Sem esse campo na resposta, nenhum
+número abaixo seria desta tela.
 
-### P50/P95 de `/api/dashboard/lean` e `/api/users/me`, contra a API implantada
+**Volume declarado** — conta do usuário de teste, por consulta de leitura contra o
+banco de staging (conexão com `set_session(readonly=True)`):
+
+| Projetos | Ativos | Produtos | Lançamentos | Eventos futuros |
+|---:|---:|---:|---:|---:|
+| 5 | 2 | 300 | **0** | **0** |
+
+⚠️ **Zero lançamentos e zero eventos**: a agregação financeira e a consulta de
+eventos rodam sobre conjunto vazio. O custo medido é o de **ida ao banco**, que
+não depende de volume (é o que a medição de 13/09 mostrou); o custo de uma conta
+com milhares de lançamentos **não** está medido aqui.
+
+### A API implantada
+
+Medianas de 7 amostras, descartada a rodada de aquecimento:
+
+| Rota | Consultas | Mediana | Faixa |
+|---|---:|---:|---|
+| `/health` (controle) | 0 | 0,284 s | 0,256 – 0,314 |
+| `/health/db` (controle) | 1 | 0,981 s | 0,966 – 1,364 |
+| `/api/users/me`, token inválido (controle) | 0 | 0,606 s | 0,536 – 1,542 |
+| **`/api/dashboard/lean`** | 5 | **1,529 s** | 1,508 – 1,931 |
+| **`/api/users/me`** | 3 | **1,153 s** | 1,138 – 1,290 |
+
+Os controles de banco batem com 13/09 (`/health` 0,294 s, `/health/db` 0,990 s).
+O token inválido veio **mais lento** (0,606 s contra 0,527 s), puxado por uma
+amostra de 1,542 s; a mínima (0,536 s) coincide com 13/09. Ele mede a ida remota
+ao Supabase, que esta migração não toca.
+
+**P50 e P95 de `lean`**, 40 chamadas depois de 5 de aquecimento:
+
+```
+P50 = 1516 ms      P95 = 1915 ms      orcamento = 400 ms
+```
+
+**Antes:** ~2,05 s de mediana, com 8 consultas (7 amostras, 14/09/2026, código
+antigo — ver a spec, "O estado medido"). **Previsão escrita antes do deploy:**
+`0,29 + 0,17 × (3 + 5)` = **1,65 s**; medido 1,52 s, a previsão era pessimista em
+8%.
+
+> **P95 de `/api/dashboard/lean`: 1915 ms contra 400 ms — não atingido.** Estoura
+> por distância (0,17 s × idas ao banco), não pela tela: 5 consultas + 3 idas de
+> protocolo ≈ 1,36 s só de ida e volta ao banco. Decisão 1 da spec do Dashboard:
+> carregado adiante, por escrito.
 
 ```bash
 # token: bloco "Como reproduzir" de docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md
 API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
-# controles: tem de bater com 13/09 (health ~0,29 s, health/db ~0,99 s, token invalido ~0,52 s)
 for i in $(seq 8); do
   curl -s -o /dev/null -w "health %{time_total}\n"   "$API/health"
   curl -s -o /dev/null -w "healthdb %{time_total}\n" "$API/health/db"
@@ -266,49 +307,92 @@ done
 for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/dashboard/lean"; done
 ```
 
-Com o volume declarado para a conta de teste (projetos ativos, produtos,
-lançamentos e eventos futuros, contados por consulta de leitura contra o banco
-de staging com o `venv` da API), o número vai ao lado do P95 quando existir. O
-orçamento vai escrito assim, como a decisão 1 da spec manda:
-
-> **P95 de `/api/dashboard/lean`: X ms contra 400 ms — não atingido.** Estoura
-> por distância (0,17 s × idas ao banco), não pela tela: 5 consultas + 3 idas de
-> protocolo. Decisão 1 da spec do Dashboard: carregado adiante, por escrito.
-
-Previsão escrita **antes** da medição, para a medição julgar (modelo de
-[13/09/2026](../medicoes/2026-09-13-custo-da-requisicao-autenticada.md)):
-`lean` ≈ `0,29 + 0,17 × (3 + 5)` = **1,65 s**.
+**Consultas por carregamento: 5**, numa requisição só — o alvo da spec-mãe
+("< 8") está **atingido**. As contagens foram medidas contra o banco de staging
+com o app real e sem sobreposição de dependência, e são travadas pelos testes da
+seção anterior.
 
 ### A tela: clique → dados
 
+```
+AMOSTRAS=944,968,972,978,1041
+MEDIANA_MS=972
+```
+
 ```bash
-cd ArchSmart-web
-set -a; . ./.env.e2e.local; set +a
+# API local de pe em :8000 (o .env.local aponta NEXT_PUBLIC_API_URL para ela)
+cd ArchSmart-api && ./venv/Scripts/python.exe -m uvicorn app.main:app --port 8000   # em background
+cd ArchSmart-web && set -a && . ./.env.e2e.local && . ./.env.local && set +a
 npx playwright test e2e/medicao-dashboard.spec.ts --reporter=line --timeout=180000
 ```
 
-Produz `AMOSTRAS=` e `MEDIANA_MS=` no mesmo formato de
-`medicao-biblioteca.spec.ts`. Arranjo: API local em `:8000`.
+O alvo da spec-mãe é **< 1,5 s**, e **neste arranjo** está atingido. O arranjo é
+o mesmo da Biblioteca (1415 ms na Seção 8, 992 ms depois de 14/09): front e API
+**locais**, apontados para o banco de staging — onde uma ida ao banco custa
+0,016 s, não 0,17 s. **Este número não é o que um usuário sente contra o
+ambiente implantado**, e não há "antes" para ele: a tela antiga nunca foi medida
+com este instrumento.
 
 ### `load_ms` do `screen_viewed` de `/dashboard`
 
-Consulta de leitura em `product_events` de staging, filtrando
-**`screen='/dashboard'` e `medido_ate='dados'`** — nunca sem esse filtro:
-linhas antigas de `/dashboard` são `medido_ate='pintura'`, com mediana de
-18 ms, e misturar as duas mediria o gatilho velho junto com o novo.
+Filtrado por `medido_ate='dados'` e separado por `medido_de`, porque as duas
+origens medem coisas diferentes:
 
-```
+| `medido_de` | n | Mediana | Faixa |
+|---|---:|---:|---|
+| `clique` — navegação de cliente, a partir do clique | 14 | **546 ms** | 433 – 698 |
+| `commit` — carregamento direto, com dado hidratado | 55 | **153 ms** | 58 – 245 |
+
+As linhas `pintura` antigas (n=34, mediana 19 ms) são do código anterior e ficam
+fora. `is_empty` saiu `false` e `principal_declarada` saiu `true` em **todas** as
+69 linhas `dados`. **As linhas vieram de front e API locais apontados para o
+banco de staging** (os guardas e a medição acima), não do deployment de staging —
+a mesma ressalva que `CLAUDE.md` registra para a Biblioteca. O `load_ms` de
+clique (546 ms) e o E2E (972 ms) são instrumentos diferentes sobre a mesma
+navegação: o E2E espera o seletor aparecer e passa pelo dev server; a diferença
+entre os dois **não foi isolada**.
+
+```bash
 cd ArchSmart-api
-python -c "from app.db.session import SessionLocal; from sqlalchemy import text; db=SessionLocal(); print(db.execute(text(\"select properties->>'medido_ate', properties->>'medido_de', properties->>'load_ms', created_at from product_events where name='screen_viewed' and properties->>'screen'='/dashboard' order by created_at desc limit 10\")).fetchall())"
+./venv/Scripts/python.exe - <<'PY'
+import os, psycopg2
+from dotenv import load_dotenv; load_dotenv(".env")
+c = psycopg2.connect(os.environ["DATABASE_URL"]); c.set_session(readonly=True); cur = c.cursor()
+cur.execute("""select properties->>'medido_de', count(*),
+  percentile_cont(0.5) within group (order by (properties->>'load_ms')::float)
+  from product_events where name='screen_viewed' and properties->>'screen'='/dashboard'
+  and properties->>'medido_ate'='dados' group by 1""")
+print(cur.fetchall())
+PY
 ```
 
-> ⚠️ **`SessionLocal` lê `DATABASE_URL` de `ArchSmart-api/.env`** — a mesma
-> regra de `../../../CLAUDE.md`: staging e produção estão os dois nesse
-> arquivo, produção comentada. **Confira qual bloco está ativo antes de rodar
-> este comando** — é um banco gerenciado de verdade, não um banco de teste. A
-> consulta acima é só leitura (`select`), então não há risco de escrita mesmo
-> apontando para o bloco errado, mas ler o ambiente errado mede a coisa errada
-> em silêncio.
+> ⚠️ **O `load_dotenv(".env")` lê `DATABASE_URL` de `ArchSmart-api/.env`** —
+> staging e produção estão os dois nesse arquivo, produção comentada. **Confira
+> qual bloco está ativo antes de rodar.** A conexão acima é `readonly`, então não
+> há risco de escrita, mas ler o ambiente errado mede a coisa errada em silêncio.
+
+### O que continua sem medir
+
+- **LCP em 4G throttled** e **JS da rota** (alvos da spec-mãe: < 2,0 s e
+  < 200 KB gzip) — nenhum instrumento deste repositório mede os dois ainda, nem
+  para a Biblioteca.
+- **O custo de `lean` com volume financeiro real** (ver o ⚠️ do volume).
+- **O que o usuário sente contra o frontend implantado:** a Deployment Protection
+  da Vercel continua escondendo o preview de staging.
+
+## A definição de pronto, item a item
+
+| Item | Estado | Onde está a prova |
+|---|---|---|
+| Paridade | ✅ com uma quebra deliberada: o erro virou estado na tela | `dashboard-content.test.tsx` (os testes de exibição copiados literalmente) |
+| `features/dashboard/hooks.ts`, zero `fetch` na tela | ✅ | `grep -rn "fetch(" "ArchSmart-web/src/app/(dashboard)/dashboard"` → 0 |
+| Os 5 estados via `QueryBoundary` | ✅ | `DashboardContent.tsx`; teste do vazio provado vermelho com `empty={null}` |
+| Teste de isolamento | ✅ | `tests/isolation/test_join_entre_contas.py`, `tests/api/test_financeiro_e_agenda.py` |
+| Orçamento de performance | ⚠️ **registrado, não atingido** — consultas < 8 ✅, clique→dados < 1,5 s ✅ no arranjo local, **P95 de API ❌ por distância**, LCP e JS **não medidos** | seção acima |
+| axe, contraste AA, teclado | ⚠️ **medido por agente, não por olho humano**; abertos: token `destructive` como texto (2,00:1 no escuro) e em ícones, par `secondary` (3,93:1), e as violações do shell | [passada de navegador](../medicoes/2026-09-14-passada-de-navegador.md) |
+| Nenhuma cor, URL, id ou limite literal | ⚠️ duas classes `text-red-*` mantidas de propósito, por contraste; "Plano Solo" fixo em `ProjectsLimitCard.tsx:31` (possível Art. 3) | `FinancialMetricCards.tsx`, comentados |
+| 390px e 1440px | ⚠️ **medido por agente**: sem estouro nas duas | passada de navegador |
+| Doc do módulo com o número medido | ✅ | este arquivo |
 
 ## O que a passada de navegador já mediu, e o que ela deixou aberto
 
@@ -321,4 +405,4 @@ depende de julgamento humano (hierarquia, perceptibilidade do anel,
 legibilidade) foi marcado como fechado ali. Para o Dashboard, o que ficou em
 aberto de propósito: `text-red-500` do saldo negativo (a conta de teste tem
 saldo zero), o par `secondary` do botão de compromisso (defeito de token, fora
-do escopo desta migração) e o nome de plano fixo em `ProjectsLimitCard.tsx:26`.
+do escopo desta migração) e o nome de plano fixo em `ProjectsLimitCard.tsx:31`.

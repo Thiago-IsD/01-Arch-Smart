@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 50/65 (77%)**
-`███████████████░░░░░`
+**Progresso geral: 51/65 (78%)**
+`████████████████░░░░`
 
-_Última atualização: 2026-09-13_
+_Última atualização: 2026-09-15_
 
 ---
 
@@ -971,7 +971,7 @@ _Última atualização: 2026-09-13_
 > plataforma inteira.
 
 ## Seção 8 · Migração das telas
-**1/10 (10%)** `██░░░░░░░░░░░░░░░░░░`
+**2/10 (20%)** `████░░░░░░░░░░░░░░░░`
 
 > Cada tela migrada aqui converte também as **cores literais** e as **imagens**
 > dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
@@ -1055,7 +1055,7 @@ _Última atualização: 2026-09-13_
       1 de [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md));
       a caixa não é marcada porque a decisão foi adiar, não fechar
 - [x] Biblioteca
-- [ ] Dashboard
+- [x] Dashboard
 - [ ] Projetos (lista + detalhe)
 - [ ] Orçamento
 - [ ] Financeiro
@@ -1063,6 +1063,79 @@ _Última atualização: 2026-09-13_
 - [ ] Agenda
 - [ ] Auth, Perfil, Configurações e Billing
 - [ ] Landing e páginas legais
+
+> ## O Dashboard, 15/09/2026 — a segunda tela
+>
+> Branch `secao-8-dashboard`, 15 commits, merge `b07aaa0` em `develop` e PR #11
+> `develop` → `staging` (merge `f912096`), com os três checks verdes e o PR em
+> `MERGEABLE / CLEAN`. Spec em
+> [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md)
+> (cinco decisões de Thiago, 14/09/2026), plano em
+> [`docs/superpowers/plans/2026-09-14-secao-8-dashboard.md`](docs/superpowers/plans/2026-09-14-secao-8-dashboard.md),
+> doc do módulo com os números em
+> [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md).
+>
+> **O Dashboard não tinha sido migrado antes** — a Seção 6 só o quebrou de 593
+> para 142 linhas. Esta migração trocou o padrão de dados inteiro.
+>
+> **O que entrou:**
+>
+> 1. **A tela no padrão da Biblioteca**: Server Component com `<Suspense>`,
+>    prefetch e `HydrationBoundary`; `QueryBoundary` com os cinco estados; zero
+>    `fetch` na tela; o erro virou estado na tela, não toast (quebra de paridade
+>    deliberada).
+> 2. **Uma requisição só.** O card de limite lê `plan_limit` de
+>    `/api/dashboard/lean` (decisão 5), com exceção escrita à regra da Seção 5.
+> 3. **Prefetch pareado por construção**: fábricas `queryOptions` em
+>    `features/<domínio>/queries.ts`. A Biblioteca migrou junto.
+> 4. **Backend**: `/api/dashboard/lean` de 8 para **5** consultas (mais
+>    `financial_entries_count`), `/api/users/me` de 5 para **3**, as duas
+>    contadas contra o banco de staging com o app real.
+> 5. **Guardas e2e** do Dashboard no `e2e.yml`, com o de hidratação provado
+>    vermelho, e a **passada de navegador** das duas telas, feita **por agente**
+>    e rotulada assim em
+>    [`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](docs/dev/medicoes/2026-09-14-passada-de-navegador.md).
+>
+> **Os números, medidos em 15/09/2026 depois do deploy** (impressão digital do
+> contêiner novo: `financial_entries_count` na resposta de `lean`):
+>
+> | Medida | Valor | Alvo |
+> |---|---|---|
+> | Consultas por carregamento | **5**, numa requisição | < 8 ✅ |
+> | `/api/dashboard/lean`, API implantada | P50 **1516 ms**, P95 **1915 ms** (n=40); era ~2,05 s | P95 < 400 ms ❌ **por distância** |
+> | Clique → dados, arranjo local da Seção 8 | mediana **972 ms** (`AMOSTRAS=944,968,972,978,1041`) | < 1,5 s ✅ neste arranjo |
+> | `load_ms`, `medido_ate=dados` | clique **546 ms** (n=14); commit **153 ms** (n=55) | — |
+>
+> Volume da conta de teste: 5 projetos (2 ativos), 300 produtos, **0**
+> lançamentos, **0** eventos futuros. Previsão escrita antes do deploy para
+> `lean`: 1,65 s; medido 1,52 s. Comandos de cada número em
+> [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md), "Os números
+> medidos".
+>
+> **A caixa foi marcada com três itens da definição de pronto em ⚠️, e é essa a
+> forma honesta de marcá-la:** o orçamento de API é **registrado, não atingido**
+> (decisão 1 da spec — estoura por distância, 0,17 s × idas ao banco); axe,
+> contraste, teclado e 390/1440px foram **medidos por agente, não por olho
+> humano**; e duas classes `text-red-*` ficaram de propósito, porque o token
+> `destructive` como texto mede 2,00:1 no tema escuro. LCP e JS da rota **não
+> foram medidos** (nenhum instrumento os mede ainda). A tabela item a item está
+> no fim da doc do módulo.
+>
+> **Os portões, no resultado do merge em `develop`:** `npm run typecheck` limpo;
+> `npm test` **32 arquivos / 247 testes**; `pytest -q` **360 passaram, 1
+> pulado**; `tools/` **125 testes, OK**; `catraca.py --eslint-json` com as nove
+> medidas iguais ao baseline, depois de `cores_literais` 583 → **553**,
+> `fetch_fora_de_lib_api` 75 → **74** e `hover_sem_focus` 8 → **7**.
+>
+> **Um defeito de processo que a execução achou, e que vale para as próximas
+> telas:** a Tarefa 5 baixou `hover_sem_focus` e deixou `tools/test_catraca.py`
+> vermelho (o teste tinha o 8 fixo), e nem o implementador nem o revisor rodaram
+> os testes de `tools/` — foi pego duas tarefas depois. **Mudança que mexe numa
+> medida da catraca roda `cd tools && python -m unittest discover -p "test_*.py"`
+> no mesmo commit.**
+>
+> O que ficou em aberto para a próxima tela está em `CLAUDE.md`, no bloco "O que
+> o Dashboard (Seção 8) deixou em aberto".
 
 > ## A Biblioteca, 12/09/2026 — a fundação e a primeira tela
 >
