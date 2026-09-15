@@ -7,10 +7,10 @@ import { Package, Store } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 import { formatCurrency } from "./format"
-import type { DashboardLeanResponse } from "./types"
+import type { DashboardLean } from "@/features/dashboard/types"
 
 /** Coluna 3 do grid secundario: "Adicoes na Biblioteca". */
-export function RecentProductsColumn({ data }: { data: DashboardLeanResponse | null }) {
+export function RecentProductsColumn({ data }: { data: DashboardLean }) {
     const router = useRouter()
 
     return (
@@ -24,7 +24,7 @@ export function RecentProductsColumn({ data }: { data: DashboardLeanResponse | n
                         </Button>
                     </div>
 
-                    {!data?.recent_products || data.recent_products.length === 0 ? (
+                    {data.recent_products.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed text-muted-foreground bg-muted/20">
                             <p className="text-sm font-medium">Nenhum produto salv recentemente.</p>
                         </div>

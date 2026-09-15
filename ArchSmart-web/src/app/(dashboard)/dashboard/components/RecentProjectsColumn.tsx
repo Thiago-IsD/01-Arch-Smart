@@ -7,10 +7,10 @@ import { ArrowRight, FolderGit2, FolderIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
-import type { DashboardLeanResponse } from "./types"
+import type { DashboardLean } from "@/features/dashboard/types"
 
 /** Coluna 1 do grid secundario: "Continuar Trabalhando". */
-export function RecentProjectsColumn({ data }: { data: DashboardLeanResponse | null }) {
+export function RecentProjectsColumn({ data }: { data: DashboardLean }) {
     const router = useRouter()
 
     return (
@@ -24,7 +24,7 @@ export function RecentProjectsColumn({ data }: { data: DashboardLeanResponse | n
                         </Button>
                     </div>
                     
-                    {!data?.recent_projects || data.recent_projects.length === 0 ? (
+                    {data.recent_projects.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed text-muted-foreground bg-muted/20">
                             <FolderIcon className="h-10 w-10 mb-3 text-muted-foreground/40" />
                             <p className="mb-4 text-sm font-medium">Você ainda não tem projetos ativos.</p>

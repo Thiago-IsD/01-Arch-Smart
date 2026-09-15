@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
-import type { DashboardLeanResponse } from "./types"
+import type { DashboardLean } from "@/features/dashboard/types"
 
 /** Coluna 2 do grid secundario: "Proximos Compromissos". */
-export function UpcomingEventsColumn({ data }: { data: DashboardLeanResponse | null }) {
+export function UpcomingEventsColumn({ data }: { data: DashboardLean }) {
     const router = useRouter()
 
     return (
@@ -26,7 +26,7 @@ export function UpcomingEventsColumn({ data }: { data: DashboardLeanResponse | n
                         </Button>
                     </div>
 
-                    {!data?.upcoming_events || data.upcoming_events.length === 0 ? (
+                    {data.upcoming_events.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed text-muted-foreground bg-muted/20">
                             <Calendar className="h-10 w-10 mb-3 text-muted-foreground/40" />
                             <p className="text-sm font-medium mb-3">Nenhum compromisso para os próximos dias.</p>

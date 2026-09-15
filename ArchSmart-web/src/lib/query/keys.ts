@@ -40,6 +40,10 @@ export const queryKeys = {
         all: ["account"] as const,
         me: () => [...queryKeys.account.all, "me"] as const,
     },
+    dashboard: {
+        all: ["dashboard"] as const,
+        lean: () => [...queryKeys.dashboard.all, "lean"] as const,
+    },
 } as const
 
 /**
