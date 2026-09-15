@@ -126,8 +126,19 @@ class ScopedRepository:
         `get_context` e `get_repo` recebem a MESMA `Session` (o FastAPI resolve
         `Depends(get_db)` uma vez por requisicao), e o caminho compartilhado ja
         carregou este `User` nela. `Session.get` consulta a identity map antes
-        do banco: zero consultas. Fora desse caminho — um teste com contexto
-        sobreposto, por exemplo — ele faz UMA consulta por chave primaria.
+        do banco — MAS a identity map so guarda referencia FRACA, e nada aqui
+        segura o objeto por conta propria: sem uma referencia forte em outro
+        lugar, o coletor de lixo pode derruba-lo entre o fim de `get_context` e
+        esta chamada, e `Session.get` cairia para uma consulta como qualquer
+        outra. Medido: `TestClient(app)` sem override contra o banco real dava
+        4 consultas em `/api/users/me`, nao 3, com `users` duas vezes.
+
+        Quem garante o "sem ida ao banco no caminho normal" e
+        `resolver_identidade_e_entitlements` (`app/core/security.py`), que
+        guarda o `User` resolvido em `db.info[USUARIO_DA_SESSAO]` — uma
+        referencia forte que vive pela `Session`/requisicao inteira. Este
+        metodo nao depende dessa chave para funcionar (so faz `db.get`), mas
+        depende dela para custar ZERO consultas.
 
         A identity map nao sabe de conta, entao a guarda de `account_id` aqui
         e a que o `repo.get()` faria pelo `WHERE`. Nunca 403: 404, pelo mesmo

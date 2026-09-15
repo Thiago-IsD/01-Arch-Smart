@@ -41,6 +41,22 @@ from app.services.entitlements import entitlements_de
 
 logger = logging.getLogger(__name__)
 
+# Chave em `db.info` (dicionario livre que toda `Session` do SQLAlchemy
+# reserva para uso da aplicacao) onde o caminho compartilhado guarda uma
+# referencia FORTE ao `User` que acabou de resolver. Existe porque a
+# identity map da `Session` guarda so referencia FRACA: sem mais nada
+# segurando o objeto, nada impede o coletor de lixo de derruba-lo entre o
+# fim deste modulo e `ScopedRepository.usuario()` rodar — e cada vez que
+# isso acontece, `Session.get()` la deixa de achar o objeto e vira uma
+# consulta como qualquer outra. Medido: `TestClient(app)` sem override
+# contra o banco real dava 4 consultas em `/api/users/me` (nao 3), com
+# `users` aparecendo DUAS vezes — a de `get_context` e a de
+# `repo.usuario()` recontando o mesmo usuario. `db.info` vive pela `Session`
+# inteira, e `get_context`/`get_repo` recebem a MESMA `Session` por
+# requisicao (o FastAPI resolve `Depends(get_db)` uma vez) — entao guardar
+# aqui e o bastante para a referencia sobreviver ate `repo.usuario()` rodar.
+USUARIO_DA_SESSAO = "usuario_resolvido"
+
 
 @dataclass(frozen=True)
 class RequestContext:
@@ -164,6 +180,9 @@ def resolver_identidade_e_entitlements(
         )
 
     usuario, status, limits = linha
+    # Referencia forte pela duracao da Session/requisicao — ver o
+    # comentario de USUARIO_DA_SESSAO, no topo do modulo.
+    db.info[USUARIO_DA_SESSAO] = usuario
     return usuario, entitlements_de(status, limits)
 
 

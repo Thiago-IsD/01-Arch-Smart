@@ -8,8 +8,12 @@ tem o que consumir.
 """
 import uuid
 
+import pytest
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFound
+from app.core.security import RequestContext
+from app.db.repository import ScopedRepository
 from app.models.all_models import Plan, Subscription
 from app.services.entitlements import PADRAO
 from tests.contador_de_queries import ContadorDeQueries, contexto_de_verdade
@@ -92,7 +96,7 @@ def test_me_gasta_no_maximo_tres_consultas_com_assinatura_e_plano(
     db.add(Subscription(account_id=conta.id, plan_id=plano.id))
     db.flush()
 
-    with contexto_de_verdade(client_a, usuario, monkeypatch) as headers:
+    with contexto_de_verdade(client_a, db, usuario, monkeypatch) as headers:
         with ContadorDeQueries(db.connection()) as contador:
             r = client_a.get("/api/users/me", headers=headers)
 
@@ -110,19 +114,34 @@ def test_me_nao_devolve_usuario_de_outra_conta_pelo_atalho_da_sessao(
     `repo.usuario()` le da identity map, e a identity map nao sabe de conta.
     A guarda de `account_id` dentro do metodo e o que impede um contexto
     inconsistente de devolver o usuario errado.
+
+    `usuario_b` ja esta na identity map so por a fixture `conta_b` segurar a
+    referencia na variavel local — nao precisa de um `db.get()` extra para
+    garantir isso.
     """
-    import pytest
-
-    from app.core.errors import NotFound
-    from app.core.security import RequestContext
-    from app.db.repository import ScopedRepository
-
     _, usuario_b = conta_b
-    db.get(type(usuario_b), usuario_b.id)  # garante que esta na identity map
     ctx = RequestContext(
         user_id=usuario_b.id,
         account_id=conta_a[0].id,  # conta errada de proposito
         email=usuario_b.email,
+        entitlements={},
+    )
+
+    with pytest.raises(NotFound):
+        ScopedRepository(db, ctx).usuario()
+
+
+def test_me_usuario_inexistente_levanta_notfound(db: Session, conta_a):
+    """
+    Ramo `achado is None` de `repo.usuario()`: um `user_id` que nao existe em
+    lugar nenhum (nao so em outra conta) tambem tem que dar 404, nao um erro
+    de atributo em cima de `None`.
+    """
+    conta, _ = conta_a
+    ctx = RequestContext(
+        user_id=uuid.uuid4(),  # nao existe nenhum User com este id
+        account_id=conta.id,
+        email="ninguem@teste.local",
         entitlements={},
     )
 
