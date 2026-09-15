@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import joinedload
 from uuid import UUID
 from typing import List
 
@@ -51,7 +52,14 @@ def get_environments(
 ):
     repo.obter(Project, project_id)
 
-    environments = repo.query(Environment).filter(Environment.project_id == project_id).all()
+    # `EnvironmentResponse` aninha `dna`: sem o join, a serializacao emitia uma
+    # consulta por ambiente (tests/api/test_projetos_sem_n_mais_um.py).
+    environments = (
+        repo.query(Environment)
+        .options(joinedload(Environment.dna))
+        .filter(Environment.project_id == project_id)
+        .all()
+    )
     return environments
 
 @router.put("/environments/{env_id}/dna", response_model=EnvironmentDNAResponse)

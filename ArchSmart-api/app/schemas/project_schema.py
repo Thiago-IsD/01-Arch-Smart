@@ -93,3 +93,8 @@ class PaginatedProjectResponse(BaseModel):
     pages: int
     items: List[ProjectResponse]
     plan_limit: int = 2  # Default only; real value comes from entitlements_da_conta() (app/services/entitlements.py)
+    # Projetos ACTIVE da conta inteira — nao da pagina, nao da busca. Existe
+    # porque o front contava ativos sobre a pagina 1 de 20 e decidia o limite
+    # de plano com esse numero (Art. 3). Obrigatorio de proposito: um default 0
+    # esconderia a rota que esquecesse de preencher.
+    active_count: int
