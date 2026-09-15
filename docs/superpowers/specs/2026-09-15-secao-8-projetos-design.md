@@ -141,27 +141,51 @@ principal`. Estados `vazio` (o card "Nenhum projeto ainda" de hoje) e `erro`
 ### Detalhe
 
 Prefetch de projeto e ambientes em `Promise.all`. O `notFound()` continua no
-servidor: 404 da API é 404 da rota, não skeleton nem estado de erro — o
-servidor resolve o projeto antes de renderizar, e só os ambientes dependem do
-prefetch tolerante. `EnvironmentsWorkspace` para de copiar
+servidor: se o prefetch do projeto terminou em `ApiError` 404, a rota chama
+`notFound()` e mostra a página de não encontrado, não skeleton nem estado de
+erro. **Ressalva escrita ao planejar:** a chamada acontece dentro do
+`<Suspense>`, depois de o stream começar, então o status HTTP da resposta é
+200 com a UI de não encontrado — e não 404 como hoje. Numa rota autenticada
+isso não muda o que o usuário vê; o preço de devolver 404 de verdade seria
+esperar o projeto antes de mandar qualquer byte. Se o prefetch **desistir** por
+tempo, o cliente busca, e um 404 ali vira o estado de erro do `QueryBoundary`,
+com a frase da API. `EnvironmentsWorkspace` para de copiar
 `initialEnvironments` para `useState` e lê de `useQuery`. Região principal: a
 lista de ambientes.
 
 ### Mutações
 
-| Hook | Substitui | Invalida |
-|---|---|---|
-| `useCriarProjeto`, `useEditarProjeto` | `ProjectWizard` + `router.refresh()` | `projects.all`, `dashboard.all` |
-| `useMudarStatusDoProjeto` | `ProjectStatusSelect` + `router.refresh()` | `projects.all`, `dashboard.all` |
-| `useExcluirProjeto` | `DeleteProjectAlert` + `push` + `refresh` | `projects.all`, `dashboard.all`; depois navega para `/projects` |
-| `useCriarAmbiente` (`POST`), `useExcluirAmbiente` (`DELETE`) | `NewEnvironmentModal`, `EnvironmentCard` + `setEnvironments` | `projects.environments(id)`, `projects.detail(id)` |
-| `useSalvarDna` (`PUT .../dna`) | `DNAEditorSheet` + `onSuccess(env)` | `projects.environments(id)` |
+| Hook | Substitui | Descarta (obsoleto, sem rebuscar) | Invalida |
+|---|---|---|---|
+| `useCriarProjeto` | `ProjectWizard` (`POST`) | — | `projects.lists()`, `dashboard.all` |
+| `useEditarProjeto`, `useMudarStatusDoProjeto` | `ProjectWizard` (`PUT`), `ProjectStatusSelect` | — | `projects.lists()`, `projects.detail(id)`, `dashboard.all` |
+| `useExcluirProjeto` | `DeleteProjectAlert` | `projects.detail(id)`, `projects.environments(id)` | `projects.lists()`, `dashboard.all` |
+| `useCriarAmbiente` (`POST`), `useExcluirAmbiente` (`DELETE`) | `NewEnvironmentModal`, `EnvironmentCard` | — | `projects.environments(id)`, `projects.lists()` |
+| `useSalvarDna` (`PUT .../dna`) | `DNAEditorSheet` | — | `projects.environments(id)` |
 
 Seis `fetch`, sete hooks: `ProjectWizard` usa o mesmo `fetch` para criar
 (`POST`) e editar (`PUT`). Não existe edição de ambiente além do DNA.
 
-- `router.refresh()` sai de todas: com a tela lendo do cache, só pagaria outra
-  ida ao servidor.
+> **Revisado em 15/09/2026, ao escrever o plano, lendo o código.** A primeira
+> versão desta tabela invalidava `projects.all` em toda mutação de projeto e
+> `projects.detail(id)` nas de ambiente. Duas coisas mudaram: excluir projeto
+> **descarta** detalhe e ambientes — marca obsoleto com `refetchType: "none"`,
+> sem rebuscar — em vez de invalidar (invalidar uma query ativa refaz a busca,
+> e ela voltaria 404 durante a navegação para `/projects`; `removeQueries` numa
+> query com observador montado não tem comportamento documentado no
+> react-query v5); e criar/excluir ambiente invalida `projects.lists()`, porque o
+> card da lista mostra `environments_count` — o cabeçalho do detalhe não usa
+> esse campo.
+
+- **`router.refresh()` fica nas três mutações de projeto** (`ProjectWizard`,
+  `ProjectStatusSelect`, `DeleteProjectAlert`) e sai das de ambiente e do
+  `ClientWizardDriver`. **Revisado em 15/09/2026:** a primeira versão desta
+  spec tirava de todas, e o risco listado no fim do documento se confirmou na
+  leitura — `projects/[id]/budget/page.tsx` e `projects/[id]/presentation/page.tsx`
+  renderizam `ProjectHeader` com dado do **servidor**, e o cabeçalho é onde moram
+  status, editar e excluir. Sem o `refresh`, mudar o status na aba Orçamento não
+  atualizaria o cabeçalho dela. Sai quando Orçamento e Apresentações migrarem;
+  o comentário no código diz isso.
 - Os callbacks `onSuccess(env)` dos modais somem; quem atualiza é a invalidação.
 - Erro de mutação continua **toast** (ação do usuário, não região de dados), com
   a mensagem lida de `detail` por `lib/api/errors.ts`. Desabilitar botão por
@@ -216,8 +240,12 @@ decidida em 14/09 (decisão 1 da spec do Dashboard).
 - **LCP em 4G** — `e2e/medicao-lcp.spec.ts`: Chromium com throttling por CDP
   (perfil 4G fixado e escrito no arquivo), `largest-contentful-paint` por
   `PerformanceObserver`, 5 amostras e mediana, rota por parâmetro.
-- **JS da rota** — script que lê o manifesto de `next build` e soma os chunks
-  de cada rota (gzip). Só em build de produção local, nunca em `dev`.
+- **JS da rota** — no mesmo spec, a soma de `encodedBodySize` dos recursos
+  `.js` que a carga dura da rota baixou (Resource Timing), com cache
+  desabilitado. É JS **compartilhado + da rota**, e é rotulado assim. Só contra
+  `next build && next start`, nunca `dev`. **Revisado ao planejar:** a primeira
+  versão lia o manifesto do build, cujo formato no Next 16 ninguém verificou;
+  o que o navegador baixou não depende desse formato.
 - Os dois são **instrumentos**, fora do `e2e.yml`.
 - **Guardas novas** no `e2e.yml`: `hidratacao-projetos` (zero pedido a
   `/api/projects*` no primeiro carregamento da lista e do detalhe, provado
@@ -310,10 +338,11 @@ E `load_ms` de `/projects` em `product_events` com `medido_ate=dados`.
 - **O token `destructive` muda a aparência de toda tela**, migrada ou não. É o
   propósito; a verificação humana é onde isso é julgado, e o valor pode voltar
   se ficar ruim — o número fica registrado de qualquer forma.
-- **Remover `router.refresh()` pode esconder dependência de Server Component**
-  ainda não migrado que lia o mesmo dado. A tarefa de mutações lista, por grep,
-  quem mais lê projeto ou ambiente antes de remover (o `HeaderBreadcrumb` foi
-  conferido e usa rótulo fixo, "Projetos").
+- ~~**Remover `router.refresh()` pode esconder dependência de Server Component**
+  ainda não migrado.~~ **Confirmado ao planejar, 15/09/2026:** Orçamento e
+  Apresentações renderizam `ProjectHeader` com dado do servidor. Por isso o
+  `refresh` fica nas mutações de projeto (ver "Mutações"). O `HeaderBreadcrumb`
+  foi conferido e usa rótulo fixo, "Projetos".
 - **A exceção de `/me` pode virar hábito.** Está escrita com o limite exato
   (decisão 2); Orçamento e Financeiro não estão cobertos por ela.
 - **LCP por throttling de CDP não é 4G real.** O perfil fica escrito no
