@@ -3,10 +3,17 @@
 
 O primeiro teste e CARACTERIZACAO — escrito e verde contra o codigo anterior a
 Task 3 do plano do Dashboard. Ele existe porque a task troca duas agregacoes
-por uma com soma condicional, e agregacao errada nao da erro: da numero.
+por uma com soma condicional, e agregacao errada nao da erro: da numero. Ele
+tambem prende conteudo e ordem de `recent_projects` (o `with_entities` desta
+branch mudou a ordem da tupla, e um teste que so contava `len()` nao pegaria
+uma coluna trocada de lugar).
 
-O segundo prende o custo. Cada consulta e uma ida a rede, 0,17 s na API
-implantada (docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md).
+Os demais testes prendem casos que o primeiro nao cobre: o teste de contagem
+de lancamentos prende que "vazio" nao se confunde com "soma zero" (lancamentos
+que se anulam), o de conta vazia prende o ramo `else 0` da agregacao
+financeira e a lista vazia em cada campo, e o ultimo prende o custo — cada
+consulta e uma ida a rede, 0,17 s na API implantada
+(docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md).
 """
 from datetime import date, datetime, timedelta
 
@@ -66,6 +73,30 @@ def test_lean_devolve_os_mesmos_valores(db: Session, client_a, conta_a):
     assert len(corpo["recent_projects"]) == 4
     assert len(corpo["recent_products"]) == 1
     assert len(corpo["upcoming_events"]) == 1
+    # ordem: desc(Project.created_at) -- o ultimo criado ("Projeto 5") vem
+    # primeiro. `criar_projeto` da a cada projeto um Client proprio chamado
+    # "Cliente de <nome>", entao nome e client_name sao distinguiveis.
+    assert corpo["recent_projects"][0]["name"] == "Projeto 5"
+    assert corpo["recent_projects"][0]["client_name"] == "Cliente de Projeto 5"
+
+
+def test_lean_conta_vazia_devolve_zeros(db: Session, client_a, conta_a):
+    """
+    Conta sem projeto, produto, evento ou lancamento nenhum -- exercita o ramo
+    `else 0` da agregacao financeira (nenhuma linha por FinancialEntry.type) e
+    o loop de listas sem linha nenhuma. Nao chama `_cenario`: e o estado de
+    conta recem-criada que a decisao 3 da spec do Dashboard chama de vazia.
+    """
+    corpo = client_a.get("/api/dashboard/lean").json()
+
+    assert corpo["active_projects_count"] == 0
+    assert corpo["financial_entries_count"] == 0
+    assert corpo["recent_projects"] == []
+    assert corpo["recent_products"] == []
+    assert corpo["upcoming_events"] == []
+    assert corpo["financial_balance"] == 0.0
+    assert corpo["financial_income"] == 0.0
+    assert corpo["financial_expense"] == 0.0
 
 
 def test_lean_conta_os_lancamentos(db: Session, client_a, conta_a):

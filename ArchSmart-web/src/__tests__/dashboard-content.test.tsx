@@ -158,4 +158,30 @@ describe("DashboardContent", () => {
         expect(screen.getByText("Nenhum compromisso para os próximos dias.")).toBeInTheDocument()
         expect(screen.getByText("Nenhum produto salv recentemente.")).toBeInTheDocument()
     })
+
+    it("estado vazio (dashboardVazio=true) renderiza o mesmo painel, via o ramo `empty` do QueryBoundary", async () => {
+        // dashboardVazio (features/dashboard/vazio.ts) exige active_projects_count,
+        // recent_products, upcoming_events E financial_entries_count zerados -- os
+        // quatro, nao so as listas do teste acima -- para o QueryBoundary tomar o
+        // ramo `vazio` em vez do ramo `children` (mesmo dado, caminho diferente:
+        // ver query-boundary.tsx, `if (vazio) return <>{empty}</>`).
+        apiMock.mockResolvedValue({
+            ...RESPOSTA,
+            recent_projects: [],
+            recent_products: [],
+            upcoming_events: [],
+            active_projects_count: 0,
+            financial_entries_count: 0,
+            financial_balance: 0,
+            financial_income: 0,
+            financial_expense: 0,
+        })
+        renderizar()
+
+        expect(await screen.findByTestId("dashboard-painel")).toBeInTheDocument()
+        expect(screen.getByText(/Bom dia, Thiago/)).toBeInTheDocument()
+        expect(screen.getByText("Você ainda não tem projetos ativos.")).toBeInTheDocument()
+        expect(screen.getByText("Nenhum compromisso para os próximos dias.")).toBeInTheDocument()
+        expect(screen.getByText("Nenhum produto salv recentemente.")).toBeInTheDocument()
+    })
 })

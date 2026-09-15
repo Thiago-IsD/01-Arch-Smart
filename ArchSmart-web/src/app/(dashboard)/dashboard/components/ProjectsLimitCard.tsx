@@ -4,8 +4,13 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 // ---------------------------------------------------------------------------
-// Card "Projetos Ativos" — separado para nao renderizar limite nenhum
-// enquanto `entitlements` (Art. 3) nao chegou.
+// Card "Projetos Ativos" — separado por composicao, nao por espera de dado.
+// `activeProjectsCount`/`planLimit` chegam prontos de `/api/dashboard/lean`
+// (decisao 5 da spec do Dashboard): e a excecao a regra da Secao 5 de ler
+// limite so por `useEntitlements()` -- ver "A excecao a regra da Secao 5" em
+// docs/dev/modulos/dashboard.md. Nao ha estado de "entitlements ainda nao
+// chegou" aqui: quem espera e o `QueryBoundary` da tela, antes deste card
+// existir.
 // ---------------------------------------------------------------------------
 
 export function ProjectsLimitCard({

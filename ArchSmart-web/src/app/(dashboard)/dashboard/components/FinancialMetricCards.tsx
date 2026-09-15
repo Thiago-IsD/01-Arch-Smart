@@ -22,8 +22,10 @@ export function FinancialMetricCards({ data }: { data: DashboardLean }) {
                     </CardHeader>
                     <CardContent className="pt-2">
                         {/* text-red-500: NAO migrado de proposito. text-destructive como texto
-                            grande mede 2,00:1 no tema escuro (script do Step 2), abaixo do piso
-                            de 3:1 do Art. 6 -- ver task-5-report.md, DONE_WITH_CONCERNS. */}
+                            grande mede 2,00:1 no tema escuro (tools/contraste.py, destructive
+                            sobre card/background), abaixo do piso de 3:1 do Art. 6 -- numero e
+                            comando em docs/dev/medicoes/2026-09-14-passada-de-navegador.md,
+                            item 7 de "O que continua aberto". */}
                         <div className={`text-2xl font-bold tracking-tight ${data.financial_balance >= 0 ? 'text-foreground' : 'text-red-500'}`}>
                             {formatCurrency(data.financial_balance)}
                         </div>
@@ -68,7 +70,8 @@ export function FinancialMetricCards({ data }: { data: DashboardLean }) {
                     </CardHeader>
                     <CardContent className="pt-2">
                         {/* text-red-600 dark:text-red-400: NAO migrado de proposito. Mesma
-                            razao do saldo acima -- ver DONE_WITH_CONCERNS no relatorio. */}
+                            razao do saldo acima -- numero e comando em
+                            docs/dev/medicoes/2026-09-14-passada-de-navegador.md, item 7. */}
                         <div className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">
                             {formatCurrency(data.financial_expense)}
                         </div>

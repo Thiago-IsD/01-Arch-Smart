@@ -155,9 +155,13 @@ def get_dashboard_lean(
             "project_name": pj_name
         })
 
-    # O usuario vem da identity map, carregado pelo caminho compartilhado
-    # (`app/core/security.py`) — zero consultas, desde que nao rode depois de
-    # um commit nesta funcao (o objeto expiraria e custaria um refresh).
+    # `repo.usuario()` custa zero consultas porque o caminho compartilhado
+    # (`resolver_identidade_e_entitlements`, app/core/security.py) guarda o
+    # User numa referencia FORTE em `db.info[USUARIO_DA_SESSAO]` -- a identity
+    # map sozinha so guarda referencia fraca e nao bastaria (ver docstring de
+    # `ScopedRepository.usuario` em app/db/repository.py). Vale a mesma ressalva
+    # de nao rodar depois de um commit nesta funcao (o objeto expiraria e
+    # custaria um refresh).
     full_name = repo.usuario().full_name
 
     return {
