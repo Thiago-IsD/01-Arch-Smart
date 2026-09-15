@@ -129,20 +129,6 @@ export function moverParaProjeto(payload: {
     })
 }
 
-export function listarProjetos(signal?: AbortSignal) {
-    return api<{ items: { id: string; name: string }[] }>("/api/projects", {
-        signal,
-        // A chave de cache (`queryKeys.projects.list(1, 100)`) afirma essa
-        // paginacao — sem mandar `page`/`size` de verdade, o servidor aplicava
-        // o proprio default e a chave mentia sobre o que a resposta era.
-        query: { page: 1, size: 100 },
-    })
-}
-
-export function listarAmbientes(projectId: string, signal?: AbortSignal) {
-    return api<{ id: string; name: string }[]>(`/api/projects/${projectId}/environments`, { signal })
-}
-
 /**
  * O inbox pode ter mais produtos do que a API aceita numa pagina (`size` tem
  * teto de 100, `le=100`). Pagina ate esgotar para trazer o inbox inteiro de

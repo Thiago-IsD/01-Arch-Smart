@@ -33,6 +33,7 @@ export const queryKeys = {
         all: ["projects"] as const,
         lists: () => [...queryKeys.projects.all, "list"] as const,
         list: (page: number, size: number) => [...queryKeys.projects.lists(), { page, size }] as const,
+        detail: (id: string) => [...queryKeys.projects.all, "detail", id] as const,
         environments: (projectId: string) =>
             [...queryKeys.projects.all, projectId, "environments"] as const,
     },

@@ -34,6 +34,12 @@ describe("queryKeys", () => {
     it("ambientes sao filhos do projeto a que pertencem", () => {
         expect(ehPrefixoDe(queryKeys.projects.all, queryKeys.projects.environments("p1"))).toBe(true)
     })
+
+    it("detail de projeto e filho de projects e nao colide com lists nem com environments", () => {
+        expect(ehPrefixoDe(queryKeys.projects.all, queryKeys.projects.detail("p1"))).toBe(true)
+        expect(ehPrefixoDe(queryKeys.projects.lists(), queryKeys.projects.detail("p1"))).toBe(false)
+        expect(queryKeys.projects.detail("p1")).not.toEqual(queryKeys.projects.environments("p1"))
+    })
 })
 
 describe("cachePolicy", () => {
