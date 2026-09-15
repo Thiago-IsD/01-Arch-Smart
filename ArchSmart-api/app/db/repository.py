@@ -119,6 +119,27 @@ class ScopedRepository:
             raise NotFound()
         return achado
 
+    def usuario(self) -> "User":
+        """
+        O usuario da sessao, sem ida ao banco no caminho normal.
+
+        `get_context` e `get_repo` recebem a MESMA `Session` (o FastAPI resolve
+        `Depends(get_db)` uma vez por requisicao), e o caminho compartilhado ja
+        carregou este `User` nela. `Session.get` consulta a identity map antes
+        do banco: zero consultas. Fora desse caminho — um teste com contexto
+        sobreposto, por exemplo — ele faz UMA consulta por chave primaria.
+
+        A identity map nao sabe de conta, entao a guarda de `account_id` aqui
+        e a que o `repo.get()` faria pelo `WHERE`. Nunca 403: 404, pelo mesmo
+        motivo de `obter`.
+        """
+        from app.models.all_models import User
+
+        achado = self.db.get(User, self.ctx.user_id)
+        if achado is None or achado.account_id != self.ctx.account_id:
+            raise NotFound()
+        return achado
+
     # -- escrita ---------------------------------------------------------
 
     def create(self, model: type[M], **campos: Any) -> M:
