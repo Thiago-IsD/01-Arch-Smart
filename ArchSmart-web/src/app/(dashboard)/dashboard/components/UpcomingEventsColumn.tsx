@@ -21,7 +21,7 @@ export function UpcomingEventsColumn({ data }: { data: DashboardLean }) {
                         <h2 className="text-xl font-bold tracking-tight text-foreground/90 flex items-center gap-2">
                             <Calendar className="h-5 w-5 text-secondary" /> Próximos Compromissos
                         </h2>
-                        <Button variant="ghost" size="sm" className="text-secondary hover:text-secondary/80 font-semibold p-0 h-auto" onClick={() => router.push("/calendar")}>
+                        <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80 font-semibold p-0 h-auto" onClick={() => router.push("/calendar")}>
                             Agenda Completa
                         </Button>
                     </div>
@@ -30,7 +30,7 @@ export function UpcomingEventsColumn({ data }: { data: DashboardLean }) {
                         <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed text-muted-foreground bg-muted/20">
                             <Calendar className="h-10 w-10 mb-3 text-muted-foreground/40" />
                             <p className="text-sm font-medium mb-3">Nenhum compromisso para os próximos dias.</p>
-                            <Button size="sm" variant="outline" className="border-secondary/20 text-secondary hover:bg-secondary/5 hover:border-secondary/50" onClick={() => router.push("/calendar")}>
+                            <Button size="sm" variant="outline" className="border-secondary/20 text-foreground hover:bg-secondary/5 hover:border-secondary/50" onClick={() => router.push("/calendar")}>
                                 Agendar Reunião
                             </Button>
                         </div>

@@ -52,7 +52,7 @@ export function RecentProductsColumn({ data }: { data: DashboardLean }) {
                                                     className="object-cover transition-transform duration-500 group-hover:scale-105 group-focus-within:scale-105"
                                                 />
                                             ) : (
-                                                <div className="flex w-full h-full items-center justify-center bg-muted text-muted-foreground text-xs">
+                                                <div className="flex w-full h-full items-center justify-center bg-muted text-foreground/80 text-xs">
                                                     Sem imagem
                                                 </div>
                                             )}

@@ -22,7 +22,7 @@ export function ProjectsLimitCard({
             <div className="absolute top-0 left-0 w-1 h-full bg-secondary" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <span className="text-sm font-medium text-muted-foreground">Projetos Ativos</span>
-                <Badge variant="secondary" className="text-[10px] font-semibold bg-secondary/10 text-secondary border-secondary/20">
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-secondary/10 text-foreground border-secondary/20">
                     Plano Solo
                 </Badge>
             </CardHeader>
