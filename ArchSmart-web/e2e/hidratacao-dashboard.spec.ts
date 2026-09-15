@@ -30,6 +30,13 @@ test("o Dashboard nao busca lean nem users/me no navegador no primeiro carregame
 
     await page.goto("/dashboard")
     await esperarPainelDoDashboard(page)
+    // O painel vem renderizado do SERVIDOR: estar no DOM nao quer dizer que o
+    // cliente hidratou. Uma chamada disparada por efeito depois da hidratacao
+    // (um useEffect com users/me, por exemplo) sairia depois desta linha e
+    // escaparia do expect. networkidle espera o navegador parar de pedir.
+    // Provado vermelho em 14/09/2026 injetando essa chamada em
+    // DashboardContent.tsx (docs/dev/medicoes/2026-09-14-passada-de-navegador.md).
+    await page.waitForLoadState("networkidle")
 
     expect(
         pedidos,
