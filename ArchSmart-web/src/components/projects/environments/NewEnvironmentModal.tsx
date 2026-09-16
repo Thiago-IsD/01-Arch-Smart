@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -50,6 +51,7 @@ interface NewEnvironmentModalProps {
 
 export function NewEnvironmentModal({ isOpen, onOpenChange, projectId }: NewEnvironmentModalProps) {
     const { toast } = useToast()
+    const router = useRouter()
     const criar = useCriarAmbiente(projectId)
     const isSubmitting = criar.isPending
 
@@ -78,6 +80,9 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId }: NewEnvi
             toast({ title: "Ambiente Criado", description: "DNA Técnico gerado com sucesso." })
             form.reset()
             onOpenChange(false)
+            // Orcamento e Impressao leem a lista de ambientes pelo servidor e
+            // continuam no padrao antigo; sai quando essas telas migrarem.
+            router.refresh()
         } catch (erro) {
             const mensagem = erro instanceof ApiError ? erro.message : "Não foi possível criar o ambiente."
             toast({ variant: "destructive", title: "Ops!", description: mensagem })

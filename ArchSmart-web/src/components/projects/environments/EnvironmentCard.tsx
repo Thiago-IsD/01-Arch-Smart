@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,7 @@ interface EnvironmentCardProps {
 
 export function EnvironmentCard({ environment, onClick }: EnvironmentCardProps) {
     const { toast } = useToast()
+    const router = useRouter()
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const excluir = useExcluirAmbiente(environment.project_id)
     const isDeleting = excluir.isPending
@@ -46,6 +48,9 @@ export function EnvironmentCard({ environment, onClick }: EnvironmentCardProps) 
         try {
             await excluir.mutateAsync(environment.id)
             toast({ title: "Ambiente Excluído", description: "O ambiente foi removido com sucesso." })
+            // Orcamento e Impressao leem a lista de ambientes pelo servidor e
+            // continuam no padrao antigo; sai quando essas telas migrarem.
+            router.refresh()
         } catch (erro) {
             const mensagem = erro instanceof ApiError ? erro.message : "Erro ao excluir o ambiente."
             toast({ variant: "destructive", title: "Ops!", description: mensagem })

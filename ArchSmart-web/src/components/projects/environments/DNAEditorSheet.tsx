@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -42,6 +43,7 @@ interface DNAEditorSheetProps {
 
 export function DNAEditorSheet({ isOpen, onOpenChange, environment }: DNAEditorSheetProps) {
     const { toast } = useToast()
+    const router = useRouter()
     const salvar = useSalvarDna(environment?.project_id ?? "")
     const isSubmitting = salvar.isPending
 
@@ -70,6 +72,9 @@ export function DNAEditorSheet({ isOpen, onOpenChange, environment }: DNAEditorS
             await salvar.mutateAsync({ envId: environment.id, areas: data })
             toast({ title: "Sucesso!", description: "DNA Técnico atualizado." })
             onOpenChange(false)
+            // Orcamento e Impressao leem a lista de ambientes pelo servidor e
+            // continuam no padrao antigo; sai quando essas telas migrarem.
+            router.refresh()
         } catch (erro) {
             const mensagem = erro instanceof ApiError ? erro.message : "Erro ao salvar as áreas."
             toast({ variant: "destructive", title: "Ops!", description: mensagem })

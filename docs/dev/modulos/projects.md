@@ -335,11 +335,11 @@ genérica>`, título "Ops!" — antes era um `catch` cego com frase fixa.
 `projects.lists()` entra em criar/excluir ambiente porque o card da lista
 mostra `environments_count`; **não** entra em salvar DNA, que não muda a
 contagem. `dashboard.all` não entra em nenhuma das três — o Dashboard não
-mostra ambiente nem contagem de ambiente (mesma regra da Tarefa 6). Nenhuma
-das três chama `router.refresh()` — ver a ressalva abaixo, que qualifica essa
-decisão.
+mostra ambiente nem contagem de ambiente (mesma regra da Tarefa 6). **As três
+chamam `router.refresh()`** depois do sucesso, no mesmo ponto do toast — ver
+"Achado do Step 7" abaixo pela razão.
 
-### Achado do Step 7: a premissa "nenhuma tela de servidor lê a lista de ambientes" é falsa
+### Achado do Step 7, e a decisão que ele gerou: as três mutações chamam `router.refresh()`
 
 O brief da Tarefa 7 mandava conferir, antes de decidir não chamar
 `router.refresh()` nas mutações de ambiente, que nenhum Server Component fora
@@ -365,36 +365,35 @@ função `getProjectEnvironments(id)` que busca `GET
 /api/projects/{id}/environments` com `cache: 'no-store'`, em paralelo com o
 orçamento e o projeto.
 
-**A premissa do brief estava errada, e eu não decidi sozinho o que fazer com
-isso** — a decisão de tirar `router.refresh()` das mutações de ambiente é do
-Thiago (não de quem executa), e o brief é claro que ela **depende** de a
-premissa ser verdadeira. Não adicionei `router.refresh()` às três mutações
-(seria eu tomando a decisão que o brief reserva para Thiago, na direção
-oposta), nem removi as duas chamadas de servidor (fora do escopo de arquivos
-desta tarefa). O que dá para dizer sem decidir:
+**A premissa do brief estava errada, e quem executou a tarefa não decidiu
+sozinho** — reportou o achado sem adicionar `router.refresh()` nem tocar
+`budget/page.tsx`/`print/page.tsx`, porque essa decisão é de Thiago. **Decidida
+por Thiago em 15/09/2026: as três mutações de ambiente/DNA passam a chamar
+`router.refresh()`**, no mesmo lugar (depois do toast de sucesso) e pela mesma
+razão que já mantinha o refresh nas quatro mutações de projeto — tratamento
+consistente das duas famílias de mutação, não uma exceção. Cada uma ganhou o
+comentário:
 
-- **Não é uma regressão desta tarefa.** O código antigo (antes da Tarefa 7)
-  também nunca chamava `router.refresh()` nos modais de ambiente — o
-  `onSuccess`/callback só atualizava o cache do React Query (Tarefa 5,
-  `PROVISORIO`) ou o `useState` local (antes da Tarefa 5). Orçamento e
-  Impressão já podiam servir uma contagem de ambientes desatualizada se o
-  usuário mudasse ambientes na aba Ambientes e depois abrisse essas abas sem
-  reload — essa condição existia antes desta tarefa e continua igual depois
-  dela.
-- **`cache: 'no-store'` limita o alcance.** Uma navegação para
-  `/projects/{id}/budget` ou `/print` que ainda não tem entrada no Router
-  Cache do Next.js sempre executa o Server Component de novo — busca fresca,
-  sem depender de `router.refresh()`. O risco de dado desatualizado é
-  específico do Router Cache do App Router (uma rota já visitada nesta sessão
-  do navegador, revisitada dentro da janela de cache), não do carregamento
-  normal.
-- **Decisão pendente:** se Orçamento/Impressão devem invalidar seu Router
-  Cache quando um ambiente muda (o que exigiria `router.refresh()` nas três
-  mutações desta tarefa, ou outra forma de invalidar rotas fora da árvore de
-  `/projects/[id]`) é pergunta de produto/UX (o quão frequente é esse
-  caminho, o quão ruim é mostrar uma contagem de ambientes desatualizada em
-  Orçamento por alguns minutos) que este brief não respondeu e que não é
-  minha para responder.
+```
+// Orcamento e Impressao leem a lista de ambientes pelo servidor e
+// continuam no padrao antigo; sai quando essas telas migrarem.
+router.refresh()
+```
+
+O `refresh()` fica **na tela que chama** (`NewEnvironmentModal.tsx`,
+`EnvironmentCard.tsx`, `DNAEditorSheet.tsx`), não dentro dos hooks de
+`features/projects/hooks.ts` — mesma regra das mutações de projeto: hook não
+conhece roteador. Coberto por `src/__tests__/ambientes-refresh.test.tsx` (3
+testes, um por mutação, cada um afirmando `expect(refresh).toHaveBeenCalled()`
+depois do toast), no mesmo padrão de `project-wizard.test.tsx`/
+`delete-project-alert.test.tsx`.
+
+**Condição de saída:** o comentário e o refresh saem das três mutações quando
+`budget/page.tsx` e `print/page.tsx` migrarem para ler ambientes por
+`features/projects` (prefetch + `QueryBoundary`, como o detalhe já faz) — a
+mesma condição que já valia para tirar o refresh das quatro mutações de
+projeto. Até lá, o achado não é mais uma pendência aberta: é a razão
+documentada de uma decisão tomada.
 
 ## O lint de `fetch` vira erro no território de Projetos (Tarefa 7)
 
@@ -549,13 +548,14 @@ para 75).
 - `fetch_fora_de_lib_api`: 65 (era 68) — `python tools/catraca.py`.
 - `eslint_erros`: 75 (era 79) — `python tools/catraca.py --eslint-json ArchSmart-web/eslint.json`; caiu por remover 4 usos de `any` nos componentes tocados (não pelo `no-restricted-syntax`, que não conta para esta medida).
 - `cores_literais`, `hover_sem_focus`, `tabindex_negativo`, `contraste_reprovado`, `arquivos_acima_de_400`, `modulos_sem_doc`, `supabase_fora_de_lib_api`: todos iguais ao baseline — nenhuma regressão.
-- `npm test`: 282 testes, 40 arquivos, zero `failed`.
+- `npm test`: 285 testes, 41 arquivos, zero `failed` (era 282/40 antes de `router.refresh()` entrar; `src/__tests__/ambientes-refresh.test.tsx` acrescentou os 3).
 - `npm run typecheck`: limpo.
 - `src/__tests__/projects-mutacoes.test.tsx`: 8/8 (5 de projeto, Tarefa 6, mais 3 de ambiente/DNA, Tarefa 7), conjunto exato de chaves por mutação.
+- `src/__tests__/ambientes-refresh.test.tsx`: 3/3 — uma por mutação, afirmando `router.refresh()` chamado depois do toast de sucesso (decisão de 15/09/2026, ver "Achado do Step 7" abaixo).
 - `npx eslint --print-config` confirma a severidade do glob: `2` (erro) em `projects/[id]/page.tsx`, `1` (aviso) em `projects/[id]/budget/page.tsx` e em `PresentationsTab.tsx` — o escape `\[id\]` funcionou de primeira, sem precisar do plano B.
 - `npx eslint` sobre o território de Projetos: zero violações de `no-restricted-syntax`; os 6 erros restantes são `no-explicit-any`/`no-unescaped-entities` pré-existentes, fora do escopo desta tarefa (ver "O lint de `fetch` vira erro..." acima).
 - Passada por agente em 15/09/2026 (API local + `npm run dev`, sessão da conta de teste E2E), em "Loft Pinheiros #3" (6 ambientes): criar "Ambiente Teste Tarefa 7" apareceu na grade sem reload (`POST .../environments` → `201`); editar o DNA (15/20/10) mudou o badge de "DNA Pendente" para "DNA Completo" na hora (`PUT .../dna` → `200`); excluir sumiu da grade com o toast "Ambiente Excluído" (`DELETE` → `204`); voltar para `/projects` mostrou "Loft Pinheiros #3" de volta em **6 Ambientes** (o `GET /api/projects` refez sozinho, pela invalidação de `projects.lists()`). Zero erro no log do servidor durante a passada. Processos derrubados pelo PID real (`netstat -ano` → PID → `taskkill //PID <pid> //T //F`), nunca por nome.
-- **Achado, não fechado**: `budget/page.tsx` e `print/page.tsx` leem a lista de ambientes no servidor — ver "Achado do Step 7" acima. Não há teste automatizado para isso; é leitura de código + `grep`.
+- **Achado do Step 7, decidido**: `budget/page.tsx` e `print/page.tsx` leem a lista de ambientes no servidor — as três mutações passaram a chamar `router.refresh()` por isso (decisão de Thiago em 15/09/2026). Ver "Achado do Step 7" acima e `src/__tests__/ambientes-refresh.test.tsx` (3/3).
 
 **A medir** (dependem de tarefas seguintes do mesmo plano, ou de olho humano —
 nenhum número foi estimado no lugar):
@@ -602,13 +602,14 @@ O "depois" desses dois números é entregável da Tarefa 12, não desta.
 | Consultas por carregamento < 8 (lista) | ✅ | 5, Tarefa 2, tabela acima |
 | Consultas por carregamento < 8 (detalhe) | ⚠️ não remedido nesta tarefa — Tarefa 2 mediu 4+3 antes do detalhe migrar; endpoint não mudou |
 | Doc do módulo | ✅ | este arquivo |
-| Server Component fora de `features/projects` não lê a lista de ambientes | ❌ **falso** — `budget/page.tsx` e `print/page.tsx` leem; achado no Step 7, não corrigido (decisão de Thiago) | "Achado do Step 7" acima |
+| As três mutações de ambiente/DNA chamam `router.refresh()` (achado do Step 7: `budget/page.tsx`/`print/page.tsx` leem ambientes no servidor) | ✅ | `src/__tests__/ambientes-refresh.test.tsx` (Tarefa 7, decisão de 15/09/2026) |
 
 Este documento cobre lista, detalhe e as sete mutações (quatro de projeto,
 Tarefa 6; três de ambiente/DNA, Tarefa 7). O restante da definição de pronto
-que depende de navegador/olho humano ainda não foi verificado, e a pendência
-do Step 7 (Orçamento/Impressão lendo ambientes no servidor, sem
-`router.refresh()` nas mutações de ambiente) segue em aberto para decisão de
-Thiago — quando a próxima tela migrar ou essa decisão for tomada, revise este
-arquivo em vez de reescrevê-lo, para não ficar descrevendo um estado que o
-código já passou.
+que depende de navegador/olho humano ainda não foi verificado. O achado do
+Step 7 (Orçamento/Impressão lendo ambientes no servidor) não é mais pendência
+aberta — Thiago decidiu em 15/09/2026 que as três mutações de ambiente/DNA
+chamam `router.refresh()`, com condição de saída registrada (sai quando
+`budget/`/`print/` migrarem para ler ambientes por `features/projects`) —
+quando essa migração acontecer, revise este arquivo em vez de reescrevê-lo,
+para não ficar descrevendo um estado que o código já passou.
