@@ -93,7 +93,13 @@ export function useExcluirProjeto() {
     })
 }
 
-/** Ambientes: sem `router.refresh()` — nenhuma tela de servidor le a lista de ambientes. */
+/**
+ * Ambientes: os componentes que chamam estas mutações fazem `router.refresh()`
+ * porque Orçamento (`budget/page.tsx`) e Impressão (`print/page.tsx`) leem a
+ * lista de ambientes pelo servidor — sem o refresh, editar um ambiente aqui
+ * não aparece lá até a navegação seguinte. Isso sai quando essas duas telas
+ * migrarem para buscar dados pelo cliente.
+ */
 export function useCriarAmbiente(projectId: string) {
     const queryClient = useQueryClient()
     return useMutation({
