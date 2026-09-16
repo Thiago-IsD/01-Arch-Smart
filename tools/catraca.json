@@ -30,7 +30,6 @@
     "ArchSmart-web/src/components/calendar/EventDialog.tsx"
   ],
   "texto_sobre_fundo_reprovado": [
-    "claro:secondary",
-    "claro:warning"
+    "claro:secondary"
   ]
 }

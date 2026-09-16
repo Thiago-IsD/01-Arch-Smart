@@ -139,6 +139,84 @@ class TestTextoSobreFundo(unittest.TestCase):
         # `text-lg` nao e token; `context-menu` nao e classe de texto; `.css` nao e lido.
         self.assertEqual(usados, {"destructive", "muted-foreground"})
 
+    def test_token_so_em_comentario_de_linha_nao_conta(self):
+        # Caso real: BatchNormalizeRow.tsx:67 cita `text-warning` numa nota em
+        # prosa dizendo que ele REPROVA como texto -- isso nao e uso.
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                "// Medido: text-warning da 1,99:1 e reprova o 4.5:1\n"
+                'const x = <p className="text-warning-foreground">oi</p>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(
+                Path(pasta), {**claro, "warning": (0, 0, 0), "warning-foreground": (0, 0, 0)}
+            )
+        self.assertNotIn("warning", usados)
+        self.assertIn("warning-foreground", usados)
+
+    def test_token_so_em_comentario_de_bloco_nao_conta(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                "/* nao use text-destructive aqui, ele reprova */\n"
+                'const x = <p className="text-muted-foreground">oi</p>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        self.assertNotIn("destructive", usados)
+        self.assertIn("muted-foreground", usados)
+
+    def test_comentario_de_bloco_multilinha_some_inteiro(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                "/*\n"
+                " * text-destructive so passa como fundo, nao como texto\n"
+                " */\n"
+                'const x = <p className="text-muted-foreground">oi</p>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        self.assertNotIn("destructive", usados)
+
+    def test_uso_real_em_classname_continua_contando(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                "// comentario qualquer, sem mencionar token\n"
+                'const x = <p className="text-destructive">oi</p>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        self.assertIn("destructive", usados)
+
+    def test_url_com_barra_dupla_nao_apaga_o_resto_da_linha(self):
+        # O cuidado classico de "tirar comentario com regex": uma URL com //
+        # no meio de uma string nao pode fazer o resto da linha sumir. Como o
+        # que vem ANTES do // aqui e a abertura da string, nao espaco vazio, a
+        # linha inteira sobrevive.
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                'const url = "https://exemplo.com"; const x = <p className="text-destructive">oi</p>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        self.assertIn("destructive", usados)
+
+    def test_variante_com_prefixo_continua_contando(self):
+        # dark:/hover:/group-hover/opt: continuam contando -- so comentario e
+        # descartado, nao prefixo de variante do Tailwind.
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                'const x = <p className="dark:text-destructive hover:text-destructive">oi</p>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        self.assertIn("destructive", usados)
+
 
 if __name__ == "__main__":
     unittest.main()

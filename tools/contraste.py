@@ -101,16 +101,50 @@ def reprovados(css: str | None = None) -> list:
 
 SRC_WEB = RAIZ / "ArchSmart-web" / "src"
 RE_CLASSE_DE_TEXTO = re.compile(r"\btext-([a-z]+(?:-[a-z]+)*)")
+RE_BLOCO_COMENTARIO = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+
+def _sem_comentarios(texto: str) -> str:
+    """Descarta comentário de bloco inteiro e linha que É um comentário de linha.
+
+    Não resolve JS de verdade -- só o suficiente para uma MENÇÃO em prosa
+    (`// text-warning da 1,99:1`) não contar como uso real. Duas regras,
+    deliberadamente conservadoras:
+
+    - `/* ... */` some inteiro, mesmo cruzando linhas (comentário de bloco do
+      JS/TS não aninha, então o não-guloso `.*?` para no primeiro `*/`).
+    - uma linha some só quando tudo ANTES do primeiro `//` nela é vazio --
+      ou seja, é comentário de linha inteira. Uma URL com `//` no meio de uma
+      string (`"https://..."`) nunca satisfaz isso, porque o que vem antes do
+      `//` naquela linha não é vazio (é a abertura da string) -- então a linha
+      sobrevive inteira, `//` incluso, exatamente o cuidado clássico de "tirar
+      comentário com regex" que apagaria o resto da linha por engano.
+    """
+    texto = RE_BLOCO_COMENTARIO.sub("", texto)
+    linhas = []
+    for linha in texto.splitlines():
+        i = linha.find("//")
+        if i != -1 and linha[:i].strip() == "":
+            continue
+        linhas.append(linha)
+    return "\n".join(linhas)
 
 
 def tokens_usados_como_texto(src: Path = SRC_WEB, tokens: dict | None = None) -> set:
-    """Nomes de token que aparecem como `text-<token>` em .ts/.tsx de `src`."""
+    """Nomes de token que aparecem como `text-<token>` em .ts/.tsx de `src`.
+
+    Comentários (bloco e linha inteira) são descartados antes de casar a
+    classe -- sem isso, uma nota em prosa citando `text-warning` (para dizer
+    que ele REPROVA como texto) contava como se a tela usasse `text-warning`
+    de verdade. Ver `_sem_comentarios`.
+    """
     if tokens is None:
         tokens, _ = tokens_dos_temas()
     achados = set()
     for arquivo in src.rglob("*"):
         if arquivo.suffix in (".ts", ".tsx"):
-            achados.update(RE_CLASSE_DE_TEXTO.findall(arquivo.read_text(encoding="utf-8")))
+            texto = _sem_comentarios(arquivo.read_text(encoding="utf-8"))
+            achados.update(RE_CLASSE_DE_TEXTO.findall(texto))
     return achados & set(tokens)
 
 
@@ -126,6 +160,12 @@ def texto_sobre_fundo_reprovados(css: str | None = None, usados: set | None = No
     (e par; `pares()` o mede sobre `X` — o que deixa `muted-foreground` sobre
     `background` sem medida), o proprio `background`, texto sobre `card`/
     `popover`/`muted`, e opacidade (`text-destructive/80`).
+
+    O caso real que esta medida pegou (`text-destructive` dentro de um `Card`)
+    so fica coberto porque `--card` tem hoje o MESMO valor de `--background`
+    nos dois temas — coincidencia de dado, nao desenho da medida. Se algum dia
+    `--card` divergir de `--background`, texto sobre card volta a nao ser
+    medido por nada aqui.
     """
     claro, escuro = tokens_dos_temas(css)
     if usados is None:
