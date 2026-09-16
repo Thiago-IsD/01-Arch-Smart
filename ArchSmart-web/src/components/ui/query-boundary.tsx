@@ -22,10 +22,10 @@ import type { Desfecho } from "@/features/telemetry/contexto"
  * pendente: e consequencia de `enabled`, e o componente nao tem como inventar
  * um estado para "a pergunta ainda nao faz sentido".
  *
- * **O certo e nao renderizar o boundary nesse caso** — renderize o proprio
- * placeholder da tela (ou nada) enquanto a query nao faz sentido, e entre no
- * boundary quando ela estiver ligada. A Biblioteca faz assim: nao renderiza o
- * boundary na aba que nao precisa da lista.
+ * **Passe `inativo`** com o que a regiao deve mostrar enquanto a pergunta nao
+ * faz sentido — ou nao renderize o boundary nesse caso, como a Biblioteca faz
+ * na aba que nao precisa da lista. Sem `inativo`, o boundary mostra o skeleton
+ * e avisa no console de desenvolvimento.
  *
  * O que o componente FAZ por conta dele: enquanto a query esta desabilitada,
  * **nao anuncia** ao canal de prontidao. Sem isso a telemetria contava uma
@@ -51,6 +51,14 @@ type Props<T> = {
      * que resolver, e o evento grava `principal_declarada: false`.
      */
     principal?: boolean
+    /**
+     * O que renderizar enquanto a query esta DESABILITADA (`enabled: false`).
+     * Sem isto, uma query desabilitada mostra `skeleton` para sempre — ver o
+     * aviso no docstring. Existe desde a migracao de Projetos (Secao 8), para o
+     * caso de query dependente (ex.: itens de um ambiente que o usuario ainda
+     * nao escolheu), que e comum nas telas seguintes.
+     */
+    inativo?: ReactNode
     children: (dados: T) => ReactNode
 }
 
@@ -87,6 +95,7 @@ export function QueryBoundary<T>({
     error,
     isEmpty,
     principal = false,
+    inativo,
     children,
 }: Props<T>): ReactElement {
     const prontidao = useProntidao()
@@ -107,6 +116,17 @@ export function QueryBoundary<T>({
     // NAO anunciar uma regiao que nunca vai reportar, senao a telemetria grava
     // `abandonado` falso na saida da tela.
     const desabilitada = query.isPending && query.fetchStatus === "idle"
+
+    // Quem esquecer `inativo` numa query desabilitada ve skeleton eterno. O
+    // aviso torna isso visivel no console de desenvolvimento, uma vez por
+    // montagem; em producao nao sai nada.
+    const esqueceuInativo = desabilitada && inativo === undefined
+    useEffect(() => {
+        if (!esqueceuInativo || process.env.NODE_ENV === "production") return
+        console.warn(
+            "[QueryBoundary] query desabilitada sem a prop `inativo`: a regiao mostra skeleton ate a query ser ligada.",
+        )
+    }, [esqueceuInativo])
 
     // Anuncia UMA vez, na montagem: e o que distingue "tela sem regiao de
     // dados" de "regiao ainda carregando". Sem isto a telemetria teria de
@@ -140,6 +160,7 @@ export function QueryBoundary<T>({
         if (desfecho) prontidao?.reportar({ desfecho, principal, origem })
     }, [desfecho, principal, prontidao, origem])
 
+    if (desabilitada && inativo !== undefined) return <>{inativo}</>
     if (query.isPending) return <>{skeleton}</>
     if (query.isError) return <>{error(query.error as Error, () => void query.refetch())}</>
     if (vazio) return <>{empty}</>

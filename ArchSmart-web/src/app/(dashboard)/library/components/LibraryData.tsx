@@ -31,19 +31,23 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
     // React Query, nao o do teto, e sem o embrulho um cold start voltaria a
     // pendurar a conexao ate a API responder.
     //
-    // Os dois em Promise.all, nao em sequencia: sao chamadas independentes, e em
-    // serie elas somariam latencia dentro do <Suspense> — o oposto do que a
-    // ADR 0009 buscava.
-    await Promise.all([
-        tentarPrefetch((signal) =>
-            queryClient.prefetchQuery(
-                queryDaListaDeProdutos(clienteComSinal(apiServer, signal), filtros),
-            ),
-        ),
-        tentarPrefetch((signal) =>
-            queryClient.prefetchQuery(queryDoBadgeDoInbox(clienteComSinal(apiServer, signal))),
-        ),
-    ])
+    // UMA chamada de `tentarPrefetch`, com as duas queries em `Promise.all`
+    // POR DENTRO — como `ProjetoData` ja fazia com projeto e ambientes. Ate a
+    // rodada de correcao 1 da Tarefa 9 (15/09/2026) eram DUAS chamadas em
+    // paralelo sobre o MESMO QueryClient: cada uma tirava o proprio snapshot
+    // do cache, e se uma terminasse antes da outra, seu laco final encontrava
+    // a query da irma ainda em voo e a acusava de ter desistido sem ter
+    // desistido de nada (a irma so nao existia no snapshot de quem terminou
+    // primeiro). Uma chamada so tambem da a Biblioteca o mesmo teto de tempo
+    // UNICO que as outras tres telas migradas ja tem — antes eram dois tetos
+    // independentes de `TIMEOUT_DO_PREFETCH_MS` correndo ao mesmo tempo.
+    await tentarPrefetch(queryClient, (signal) => {
+        const cliente = clienteComSinal(apiServer, signal)
+        return Promise.all([
+            queryClient.prefetchQuery(queryDaListaDeProdutos(cliente, filtros)),
+            queryClient.prefetchQuery(queryDoBadgeDoInbox(cliente)),
+        ])
+    })
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>

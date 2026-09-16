@@ -10,12 +10,21 @@
  * DOM o tempo todo — o que muda por etapa e a classe `hidden`, que o jsdom
  * nao aplica. Por isso a etapa corrente e observada pelos botoes do rodape
  * (Cancelar/Voltar, Proximo/Criar Projeto), e nao pela presenca dos campos.
+ *
+ * Ajustado na Tarefa 6 da migracao de Projetos (Secao 8): mock de fetch como
+ * Response e QueryClientProvider — a requisicao passou a sair por lib/api.
+ * Nenhuma asserção de comportamento mudou.
  */
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ProjectWizard } from "@/components/projects/ProjectWizard"
+
+function resposta(corpo: unknown, status = 200) {
+    return new Response(JSON.stringify(corpo), { status, headers: { "Content-Type": "application/json" } })
+}
 
 const refresh = vi.fn()
 vi.mock("next/navigation", () => ({
@@ -40,14 +49,19 @@ beforeAll(() => {
 
 beforeEach(() => {
     vi.clearAllMocks()
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: "novo" }) })
+    fetchMock.mockImplementation(async () => resposta({ id: "novo" }))
     vi.stubGlobal("fetch", fetchMock)
 })
 
 const onOpenChange = vi.fn()
 
 function abrir(props: Record<string, unknown> = {}) {
-    return render(<ProjectWizard isOpen onOpenChange={onOpenChange} {...props} />)
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+    return render(
+        <QueryClientProvider client={client}>
+            <ProjectWizard isOpen onOpenChange={onOpenChange} {...props} />
+        </QueryClientProvider>,
+    )
 }
 
 async function escolherNoSelect(
@@ -157,10 +171,9 @@ describe("ProjectWizard (caracterizacao — descreve o presente)", () => {
         const [url, init] = fetchMock.mock.calls[0]
         expect(String(url)).toContain("/api/projects")
         expect(init.method).toBe("POST")
-        expect(init.headers).toEqual({
-            "Content-Type": "application/json",
-            Authorization: "Bearer token-de-teste",
-        })
+        const headers = new Headers(init.headers)
+        expect(headers.get("Content-Type")).toBe("application/json")
+        expect(headers.get("Authorization")).toBe("Bearer token-de-teste")
         expect(JSON.parse(init.body)).toMatchObject({
             name: "Apartamento Jardins",
             service_type: "Consultoria Express",
@@ -204,11 +217,7 @@ describe("ProjectWizard (caracterizacao — descreve o presente)", () => {
     })
 
     it("403 vira o toast de Limite de Plano, com a frase que a API mandou", async () => {
-        fetchMock.mockResolvedValue({
-            ok: false,
-            status: 403,
-            json: async () => ({ detail: "Seu plano permite 2 projetos." }),
-        })
+        fetchMock.mockImplementation(async () => resposta({ detail: "Seu plano permite 2 projetos." }, 403))
         const usuario = userEvent.setup()
         abrir()
         await usuario.type(screen.getByLabelText("Nome do Projeto"), "Apartamento Jardins")

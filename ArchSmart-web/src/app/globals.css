@@ -37,7 +37,7 @@
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84.2% 40%;
     --destructive-foreground: 210 40% 98%;
 
     /* Estado. Medidos com tools/contraste.py em 09/09/2026: 5,07:1, 4,91:1 e
@@ -109,8 +109,9 @@
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* destructive no escuro: vermelho claro com texto escuro por cima. Com texto branco nenhuma luminosidade passa 4,5:1 como texto E como preenchimento (spec de Projetos, decisao 5). */
+    --destructive: 0 84.2% 60%;
+    --destructive-foreground: 222.2 84% 4.9%;
 
     /* Medidos em 09/09/2026: 10,17:1, 10,83:1 e 6,67:1. */
     --success: 142 60% 55%;

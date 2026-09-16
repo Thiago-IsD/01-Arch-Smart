@@ -1,5 +1,6 @@
+import type { ReactNode } from "react"
 import { render, screen } from "@testing-library/react"
-import type { UseQueryResult } from "@tanstack/react-query"
+import { QueryClient, QueryClientProvider, useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { describe, expect, it, vi } from "vitest"
 
 import { QueryBoundary } from "@/components/ui/query-boundary"
@@ -258,5 +259,57 @@ describe("QueryBoundary", () => {
             rerender(comCanal(canal, query<string[]>({ isPending: true, fetchStatus: "fetching" })))
             expect(canal.anunciar).toHaveBeenCalledTimes(1)
         })
+    })
+})
+
+describe("QueryBoundary com query desabilitada", () => {
+    function Regiao({ inativo }: { inativo?: ReactNode }) {
+        const query = useQuery({ queryKey: ["desligada"], queryFn: async () => [1], enabled: false })
+        return (
+            <QueryBoundary
+                query={query}
+                skeleton={<p>carregando</p>}
+                empty={<p>vazio</p>}
+                error={() => <p>erro</p>}
+                inativo={inativo}
+            >
+                {(d) => <p>{d.length} itens</p>}
+            </QueryBoundary>
+        )
+    }
+
+    function comCliente(ui: ReactNode) {
+        return <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
+    }
+
+    it("com `inativo`, renderiza o inativo — nao o skeleton eterno", () => {
+        render(comCliente(<Regiao inativo={<p>escolha um ambiente</p>} />))
+        expect(screen.getByText("escolha um ambiente")).toBeInTheDocument()
+        expect(screen.queryByText("carregando")).not.toBeInTheDocument()
+    })
+
+    it("sem `inativo`, mantem o skeleton e AVISA — o esquecimento deixa de ser silencioso", () => {
+        const aviso = vi.spyOn(console, "warn").mockImplementation(() => {})
+        render(comCliente(<Regiao />))
+        expect(screen.getByText("carregando")).toBeInTheDocument()
+        expect(aviso).toHaveBeenCalledTimes(1)
+        expect(String(aviso.mock.calls[0][0])).toContain("inativo")
+        aviso.mockRestore()
+    })
+
+    it("query habilitada nunca avisa", async () => {
+        const aviso = vi.spyOn(console, "warn").mockImplementation(() => {})
+        function Ligada() {
+            const query = useQuery({ queryKey: ["ligada"], queryFn: async () => [1] })
+            return (
+                <QueryBoundary query={query} skeleton={<p>carregando</p>} empty={<p>vazio</p>} error={() => <p>erro</p>}>
+                    {(d) => <p>{d.length} itens</p>}
+                </QueryBoundary>
+            )
+        }
+        render(comCliente(<Ligada />))
+        expect(await screen.findByText("1 itens")).toBeInTheDocument()
+        expect(aviso).not.toHaveBeenCalled()
+        aviso.mockRestore()
     })
 })

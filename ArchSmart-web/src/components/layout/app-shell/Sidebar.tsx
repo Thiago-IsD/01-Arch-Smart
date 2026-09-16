@@ -60,13 +60,14 @@ export function Sidebar() {
                         <Link
                             key={item.href}
                             href={item.href}
+                            aria-current={isActive ? "page" : undefined}
                             className={`relative flex h-11 w-full items-center rounded-md transition-all duration-200 ${isActive
-                                ? "bg-primary/10 text-primary shadow-sm border-l-2 border-primary"
+                                ? "bg-primary/10 text-foreground font-semibold shadow-sm border-l-2 border-primary"
                                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 }`}
                         >
                             <div className="grid h-full w-12 place-content-center">
-                                <item.icon className="h-4 w-4" />
+                                <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} aria-hidden="true" />
                             </div>
                             {open && (
                                 <span className="text-sm font-medium transition-opacity duration-200">

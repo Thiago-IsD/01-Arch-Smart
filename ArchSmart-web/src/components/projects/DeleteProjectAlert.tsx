@@ -2,12 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { getAccessToken } from "@/lib/api/auth"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Trash2 } from "lucide-react"
-import { apiUrl } from "@/lib/api-url"
+import { ApiError } from "@/lib/api/errors"
+import { useExcluirProjeto } from "@/features/projects/hooks"
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -26,42 +26,33 @@ interface DeleteProjectAlertProps {
 
 export function DeleteProjectAlert({ projectId, projectName }: DeleteProjectAlertProps) {
     const [confirmName, setConfirmName] = useState("")
-    const [isDeleting, setIsDeleting] = useState(false)
     const { toast } = useToast()
     const router = useRouter()
     const [isOpen, setIsOpen] = useState(false)
+    const excluir = useExcluirProjeto()
+    const isDeleting = excluir.isPending
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.preventDefault()
-
         if (confirmName !== projectName) return
 
         try {
-            setIsDeleting(true)
-            const token = (await getAccessToken()) || ""
-
-            const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
-                method: "DELETE",
-                headers: { "Authorization": `Bearer ${token}` }
-            })
-
-            if (!res.ok) throw new Error("Erro ao excluir o projeto.")
-
+            await excluir.mutateAsync(projectId)
             toast({ title: "Projeto Excluído", description: "O projeto e todos os seus ambientes foram excluídos com sucesso." })
             setIsOpen(false)
             router.push("/projects")
+            // Ver o comentario em ProjectWizard.
             router.refresh()
-        } catch (error) {
-            toast({ variant: "destructive", title: "Ops!", description: "Não foi possível excluir o projeto." })
-        } finally {
-            setIsDeleting(false)
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Não foi possível excluir o projeto."
+            toast({ variant: "destructive", title: "Ops!", description: mensagem })
         }
     }
 
     return (
         <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
             <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300 hidden md:flex">
+                <Button variant="outline" size="sm" className="hidden border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive md:flex">
                     <Trash2 className="w-4 h-4 mr-2" /> Excluir
                 </Button>
             </AlertDialogTrigger>

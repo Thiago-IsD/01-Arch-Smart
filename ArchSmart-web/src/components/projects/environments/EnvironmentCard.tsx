@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,19 +22,21 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { getAccessToken } from "@/lib/api/auth"
-import { apiUrl } from "@/lib/api-url"
+import { useExcluirAmbiente } from "@/features/projects/hooks"
+import { ApiError } from "@/lib/api/errors"
+import type { Ambiente } from "@/features/projects/types"
 
 interface EnvironmentCardProps {
-    environment: any
+    environment: Ambiente
     onClick: () => void
-    onDelete: (id: string) => void
 }
 
-export function EnvironmentCard({ environment, onClick, onDelete }: EnvironmentCardProps) {
+export function EnvironmentCard({ environment, onClick }: EnvironmentCardProps) {
     const { toast } = useToast()
+    const router = useRouter()
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-    const [isDeleting, setIsDeleting] = useState(false)
+    const excluir = useExcluirAmbiente(environment.project_id)
+    const isDeleting = excluir.isPending
     const isComplete = environment.dna?.is_complete
 
     const handleDeleteClick = (e: React.MouseEvent) => {
@@ -42,23 +45,15 @@ export function EnvironmentCard({ environment, onClick, onDelete }: EnvironmentC
     }
 
     const confirmDelete = async () => {
-        setIsDeleting(true)
         try {
-            const token = (await getAccessToken()) || ""
-
-            const res = await fetch(apiUrl(`/api/environments/${environment.id}`), {
-                method: "DELETE",
-                headers: { "Authorization": `Bearer ${token}` }
-            })
-
-            if (!res.ok) throw new Error("Erro ao deletar ambiente")
-
+            await excluir.mutateAsync(environment.id)
             toast({ title: "Ambiente Excluído", description: "O ambiente foi removido com sucesso." })
-            onDelete(environment.id)
-        } catch (error) {
-            toast({ variant: "destructive", title: "Ops!", description: "Erro ao excluir o ambiente." })
-        } finally {
-            setIsDeleting(false)
+            // Orcamento e Impressao leem a lista de ambientes pelo servidor e
+            // continuam no padrao antigo; sai quando essas telas migrarem.
+            router.refresh()
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Erro ao excluir o ambiente."
+            toast({ variant: "destructive", title: "Ops!", description: mensagem })
         }
     }
 

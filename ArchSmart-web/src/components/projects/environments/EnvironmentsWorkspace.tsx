@@ -1,37 +1,25 @@
 "use client"
 
 import { useState } from "react"
+import { Plus } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import type { Ambiente } from "@/features/projects/types"
+
+import { DNAEditorSheet } from "./DNAEditorSheet"
 import { EnvironmentCard } from "./EnvironmentCard"
 import { NewEnvironmentModal } from "./NewEnvironmentModal"
-import { DNAEditorSheet } from "./DNAEditorSheet"
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
 
 interface EnvironmentsWorkspaceProps {
     projectId: string
-    initialEnvironments: any[]
+    ambientes: Ambiente[]
 }
 
-export function EnvironmentsWorkspace({ projectId, initialEnvironments }: EnvironmentsWorkspaceProps) {
-    const [environments, setEnvironments] = useState(initialEnvironments)
+export function EnvironmentsWorkspace({ projectId, ambientes }: EnvironmentsWorkspaceProps) {
     const [isNewModalOpen, setIsNewModalOpen] = useState(false)
-
-    // DNA Editor State
     const [selectedEnvId, setSelectedEnvId] = useState<string | null>(null)
 
-    const handleEnvironmentAdded = (newEnv: any) => {
-        setEnvironments(prev => [...prev, newEnv])
-    }
-
-    const handleEnvironmentUpdated = (updatedEnv: any) => {
-        setEnvironments(prev => prev.map(env => env.id === updatedEnv.id ? updatedEnv : env))
-    }
-
-    const handleEnvironmentDeleted = (deletedId: string) => {
-        setEnvironments(prev => prev.filter(env => env.id !== deletedId))
-    }
-
-    const selectedEnv = environments.find(e => e.id === selectedEnvId)
+    const selectedEnv = ambientes.find((e) => e.id === selectedEnvId)
 
     return (
         <div className="h-full flex flex-col">
@@ -42,14 +30,13 @@ export function EnvironmentsWorkspace({ projectId, initialEnvironments }: Enviro
                 </Button>
             </div>
 
-            {environments.length > 0 ? (
+            {ambientes.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {environments.map(env => (
+                    {ambientes.map(env => (
                         <EnvironmentCard
                             key={env.id}
                             environment={env}
                             onClick={() => setSelectedEnvId(env.id)}
-                            onDelete={(id) => handleEnvironmentDeleted(id)}
                         />
                     ))}
                 </div>
@@ -72,14 +59,12 @@ export function EnvironmentsWorkspace({ projectId, initialEnvironments }: Enviro
                 isOpen={isNewModalOpen}
                 onOpenChange={setIsNewModalOpen}
                 projectId={projectId}
-                onSuccess={handleEnvironmentAdded}
             />
 
             <DNAEditorSheet
                 environment={selectedEnv}
                 isOpen={!!selectedEnvId}
                 onOpenChange={(open) => !open && setSelectedEnvId(null)}
-                onSuccess={handleEnvironmentUpdated}
             />
         </div>
     )

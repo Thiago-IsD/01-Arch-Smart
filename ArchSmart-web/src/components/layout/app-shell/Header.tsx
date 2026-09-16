@@ -114,11 +114,11 @@ export function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen
                     {/* User Avatar Dropdown */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button suppressHydrationWarning className="flex items-center gap-2 rounded-lg p-2 hover:bg-accent transition-colors">
+                            <button suppressHydrationWarning aria-label="Menu da conta" className="flex items-center gap-2 rounded-lg p-2 hover:bg-accent transition-colors">
                                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <User className="h-4 w-4 text-primary" />
+                                    <User className="h-4 w-4 text-primary" aria-hidden="true" />
                                 </div>
-                                <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                                <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" aria-hidden="true" />
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">

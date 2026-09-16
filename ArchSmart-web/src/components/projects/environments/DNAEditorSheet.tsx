@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -22,8 +23,9 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form"
-import { getAccessToken } from "@/lib/api/auth"
-import { apiUrl } from "@/lib/api-url"
+import { useSalvarDna } from "@/features/projects/hooks"
+import { ApiError } from "@/lib/api/errors"
+import type { Ambiente } from "@/features/projects/types"
 
 const dnaSchema = z.object({
     floor_area: z.coerce.number().min(0, "A área do piso deve ser um número positivo."),
@@ -36,13 +38,14 @@ type DNAFormValues = z.infer<typeof dnaSchema>
 interface DNAEditorSheetProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
-    environment: any
-    onSuccess: (updatedEnv: any) => void
+    environment: Ambiente | undefined
 }
 
-export function DNAEditorSheet({ isOpen, onOpenChange, environment, onSuccess }: DNAEditorSheetProps) {
+export function DNAEditorSheet({ isOpen, onOpenChange, environment }: DNAEditorSheetProps) {
     const { toast } = useToast()
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const router = useRouter()
+    const salvar = useSalvarDna(environment?.project_id ?? "")
+    const isSubmitting = salvar.isPending
 
     const form = useForm<DNAFormValues>({
         resolver: zodResolver(dnaSchema) as any,
@@ -65,36 +68,16 @@ export function DNAEditorSheet({ isOpen, onOpenChange, environment, onSuccess }:
 
     const onSubmit = async (data: DNAFormValues) => {
         if (!environment) return
-
         try {
-            setIsSubmitting(true)
-            const token = (await getAccessToken()) || ""
-
-            const res = await fetch(apiUrl(`/api/environments/${environment.id}/dna`), {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            })
-
-            if (!res.ok) throw new Error("Falha ao salvar DNA Técnico")
-
-            const updatedDna = await res.json()
+            await salvar.mutateAsync({ envId: environment.id, areas: data })
             toast({ title: "Sucesso!", description: "DNA Técnico atualizado." })
-
-            // Pass the updated environment shape back up
-            onSuccess({
-                ...environment,
-                dna: updatedDna
-            })
-
             onOpenChange(false)
-        } catch (error) {
-            toast({ variant: "destructive", title: "Ops!", description: "Erro ao salvar as áreas." })
-        } finally {
-            setIsSubmitting(false)
+            // Orcamento e Impressao leem a lista de ambientes pelo servidor e
+            // continuam no padrao antigo; sai quando essas telas migrarem.
+            router.refresh()
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Erro ao salvar as áreas."
+            toast({ variant: "destructive", title: "Ops!", description: mensagem })
         }
     }
 

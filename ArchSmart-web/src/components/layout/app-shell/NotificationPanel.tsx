@@ -13,7 +13,9 @@ export interface NotificationPanelProps {
 
 export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead }: NotificationPanelProps) {
     return (
-        <div
+        <aside
+            aria-label="Notificações"
+            inert={!isOpen}
             className={`fixed top-0 right-0 h-full w-96 bg-card border-l border-border shadow-2xl z-[120] transform transition-transform duration-300 ease-in-out flex flex-col ${isOpen ? "translate-x-0" : "translate-x-full"
                 }`}
         >
@@ -24,9 +26,10 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
                     {/* Optional: mark all as read button here */}
                     <button
                         onClick={onClose}
+                        aria-label="Fechar notificações"
                         className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent transition-colors"
                     >
-                        <X className="h-4 w-4 text-muted-foreground" />
+                        <X className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </button>
                 </div>
             </div>
@@ -68,6 +71,6 @@ export function NotificationPanel({ isOpen, onClose, notifications, onMarkAsRead
                     ))
                 )}
             </div>
-        </div>
+        </aside>
     );
 }
