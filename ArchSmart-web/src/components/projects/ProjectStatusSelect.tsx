@@ -26,11 +26,12 @@ export function ProjectStatusSelect({ projectId, currentStatus }: ProjectStatusS
             // leem o cabecalho do servidor.
             router.refresh()
         } catch (erro) {
-            if (erro instanceof ApiError && erro.status === 403) {
-                toast({ variant: "destructive", title: "Limite de Plano", description: erro.message })
-                return
-            }
-            toast({ variant: "destructive", title: "Ops!", description: "Não foi possível atualizar o status." })
+            const mensagem = erro instanceof ApiError ? erro.message : "Não foi possível atualizar o status."
+            toast({
+                variant: "destructive",
+                title: erro instanceof ApiError && erro.status === 403 ? "Limite de Plano" : "Ops!",
+                description: mensagem,
+            })
         }
     }
 

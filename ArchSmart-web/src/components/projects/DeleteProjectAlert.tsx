@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Trash2 } from "lucide-react"
+import { ApiError } from "@/lib/api/errors"
 import { useExcluirProjeto } from "@/features/projects/hooks"
 import {
     AlertDialog,
@@ -42,8 +43,9 @@ export function DeleteProjectAlert({ projectId, projectName }: DeleteProjectAler
             router.push("/projects")
             // Ver o comentario em ProjectWizard.
             router.refresh()
-        } catch {
-            toast({ variant: "destructive", title: "Ops!", description: "Não foi possível excluir o projeto." })
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Não foi possível excluir o projeto."
+            toast({ variant: "destructive", title: "Ops!", description: mensagem })
         }
     }
 
