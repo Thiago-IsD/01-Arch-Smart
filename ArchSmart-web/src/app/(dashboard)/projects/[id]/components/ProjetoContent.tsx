@@ -55,12 +55,19 @@ export function ProjetoContent({ id }: { id: string }) {
             </div>
 
             <div data-testid="projeto-ambientes" className="mt-6 flex-1">
+                {/* Regiao `principal` (decide load_ms/is_empty da tela) — por
+                    isso o erro dela usa o testid especifico
+                    "projeto-ambientes-error", nunca o "projeto-error" do
+                    cabecalho: os dois QueryBoundary sao independentes e podem
+                    errar ao mesmo tempo. */}
                 <QueryBoundary
                     query={ambientes}
                     principal
                     skeleton={<AmbientesSkeleton />}
                     empty={<EnvironmentsWorkspace projectId={id} ambientes={[]} />}
-                    error={(erro, refazer) => <ProjetoComErro erro={erro} refazer={refazer} />}
+                    error={(erro, refazer) => (
+                        <ProjetoComErro erro={erro} refazer={refazer} testId="projeto-ambientes-error" />
+                    )}
                 >
                     {(lista) => <EnvironmentsWorkspace projectId={id} ambientes={lista} />}
                 </QueryBoundary>

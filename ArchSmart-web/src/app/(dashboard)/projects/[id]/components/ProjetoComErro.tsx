@@ -5,10 +5,25 @@ import { AlertCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
-export function ProjetoComErro({ erro, refazer }: { erro: Error; refazer: () => void }) {
+/**
+ * `testId` tem default porque as duas regioes do detalhe (cabecalho e
+ * ambientes) usam este mesmo componente, e os dois `useQuery` sao
+ * independentes: uma queda de API pode errar os dois ao mesmo tempo. Sem um
+ * testid por regiao, os dois emitiriam "projeto-error" e um
+ * `getByTestId("projeto-error")` estouraria por match multiplo.
+ */
+export function ProjetoComErro({
+    erro,
+    refazer,
+    testId = "projeto-error",
+}: {
+    erro: Error
+    refazer: () => void
+    testId?: string
+}) {
     return (
         <div
-            data-testid="projeto-error"
+            data-testid={testId}
             role="alert"
             className="flex w-full flex-col items-center justify-center gap-3 py-16 text-center"
         >

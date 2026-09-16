@@ -76,4 +76,26 @@ describe("ProjetoContent", () => {
         const erro = await screen.findByTestId("projeto-error")
         expect(erro).toHaveTextContent("Projeto não encontrado.")
     })
+
+    it("as duas regioes em erro ao mesmo tempo nao colidem no testid", async () => {
+        // Nao semear NENHUM dos dois caches: `setQueryData` mantém a query
+        // "fresca" pelo staleTime (30s) e ela nunca bateria no fetch — é a
+        // armadilha que fez o teste anterior só falhar no cabeçalho, mesmo com
+        // as duas regiões independentes.
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue(
+                new Response(JSON.stringify({ detail: "Indisponível." }), {
+                    status: 503,
+                    headers: { "Content-Type": "application/json" },
+                }),
+            ),
+        )
+        renderizar(undefined, undefined)
+
+        const erroCabecalho = await screen.findAllByTestId("projeto-error")
+        const erroAmbientes = await screen.findAllByTestId("projeto-ambientes-error")
+        expect(erroCabecalho).toHaveLength(1)
+        expect(erroAmbientes).toHaveLength(1)
+    })
 })
