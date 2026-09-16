@@ -7,10 +7,10 @@
 > Seção 3 liga no CI — rode `python tools/progresso.py --check`; ele sai com
 > código 1 e imprime a diferença se algo estiver errado.
 
-**Progresso geral: 51/65 (78%)**
+**Progresso geral: 52/65 (80%)**
 `████████████████░░░░`
 
-_Última atualização: 2026-09-15_
+_Última atualização: 2026-09-16_
 
 ---
 
@@ -971,7 +971,7 @@ _Última atualização: 2026-09-15_
 > plataforma inteira.
 
 ## Seção 8 · Migração das telas
-**2/10 (20%)** `████░░░░░░░░░░░░░░░░`
+**3/10 (30%)** `██████░░░░░░░░░░░░░░`
 
 > Cada tela migrada aqui converte também as **cores literais** e as **imagens**
 > dela — decidido em 09/09/2026, no desenho da Seção 6: é uma passada por tela,
@@ -1056,13 +1056,81 @@ _Última atualização: 2026-09-15_
       a caixa não é marcada porque a decisão foi adiar, não fechar
 - [x] Biblioteca
 - [x] Dashboard
-- [ ] Projetos (lista + detalhe)
+- [x] Projetos (lista + detalhe)
 - [ ] Orçamento
 - [ ] Financeiro
 - [ ] Apresentações e Portal
 - [ ] Agenda
 - [ ] Auth, Perfil, Configurações e Billing
 - [ ] Landing e páginas legais
+
+> ## Projetos, 16/09/2026 — a terceira tela
+>
+> Branch `secao-8-projetos`, 12 tarefas. Merge em `develop` e PR `develop` →
+> `staging`: fora do escopo desta nota — ainda não aconteceram no momento em
+> que ela foi escrita, então nenhum hash é citado aqui; quem completar o
+> merge acrescenta os hashes depois. Spec em
+> [`docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md`](docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md),
+> doc do módulo com os números em
+> [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
+>
+> **A verificação humana (Step 8/9 da Tarefa 12, decisão 7 da spec) foi
+> respondida por Thiago em 16/09/2026: "verificado" — uma aprovação global
+> da branch inteira, sem apontar nenhum defeito e sem comentar item a item os
+> 16 pontos entregues** (4 rotas — `/projects`, `/projects/<id>`,
+> `/dashboard`, `/library` — × 2 larguras × 2 temas, mais 8 perguntas
+> dirigidas; lista completa em
+> [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md), seção
+> "Verificação humana"). **Isto não é "cada item foi olhado e aprovado
+> individualmente" — é diferente, e a diferença fica registrada**: os itens
+> conhecidos seguem como conhecidos e aceitos, não confirmados um a um.
+>
+> **O que entrou:** lista e detalhe no padrão da Biblioteca/Dashboard
+> (`QueryBoundary`, prefetch, `HydrationBoundary`); `/api/projects` de 43 para
+> **5** consultas (constante 1–20 projetos, reconfirmado ao vivo contra
+> staging na Tarefa 12); as sete mutações (quatro de projeto, três de
+> ambiente/DNA) por `useMutation` com mapa explícito de invalidação,
+> incluindo `dashboard.all`; `router.refresh()` nas sete, porque
+> Orçamento/Apresentação/Impressão ainda leem projeto/ambientes no servidor;
+> `notFound()` do detalhe responde 200 (decisão registrada); LCP/JS ganharam
+> instrumento pela primeira vez, para as três telas.
+>
+> **Números medidos, arranjo local da Tarefa 12:** clique → dados **921 ms**
+> (`AMOSTRAS=919,919,921,933,942`); LCP **952 ms** (era 1308), JS 466888
+> bytes (era 358129); consultas por carregamento **5** (lista) / **4**
+> (detalhe) / **3** (ambientes), reconfirmadas ao vivo contra staging;
+> `load_ms` de clique **521 ms** (n=8), de commit **206 ms** (n=25).
+> **P95 da API implantada: não medido** — depende do deploy, que fica fora
+> desta nota; comando exato em
+> [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
+>
+> **A definição de pronto fechou com estes itens em ⚠️:** orçamento de
+> performance na API implantada (a medir pós-deploy, por distância — mesma
+> causa do Dashboard e da Biblioteca); axe, teclado e 390/1440px foram
+> **medidos por agente, não por olho humano** — a verificação humana global
+> de Thiago cobriu o conjunto, mas não confirmou cada achado da passada por
+> agente item a item. Achado novo, registrado e não corrigido:
+> `/projects/{id}` estoura **203px** em 390px, nos dois temas (causa isolada
+> no `Header` do shell — breadcrumb + data não encolhem com nome de projeto
+> longo —, não em código de Projetos; a lista não estoura).
+>
+> **Itens conhecidos que continuam abertos, e que a verificação humana não
+> derrubou nem corrigiu:** o estouro de 203px acima; o estouro de ~42px já
+> conhecido da Biblioteca (`p-8` de `library/page.tsx:14`); a ausência de
+> `not-found.tsx` na árvore da aplicação (rota sem correspondência cai no 404
+> padrão do Next, em inglês, fora do shell); a copy dos erros de mutação
+> nunca revisada; `custom_installments` descartado na serialização de
+> `GET /api/projects/{id}` (efeito no usuário: editar um projeto com
+> recebimento Personalizado traz o cronograma vazio e o salvamento reprova);
+> e os demais itens do bloco "O que Projetos (Seção 8) deixou em aberto" no
+> `CLAUDE.md`.
+>
+> Os portões, medidos em 16/09/2026: comandos e resultados no relatório da
+> Tarefa 12
+> (`.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md`).
+>
+> O que ficou em aberto para a próxima tela está em `CLAUDE.md`, no bloco "O
+> que Projetos (Seção 8) deixou em aberto".
 
 > ## O Dashboard, 15/09/2026 — a segunda tela
 >

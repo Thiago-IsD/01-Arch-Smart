@@ -864,17 +864,59 @@ captura de tela.
 | Orçamento de performance (API implantada, P95) | ⚠️ **a medir depois do deploy** — previsão ≈ 1,89 s (lista) / 1,55 s (ambientes), por distância | seção acima |
 | Consultas por carregamento (lista, detalhe, ambientes) | ✅ 5 / 4 / 3, reconfirmadas ao vivo contra staging | seção acima |
 | LCP e JS da rota | ✅ medido (952 ms / 466888 bytes) — sem alvo formal isolado por rota nesta régua | `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md` |
-| axe em navegador | ⚠️ **medido por agente** — lista repete achados já conhecidos (shell); detalhe tem achados novos (`aria-required-*` nas abas, `heading-order`, verde literal) | seção acima |
-| Navegação só por teclado | ⚠️ **medido por agente** — sem parada invisível, wizard e diálogo de exclusão abrem/fecham sem mouse | seção acima |
-| 390px e 1440px | ⚠️ **medido por agente** — lista sem estouro; **detalhe estoura 203px em 390px, achado novo, não corrigido** | seção acima |
+| axe em navegador | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista repete achados já conhecidos (shell); detalhe tem achados novos (`aria-required-*` nas abas, `heading-order`, verde literal), registrados e não corrigidos | seção acima |
+| Navegação só por teclado | ✅ **medido por agente, aprovação humana global em 16/09/2026** — sem parada invisível, wizard e diálogo de exclusão abrem/fecham sem mouse | seção acima |
+| 390px e 1440px | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista sem estouro; **detalhe estoura 203px em 390px, achado novo, registrado e não corrigido** | seção acima |
 | Guardas e2e no `e2e.yml` | ✅ | `.github/workflows/e2e.yml` |
 | Doc do módulo com números e comando | ✅ | este arquivo |
-| Verificação humana (decisão 7 da spec) | ⚠️ **PENDENTE — aguardando resposta de Thiago** à lista da Tarefa 12 | `.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md` |
+| Verificação humana (decisão 7 da spec) | ✅ **Concluída em 16/09/2026 — Thiago respondeu "verificado"** | seção "Verificação humana", abaixo |
+
+⚠️ **A ressalva das três linhas de olho humano acima: a aprovação foi
+global, não item a item.** Thiago respondeu "verificado" para a branch
+inteira, sem apontar nenhum defeito e sem comentar cada achado da passada
+por agente (axe, teclado, 390/1440px) individualmente. Isso é diferente de
+"cada achado foi revisto e confirmado um por um" — e é essa a razão de as
+três linhas virarem ✅ com a ressalva escrita, em vez de silenciosamente. Os
+achados que a passada por agente já tinha listado como não corrigidos
+(estouro de 203px, os `aria-*` do `ProjectHeader`, o `bg-emerald-500/10`
+literal, `page-has-heading-one` e `color-contrast` da lista) continuam não
+corrigidos — a aprovação não os resolveu, só confirmou que ninguém os achou
+bloqueantes para o merge.
 
 ## Verificação humana
 
-**PENDENTE.** A lista de verificação foi entregue a Thiago em 16/09/2026 (Step
-8 da Tarefa 12) e o merge **não** acontece antes da resposta. Quando ela
-chegar, esta seção passa a ter o nome do verificador, a data, e o veredito
-item a item — nenhum item da definição de pronto acima que dependa de olho
-humano vira ✅ antes disso.
+**Verificador:** Thiago. **Data:** 16/09/2026. **Forma:** **aprovação
+global** — a resposta foi "verificado", para a branch inteira, sem apontar
+nenhum defeito e sem comentar item a item a lista entregue. **Isto é
+diferente de "cada item foi olhado e aprovado individualmente"**, e a
+diferença é registrada aqui de propósito, porque é o tipo de coisa que se
+perde se só o veredito final ficar escrito.
+
+O que estava sob os olhos dele — a lista entregue em
+`.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md` (Step 8 da
+Tarefa 12): 4 rotas (`/projects`, `/projects/<id>`, `/dashboard`, `/library`)
+× 2 larguras (390px, 1440px) × 2 temas (claro, escuro) — **16
+combinações** —, mais 8 perguntas dirigidas:
+
+1. Botão "Excluir"/"Excluir Projeto Permanentemente" no tema escuro (texto
+   escuro sobre vermelho claro, com o token novo de destrutivo) — aceitável?
+2. Dashboard: valores de despesa e saldo negativo, com o token novo no lugar
+   de `text-red-*` — legíveis nos dois temas?
+3. Sidebar: o item ativo passou de texto teal para texto padrão com borda e
+   ícone teal — continua óbvio?
+4. Lista de Projetos: card de limite (x/y), estado vazio e estado de erro.
+5. Detalhe: cabeçalho, ambientes, criar/editar DNA/excluir ambiente.
+6. Teclado: `Tab` do topo ao fim de `/projects` — o anel de foco visível em
+   todos os passos? Algum foco some?
+7. 390px: algo estoura na horizontal em alguma das 4 rotas, incluindo os
+   dois já conhecidos (Biblioteca ~42px, detalhe de Projetos ~203px)?
+8. Hierarquia e ordem de leitura das duas telas de Projetos.
+
+**Nenhuma das 16 combinações nem das 8 perguntas recebeu resposta
+individual** — a aprovação cobriu o conjunto, não cada linha. Os itens que a
+própria lista já apontava como conhecidos e abertos (os dois estouros de
+390px, a ausência de `not-found.tsx`, a copy dos erros de mutação nunca
+revisada, `custom_installments` descartado, e os demais do bloco "O que
+Projetos (Seção 8) deixou em aberto" no `CLAUDE.md`) seguem registrados como
+**conhecidos e aceitos** — a aprovação global não os corrigiu nem os
+reabriu, só liberou o merge com eles cientes e de pé.
