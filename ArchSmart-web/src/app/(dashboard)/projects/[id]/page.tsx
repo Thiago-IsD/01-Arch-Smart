@@ -1,74 +1,21 @@
-import { getServerAccessToken } from "@/lib/api/auth.server"
-import { notFound } from "next/navigation"
-import { ChevronLeft } from "lucide-react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { EnvironmentsWorkspace } from "@/components/projects/environments/EnvironmentsWorkspace"
-import { ProjectHeader } from "@/components/projects/ProjectHeader"
-import { apiUrl } from "@/lib/api-url"
+import { Suspense } from "react"
 
-async function getProjectDetails(id: string) {
-    const token = await getServerAccessToken()
+import { ProjectWorkspaceSkeleton } from "@/components/projects/ProjectWorkspaceSkeleton"
 
-    if (!token) return null
+import { ProjetoData } from "./components/ProjetoData"
 
-    try {
-        const res = await fetch(apiUrl(`/api/projects/${id}`), {
-            headers: { "Authorization": `Bearer ${token}` },
-            cache: 'no-store'
-        })
-        if (!res.ok) return null
-        return res.json()
-    } catch (e) {
-        return null
-    }
-}
-
-async function getProjectEnvironments(id: string) {
-    const token = await getServerAccessToken()
-
-    if (!token) return []
-
-    try {
-        const res = await fetch(apiUrl(`/api/projects/${id}/environments`), {
-            headers: { "Authorization": `Bearer ${token}` },
-            cache: 'no-store'
-        })
-        if (!res.ok) return []
-        return res.json()
-    } catch (e) {
-        return []
-    }
-}
-
-export default async function ProjectWorkspacePage(
-    props: { params: Promise<{ id: string }> }
-) {
-    const params = await props.params
-    const project = await getProjectDetails(params.id)
-
-    if (!project) {
-        notFound()
-    }
-
-    const environments = await getProjectEnvironments(params.id)
+export default async function ProjectWorkspacePage(props: { params: Promise<{ id: string }> }) {
+    const { id } = await props.params
 
     return (
-        <div className="h-full flex flex-col space-y-6 p-8">
-            <ProjectHeader project={project} activeTab="ambientes" />
-
-            {/* Workspace Modules */}
-            <div className="flex-1 mt-6">
-                <Tabs defaultValue="ambientes" className="h-full flex flex-col">
-
-                    <div className="flex-1 mt-6">
-                        <TabsContent value="ambientes" className="m-0 h-full">
-                            <EnvironmentsWorkspace projectId={project.id} initialEnvironments={environments} />
-                        </TabsContent>
-                    </div>
-                </Tabs>
-            </div>
-        </div>
+        <Suspense
+            fallback={
+                <div data-testid="projeto-shell-streaming">
+                    <ProjectWorkspaceSkeleton />
+                </div>
+            }
+        >
+            <ProjetoData id={id} />
+        </Suspense>
     )
 }
