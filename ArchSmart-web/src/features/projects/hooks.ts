@@ -27,7 +27,11 @@ export function useProjetosParaMover(ativo: boolean) {
     return useQuery({
         ...queryDaListaDeProjetos(api, { page: 1, size: 100 }),
         enabled: ativo,
-        select: (pagina) => pagina.items,
+        // `?? []` cobre tanto `undefined` quanto `items: null` vindo da API.
+        // O destructuring com default (`= []`) do consumidor so cobre
+        // `undefined` — sem isto, `items: null` chegaria como `null` e
+        // `projects.map(...)` quebraria no MoveToProjectModal.
+        select: (pagina) => pagina.items ?? [],
     })
 }
 

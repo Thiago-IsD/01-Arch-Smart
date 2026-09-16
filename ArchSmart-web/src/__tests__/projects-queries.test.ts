@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from "vitest"
+import { createElement, type ReactNode } from "react"
+
+import { describe, expect, it, vi, beforeEach } from "vitest"
+import { renderHook, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 import type { ClienteApi } from "@/lib/api/core"
 import { cachePolicy, queryKeys } from "@/lib/query/keys"
@@ -9,6 +13,16 @@ import {
     queryDosAmbientes,
 } from "@/features/projects/queries"
 import { estadoDoLimite } from "@/features/projects/limite"
+import { useProjetosParaMover } from "@/features/projects/hooks"
+
+vi.mock("@/lib/api/auth", () => ({
+    getAccessToken: async () => "tok123",
+    supabaseBrowser: () => {
+        throw new Error("nao deve ser chamado no teste")
+    },
+    signOut: async () => {},
+    setSession: async () => {},
+}))
 
 /**
  * A fabrica e a fonte unica: `ProjetosData`/`ProjetoData` (servidor) chamam com
@@ -58,6 +72,55 @@ describe("fabricas de query de Projetos", () => {
         const sinal = new AbortController().signal
         await opcoes.queryFn!({ signal: sinal } as never)
         expect(cliente).toHaveBeenCalledWith("/api/projects/p1/environments", { signal: sinal })
+    })
+})
+
+function envolver() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    function Wrapper({ children }: { children: ReactNode }) {
+        return createElement(QueryClientProvider, { client }, children)
+    }
+    return Wrapper
+}
+
+describe("useProjetosParaMover", () => {
+    beforeEach(() => {
+        vi.stubGlobal("fetch", vi.fn())
+    })
+
+    /**
+     * Correcao 1 da revisao da Tarefa 3: o `select` virou `pagina.items`, sem
+     * o `?? []` que a versao anterior (`features/library/hooks.ts`) tinha.
+     * `items: null` chegaria como `null` ao MoveToProjectModal, cujo
+     * `const { data: projects = [] } = ...` so cobre `undefined` — e
+     * `projects.map(...)` quebraria. `select` precisa devolver `[]` tanto
+     * para `items` ausente quanto para `items: null`.
+     */
+    it("items nulo ou ausente chega ao consumidor como array vazio", async () => {
+        ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+            new Response(JSON.stringify({ items: null, total: 0, page: 1, size: 100, pages: 0, plan_limit: 2, active_count: 0 }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            }),
+        )
+        const { result } = renderHook(() => useProjetosParaMover(true), { wrapper: envolver() })
+        await waitFor(() => expect(result.current.isSuccess).toBe(true))
+        expect(result.current.data).toEqual([])
+    })
+
+    it("items presente continua chegando intacto", async () => {
+        ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    items: [{ id: "p1", name: "Apto 101" }],
+                    total: 1, page: 1, size: 100, pages: 1, plan_limit: 2, active_count: 1,
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+        )
+        const { result } = renderHook(() => useProjetosParaMover(true), { wrapper: envolver() })
+        await waitFor(() => expect(result.current.isSuccess).toBe(true))
+        expect(result.current.data).toEqual([{ id: "p1", name: "Apto 101" }])
     })
 })
 
