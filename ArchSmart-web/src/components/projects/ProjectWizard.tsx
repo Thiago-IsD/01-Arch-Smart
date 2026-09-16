@@ -29,12 +29,11 @@ import { wizardSchema, type WizardFormValues } from "./project-wizard/schema"
 interface ProjectWizardProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
-    onSuccess?: () => void
     mode?: "create" | "edit"
     initialData?: any
 }
 
-export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create", initialData }: ProjectWizardProps) {
+export function ProjectWizard({ isOpen, onOpenChange, mode = "create", initialData }: ProjectWizardProps) {
     const [step, setStep] = useState(1)
     const { toast } = useToast()
     const router = useRouter()
@@ -140,7 +139,6 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
             form.reset()
             setStep(1)
             onOpenChange(false)
-            onSuccess?.()
 
             // Orcamento e Apresentacoes renderizam ProjectHeader com dado do
             // SERVIDOR; sem isto, editar ali nao atualiza o cabecalho. Sai
