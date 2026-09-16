@@ -14,9 +14,11 @@ primaria sai da identity map SEM ir ao banco — o N+1 ficaria invisivel aqui e
 continuaria vivo na producao, onde nenhuma requisicao chega com o cliente ja
 carregado.
 """
+from datetime import date
+
 from sqlalchemy.orm import Session
 
-from app.models.all_models import Account, Client, Environment, EnvironmentDNA, Project
+from app.models.all_models import Account, Client, Environment, EnvironmentDNA, FinancialEntry, Project
 from tests.contador_de_queries import ContadorDeQueries
 
 
@@ -119,6 +121,54 @@ def test_o_detalhe_custa_o_mesmo_com_1_e_com_20_ambientes(db: Session, conta_a, 
     # 1 contexto/entitlements + 1 obter do projeto + 1 ambientes (colecao,
     # so para o len de environments_count) + 1 cliente.
     assert c20 <= 4, f"{c20} consultas no detalhe:\n  " + contador.resumo()
+
+
+def test_o_detalhe_com_recebimento_personalizado_gasta_uma_consulta_a_mais(
+    db: Session, conta_a, client_a
+):
+    """`get_project_by_id` só busca `FinancialEntry` quando `payment_method ==
+    "CUSTOM"` (projects.py:98-103) — o teto de 4 consultas dos outros dois
+    testes deste arquivo vale só para o caminho padrão, que nunca visita essa
+    tabela. Este caso mede o caminho que os outros não alcançam."""
+    conta, _ = conta_a
+    cliente = Client(account_id=conta.id, name="Cliente Personalizado")
+    db.add(cliente)
+    db.flush()
+    projeto = Project(
+        account_id=conta.id,
+        client_id=cliente.id,
+        name="Projeto Personalizado",
+        payment_method="CUSTOM",
+        service_value=1000.0,
+    )
+    db.add(projeto)
+    db.flush()
+    for indice in range(3):
+        db.add(
+            FinancialEntry(
+                account_id=conta.id,
+                project_id=projeto.id,
+                description=f"Parcela {indice}",
+                amount=1000.0 / 3,
+                type="INCOME",
+                status="PREDICTED",
+                due_date=date(2026, 10, 1 + indice),
+            )
+        )
+    db.flush()
+
+    c, corpo, contador = _contar(db, client_a, f"/api/projects/{projeto.id}")
+
+    assert corpo["payment_method"] == "CUSTOM"
+    # `custom_installments` nao esta em `corpo`: `ProjectResponse` nao declara
+    # o campo e o Pydantic o descarta (pendencia 4 da Secao 8 em CLAUDE.md) —
+    # a consulta acontece e o resultado e jogado fora. Nao afirmamos o valor
+    # aqui, so que a consulta que o monta foi paga.
+    assert "custom_installments" not in corpo
+    # 1 contexto/entitlements + 1 obter do projeto + 1 ambientes (colecao,
+    # so para o len de environments_count) + 1 cliente + 1 FinancialEntry
+    # (so entra quando payment_method == "CUSTOM"; projects.py:99-103) = 5.
+    assert c <= 5, f"{c} consultas no detalhe com recebimento personalizado:\n  " + contador.resumo()
 
 
 def test_a_lista_de_ambientes_nao_consulta_um_dna_por_ambiente(db: Session, conta_a, client_a):
