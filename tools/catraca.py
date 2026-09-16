@@ -28,6 +28,11 @@ manual (`fetch` cru, cliente Supabase direto) fora de `src/lib/api/`:
                          que nasca reprovado nao esta no baseline e reprova --
                          e assim que "portao fechado para o que a Secao 6 cria"
                          sai de graca, sem lista de excecao para envelhecer
+  - texto_sobre_fundo_reprovado  tokens usados como `text-<token>` abaixo de
+                         4.5:1 sobre --background, nos dois temas -- nasceu na
+                         Tarefa 10 da Secao 8 (Projetos) porque
+                         `contraste_reprovado` so mede pares e nunca viu
+                         `destructive` como texto, que media 2,00:1 no escuro
 
 A Tarefa 7 da Secao 6 acrescentou duas medidas de acessibilidade:
 
@@ -183,6 +188,7 @@ CRITERIOS = {
     "fetch_fora_de_lib_api": "ocorrencias de `fetch(` em ArchSmart-web/src/**/*.{ts,tsx}, fora de src/lib/api/",
     "supabase_fora_de_lib_api": "ocorrencias de `create{Browser,Server}Client(` fora de src/lib/api/ e src/proxy.ts",
     "contraste_reprovado": "pares (cor, cor-foreground) de globals.css abaixo de 4.5:1, nos dois temas",
+    "texto_sobre_fundo_reprovado": "tokens usados como text-<token> abaixo de 4.5:1 sobre --background, nos dois temas (ver contraste.texto_sobre_fundo_reprovados para o que fica de fora)",
     "tabindex_negativo": "ocorrencias de tabIndex={-1} em ArchSmart-web/src/**/*.tsx",
     "hover_sem_focus": "linhas com opacity-0 + group-hover: (ou group-hover/nome:) e sem escape de foco (focus:, focus-within:, ou as formas nomeadas) em ArchSmart-web/src/**/*.tsx",
     "arquivos_acima_de_400": f"arquivos .ts/.tsx de ArchSmart-web/src com mais de {LIMITE_DE_LINHAS} linhas",
@@ -378,6 +384,7 @@ MEDIDORES = {
     "supabase_fora_de_lib_api": lambda: contar_ocorrencias(
         SRC_WEB, RE_SUPABASE, (LIB_API_WEB, PROXY_WEB)),
     "contraste_reprovado": lambda: contraste.reprovados(),
+    "texto_sobre_fundo_reprovado": lambda: contraste.texto_sobre_fundo_reprovados(),
     "tabindex_negativo": lambda: contar_ocorrencias(SRC_WEB, RE_TABINDEX_NEGATIVO),
     "hover_sem_focus": lambda: contar_hover_sem_focus(SRC_WEB),
     "arquivos_acima_de_400": lambda: arquivos_grandes(SRC_WEB),

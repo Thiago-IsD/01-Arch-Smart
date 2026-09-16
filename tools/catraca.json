@@ -29,5 +29,11 @@
     "ArchSmart-web/src/app/portal/[uuid]/components/PortalBudget.tsx",
     "ArchSmart-web/src/app/produto/page.tsx",
     "ArchSmart-web/src/components/calendar/EventDialog.tsx"
+  ],
+  "texto_sobre_fundo_reprovado": [
+    "claro:destructive",
+    "claro:secondary",
+    "claro:warning",
+    "escuro:destructive"
   ]
 }

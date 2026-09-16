@@ -1,5 +1,7 @@
 """Testes do validador de contraste. Só biblioteca padrão, como todo tools/."""
+import tempfile
 import unittest
+from pathlib import Path
 
 import contraste
 
@@ -80,6 +82,58 @@ class TestTokensDeEstado(unittest.TestCase):
             contraste.reprovados(),
             ["claro:destructive", "claro:muted", "claro:secondary", "escuro:secondary"],
         )
+
+
+CSS_DE_HOJE = """
+:root {
+  --background: 0 0% 100%; --foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%; --destructive-foreground: 210 40% 98%;
+  --muted: 210 40% 96.1%; --muted-foreground: 215.4 16.3% 46.9%;
+}
+.dark {
+  --background: 222.2 84% 4.9%; --foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%; --destructive-foreground: 210 40% 98%;
+}
+"""
+
+CSS_NOVO = CSS_DE_HOJE.replace("--destructive: 0 84.2% 60.2%", "--destructive: 0 84.2% 40%").replace(
+    "--destructive: 0 62.8% 30.6%; --destructive-foreground: 210 40% 98%",
+    "--destructive: 0 84.2% 60%; --destructive-foreground: 222.2 84% 4.9%",
+)
+
+
+class TestTextoSobreFundo(unittest.TestCase):
+    def test_destructive_como_texto_reprova_nos_dois_temas_hoje(self):
+        # 3,76:1 no claro e 2,00:1 no escuro (medido em 15/09/2026, spec de
+        # Projetos, decisao 5). A catraca antiga so media o par com o
+        # foreground (3,59 no claro, 9,56 no escuro) e nunca viu o 2,00.
+        fora = contraste.texto_sobre_fundo_reprovados(CSS_DE_HOJE, usados={"destructive"})
+        self.assertEqual(fora, ["claro:destructive", "escuro:destructive"])
+
+    def test_os_valores_novos_passam_como_texto_e_como_par(self):
+        self.assertEqual(contraste.texto_sobre_fundo_reprovados(CSS_NOVO, usados={"destructive"}), [])
+        self.assertNotIn("claro:destructive", contraste.reprovados(CSS_NOVO))
+        self.assertNotIn("escuro:destructive", contraste.reprovados(CSS_NOVO))
+
+    def test_foreground_de_par_e_background_nao_sao_medidos_sobre_o_fundo(self):
+        # `destructive-foreground` e texto SOBRE destructive, nao sobre o fundo;
+        # `background` sobre ele mesmo daria 1:1. Os dois ficam de fora.
+        fora = contraste.texto_sobre_fundo_reprovados(
+            CSS_DE_HOJE, usados={"destructive-foreground", "background"}
+        )
+        self.assertEqual(fora, [])
+
+    def test_tokens_usados_como_texto_le_o_codigo_e_cruza_com_os_tokens(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                'const x = <p className="hover:text-destructive text-muted-foreground text-lg context-menu">oi</p>',
+                encoding="utf-8",
+            )
+            Path(pasta, "b.css").write_text(".x { color: text-primary }", encoding="utf-8")
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        # `text-lg` nao e token; `context-menu` nao e classe de texto; `.css` nao e lido.
+        self.assertEqual(usados, {"destructive", "muted-foreground"})
 
 
 if __name__ == "__main__":

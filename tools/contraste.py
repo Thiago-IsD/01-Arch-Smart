@@ -98,6 +98,51 @@ def reprovados(css: str | None = None) -> list:
     return sorted(fora)
 
 
+SRC_WEB = RAIZ / "ArchSmart-web" / "src"
+RE_CLASSE_DE_TEXTO = re.compile(r"\btext-([a-z]+(?:-[a-z]+)*)")
+
+
+def tokens_usados_como_texto(src: Path = SRC_WEB, tokens: dict | None = None) -> set:
+    """Nomes de token que aparecem como `text-<token>` em .ts/.tsx de `src`."""
+    if tokens is None:
+        tokens, _ = tokens_dos_temas()
+    achados = set()
+    for arquivo in src.rglob("*"):
+        if arquivo.suffix in (".ts", ".tsx"):
+            achados.update(RE_CLASSE_DE_TEXTO.findall(arquivo.read_text(encoding="utf-8")))
+    return achados & set(tokens)
+
+
+def texto_sobre_fundo_reprovados(css: str | None = None, usados: set | None = None) -> list:
+    """
+    Tokens usados como texto que ficam abaixo de PISO sobre `--background`.
+
+    Existe porque `reprovados()` so mede pares (cor, cor-foreground): o
+    `destructive` usado como TEXTO media 2,00:1 no tema escuro e passava verde
+    (item 2 do bloco do Dashboard no CLAUDE.md).
+
+    Fora da medida, de proposito e escrito: `X-foreground` quando `X` e token
+    (e par; `pares()` o mede sobre `X` — o que deixa `muted-foreground` sobre
+    `background` sem medida), o proprio `background`, texto sobre `card`/
+    `popover`/`muted`, e opacidade (`text-destructive/80`).
+    """
+    claro, escuro = tokens_dos_temas(css)
+    if usados is None:
+        usados = tokens_usados_como_texto(tokens=claro)
+    fora = []
+    for rotulo, tema in (("claro", claro), ("escuro", escuro)):
+        if "background" not in tema:
+            continue
+        for nome in sorted(usados):
+            if nome == "background" or nome not in tema:
+                continue
+            if nome.endswith("-foreground") and nome[: -len("-foreground")] in tema:
+                continue
+            if contraste(tema[nome], tema["background"]) < PISO:
+                fora.append(f"{rotulo}:{nome}")
+    return sorted(fora)
+
+
 def main() -> int:
     claro, escuro = tokens_dos_temas()
     for rotulo, tema in (("claro", claro), ("escuro", escuro)):
