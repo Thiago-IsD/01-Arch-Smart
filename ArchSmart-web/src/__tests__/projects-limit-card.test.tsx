@@ -10,8 +10,13 @@ describe("ProjectsLimitCard", () => {
     })
 
     it("limite 0 nao produz NaN e diz que o limite foi atingido", () => {
+        // `not.toContain("NaN")` no HTML seria um no-op: o jsdom descarta
+        // silenciosamente um `style` invalido (`width: NaN%`) em vez de
+        // renderiza-lo, entao a string nunca apareceria de qualquer jeito.
+        // A asserção que discrimina de verdade e o valor CALCULADO da barra.
         const { container } = render(<ProjectsLimitCard activeProjectsCount={0} planLimit={0} />)
-        expect(container.innerHTML).not.toContain("NaN")
+        const barra = container.querySelector<HTMLElement>(".transition-all")
+        expect(barra?.style.width).toBe("100%")
         expect(screen.getByText("Limite de projetos atingido")).toBeInTheDocument()
     })
 

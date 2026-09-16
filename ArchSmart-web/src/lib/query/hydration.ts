@@ -50,6 +50,19 @@ export const TIMEOUT_DO_PREFETCH_MS = 3_000
  * `errorUpdatedAt` durante a chamada. Um QueryClient de servidor nasce vazio
  * por requisicao, entao na pratica sao todas; o filtro existe para a funcao
  * nao mentir se um dia receber um cliente com historico.
+ *
+ * ## Por que so avisa a que TERMINOU
+ *
+ * Ate a rodada de correcao 1 da Tarefa 9 (15/09/2026) o laco final so olhava
+ * `status !== "success"` — sem checar `fetchStatus`. A Biblioteca chama
+ * `tentarPrefetch` duas vezes em paralelo (`Promise.all`, `LibraryData.tsx`)
+ * sobre o MESMO `QueryClient`; se a chamada A terminasse antes da B, o laco de
+ * A encontrava a query da B, criada depois do snapshot de A e portanto
+ * "tocada", ainda em voo — e avisava que ela tinha desistido, sem ela ter
+ * desistido de nada. Por isso o laco exige `fetchStatus !== "fetching"`: uma
+ * query tocada que ainda esta buscando e de uma chamada irma concorrente, ou
+ * ainda esta em voo por outro motivo — nunca "desistiu", que so se sabe depois
+ * que ela termina.
  */
 export async function tentarPrefetch(
     queryClient: QueryClient,
@@ -75,7 +88,14 @@ export async function tentarPrefetch(
     }
 
     for (const query of cache.getAll()) {
-        if (tocada(query) && query.state.status !== "success") {
+        // `fetchStatus === "fetching"` = ainda em voo — de uma chamada irma
+        // concorrente sobre o mesmo QueryClient, ou desta propria tarefa mas
+        // ainda nao resolvida. Nao e desistencia: so entra no aviso a query
+        // tocada que ja TERMINOU sem sucesso.
+        if (tocada(query) && query.state.fetchStatus !== "fetching" && query.state.status !== "success") {
+            // A chave pode carregar id de recurso (ex.: id de projeto). Vai
+            // so para o log do SERVIDOR — nunca chega ao navegador —, e existe
+            // para diagnosticar qual prefetch desistiu; aceito de proposito.
             console.warn(
                 "[prefetch] desistiu, o cliente vai buscar:",
                 JSON.stringify(query.queryKey),

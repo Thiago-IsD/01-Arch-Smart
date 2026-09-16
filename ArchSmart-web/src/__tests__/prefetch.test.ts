@@ -67,4 +67,36 @@ describe("tentarPrefetch", () => {
         )
         expect(aviso).not.toHaveBeenCalled()
     })
+
+    it("query irma disparada durante a chamada, ainda em voo quando a tarefa termina, nao avisa — so a que realmente terminou em erro avisa", async () => {
+        // Reproduz o cenario da Biblioteca antes do conserto: duas chamadas de
+        // prefetch concorrentes sobre o MESMO QueryClient. Aqui as duas
+        // queries nascem dentro da mesma `tarefa` para isolar so o laco final
+        // de `tentarPrefetch` — a irma e disparada e NAO aguardada, entao
+        // ainda esta em voo (fetchStatus "fetching") quando a query propria
+        // termina e o laco roda. Sem a guarda de `fetchStatus`, a irma tambem
+        // seria acusada de ter desistido.
+        const queryClient = criarQueryClientDoServidor()
+        let liberarIrma: () => void = () => {}
+        const travaDaIrma = new Promise<number>((resolve) => {
+            liberarIrma = () => resolve(1)
+        })
+        let promessaIrma: Promise<unknown> = Promise.resolve()
+
+        await tentarPrefetch(queryClient, () => {
+            promessaIrma = queryClient.prefetchQuery({ queryKey: ["irma"], queryFn: () => travaDaIrma })
+            return queryClient.prefetchQuery({
+                queryKey: ["propria", "com", "erro"],
+                queryFn: async () => {
+                    throw new Error("falhou de verdade")
+                },
+            })
+        })
+
+        expect(aviso).toHaveBeenCalledTimes(1)
+        expect(aviso.mock.calls[0].map(String).join(" ")).toContain("propria")
+
+        liberarIrma()
+        await promessaIrma
+    })
 })
