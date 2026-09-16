@@ -1,0 +1,70 @@
+import { QueryClient } from "@tanstack/react-query"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+
+import { TIMEOUT_DO_PREFETCH_MS, criarQueryClientDoServidor, tentarPrefetch } from "@/lib/query/hydration"
+
+let aviso: ReturnType<typeof vi.spyOn>
+
+beforeEach(() => {
+    aviso = vi.spyOn(console, "warn").mockImplementation(() => {})
+})
+
+afterEach(() => {
+    aviso.mockRestore()
+    vi.useRealTimers()
+})
+
+describe("tentarPrefetch", () => {
+    it("prefetch com sucesso nao avisa", async () => {
+        const queryClient = criarQueryClientDoServidor()
+        await tentarPrefetch(queryClient, () =>
+            queryClient.prefetchQuery({ queryKey: ["ok"], queryFn: async () => 1 }),
+        )
+        expect(aviso).not.toHaveBeenCalled()
+    })
+
+    it("queryFn que falha AVISA, com a chave — prefetchQuery engole o erro, e antes isto era invisivel", async () => {
+        const queryClient = criarQueryClientDoServidor()
+        await tentarPrefetch(queryClient, () =>
+            queryClient.prefetchQuery({
+                queryKey: ["projects", "detail", "p1"],
+                queryFn: async () => {
+                    throw new Error("fora do ar")
+                },
+            }),
+        )
+        expect(aviso).toHaveBeenCalledTimes(1)
+        expect(aviso.mock.calls[0].map(String).join(" ")).toContain("projects")
+        expect(aviso.mock.calls[0].map(String).join(" ")).toContain("fora do ar")
+    })
+
+    it("estourar o teto AVISA", async () => {
+        vi.useFakeTimers()
+        const queryClient = criarQueryClientDoServidor()
+        const promessa = tentarPrefetch(queryClient, (signal) =>
+            queryClient.prefetchQuery({
+                queryKey: ["lento"],
+                queryFn: () =>
+                    new Promise((_, rejeitar) => {
+                        signal.addEventListener("abort", () => rejeitar(new Error("abortado pelo teto")))
+                    }),
+            }),
+        )
+        await vi.advanceTimersByTimeAsync(TIMEOUT_DO_PREFETCH_MS + 1)
+        await promessa
+        expect(aviso).toHaveBeenCalledTimes(1)
+        expect(aviso.mock.calls[0].map(String).join(" ")).toContain("lento")
+    })
+
+    it("so olha as queries da propria tarefa: uma query ja com erro no cliente, de antes, nao conta", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        await queryClient
+            .prefetchQuery({ queryKey: ["velha"], queryFn: async () => { throw new Error("antiga") } })
+        aviso.mockClear()
+
+        await tentarPrefetch(queryClient, () =>
+            queryClient.prefetchQuery({ queryKey: ["nova"], queryFn: async () => 1 }),
+        )
+        expect(aviso).not.toHaveBeenCalled()
+    })
+})

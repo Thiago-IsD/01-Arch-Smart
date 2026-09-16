@@ -15,7 +15,7 @@ import { DashboardContent } from "./DashboardContent"
 export async function DashboardData() {
     const queryClient = criarQueryClientDoServidor()
 
-    await tentarPrefetch((signal) =>
+    await tentarPrefetch(queryClient, (signal) =>
         queryClient.prefetchQuery(queryDoDashboard(clienteComSinal(apiServer, signal))),
     )
 

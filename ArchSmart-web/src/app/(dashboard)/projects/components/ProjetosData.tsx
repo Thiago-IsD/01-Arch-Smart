@@ -22,7 +22,7 @@ export async function ProjetosData() {
     const queryClient = criarQueryClientDoServidor()
 
     const [, me] = await Promise.all([
-        tentarPrefetch((signal) =>
+        tentarPrefetch(queryClient, (signal) =>
             queryClient.prefetchQuery(queryDaListaDeProjetos(clienteComSinal(apiServer, signal))),
         ),
         apiServer<Me>("/api/users/me").catch(() => undefined),

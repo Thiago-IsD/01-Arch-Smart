@@ -25,7 +25,7 @@ import { ProjetoContent } from "./ProjetoContent"
 export async function ProjetoData({ id }: { id: string }) {
     const queryClient = criarQueryClientDoServidor()
 
-    await tentarPrefetch((signal) => {
+    await tentarPrefetch(queryClient, (signal) => {
         const cliente = clienteComSinal(apiServer, signal)
         return Promise.all([
             queryClient.prefetchQuery(queryDoProjeto(cliente, id)),

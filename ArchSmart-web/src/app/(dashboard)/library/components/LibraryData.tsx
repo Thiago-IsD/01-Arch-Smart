@@ -35,12 +35,12 @@ export async function LibraryData({ filtros }: { filtros: FiltrosDeProduto }) {
     // serie elas somariam latencia dentro do <Suspense> — o oposto do que a
     // ADR 0009 buscava.
     await Promise.all([
-        tentarPrefetch((signal) =>
+        tentarPrefetch(queryClient, (signal) =>
             queryClient.prefetchQuery(
                 queryDaListaDeProdutos(clienteComSinal(apiServer, signal), filtros),
             ),
         ),
-        tentarPrefetch((signal) =>
+        tentarPrefetch(queryClient, (signal) =>
             queryClient.prefetchQuery(queryDoBadgeDoInbox(clienteComSinal(apiServer, signal))),
         ),
     ])

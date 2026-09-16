@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query"
+import type { Query } from "@tanstack/react-query"
 
 import type { ClienteApi } from "@/lib/api/core"
 
@@ -34,25 +35,53 @@ export const TIMEOUT_DO_PREFETCH_MS = 3_000
 
 /**
  * `tarefa` recebe o `AbortSignal` do teto e tem que repassa-lo ate o `fetch`
- * (via `apiServer`). Sem isso o teto so para de *esperar* — a chamada
- * continua correndo no servidor, sem ninguem escutando, ate a API responder
- * (ate ~42 s num cold start) ou a plataforma cortar a conexao sozinha. Contra
- * um free tier onde o timeout e o caso esperado, e nao o raro, essa conexao
- * pendurada e o custo real do atalho de so "desistir de esperar".
+ * (via `clienteComSinal`). Sem isso o teto so para de *esperar* — a chamada
+ * continua correndo no servidor ate a API responder (ate ~42 s num cold start).
+ *
+ * ## Por que recebe o `queryClient`
+ *
+ * `prefetchQuery` NUNCA rejeita: o erro da `queryFn` fica no estado da query.
+ * Ate 15/09/2026 esta funcao so tinha um `catch`, que portanto nunca rodava —
+ * prefetch que desistia era invisivel no log do servidor, nas quatro telas
+ * (item 9 do bloco do Dashboard no CLAUDE.md). Agora ela olha o estado das
+ * queries que a TAREFA tocou e avisa as que nao terminaram em sucesso.
+ *
+ * "Que a tarefa tocou" = as que nao existiam ou mudaram de `dataUpdatedAt`/
+ * `errorUpdatedAt` durante a chamada. Um QueryClient de servidor nasce vazio
+ * por requisicao, entao na pratica sao todas; o filtro existe para a funcao
+ * nao mentir se um dia receber um cliente com historico.
  */
 export async function tentarPrefetch(
+    queryClient: QueryClient,
     tarefa: (signal: AbortSignal) => Promise<unknown>,
 ): Promise<void> {
+    const cache = queryClient.getQueryCache()
+    const antes = new Map(
+        cache.getAll().map((q) => [q.queryHash, `${q.state.dataUpdatedAt}:${q.state.errorUpdatedAt}`]),
+    )
+    const tocada = (q: Query) => antes.get(q.queryHash) !== `${q.state.dataUpdatedAt}:${q.state.errorUpdatedAt}`
+
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), TIMEOUT_DO_PREFETCH_MS)
     try {
         await tarefa(controller.signal)
     } catch (erro) {
-        // Prefetch e otimizacao, nao contrato: falhar aqui degrada para busca
-        // no cliente, e a tela funciona igual. Engolir e deliberado.
+        // Tarefa que nao e `prefetchQuery` pode rejeitar de verdade. Prefetch
+        // e otimizacao, nao contrato: degrada para busca no cliente.
         console.warn("[prefetch] desistiu, o cliente vai buscar:", erro)
+        return
     } finally {
         clearTimeout(timer)
+    }
+
+    for (const query of cache.getAll()) {
+        if (tocada(query) && query.state.status !== "success") {
+            console.warn(
+                "[prefetch] desistiu, o cliente vai buscar:",
+                JSON.stringify(query.queryKey),
+                query.state.error,
+            )
+        }
     }
 }
 
