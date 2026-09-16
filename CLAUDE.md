@@ -885,12 +885,22 @@ em [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
    Confirmado ao vivo: `fetch(location.href, {credentials:"include"}).then(r=>r.status)` → `200`.
 
 4. **`GET /api/projects/{id}` calcula `custom_installments` e o Pydantic
-   descarta o campo na serialização — código morto, sem teste.**
+   descarta o campo na serialização — e isso quebra a edição de um projeto com
+   recebimento Personalizado, não é só limpeza de backend.**
    `ArchSmart-api/app/api/endpoints/projects.py:98-106` (`get_project_by_id`)
    faz `setattr` num atributo que `ProjectResponse` não declara; o Pydantic
-   descarta silenciosamente na resposta. Achado da Tarefa 3, registrado para
-   esta tarefa (não é defeito dela) e não consertado — é limpeza de backend,
-   fora do escopo de arquivos desta migração.
+   descarta silenciosamente na resposta, então `initialData.custom_installments`
+   chega `undefined` no front. `ProjectWizard.tsx` cai no `|| []`
+   (`custom_installments: initialData.custom_installments || []`), e o schema
+   do wizard (`project-wizard/schema.ts`) exige, para `payment_method ===
+   "CUSTOM"`, que a soma das parcelas bata com `service_value` — com o
+   cronograma vazio a soma é zero. **Efeito no usuário: abrir "Editar Dados" num
+   projeto com recebimento Personalizado traz o cronograma vazio, e salvar
+   reprova com "A soma das parcelas deve ser igual ao Valor Fechado do
+   Serviço.", apontando para um campo que a própria tela zerou.** Achado da
+   Tarefa 3, registrado para esta tarefa (não é defeito dela) e não
+   consertado — corrigir muda contrato de API (`ProjectResponse` precisaria
+   declarar o campo), fora do escopo de arquivos desta migração.
 
 5. **`texto_sobre_fundo_reprovado` (a medida nova da Tarefa 10) tem furos
    conhecidos, escritos no próprio docstring da régua — não mede:**
