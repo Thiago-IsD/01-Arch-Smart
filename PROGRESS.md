@@ -1066,10 +1066,9 @@ _Última atualização: 2026-09-16_
 
 > ## Projetos, 16/09/2026 — a terceira tela
 >
-> Branch `secao-8-projetos`, 12 tarefas. Merge em `develop` e PR `develop` →
-> `staging`: fora do escopo desta nota — ainda não aconteceram no momento em
-> que ela foi escrita, então nenhum hash é citado aqui; quem completar o
-> merge acrescenta os hashes depois. Spec em
+> Branch `secao-8-projetos`, 12 tarefas, 32 commits. **Merge `b04a015` em
+> `develop`**, em 16/09/2026, logo depois da verificação humana; o PR
+> `develop` → `staging` saiu na sequência. Spec em
 > [`docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md`](docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md),
 > doc do módulo com os números em
 > [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
