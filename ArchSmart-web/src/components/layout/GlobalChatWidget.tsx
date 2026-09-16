@@ -44,9 +44,11 @@ export function GlobalChatWidget() {
     };
 
     return (
-        <>
+        <aside aria-label="Assistente Arq Smart">
             {/* Chat Window */}
             <Card
+                data-chat-janela
+                inert={!isOpen}
                 className={`fixed z-50 shadow-2xl border-border flex flex-col transition-all duration-300 ease-in-out
                     ${isOpen
                         ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -60,7 +62,7 @@ export function GlobalChatWidget() {
                     <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8 bg-primary">
                             <AvatarFallback className="bg-primary text-primary-foreground">
-                                <Bot className="h-4 w-4" />
+                                <Bot className="h-4 w-4" aria-hidden="true" />
                             </AvatarFallback>
                         </Avatar>
                         <div>
@@ -74,9 +76,10 @@ export function GlobalChatWidget() {
                         variant="ghost"
                         size="icon"
                         onClick={() => setIsOpen(false)}
+                        aria-label="Fechar assistente"
                         className="h-8 w-8 rounded-full hover:bg-accent"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" aria-hidden="true" />
                     </Button>
                 </CardHeader>
 
@@ -154,9 +157,10 @@ export function GlobalChatWidget() {
                             size="icon"
                             onClick={handleSend}
                             disabled={!inputValue.trim()}
+                            aria-label="Enviar mensagem"
                             className="shrink-0"
                         >
-                            <SendHorizontal className="h-4 w-4" />
+                            <SendHorizontal className="h-4 w-4" aria-hidden="true" />
                         </Button>
                     </div>
                 </CardFooter>
@@ -165,12 +169,14 @@ export function GlobalChatWidget() {
             {/* Floating Button */}
             <Button
                 onClick={() => setIsOpen(!isOpen)}
+                aria-label="Abrir assistente"
+                inert={isOpen}
                 className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 ${isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100"
                     }`}
                 size="icon"
             >
-                <MessageCircle className="h-6 w-6" />
+                <MessageCircle className="h-6 w-6" aria-hidden="true" />
             </Button>
-        </>
+        </aside>
     );
 }
