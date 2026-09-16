@@ -11,9 +11,9 @@ Antes de escrever qualquer código:
 
 **Código em área ainda não migrada segue o padrão antigo até a tarefa dela chegar.** Nunca migre uma área "de passagem": isso mistura mudanças, quebra a medição de desempenho e torna impossível saber o que causou uma regressão.
 
-Estado em 15/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8: a fundação e a primeira tela concluídas e mergeadas até `staging`, 1/9** — 10 tarefas, 37 commits, merge `b08be29` em `develop` e PR #9 `develop` → `staging` (merge `a4bdf56`, 12/09/2026), com os **cinco** checks verdes e o PR em `MERGEABLE / CLEAN`. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que roda **sob demanda** (`workflow_dispatch`, em `.github/workflows/e2e.yml`) e não no gatilho de PR, porque nasceria e permaneceria vermelho — ver "Portões de CI" para a razão e a condição de promoção. ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. ✅ **A parede caiu em 12/09/2026 e as medições rodaram** (Thiago corrigiu a credencial, que tinha um caractere sobrando; verificada antes de medir: `HTTP 200`, token, e-mail confirmado). O orçamento de performance **foi medido**: mediana da Biblioteca de **1415 ms** (`AMOSTRAS=1390,1403,1415,1418,1422`) contra os 1454 ms de **antes** da Seção 8 — **ausência de regressão**, não ganho reivindicado. O `telemetria-biblioteca.spec.ts`, que nunca havia rodado, **passou** (3/3), e `product_events` — que estava com **0 linhas** — recebeu as primeiras linhas do protocolo novo: `medido_ate=dados`, `medido_de=clique`, `is_empty=false`, `load_ms` de mediana **1068 ms**, mesma ordem de grandeza do E2E. **O `load_ms` virou dado utilizável** e a pendência 2 da Seção 7 fechou. O P95 de `/api/products` **estoura o orçamento** (634 ms contra 400 ms) e a causa **não é a query**, que custa 17 ms. ⚠️ **A atribuição que eu publiquei em 12/09 estava errada, e a medição de 13/09 a desmentiu:** eu disse que a causa era o JWT — staging assina em ES256, a API valida em HS256, e toda requisição autenticada paga uma ida remota. O diagnóstico está certo, o **tamanho** não: isolando com um token inválido, essa ida custa **~0,28 s**, enquanto uma requisição autenticada custa **~2,3 s** na API implantada — e duas rotas que fazem trabalhos diferentes custam o mesmo, então o custo está no **caminho compartilhado** e ninguém mediu onde. Consertar só o JWT recuperaria um oitavo e deixaria a rota a cinco vezes do orçamento. **A tarefa é medir primeiro**, e ela é a primeira caixa da Seção 8 no `PROGRESS.md`, antes do Dashboard: [`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md). ✅ **Essa medição rodou em 13/09/2026 e o "onde" tem número: distância × idas ao banco.** Uma ida ao banco custa **0,17 s** a partir do contêiner, contra **0,016 s** deste notebook para o mesmo pooler; a chamada da Biblioteca gasta **11 idas** (8 consultas + 3 de protocolo: pre-ping, `BEGIN`, `ROLLBACK`), das quais **2 consultas** são o caminho compartilhado. O JWT remoto mede **0,240 s** — não os ~420 ms que eu tinha estimado — e vale 12%; o `307` custa **0,29 s** e a Biblioteca o paga **duas vezes**; a **CPU do free tier não é o gargalo** (oito requisições pesadas em paralelo terminam em 4,11 s, não em ~24 s). Modelo que ajusta as três séries: `0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`. ✅ **Quatro correções entraram e foram medidas na API implantada em 14/09/2026** (PR #10, merge `057085a`): barra final nas duas rotas que a exigem, `joinedload` de `state`/`origin` na lista, usuário e entitlements numa consulta só, e validação local do ES256 por JWKS. A chamada da Biblioteca saiu de **8 consultas para 3** e de **2,29 s para 1,175 s** — queda de **48%** —, e a tela foi de 1415 ms para **992 ms** no arranjo da Seção 8. ⚠️ **O orçamento continua estourado: P95 de 1613 ms contra 400 ms**, quatro vezes acima (era ~5,7×). O que sobra são 6 idas ao banco a 0,17 s cada, e **isso é distância, não código** — o Render não tem região na América do Sul nem troca a região de um serviço existente. **A escolha entre as três saídas é de Thiago**, e está na tabela "As saídas" do arquivo de medição. ✅ **Seção 8: o Dashboard concluído, mergeado até `staging` e medido — 2/9 telas.** Branch `secao-8-dashboard`, 15 commits, merge `b07aaa0` em `develop` e PR #11 `develop` → `staging` (merge `f912096`, 15/09/2026), com os três checks verdes. A tela saiu do padrão antigo (a Seção 6 só a tinha quebrado em arquivos) para o da Biblioteca, faz **uma requisição e 5 consultas** (o card de limite lê `plan_limit` de `/api/dashboard/lean`, exceção escrita à regra da Seção 5), e o prefetch pareado passou a ser **fábrica `queryOptions`** — a Biblioteca migrou junto. `/api/dashboard/lean` caiu de 8 para 5 consultas e `/api/users/me` de 5 para 3. **Medido em 15/09/2026 contra a API implantada:** `lean` com P50 **1516 ms** e P95 **1915 ms** (era ~2,05 s); clique → dados de **972 ms** no arranjo local da Seção 8; `load_ms` de clique **546 ms**. ⚠️ **O orçamento de API fica registrado, não atingido** (decisão 1 da spec do Dashboard: estoura por distância), e axe, teclado e 390/1440px foram **medidos por agente, não por olho humano**. Números, comandos e a definição de pronto item a item em [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md). Os três itens de olho humano **continuam abertos**. Números e comandos em [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **A metade backend foi verificada de fora em 12/09/2026, depois do merge**, contra `https://arqsmart-staging.onrender.com`: `/health` → `200`, `/health/db` → `{"status":"ok","db":"up"}`, `openapi.json` com **58 rotas** (a Seção 8 não acrescentou rota nem migração — `alembic heads` continua em `170b12223b9b`, 31 migrações), e `POST /api/telemetry/events` sem token → `422`, igual ao que a Seção 7 mediu. ⚠️ **Isso NÃO prova que a chave nova do rate limit está servindo**, e a razão é a própria descoberta da Tarefa 4: o `@limiter.limit` roda **depois** de o FastAPI resolver `Depends(get_repo)`, então requisição sem token válido morre antes de a função de chave ser chamada — a mudança não é observável de fora sem sessão. **A metade frontend continua não verificada de fora**, como nas Seções 5, 6 e 7.
+Estado em 15/09/2026: Seção 1 concluída (correções de segurança, merge `f190a07`). Seção 2 concluída (estrutura e documentação, merge `f167375`). Seção 3 concluída (esteira, ambientes e branches, 5/5). **Seção 4 concluída, mergeada e implantada em staging** — camada de dados do backend, 9/9, merge `f963fb6` em `develop` e PR #5 `develop` → `staging`. **Seção 5 concluída e mergeada até `staging`** — camada de dados do frontend, 8/8, merge `6e94d63` em `develop` e PR #6 `develop` → `staging` (merge `ce1012e`, 07/09/2026), com os três jobs de CI verdes. **O portão de tempo daquela seção estava ABERTO e foi FECHADO em 10/09/2026**, na Tarefa 1 da Seção 6: o que faltava era credencial de usuário de teste, e a tarefa criou o usuário dedicado em staging e rodou o Playwright — mediana de **1454 ms** (`AMOSTRAS=1434,1445,1454,1469,1948`), mais a verificação viva de que a lista da Biblioteca hidrata sem requisição do navegador. O "antes" continua **não medido** — o código anterior à Seção 5 não existe em nenhuma branch viva —, então a comparação é contra a referência externa de agosto (3,6 s), rotulada como tal; ver a nota da Seção 5 em `PROGRESS.md` e [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **Seção 6 concluída e mergeada até `staging`** — camada de UI, 9/9, merge `0ac71d9` em `develop` e PR #7 `develop` → `staging` (merge `5dbd13f`, 10/09/2026). O que ela entregou está em [`docs/dev/componentes.md`](docs/dev/componentes.md), que é a referência a ler **antes** de construir tela nova. Como na Seção 5, "mergeada até staging" não quer dizer verificada de fora: a Deployment Protection da Vercel continua escondendo o conteúdo, e **ninguém abriu as telas para confirmar que o build servido é o da Seção 6**. **Seção 7 concluída e mergeada até `staging`** — telemetria de produto e custo de IA, merge `c40089b` em `develop` e PR #8 `develop` → `staging` (merge `3586319`, 11/09/2026), com os três jobs de CI verdes e o PR em `MERGEABLE / CLEAN`. Foram **4 de 5 tarefas**, não 5 de 5: a Tarefa 1 (verificação visual do que a Seção 6 mudou) ficou bloqueada, porque toda rota da aplicação exige sessão — inclusive a galeria `/dev/componentes` — e a senha do usuário de teste E2E é deliberadamente não versionada; a mesma parede bloqueou a prova viva da Tarefa 5, então **nenhuma navegação real confirmou ainda que um `screen_viewed` chega ao banco**, e o `load_ms` que a seção gravava **não era dado utilizável** (ver a pendência 2 mais abaixo, e a correção datada na decisão 5 da spec) — **isso mudou na Seção 8**, que trocou o gatilho: a tela passou a declarar prontidão em vez de a telemetria inferir, e o rótulo passou a dizer o que foi medido. Ver a nota da Seção 7 em `PROGRESS.md` para os números medidos e os três defeitos que a execução encontrou no próprio plano. **Seção 8: a fundação e a primeira tela concluídas e mergeadas até `staging`, 1/9** — 10 tarefas, 37 commits, merge `b08be29` em `develop` e PR #9 `develop` → `staging` (merge `a4bdf56`, 12/09/2026), com os **cinco** checks verdes e o PR em `MERGEABLE / CLEAN`. A seção migrou **a Biblioteca**, que é o piloto de onde as outras oito telas copiam; as oito continuam no padrão antigo de propósito. A fundação que elas herdam: a tela **declara prontidão** e a telemetria parou de inferir (`QueryBoundary` anuncia e reporta; `medido_ate` tem cinco valores, mais `medido_de` e `principal_declarada`), os eventos saem **em lote** com `keepalive`, o balde do rate limit virou **por conta**, sobrou **um** `FormField` (o do react-hook-form), e quatro furos da catraca foram tapados antes de medir tela. **O CI ganhou um quarto job** (`E2E — Playwright contra staging`), que roda **sob demanda** (`workflow_dispatch`, em `.github/workflows/e2e.yml`) e não no gatilho de PR, porque nasceria e permaneceria vermelho — ver "Portões de CI" para a razão e a condição de promoção. ⚠️ **A tela fechou com três dos nove itens da definição de pronto NÃO verificados** — axe em navegador, navegação por teclado, e as larguras de 390px/1440px —, mais o orçamento de performance não medido, porque **a credencial do usuário de teste E2E passou a ser rejeitada pelo Supabase de staging** (`HTTP 400, "Invalid login credentials"`, 11/09/2026). Nenhum número foi estimado no lugar; a nota da Seção 8 em `PROGRESS.md` e [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) têm o comando de cada medição que falta. ✅ **A parede caiu em 12/09/2026 e as medições rodaram** (Thiago corrigiu a credencial, que tinha um caractere sobrando; verificada antes de medir: `HTTP 200`, token, e-mail confirmado). O orçamento de performance **foi medido**: mediana da Biblioteca de **1415 ms** (`AMOSTRAS=1390,1403,1415,1418,1422`) contra os 1454 ms de **antes** da Seção 8 — **ausência de regressão**, não ganho reivindicado. O `telemetria-biblioteca.spec.ts`, que nunca havia rodado, **passou** (3/3), e `product_events` — que estava com **0 linhas** — recebeu as primeiras linhas do protocolo novo: `medido_ate=dados`, `medido_de=clique`, `is_empty=false`, `load_ms` de mediana **1068 ms**, mesma ordem de grandeza do E2E. **O `load_ms` virou dado utilizável** e a pendência 2 da Seção 7 fechou. O P95 de `/api/products` **estoura o orçamento** (634 ms contra 400 ms) e a causa **não é a query**, que custa 17 ms. ⚠️ **A atribuição que eu publiquei em 12/09 estava errada, e a medição de 13/09 a desmentiu:** eu disse que a causa era o JWT — staging assina em ES256, a API valida em HS256, e toda requisição autenticada paga uma ida remota. O diagnóstico está certo, o **tamanho** não: isolando com um token inválido, essa ida custa **~0,28 s**, enquanto uma requisição autenticada custa **~2,3 s** na API implantada — e duas rotas que fazem trabalhos diferentes custam o mesmo, então o custo está no **caminho compartilhado** e ninguém mediu onde. Consertar só o JWT recuperaria um oitavo e deixaria a rota a cinco vezes do orçamento. **A tarefa é medir primeiro**, e ela é a primeira caixa da Seção 8 no `PROGRESS.md`, antes do Dashboard: [`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md). ✅ **Essa medição rodou em 13/09/2026 e o "onde" tem número: distância × idas ao banco.** Uma ida ao banco custa **0,17 s** a partir do contêiner, contra **0,016 s** deste notebook para o mesmo pooler; a chamada da Biblioteca gasta **11 idas** (8 consultas + 3 de protocolo: pre-ping, `BEGIN`, `ROLLBACK`), das quais **2 consultas** são o caminho compartilhado. O JWT remoto mede **0,240 s** — não os ~420 ms que eu tinha estimado — e vale 12%; o `307` custa **0,29 s** e a Biblioteca o paga **duas vezes**; a **CPU do free tier não é o gargalo** (oito requisições pesadas em paralelo terminam em 4,11 s, não em ~24 s). Modelo que ajusta as três séries: `0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`. ✅ **Quatro correções entraram e foram medidas na API implantada em 14/09/2026** (PR #10, merge `057085a`): barra final nas duas rotas que a exigem, `joinedload` de `state`/`origin` na lista, usuário e entitlements numa consulta só, e validação local do ES256 por JWKS. A chamada da Biblioteca saiu de **8 consultas para 3** e de **2,29 s para 1,175 s** — queda de **48%** —, e a tela foi de 1415 ms para **992 ms** no arranjo da Seção 8. ⚠️ **O orçamento continua estourado: P95 de 1613 ms contra 400 ms**, quatro vezes acima (era ~5,7×). O que sobra são 6 idas ao banco a 0,17 s cada, e **isso é distância, não código** — o Render não tem região na América do Sul nem troca a região de um serviço existente. **A escolha entre as três saídas é de Thiago**, e está na tabela "As saídas" do arquivo de medição. ✅ **Seção 8: o Dashboard concluído, mergeado até `staging` e medido — 2/9 telas.** Branch `secao-8-dashboard`, 15 commits, merge `b07aaa0` em `develop` e PR #11 `develop` → `staging` (merge `f912096`, 15/09/2026), com os três checks verdes. A tela saiu do padrão antigo (a Seção 6 só a tinha quebrado em arquivos) para o da Biblioteca, faz **uma requisição e 5 consultas** (o card de limite lê `plan_limit` de `/api/dashboard/lean`, exceção escrita à regra da Seção 5), e o prefetch pareado passou a ser **fábrica `queryOptions`** — a Biblioteca migrou junto. `/api/dashboard/lean` caiu de 8 para 5 consultas e `/api/users/me` de 5 para 3. **Medido em 15/09/2026 contra a API implantada:** `lean` com P50 **1516 ms** e P95 **1915 ms** (era ~2,05 s); clique → dados de **972 ms** no arranjo local da Seção 8; `load_ms` de clique **546 ms**. ⚠️ **O orçamento de API fica registrado, não atingido** (decisão 1 da spec do Dashboard: estoura por distância), e axe, teclado e 390/1440px foram **medidos por agente, não por olho humano**. Números, comandos e a definição de pronto item a item em [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md). Os três itens de olho humano **continuam abertos**. Números e comandos em [`docs/dev/medicoes/2026-09-06-biblioteca-depois.md`](docs/dev/medicoes/2026-09-06-biblioteca-depois.md). **A metade backend foi verificada de fora em 12/09/2026, depois do merge**, contra `https://arqsmart-staging.onrender.com`: `/health` → `200`, `/health/db` → `{"status":"ok","db":"up"}`, `openapi.json` com **58 rotas** (a Seção 8 não acrescentou rota nem migração — `alembic heads` continua em `170b12223b9b`, 31 migrações), e `POST /api/telemetry/events` sem token → `422`, igual ao que a Seção 7 mediu. ⚠️ **Isso NÃO prova que a chave nova do rate limit está servindo**, e a razão é a própria descoberta da Tarefa 4: o `@limiter.limit` roda **depois** de o FastAPI resolver `Depends(get_repo)`, então requisição sem token válido morre antes de a função de chave ser chamada — a mudança não é observável de fora sem sessão. **A metade frontend continua não verificada de fora**, como nas Seções 5, 6 e 7. ⏳ **Seção 8: Projetos (lista + detalhe) implementada na branch `secao-8-projetos` (12 tarefas), e PARADA antes do merge para a verificação humana da decisão 7 daquela spec — ainda não é 3/9, porque a caixa só marca quando a resposta de Thiago chegar.** `/api/projects` saiu de 43 para **5** consultas (constante 1–20 projetos, reconfirmado ao vivo contra staging na Tarefa 12); a lista e o detalhe migraram para `QueryBoundary`/prefetch/`HydrationBoundary`; as sete mutações (quatro de projeto, três de ambiente/DNA) viraram `useMutation` com mapa explícito de invalidação, incluindo `dashboard.all`. **Medido no arranjo local da Tarefa 12:** clique → dados **921 ms** (< 1,5 s ✅ neste arranjo); LCP **952 ms**/JS 466888 bytes (era 1308 ms/358129, "antes" nunca medido até esta seção); `load_ms` de clique **521 ms** (n=8), de commit **206 ms** (n=25). **P95 da API implantada não foi medido** — depende do deploy, que vem depois desta parada. ⚠️ **Achado novo na passada por agente: `/projects/{id}` estoura 203px em 390px** (a lista não estoura) — causa isolada no shell (`Header.tsx`, breadcrumb + data não encolhem), registrado e não corrigido. axe, teclado e 390/1440px foram, de novo, **medidos por agente, não por olho humano** — e é exatamente essa lacuna que a parada da Tarefa 12 pede para fechar antes do merge. Lista de verificação e o que falta responder em `.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md`. Números completos em [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md) e [`docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md`](docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md).
 
-**A próxima tela é Projetos (lista + detalhe)**, a terceira da tabela da Seção 8 em [`docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md`](docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md). O padrão a copiar está em [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md) (o mais recente, com as fábricas `queryOptions`), [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) e [`docs/dev/componentes.md`](docs/dev/componentes.md). **Leia antes os blocos "O que o Dashboard (Seção 8) deixou em aberto" e "O que a Biblioteca (Seção 8) deixou em aberto"** mais abaixo: eles têm os itens que o plano de Projetos precisa pôr como tarefa ou recusar por escrito — e Projetos herda dois débitos medidos (o N+1 de `/api/projects` e o prefetch de `/api/users/me` fora das fábricas). A caixa **"Custo da requisição autenticada"** continua aberta no `PROGRESS.md`: a decisão sobre a distância foi carregada adiante, não tomada. Seção 9 pendente. Produção ainda não recebeu: `main` está na Seção 3.
+**A tela seguinte, depois de Projetos fechar (merge + deploy), é Orçamento**, a quarta da tabela da Seção 8 em [`docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md`](docs/superpowers/specs/2026-08-23-reestruturacao-arq-smart-design.md). O padrão a copiar está em [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md) (o mais recente), [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md), [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) e [`docs/dev/componentes.md`](docs/dev/componentes.md). **Leia antes os blocos "O que Projetos (Seção 8) deixou em aberto", "O que o Dashboard (Seção 8) deixou em aberto" e "O que a Biblioteca (Seção 8) deixou em aberto"** mais abaixo: eles têm os itens que o plano de Orçamento precisa pôr como tarefa ou recusar por escrito — Orçamento e Apresentação são, em especial, quem herda a condição de saída do `router.refresh()` que sete mutações de Projetos carregam. A caixa **"Custo da requisição autenticada"** continua aberta no `PROGRESS.md`: a decisão sobre a distância foi carregada adiante, não tomada. Seção 9 pendente. Produção ainda não recebeu: `main` está na Seção 3.
 
 > ✅ **A ordem acima ("depois dela, o Dashboard") deu a entender que o Dashboard esperaria a decisão do conserto — não esperou, e a decisão de não esperar foi tomada, não pulada.** Em 14/09/2026, por escrito, Thiago **carregou adiante** a decisão sobre o custo da requisição autenticada (decisão 1 de [`docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md`](docs/superpowers/specs/2026-09-14-secao-8-dashboard-design.md)), e o Dashboard migrou nessa mesma data. O que isso muda: o item "Orçamento de performance atingido" da definição de pronto do Dashboard **não é marcado como atingido** — é registrado com o número, o comando, e a frase "estoura por distância (0,17 s × idas ao banco), não pela tela". O alvo de queries por carregamento continua valendo inteiro, porque não depende da distância.
 
@@ -676,9 +676,15 @@ as oito telas seguintes, não só a Biblioteca.
 
 Mesmo padrão dos blocos acima, e a mesma regra: **nenhuma destas é para um
 agente decidir sozinho.** Quem escrever o plano de Projetos põe cada uma como
-tarefa ou registra por escrito a decisão de não pôr. Os itens **4, 6, 7, 8, 9 e
-11** do bloco da Biblioteca, acima, **continuam abertos** e entram na mesma
-conta; os itens 2, 3 e 5 de lá estão só parcialmente endereçados.
+tarefa ou registra por escrito a decisão de não pôr. Os itens **4, 6, 7, 8 e
+9** do bloco da Biblioteca, acima, **continuam abertos** e entram na mesma
+conta; os itens 2, 3 e 5 de lá estão só parcialmente endereçados. **O item 11
+da Biblioteca (`QueryBoundary` com query desabilitada) fechou em 15/09/2026,
+na Tarefa 8 da migração de Projetos** (commit `79ac4dc`): o boundary ganhou o
+mínimo — não anuncia à telemetria quando a query está `enabled: false` — sem
+ainda desenhar a API para o caso (um prop explícito tipo `inativo`); isso
+ficou registrado como item aberto de Projetos, não mais da Biblioteca (ver o
+bloco "Projetos deixou em aberto", abaixo).
 
 Os números e os comandos de cada item estão em
 [`docs/dev/modulos/dashboard.md`](docs/dev/modulos/dashboard.md) e em
@@ -692,25 +698,46 @@ Os números e os comandos de cada item estão em
    [`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md).
    **É decisão de Thiago**; a caixa dela no `PROGRESS.md` segue aberta.
 
-2. **O token `destructive` reprova como texto no tema escuro: 2,00:1** (piso
-   3:1 para texto grande). Por isso `FinancialMetricCards.tsx` mantém **duas**
-   classes `text-red-*` de propósito, comentadas, nos valores de saldo negativo
-   e despesas. O mesmo token é usado em **ícones** a ~2:1 (`DashboardComErro`,
-   os chips de despesa e saldo negativo). Consertar é mexer no token em
-   `globals.css` — **decisão de design**, e a catraca `contraste_reprovado` não vê
-   token de texto sobre `--background`.
+2. ~~**O token `destructive` reprova como texto no tema escuro: 2,00:1**~~
+   **Fechada em 15/09/2026, na Tarefa 10 da migração de Projetos (commits
+   `c24c9f7`, `909ea2f`).** Decisão 5 daquela spec: um token por tema, com
+   foreground invertido no escuro (claro `0 84.2% 40%` + fg `210 40% 98%` →
+   **6,23:1**; escuro `0 84.2% 60%` + fg `222.2 84% 4.9%` → **5,29:1**), e a
+   catraca ganhou a medida que faltava — `texto_sobre_fundo_reprovado`, token de
+   texto sobre `--background` — no mesmo commit que a corrigiu, com teste. As
+   duas `text-red-*` de `FinancialMetricCards.tsx` saíram. Custo aceito, por
+   escrito: no tema escuro o botão destrutivo passa a ter texto **escuro** sobre
+   vermelho claro — entrou na verificação humana da Tarefa 12 (item 1 da lista).
+   `contraste_reprovado` caiu de 4 para 3; `texto_sobre_fundo_reprovado` nasceu
+   em 4 e está em **1** hoje (`claro:secondary`, o coral da marca — item 3
+   abaixo, que continua aberto). O texto original: O token `destructive`
+   reprovava como texto no tema escuro (2,00:1, piso 3:1 para texto grande), e
+   por isso `FinancialMetricCards.tsx` mantinha duas classes `text-red-*` de
+   propósito, comentadas, nos valores de saldo negativo e despesas.
 
 3. **O par `secondary`/`secondary-foreground` mede 3,93:1** no botão "Entrar" de
    compromisso (`UpcomingEventsColumn.tsx:58`). É o coral da marca, já contado
    em `contraste_reprovado`. O axe não o viu porque a conta de teste não tem
    compromisso.
 
-4. **O shell tem violações de acessibilidade que valem para todas as telas**:
-   `button-name` no menu do usuário do `Header` (5 nós, impacto **crítico**),
-   **3 paradas de Tab invisíveis**, `region` (6 nós, `NotificationPanel` e o
-   widget de chat) e o contraste do item ativo da `Sidebar` (4,17:1). Nada disso
-   é da tela Dashboard, e por isso não foi consertado nela. **Consertar o shell
-   é tarefa própria** — ou do plano de Projetos, ou recusada por escrito.
+4. ~~**O shell tem violações de acessibilidade que valem para todas as
+   telas**~~ **Fechada em 15/09/2026, na Tarefa 11 da migração de Projetos
+   (commit `45fd072`).** `button-name` e `region` (o menu do usuário do
+   `Header` e o `NotificationPanel`/chat) somem nas 8 combinações medidas; as
+   **3 paradas de Tab invisíveis** somem (40 Tabs, sem nenhuma); o contraste do
+   item ativo da `Sidebar` foi resolvido com nome acessível, landmarks e
+   `inert` no que está fechado, mais borda/peso/`aria-current` em vez de só
+   cor. **`/dashboard` fica sem violação nenhuma de axe** depois do conserto;
+   `/projects` mantém `color-contrast`(6) e `page-has-heading-one`(1), que são
+   **da própria tela**, não do shell. `tabindex_negativo` continua em 3 — o
+   conserto usou `inert`, não `tabIndex`. Dois minors registrados e não
+   corrigidos: ícones das bolhas do chat sem `aria-hidden`, e `MobileSidebar`
+   ganhou `aria-current` além da troca de cor (ver o bloco "Projetos deixou em
+   aberto", abaixo). O texto original: O shell tinha violações de
+   acessibilidade que valiam para todas as telas — `button-name` no menu do
+   usuário do `Header` (5 nós, impacto crítico), 3 paradas de Tab invisíveis,
+   `region` (6 nós, `NotificationPanel` e o widget de chat) e o contraste do
+   item ativo da `Sidebar` (4,17:1).
 
 5. **A Biblioteca estoura 42px em 390px**, nos dois temas. A causa foi isolada
    por experimento de DOM: o `p-8` da raiz de `library/page.tsx:14` somado à
@@ -722,47 +749,237 @@ Os números e os comandos de cada item estão em
    `account.plan_name` em `/api/users/me`, que o Dashboard deixou de chamar;
    consertar exige decidir se `lean` passa a devolver o nome.
 
-7. **Nenhuma mutação invalida `queryKeys.dashboard.all`.** Criar projeto,
-   lançamento ou evento em outra tela deixa o Dashboard servindo cache por até
-   30 s (`cachePolicy.transacional`). **Projetos é a primeira tela que muta o
-   que o Dashboard mostra**, então a pergunta chega com ela.
+7. ~~**Nenhuma mutação invalida `queryKeys.dashboard.all`.**~~ **Fechada em
+   15/09/2026, na Tarefa 6 da migração de Projetos (commits `50af052`..`941ee6e`).**
+   As quatro mutações de projeto (criar, editar, mudar status, excluir)
+   invalidam `dashboard.all` no `onSuccess`, com o **conjunto exato** de chaves
+   por mutação afirmado em `src/__tests__/projects-mutacoes.test.tsx` — nem uma
+   chave a mais (custaria uma ida extra à API a 0,17 s), nem uma a menos
+   (deixaria o Dashboard mentindo). As três mutações de ambiente/DNA (Tarefa 7)
+   **não** invalidam `dashboard.all`, de propósito: o Dashboard não mostra
+   ambiente nem contagem de ambiente. O texto original: Nenhuma mutação
+   invalidava `queryKeys.dashboard.all` — criar projeto, lançamento ou evento em
+   outra tela deixava o Dashboard servindo cache por até 30 s.
 
    ```
-   grep -rn "invalidateQueries" ArchSmart-web/src --include=*.ts --include=*.tsx | grep dashboard   # 0
+   grep -rn "invalidateQueries" ArchSmart-web/src --include=*.ts --include=*.tsx | grep dashboard   # 4, hoje — as 4 mutacoes de projeto
    ```
 
-8. **Projetos herda dois débitos medidos.** `/api/projects` tem **N+1**: 12
-   consultas numa página de 5 projetos (`environments` e `clients` por linha,
-   medido em 13/09/2026), a 0,17 s cada na API implantada. E
-   `projects/page.tsx:47` prefetcha `/api/users/me` com `apiServer` direto, fora
-   das fábricas `queryOptions` — `features/account` **não tem `queries.ts`**, e
-   foi deixado assim de propósito para esta tela decidir.
+8. **Projetos herda dois débitos medidos — um fechado, um recusado por
+   escrito.** ~~`/api/projects` tem N+1~~ **fechado na Tarefa 2 da migração de
+   Projetos (commit `a2b4601`)**: 43 consultas numa lista de 20 projetos caíram
+   para **5**, constante entre 1 e 20 (`joinedload` do cliente + contagem de
+   ambientes por subconsulta agregada + `active_count` numa consulta própria),
+   travado por `tests/api/test_projetos_sem_n_mais_um.py` e reconfirmado ao
+   vivo contra staging na Tarefa 12 (`docs/dev/modulos/projects.md`, "Consultas
+   por carregamento"). **`/me` fora das fábricas continua — recusado por
+   escrito, decisão 2 da spec de Projetos**: `features/account/queries.ts` não
+   foi criado; a lista prefetcha `/api/projects` pela fábrica nova, mas
+   continua lendo `entitlements.project_limit` de `/me` com `apiServer` direto,
+   e "Plano Solo" continua fixo (ver o bloco "Projetos deixou em aberto",
+   abaixo). O texto original: `/api/projects` tinha N+1 — 12 consultas numa
+   página de 5 projetos — e `projects/page.tsx:47` prefetchava `/api/users/me`
+   com `apiServer` direto, fora das fábricas `queryOptions`.
 
-9. **Dois defeitos pré-existentes, registrados e não consertados.**
-   `tentarPrefetch` (`lib/query/hydration.ts`) nunca imprime o aviso de timeout,
-   porque `prefetchQuery` engole o erro — **prefetch que desiste é invisível no
-   log do servidor**, nas duas telas. E `ProjectsLimitCard.tsx:23` divide por
-   `planLimit`: um plano com limite 0 dá `NaN`.
+9. ~~**Dois defeitos pré-existentes, registrados e não consertados.**~~
+   **Fechados em 15/09/2026, na Tarefa 9 da migração de Projetos (commits
+   `8c61eb8`, `24fd072`).** `tentarPrefetch` agora lê o estado da query no
+   `QueryClient` depois do `prefetchQuery` e loga quando ela não resolveu, em
+   vez de depender de uma exceção que `prefetchQuery` engolia — com uma guarda
+   extra achada na execução: `fetchStatus === "fetching"` não conta como
+   desistência (uma query irmã ainda em voo no mesmo `QueryClient`, caso real
+   da Biblioteca com duas chamadas concorrentes, não pode ser confundida com
+   timeout). `ProjectsLimitCard.tsx` passou a usar `estadoDoLimite` de
+   `features/projects/limite.ts`, que trata limite `<= 0` como "no limite" sem
+   dividir — o `NaN` não existe mais nesse card. O texto original: `tentarPrefetch`
+   nunca imprimia o aviso de timeout, e `ProjectsLimitCard.tsx:23` dividia por
+   `planLimit`, dando `NaN` com limite 0.
 
 10. **`captura-visual-secao-6.spec.ts` não roda limpo.** O seletor `"Ações"`
     sem `exact` casa com o botão "Notificações", e o `closest` do toast pega o
     próprio botão. A captura da Seção 6 foi feita por script fora do
     repositório; o instrumento versionado continua com os dois defeitos.
 
-11. **LCP em 4G e JS da rota não têm instrumento.** São dois dos cinco alvos de
-    orçamento da spec-mãe, e nenhuma tela — nem a Biblioteca, nem o Dashboard —
-    tem número para eles.
+11. ~~**LCP em 4G e JS da rota não têm instrumento.**~~ **Fechada em
+    15/09/2026, na Tarefa 1 da migração de Projetos (commit `651f037`), com o
+    "depois" medido na Tarefa 12.** `e2e/medicao-carga.spec.ts` mede os dois
+    por CDP (perfil "Slow 4G" do Lighthouse) contra `next build && next start`,
+    e agora Biblioteca, Dashboard e Projetos têm "antes" **e** "depois":
+    `/library` 1048→1108 ms, `/dashboard` 1292→1180 ms, `/projects` 1308→952 ms
+    (a única das três que mudou de código nesta migração — as outras duas
+    mudaram só porque JS **compartilhado** cresceu, pelas Tarefas 9–11 da mesma
+    migração). Números completos em
+    [`docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md`](docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md).
+    O texto original: LCP em 4G e JS da rota não tinham instrumento — eram dois
+    dos cinco alvos de orçamento da spec-mãe sem número para nenhuma tela.
 
-12. **Nada da passada de navegador foi visto por olho humano.** axe, teclado e
-    390/1440px foram **medidos por agente** sobre captura e DOM; hierarquia,
-    ordem de leitura e perceptibilidade do anel seguem não verificadas. **A
-    decisão de Thiago é se alguém olha antes de a terceira tela entrar por cima.**
+12. **Nada da passada de navegador tinha sido visto por olho humano — a
+    Tarefa 12 da migração de Projetos executou a verificação que este item
+    pedia, e o resultado está pendente.** Decisão 7 daquela spec: a última
+    tarefa **para** antes do merge e entrega a Thiago uma lista de rotas ×
+    larguras × temas (`/projects`, `/projects/<id>`, `/dashboard`, `/library`,
+    em 390px/1440px e claro/escuro — 16 combinações), pedindo "ok" ou o que
+    estiver errado, item a item. **⏳ PENDENTE — aguardando a resposta de
+    Thiago** (lista completa e o que ela cobre em
+    `.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md`); nenhum
+    item de olho humano deste bloco ou do de Projetos vira ✅ antes dela
+    chegar, e o merge desta seção não acontece antes também. O texto original:
+    Nada da passada de navegador tinha sido visto por olho humano — axe,
+    teclado e 390/1440px foram medidos por agente sobre captura e DOM;
+    hierarquia, ordem de leitura e perceptibilidade do anel seguiam não
+    verificadas.
 
 13. **Processo: medida da catraca que muda exige rodar os testes de `tools/`
     no mesmo commit.** A Tarefa 5 baixou `hover_sem_focus` para 7 e deixou
     `tools/test_catraca.py` vermelho (o teste tinha o 8 fixo); ninguém rodou
     `cd tools && python -m unittest discover -p "test_*.py"`, e o defeito só foi
     pego duas tarefas depois. O job `Repositorio` do CI teria reprovado o PR.
+
+## O que Projetos (Seção 8) deixou em aberto — **planejar antes da próxima tela**
+
+Mesmo padrão dos blocos acima: **nenhuma destas é para um agente decidir
+sozinho.** Quem escrever o plano da quarta tela põe cada uma como tarefa ou
+registra por escrito a decisão de não pôr. Os itens **1, 3, 5, 6, 10 e 13** do
+bloco do Dashboard, acima, e os itens **4, 6, 7, 8 e 9** do bloco da
+Biblioteca **continuam abertos** e entram na mesma conta. Números e comandos
+em [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
+
+1. **`router.refresh()` continua em SETE mutações — quatro de projeto e três
+   de ambiente/DNA.** `ProjectWizard`, `ProjectStatusSelect` e
+   `DeleteProjectAlert` chamam `router.refresh()` porque `budget/page.tsx` e
+   `presentation/page.tsx` renderizam `ProjectHeader` com dado buscado no
+   **servidor** — sem o refresh, mudar o status na aba Orçamento não
+   atualizaria o cabeçalho dela. O achado da Tarefa 7 estendeu a mesma razão
+   às três mutações de ambiente/DNA (`NewEnvironmentModal`, `EnvironmentCard`,
+   `DNAEditorSheet`): `budget/page.tsx` **e** `print/page.tsx` também buscam
+   `/api/projects/{id}/environments` no servidor — a premissa do brief daquela
+   tarefa ("nenhuma tela de servidor lê a lista de ambientes") estava errada.
+   **Condição de saída, para as duas famílias**: sai quando Orçamento,
+   Apresentação e Impressão migrarem para ler projeto/ambientes por
+   `features/projects` (prefetch + `QueryBoundary`), a mesma condição que já
+   valia para as mutações de projeto.
+
+2. **`/api/users/me` continua fora das fábricas, e "Plano Solo" continua
+   fixo — recusado por escrito, decisão 2 da spec de Projetos.**
+   `features/account/queries.ts` não foi criado nesta tela: a lista de
+   Projetos prefetcha `/api/projects` pela fábrica nova, mas continua lendo
+   `entitlements.project_limit` de `/me` com `apiServer` direto, sem
+   hidratar essa chamada — só o número desce como prop. Sem `/me`, `planLimit`
+   fica `undefined` e a tela não inventa número (Art. 3): sem contador, sem
+   barra, sem modal de upgrade. Consequência aceita: "Plano Solo" continua
+   fixo em `CabecalhoDeProjetos.tsx` — o nome real viria de `account.plan_name`,
+   que só chegaria por essa fábrica que não foi criada. Vale só para `/me`, e
+   só até uma tela decidir criar a fábrica de conta.
+
+3. **`notFound()` do detalhe responde `HTTP 200` com a UI de não encontrado,
+   não `404`.** `ProjetoData` chama `notFound()` quando o prefetch do projeto
+   resolve com `ApiError` 404 — mas isso acontece **dentro** do `<Suspense>` de
+   `page.tsx`, depois de o stream já ter começado, então o status HTTP da
+   resposta inteira já é `200`. Numa rota autenticada isso não muda o que o
+   usuário vê; o preço de devolver 404 de verdade seria esperar o projeto
+   antes de mandar qualquer byte — recusado por decisão registrada na spec.
+   Confirmado ao vivo: `fetch(location.href, {credentials:"include"}).then(r=>r.status)` → `200`.
+
+4. **`GET /api/projects/{id}` calcula `custom_installments` e o Pydantic
+   descarta o campo na serialização — código morto, sem teste.**
+   `ArchSmart-api/app/api/endpoints/projects.py:98-106` (`get_project_by_id`)
+   faz `setattr` num atributo que `ProjectResponse` não declara; o Pydantic
+   descarta silenciosamente na resposta. Achado da Tarefa 3, registrado para
+   esta tarefa (não é defeito dela) e não consertado — é limpeza de backend,
+   fora do escopo de arquivos desta migração.
+
+5. **`texto_sobre_fundo_reprovado` (a medida nova da Tarefa 10) tem furos
+   conhecidos, escritos no próprio docstring da régua — não mede:**
+   `X-foreground` quando `X` é token (então `muted-foreground` sobre o fundo
+   fica sem medida); texto sobre `card`/`popover`/`muted` (só está coberto hoje
+   porque `--card` == `--background`, e isso pode divergir); opacidade
+   (`text-destructive/80`); token citado em comentário de **fim de linha** de
+   código; e `/*` colado em `(` sem espaço (o padrão JSX `(/* comentário */
+   valor)`). Mesma lição da Seção 6: régua não é prova, e o próximo furo
+   medido já é conhecido antes de aparecer.
+
+6. **Sobraram reprovados na catraca de contraste, registrados e não
+   corrigidos:** `texto_sobre_fundo_reprovado` tem **1** (`claro:secondary` —
+   o coral da marca, como texto) e `contraste_reprovado` tem **3**
+   (`claro:muted`, `claro:secondary`, `escuro:secondary`). O `secondary` é
+   decisão de design (já registrado no item 3 do bloco do Dashboard, acima);
+   `claro:muted` é achado novo desta seção, não investigado a fundo.
+
+7. **`/projects` ainda tem, no axe, `color-contrast` (6 nós) e
+   `page-has-heading-one` (1) — da própria tela, não do shell.** Mesmos
+   números que a Tarefa 11 já tinha medido; nada regrediu, nada foi
+   consertado. **O detalhe (`/projects/{id}`) nunca tinha sido medido por axe
+   antes da Tarefa 12, e tem achados próprios, novos**: `aria-required-children`
+   (1), `aria-required-parent` (3) e `aria-valid-attr-value` (1) nos três
+   `TabsTrigger` do `ProjectHeader` (cada um envolto num `<Link>`, quebrando a
+   relação pai-filho que o ARIA de abas do Radix exige), `heading-order` (1,
+   o `h3` de "Caderno de Ambientes") e, só no tema claro, `color-contrast` (3,
+   inclui `bg-emerald-500/10` — verde literal fora do sistema de tokens).
+   Nenhum foi consertado.
+
+8. ⚠️ **Achado novo: `/projects/{id}` estoura 203px em 390px, nos dois
+   temas — maior que o estouro já conhecido da Biblioteca (42px), e não é o
+   mesmo defeito.** Isolado por medição de retângulos: o elemento mais largo
+   é a `Header` do **shell** (`src/components/layout/app-shell/Header.tsx`,
+   593px), não `ProjectHeader.tsx` (a fileira de abas já tem `flex-wrap`). A
+   coluna esquerda do shell (breadcrumb "Projetos › Loft Pinheiros #3" + a
+   data por extenso, ex. "quarta-feira, 16 de setembro de 2026") mede 204px
+   de largura intrínseca e não encolhe; somada ao grupo de ícones à direita
+   (136px) mais o botão de menu mobile e o padding, o total excede 390px e a
+   fileira não quebra linha. **A lista de Projetos não estoura** (breadcrumb
+   curto, só "Projetos"). É defeito do **shell**, reaproveitado por toda tela
+   com breadcrumb de dois segmentos e um nome de projeto longo — não
+   corrigido, de propósito. Comando:
+   `document.documentElement.scrollWidth - window.innerWidth` em
+   `/projects/<id>` a 390px → `203`. Ver
+   [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
+
+9. **`defaultValues.type` do formulário de ambiente convive com o
+   `.default()` do schema.** Achado e aceito na Tarefa 7: o comportamento
+   observável está correto e coberto por teste, mas quem remover só o
+   `.default()` do schema não é avisado — o valor default continua vindo do
+   `defaultValues` do react-hook-form. Registrado no docstring do schema;
+   nenhuma doc versionada afirma "fonte única".
+
+10. **O elemento `NEXTJS-PORTAL` recebe foco no ciclo de `Tab`, em
+    desenvolvimento.** Achado da Tarefa 11: artefato do overlay do `next dev`
+    (o indicador de rota/erro do Next), que **não existe** em build de
+    produção (`next build && next start`) — confirmado nas medições de
+    teclado da Tarefa 12, rodadas contra produção local, sem essa parada.
+    Não é defeito de nenhuma tela.
+
+11. **A Biblioteca passou a ter UM teto de tempo de prefetch para lista e
+    badge, onde antes eram dois independentes.** Decisão da Tarefa 9: em vez
+    de só blindar `tentarPrefetch` contra o falso positivo de query irmã em
+    voo, `LibraryData.tsx` passou a fazer as duas chamadas (lista + badge do
+    inbox) num `Promise.all` só, como `ProjetoData` já fazia para
+    projeto+ambientes. Custo aceito, por escrito: a Biblioteca passa a
+    compartilhar um teto de 3 s (`TIMEOUT_DO_PREFETCH_MS`) entre lista e
+    badge — um cold start pode derrubar os dois prefetches juntos em vez de
+    só um.
+
+12. **Dois achados de acessibilidade da Tarefa 11, registrados e não
+    corrigidos:** os ícones das bolhas de mensagem do chat não têm
+    `aria-hidden`; e `MobileSidebar` ganhou `aria-current` além da troca de
+    cor (mudança já declarada no commit, mas sem teste dedicado). Nenhum dos
+    dois é regressão — são melhorias parciais que pararam de propósito no
+    escopo da Tarefa 11.
+
+13. **`is_empty` numa tela com mais de uma região — Projetos tem lista e
+    detalhe, cada um com UMA região `principal` própria, então a pergunta
+    geral (item 5 da Biblioteca) continua evitada por construção, não
+    respondida.** A lista tem uma região (a página de projetos); o detalhe
+    tem duas `QueryBoundary` (cabeçalho e ambientes), mas só os ambientes são
+    `principal` — o cabeçalho nunca decide `is_empty`/`load_ms`. A primeira
+    tela com **duas regiões, ambas candidatas a principal**, ainda não
+    existe.
+
+14. ⚠️ **Cada defeito que a verificação humana da Tarefa 12 apontar, e que
+    não for consertado no mesmo ciclo, entra aqui.** PENDENTE — aguardando a
+    resposta de Thiago à lista de verificação
+    (`.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md`). Nada
+    foi escrito neste item além deste marcador, porque nada foi respondido
+    ainda.
 
 ## Portões de CI
 
@@ -816,9 +1033,12 @@ gh workflow run e2e.yml --ref <branch>
 > Ele roda os specs de **guarda** por nome (`auth`, `dashboard`,
 > `hidratacao-biblioteca`, `telemetria-biblioteca`, `hidratacao-dashboard`,
 > `telemetria-dashboard` — as duas últimas acrescentadas pela Tarefa 6 da
-> migração do Dashboard, na Seção 8), nunca `npx playwright test`
+> migração do Dashboard, na Seção 8 —, `hidratacao-projetos`,
+> `telemetria-projetos` — estas duas acrescentadas pela Tarefa 12 da migração
+> de Projetos, na mesma seção), nunca `npx playwright test`
 > sem filtro: `e2e/` também tem **instrumentos** (`medicao-biblioteca`,
-> `medicao-dashboard`, `captura-visual-secao-6`), que produzem número e imagem,
+> `medicao-dashboard`, `medicao-projetos`, `medicao-carga`, `medicao-axe`,
+> `captura-visual-secao-6`), que produzem número e imagem,
 > exigem variável que o
 > CI não tem, e cuja saída barata seria um `skip` silencioso. **Spec novo de
 > guarda precisa ser acrescentado naquela linha do workflow** — criar o arquivo

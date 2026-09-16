@@ -604,12 +604,263 @@ O "depois" desses dois números é entregável da Tarefa 12, não desta.
 | Doc do módulo | ✅ | este arquivo |
 | As três mutações de ambiente/DNA chamam `router.refresh()` (achado do Step 7: `budget/page.tsx`/`print/page.tsx` leem ambientes no servidor) | ✅ | `src/__tests__/ambientes-refresh.test.tsx` (Tarefa 7, decisão de 15/09/2026) |
 
-Este documento cobre lista, detalhe e as sete mutações (quatro de projeto,
-Tarefa 6; três de ambiente/DNA, Tarefa 7). O restante da definição de pronto
-que depende de navegador/olho humano ainda não foi verificado. O achado do
-Step 7 (Orçamento/Impressão lendo ambientes no servidor) não é mais pendência
+Este documento cobria, até aqui, lista, detalhe e as sete mutações (quatro de
+projeto, Tarefa 6; três de ambiente/DNA, Tarefa 7). O achado do Step 7
+(Orçamento/Impressão lendo ambientes no servidor) não é mais pendência
 aberta — Thiago decidiu em 15/09/2026 que as três mutações de ambiente/DNA
 chamam `router.refresh()`, com condição de saída registrada (sai quando
 `budget/`/`print/` migrarem para ler ambientes por `features/projects`) —
 quando essa migração acontecer, revise este arquivo em vez de reescrevê-lo,
-para não ficar descrevendo um estado que o código já passou.
+para não ficar descrevendo um estado que o código já passou. **A Tarefa 12
+(guardas e2e, medições "depois", passada por agente e a parada para
+verificação humana) fecha a seção abaixo.**
+
+## Tarefa 12 — guardas, medições e a passada por agente completa
+
+### Guardas novas no `e2e.yml`
+
+`e2e/projetos-dados.ts` tem o mesmo contrato de `dashboard-dados.ts`/
+`biblioteca.ts`, com uma diferença que a Tarefa 5 já tinha deixado registrada:
+`esperarAmbientesDoProjeto` olha **dois** testids de erro, não um —
+`projeto-error` (cabeçalho) e `projeto-ambientes-error` (ambientes), porque as
+duas regiões do detalhe são `QueryBoundary` independentes e podem falhar
+sozinhas ou juntas.
+
+`e2e/hidratacao-projetos.spec.ts` (2 testes) foi **provado vermelho antes de
+verde**, como o brief mandou: um `useEffect(() => { void api(...) }, [])`
+temporário em `ProjetosContent.tsx` (`/api/projects?page=1&size=1`) e em
+`ProjetoContent.tsx` (`/api/projects/{id}`) fez as duas guardas reprovarem
+citando a URL —
+
+```
+Error: a lista pediu no navegador: http://localhost:8000/api/projects?page=1&size=1
+Error: o detalhe pediu no navegador: http://localhost:8000/api/projects/31211f47-b9f7-4c0e-81f0-f2403b3fe710 (×2)
+```
+
+— e depois de desfeita a injeção (`git diff` limpo, conferido antes do
+commit), `2 passed` de novo.
+
+`e2e/telemetria-projetos.spec.ts` rodou **8 vezes** ao todo (não só as 3 que o
+brief pedia): a primeira leva de 3 teve **1 falha isolada** na segunda
+execução, num `waitFor` de precondição (`projetos-pagina` visível) que
+estourou o timeout de 5 s **antes** de qualquer asserção de telemetria rodar
+— não é o mecanismo de telemetria que falhou, é uma corrida contra o servidor
+de desenvolvimento (mesma classe de flake já registrada no `PROGRESS.md` para
+`project-wizard.test.tsx` sob carga, Tarefa 5). As 5 execuções seguintes,
+rodadas imediatamente depois, deram `1 passed` cada. **7 de 8**, com a única
+falha isolada a uma precondição, não à asserção do protocolo de telemetria.
+
+### Medições "depois"
+
+**LCP e JS da rota** — instrumento da Tarefa 1, rodado contra `next build &&
+next start`. Números completos, com a explicação de por que Biblioteca e
+Dashboard também mudaram (JS **compartilhado**, mexido pelas Tarefas 9–11
+desta mesma migração), em
+[`docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md`](../medicoes/2026-09-15-lcp-e-js-da-rota.md#o-depois--16092026-tarefa-12-da-migração-de-projetos):
+
+| Rota | LCP antes | LCP depois | JS antes | JS depois |
+|---|---:|---:|---:|---:|
+| `/projects` | 1308 ms | **952 ms** | 358129 | 466888 |
+
+**Clique → dados**, arranjo local (API local + `npm run dev`, como as outras
+duas telas):
+
+```
+AMOSTRAS=919,919,921,933,942
+MEDIANA_MS=921
+```
+
+Alvo da spec-mãe (< 1,5 s): **atingido neste arranjo** — mesma ressalva das
+outras duas telas: front e API locais contra o banco de staging, não o que um
+usuário sente contra o ambiente implantado.
+
+**Consultas por carregamento**, reconfirmadas ao vivo contra o banco de
+staging com o app real (`ArchSmart-api/.env` no bloco `## staging ##`,
+conferido antes de medir), via `TestClient(app)` + `before_cursor_execute`
+(mesmo mecanismo de
+[`docs/dev/medicoes/2026-09-13-custo-da-requisicao-autenticada.md`](../medicoes/2026-09-13-custo-da-requisicao-autenticada.md)),
+com um token real da conta de teste:
+
+| Rota | Consultas | Constante? |
+|---|---:|---|
+| `GET /api/projects` | **5** | sim — igual com `size=1` e `size=20` |
+| `GET /api/projects/{id}` | **4** | — |
+| `GET /api/projects/{id}/environments` | **3** | — |
+
+Os três números batem com os da Tarefa 2 (suíte): nenhum código de backend
+mudou entre a Tarefa 2 e esta. As três rotas respondem com `307` para a URL
+sem barra final quando chamadas com barra (`/api/projects/` → redireciona
+para `/api/projects`); a contagem acima é da chamada final, depois do
+redirecionamento — o próprio redirecionamento não faz consulta.
+
+**`load_ms` do `screen_viewed` de `/projects`**, filtrado por
+`medido_ate=dados` (as linhas vieram das 8 execuções de
+`telemetria-projetos.spec.ts` mais o aquecimento de outras medições desta
+tarefa — front e API locais contra o **banco de staging**, não o deployment):
+
+| `medido_de` | n | Mediana | Faixa |
+|---|---:|---:|---|
+| `clique` | 8 | **521 ms** | 491 – 1020 |
+| `commit` | 25 | **206 ms** | 103 – 2372 |
+
+```bash
+cd ArchSmart-api
+./venv/Scripts/python.exe - <<'PY'
+import os, psycopg2
+from dotenv import load_dotenv; load_dotenv(".env")
+c = psycopg2.connect(os.environ["DATABASE_URL"]); c.set_session(readonly=True); cur = c.cursor()
+cur.execute("""select properties->>'medido_de', count(*),
+  percentile_cont(0.5) within group (order by (properties->>'load_ms')::float)
+  from product_events where name='screen_viewed' and properties->>'screen'='/projects'
+  and properties->>'medido_ate'='dados' group by 1""")
+print(cur.fetchall())
+PY
+```
+
+**P95 da API implantada — não medido nesta tarefa, só depois do deploy.** O
+mesmo procedimento de `docs/dev/modulos/dashboard.md` ("Os números medidos"),
+trocando `lean` por `/api/projects` e `/api/projects/{id}/environments`, com a
+impressão digital do contêiner novo sendo `active_count` na resposta de
+`/api/projects` — sem esse campo, o contêiner ainda não é o desta seção e
+nenhum número vale:
+
+```bash
+API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
+curl -s "$API/api/projects?page=1&size=20" -H "$H" | python -c "import json,sys; print('active_count' in json.load(sys.stdin))"
+for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects?page=1&size=20"; done
+for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects/<id>/environments"; done
+```
+
+Pelo modelo de distância já medido (`0,29 + 0,24 (se autenticado) + 0,17 ×
+(3 + consultas)`), a expectativa **por distância** para `/api/projects` (5
+consultas) é ≈ `0,29 + 0,24 + 0,17×8` ≈ **1,89 s**, e para `/environments` (3
+consultas) ≈ `0,29 + 0,24 + 0,17×6` ≈ **1,55 s** — as duas acima do orçamento
+de 400 ms, pela mesma razão registrada para a Biblioteca e o Dashboard
+("estoura por distância, não pela tela"). **Isto é previsão, não medição** —
+fica marcado como tal até o número real existir.
+
+### A passada por agente completa (axe, 390/1440, teclado)
+
+⚠️ **Tudo nesta seção foi verificado por agente sobre captura de tela e
+medição no DOM — não por olho humano.** O julgamento humano que a definição
+de pronto pede (hierarquia, ordem de leitura, perceptibilidade do anel,
+legibilidade) segue não verificado; é exatamente isso que a verificação
+humana da Tarefa 12 (mais abaixo) resolve.
+
+**axe-core**, `/projects` e `/projects/{id}`, dois temas, duas larguras — 8
+combinações, com a API local quente e sessão real:
+
+| Rota | Tema | Largura | Violações |
+|---|---|---:|---|
+| `/projects` | claro | 390 | `color-contrast`(6), `page-has-heading-one`(1) |
+| `/projects` | claro | 1440 | `color-contrast`(6), `page-has-heading-one`(1) |
+| `/projects` | escuro | 390 | `color-contrast`(6), `page-has-heading-one`(1) |
+| `/projects` | escuro | 1440 | `color-contrast`(6), `page-has-heading-one`(1) |
+| `/projects/{id}` | claro | 390 | `aria-required-children`(1), `aria-required-parent`(3), `aria-valid-attr-value`(1), `color-contrast`(3), `heading-order`(1) |
+| `/projects/{id}` | claro | 1440 | mesmas 5, mesmas contagens |
+| `/projects/{id}` | escuro | 390 | `aria-required-children`(1), `aria-required-parent`(3), `aria-valid-attr-value`(1), `heading-order`(1) — **sem** `color-contrast` |
+| `/projects/{id}` | escuro | 1440 | mesmas 4, mesmas contagens |
+
+A lista repete exatamente o que a Tarefa 11 já tinha medido (`color-contrast`
+6 nós + `page-has-heading-one` 1, "da própria tela") — **sem violação nova**.
+O **detalhe nunca tinha sido medido por axe em navegador antes desta tarefa**,
+e tem um conjunto diferente: os três `aria-required-*`/`aria-valid-attr-value`
+apontam para os `TabsTrigger` do `ProjectHeader` (Ambientes/Orçamento/
+Apresentação) — casam com a estrutura `Tabs`/`TabsList`/`TabsTrigger` do Radix
+envolvendo cada gatilho num `<Link>`, o que quebra a relação pai-filho que o
+ARIA de abas exige; `heading-order` aponta para o `h3` de "Caderno de
+Ambientes" (`EnvironmentsWorkspace`); `color-contrast` (3 nós, só no tema
+claro) inclui `.bg-emerald-500\/10` — um verde literal fora do sistema de
+tokens, achado novo. Comando:
+
+```bash
+cd ArchSmart-web; set -a; . ./.env.e2e.local; set +a
+for tema in claro escuro; do for largura in 390 1440; do
+  ROTA=/projects/<id> TEMA=$tema LARGURA=$largura npx playwright test e2e/medicao-axe.spec.ts --reporter=line
+done; done
+```
+
+**Largura, 390px** — `scrollWidth` vs `innerWidth`, sessão real:
+
+| Rota | `scrollWidth` | `innerWidth` | Estoura |
+|---|---:|---:|---:|
+| `/projects` | 390 | 390 | **0px** |
+| `/projects/{id}` | 593 | 390 | **203px** |
+
+⚠️ **Achado novo, maior que o estouro já conhecido da Biblioteca (42px) — e
+não é o mesmo defeito.** O detalhe estoura 203px em 390px, nos dois temas.
+Isolado por medição direta de retângulos (não por leitura de código): o
+elemento mais largo que a viewport é `header .flex.h-16` (593px), da `Header`
+**do shell** (`src/components/layout/app-shell/Header.tsx`), não de
+`ProjectHeader.tsx` — a fileira de abas de `ProjectHeader` já tem `flex-wrap`
+e não é a causa. Dentro do shell, a coluna esquerda (`.flex.flex-col.min-w-0`,
+que tem `HeaderBreadcrumb` mais a linha de data) mede 204px de largura
+intrínseca — o breadcrumb "Projetos › Loft Pinheiros #3" e a data por
+extenso ("quarta-feira, 16 de setembro de 2026") não encolhem abaixo disso —,
+e o grupo de ícones à direita mede 136px; somados ao botão de menu mobile e
+ao padding (`px-6`), o total excede 390px e a fileira (`flex ... px-6
+md:px-8`, sem `flex-wrap`) não quebra linha. **A lista não estoura** porque o
+breadcrumb dela é só "Projetos" (um segmento, sem chevron) — bem mais curto.
+Isto é **do shell**, reusado por toda tela com breadcrumb de dois segmentos e
+um nome de projeto longo; não foi corrigido, de propósito (regra da casa:
+registra, conserta só com ok de Thiago). Como reproduzir:
+
+```js
+// no console, em /projects/<id> a 390px
+document.documentElement.scrollWidth - window.innerWidth   // 203
+document.querySelector("header .flex.h-16").getBoundingClientRect().width   // 593
+```
+
+**Teclado** — `Tab` a partir do topo, lista e detalhe, sessão real:
+
+- **Lista**: sem parada invisível nas 30 primeiras paradas (sidebar → botões
+  do `Header` → o botão do cabeçalho de Projetos → os cards). O botão do
+  cabeçalho, nesta conta, é **"Slot Indisponível"** (`UpgradeAlertModal`), não
+  "Novo Projeto" — a conta de teste está no limite do plano
+  (`active_count=2`, `project_limit=2`, medido em `/api/users/me`). Alcançado
+  no Tab 11, `Enter` abre o `AlertDialog` (`role="alertdialog"`), `Escape`
+  fecha. O wizard em si (`ProjectWizard`, dirigido por `?action=new`) foi
+  testado por URL direta, já que o botão que o abre não renderiza com esta
+  conta: abre (`role="dialog"` presente) e `Escape` fecha — **com um atraso de
+  ~1 s**, porque fechar passa por `router.push("/projects")`
+  (`ClientWizardDriver.tsx`), uma navegação de verdade, não um `setState`
+  local; um `waitForTimeout` curto (300 ms) mede "não fechou" por engano — o
+  fechamento em si funciona.
+- **Detalhe**: sem parada invisível nas 30 primeiras. `"Excluir"`
+  (`DeleteProjectAlert`) alcançado no Tab 16; `Enter` abre o
+  `AlertDialog` de confirmação, `Escape` fecha. As três abas
+  (Ambientes/Orçamento/Apresentação) e "Novo Ambiente"/"Editar Dados" são
+  alcançáveis e distintas no anel de foco.
+
+Nenhum teclado ficou preso (nenhum elemento sem saída), e as duas ações que a
+definição de pronto pede para testar sem mouse — abrir/fechar o wizard e o
+diálogo de exclusão — funcionam.
+
+**Capturas** — as 8 combinações (`/projects` e `/projects/{id}` × claro/escuro
+× 390/1440) foram tiradas com `page.screenshot({ fullPage: true })` e salvas
+fora do repositório (scratchpad da sessão que rodou a Tarefa 12) para a
+verificação humana da Tarefa 12 olhar — este repositório não versiona
+captura de tela.
+
+### O que a Tarefa 12 fecha, na definição de pronto
+
+| Item | Estado | Onde está a prova |
+|---|---|---|
+| Orçamento de performance (clique → dados) | ✅ no arranjo local — 921 ms < 1,5 s | seção acima |
+| Orçamento de performance (API implantada, P95) | ⚠️ **a medir depois do deploy** — previsão ≈ 1,89 s (lista) / 1,55 s (ambientes), por distância | seção acima |
+| Consultas por carregamento (lista, detalhe, ambientes) | ✅ 5 / 4 / 3, reconfirmadas ao vivo contra staging | seção acima |
+| LCP e JS da rota | ✅ medido (952 ms / 466888 bytes) — sem alvo formal isolado por rota nesta régua | `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md` |
+| axe em navegador | ⚠️ **medido por agente** — lista repete achados já conhecidos (shell); detalhe tem achados novos (`aria-required-*` nas abas, `heading-order`, verde literal) | seção acima |
+| Navegação só por teclado | ⚠️ **medido por agente** — sem parada invisível, wizard e diálogo de exclusão abrem/fecham sem mouse | seção acima |
+| 390px e 1440px | ⚠️ **medido por agente** — lista sem estouro; **detalhe estoura 203px em 390px, achado novo, não corrigido** | seção acima |
+| Guardas e2e no `e2e.yml` | ✅ | `.github/workflows/e2e.yml` |
+| Doc do módulo com números e comando | ✅ | este arquivo |
+| Verificação humana (decisão 7 da spec) | ⚠️ **PENDENTE — aguardando resposta de Thiago** à lista da Tarefa 12 | `.superpowers/sdd/2026-09-15-secao-8-projetos/task-12-report.md` |
+
+## Verificação humana
+
+**PENDENTE.** A lista de verificação foi entregue a Thiago em 16/09/2026 (Step
+8 da Tarefa 12) e o merge **não** acontece antes da resposta. Quando ela
+chegar, esta seção passa a ter o nome do verificador, a data, e o veredito
+item a item — nenhum item da definição de pronto acima que dependa de olho
+humano vira ✅ antes disso.
