@@ -251,6 +251,13 @@ class Project(Base):
 
     @property
     def environments_count(self) -> int:
+        # A lista de projetos anota a contagem numa consulta agregada
+        # (`_anotar_contagem_de_ambientes`, app/api/endpoints/projects.py):
+        # sem isso, cada linha carregava a colecao inteira so para o `len`.
+        # Sem anotacao — detalhe, criacao, edicao —, conta pela colecao.
+        anotado = self.__dict__.get("_environments_count")
+        if anotado is not None:
+            return anotado
         return len(self.environments) if self.environments else 0
 
 class Client(Base):

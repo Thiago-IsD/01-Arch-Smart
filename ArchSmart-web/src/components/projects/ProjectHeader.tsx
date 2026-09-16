@@ -6,9 +6,10 @@ import { EditProjectButton } from "@/components/projects/EditProjectButton"
 import { DeleteProjectAlert } from "@/components/projects/DeleteProjectAlert"
 import { ProjectStatusSelect } from "@/components/projects/ProjectStatusSelect"
 import { DynamicBreadcrumb } from "@/contexts/BreadcrumbContext"
+import type { Projeto } from "@/features/projects/types"
 
 interface ProjectHeaderProps {
-    project: any;
+    project: Projeto;
     activeTab?: "ambientes" | "orcamento" | "apresentacao";
 }
 

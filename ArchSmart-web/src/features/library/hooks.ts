@@ -5,7 +5,7 @@ import { api } from "@/lib/api/client"
 import { queryKeys, cachePolicy, type FiltrosDeProduto } from "@/lib/query/keys"
 import {
     aprovarEmLote, aprovarProduto, atualizarProduto, criarProduto, excluirProduto,
-    listarAmbientes, listarProjetos, moverParaProjeto, obterProduto,
+    moverParaProjeto, obterProduto,
     type PayloadDeProduto,
 } from "./api"
 import { queryDaListaDeProdutos, queryDoBadgeDoInbox } from "./queries"
@@ -111,24 +111,5 @@ export function useMoveToProject() {
     return useMutation({
         mutationFn: moverParaProjeto,
         onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.all }),
-    })
-}
-
-export function useProjetosParaMover(ativo: boolean) {
-    return useQuery({
-        queryKey: queryKeys.projects.list(1, 100),
-        queryFn: ({ signal }) => listarProjetos(signal),
-        enabled: ativo,
-        select: (r) => r.items ?? [],
-        ...cachePolicy.transacional,
-    })
-}
-
-export function useAmbientesDoProjeto(projectId: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.projects.environments(projectId ?? ""),
-        queryFn: ({ signal }) => listarAmbientes(projectId as string, signal),
-        enabled: !!projectId,
-        ...cachePolicy.transacional,
     })
 }

@@ -1,19 +1,12 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { getAccessToken } from "@/lib/api/auth"
-import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import { apiUrl } from "@/lib/api-url"
 
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+import { ApiError } from "@/lib/api/errors"
+import { useMudarStatusDoProjeto } from "@/features/projects/hooks"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface ProjectStatusSelectProps {
     projectId: string
@@ -21,56 +14,36 @@ interface ProjectStatusSelectProps {
 }
 
 export function ProjectStatusSelect({ projectId, currentStatus }: ProjectStatusSelectProps) {
-    const [isUpdating, setIsUpdating] = useState(false)
     const { toast } = useToast()
     const router = useRouter()
+    const mudar = useMudarStatusDoProjeto()
 
-    const handleStatusChange = async (newStatus: string) => {
+    const handleStatusChange = async (novoStatus: string) => {
         try {
-            setIsUpdating(true)
-            const token = (await getAccessToken()) || ""
-
-            const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: newStatus })
-            })
-
-            const responseData = await res.json()
-
-            if (!res.ok) {
-                if (res.status === 403) {
-                    toast({
-                        variant: "destructive",
-                        title: "Limite de Plano",
-                        description: responseData.detail || "Você atingiu o limite de projetos do seu plano.",
-                    })
-                    return
-                }
-                throw new Error("Erro ao atualizar status.")
-            }
-
+            await mudar.mutateAsync({ id: projectId, status: novoStatus })
             toast({ title: "Status Atualizado", description: "O status do projeto foi alterado com sucesso." })
+            // Ver o comentario em ProjectWizard: Orcamento e Apresentacoes ainda
+            // leem o cabecalho do servidor.
             router.refresh()
-        } catch (error) {
-            toast({ variant: "destructive", title: "Ops!", description: "Não foi possível atualizar o status." })
-        } finally {
-            setIsUpdating(false)
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Não foi possível atualizar o status."
+            toast({
+                variant: "destructive",
+                title: erro instanceof ApiError && erro.status === 403 ? "Limite de Plano" : "Ops!",
+                description: mensagem,
+            })
         }
     }
 
     return (
         <div className="relative">
-            {isUpdating && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 rounded-md">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            {mudar.isPending && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/50">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />
                 </div>
             )}
-            <Select defaultValue={currentStatus} onValueChange={handleStatusChange} disabled={isUpdating}>
-                <SelectTrigger className="w-[180px] h-9">
+            <Select defaultValue={currentStatus} onValueChange={handleStatusChange} disabled={mudar.isPending}>
+                <SelectTrigger className="h-9 w-[180px]" aria-label="Status do projeto">
                     <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>

@@ -79,14 +79,17 @@ jobs:
         # reprova por um motivo que nao e defeito de codigo.
         timeout-minutes: 15
         # Os specs vao POR NOME, e nao `npx playwright test` sem filtro.
-        # `e2e/` tem dois INSTRUMENTOS, que nao sao guarda e nao podem virar
-        # portao: `medicao-biblioteca.spec.ts` produz uma mediana (um numero
-        # de medicao nao tem verde nem vermelho) e `captura-visual-secao-6.spec.ts`
-        # exige `CAPTURAS_DIR` no ambiente e escreve imagem fora do
-        # repositorio. Rodar sem filtro reprovaria por falta de variavel, e a
-        # saida barata para isso seria um `skip` silencioso — que este
-        # repositorio nao admite. Spec novo de guarda entra nesta linha; nao
-        # basta criar o arquivo.
+        # `e2e/` tem varios INSTRUMENTOS, que nao sao guarda e nao podem virar
+        # portao: `medicao-biblioteca.spec.ts`, `medicao-dashboard.spec.ts`,
+        # `medicao-projetos.spec.ts` e `medicao-carga.spec.ts` produzem uma
+        # mediana (um numero de medicao nao tem verde nem vermelho),
+        # `medicao-axe.spec.ts` produz uma lista de violacoes (nao passa nem
+        # falha por si), e `captura-visual-secao-6.spec.ts` exige
+        # `CAPTURAS_DIR` no ambiente e escreve imagem fora do repositorio.
+        # Rodar sem filtro reprovaria por falta de variavel, e a saida barata
+        # para isso seria um `skip` silencioso — que este repositorio nao
+        # admite. Spec novo de guarda entra nesta linha; nao basta criar o
+        # arquivo.
         run: >-
           npx playwright test
           e2e/auth.spec.ts
@@ -95,4 +98,6 @@ jobs:
           e2e/telemetria-biblioteca.spec.ts
           e2e/hidratacao-dashboard.spec.ts
           e2e/telemetria-dashboard.spec.ts
+          e2e/hidratacao-projetos.spec.ts
+          e2e/telemetria-projetos.spec.ts
           --reporter=line

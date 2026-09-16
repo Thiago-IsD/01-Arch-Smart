@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from typing import Any
 from uuid import UUID
 
 from app.db.repository import ScopedRepository, get_repo
-from app.models.all_models import Project, Client
+from app.models.all_models import Client, Environment, Project
 from app.schemas.project_schema import ProjectResponse, PaginatedProjectResponse, ProjectWizardCreate
 from app.services.financial_service import sync_project_financials
 
@@ -22,6 +23,24 @@ def _get_plan_limit(repo: ScopedRepository) -> int:
     """
     return int(repo.ctx.entitlements["project_limit"])
 
+def _anotar_contagem_de_ambientes(repo: ScopedRepository, projetos: list[Project]) -> None:
+    """
+    Uma consulta agregada para a pagina inteira, no lugar de carregar a colecao
+    `environments` de cada projeto so para contar. Ver `Project.environments_count`.
+    """
+    if not projetos:
+        return
+    contagens = dict(
+        repo.query(Environment)
+        .with_entities(Environment.project_id, func.count(Environment.id))
+        .filter(Environment.project_id.in_([p.id for p in projetos]))
+        .group_by(Environment.project_id)
+        .all()
+    )
+    for projeto in projetos:
+        projeto._environments_count = contagens.get(projeto.id, 0)
+
+
 @router.get("", response_model=PaginatedProjectResponse)
 def get_projects(
     repo: ScopedRepository = Depends(get_repo),
@@ -30,7 +49,12 @@ def get_projects(
     search: str = None
 ) -> Any:
     """
-    Lista todos os projetos do arquiteto.
+    Lista os projetos da conta. Custo fixo de 5 consultas, qualquer que seja o
+    tamanho da pagina — 4 deste endpoint (contagem, pagina com join do
+    cliente, contagem agregada de ambientes, active_count) mais 1 de
+    contexto/entitlements, resolvida antes de chegar aqui pelo caminho
+    compartilhado (Depends(get_repo) -> get_context), nao por este codigo
+    (tests/api/test_projetos_sem_n_mais_um.py).
     """
     query = repo.query(Project)
 
@@ -41,8 +65,14 @@ def get_projects(
 
     total = query.count()
     pages = (total + size - 1) // size
-    items = query.offset((page - 1) * size).limit(size).all()
-    plan_limit = _get_plan_limit(repo)
+    items = (
+        query.options(joinedload(Project.client))
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    _anotar_contagem_de_ambientes(repo, items)
+    active_count = repo.query(Project).filter(Project.status == "ACTIVE").count()
 
     return {
         "total": total,
@@ -50,7 +80,8 @@ def get_projects(
         "size": size,
         "pages": pages,
         "items": items,
-        "plan_limit": plan_limit
+        "plan_limit": _get_plan_limit(repo),
+        "active_count": active_count,
     }
 
 @router.get("/{project_id}", response_model=ProjectResponse)

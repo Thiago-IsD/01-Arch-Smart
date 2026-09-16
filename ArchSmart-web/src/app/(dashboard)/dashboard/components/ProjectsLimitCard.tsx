@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { estadoDoLimite } from "@/features/projects/limite"
 
 // ---------------------------------------------------------------------------
 // Card "Projetos Ativos" — separado por composicao, nao por espera de dado.
@@ -20,7 +21,7 @@ export function ProjectsLimitCard({
     activeProjectsCount: number
     planLimit: number
 }) {
-    const projectPercentage = Math.min((activeProjectsCount / planLimit) * 100, 100)
+    const limite = estadoDoLimite(activeProjectsCount, planLimit)
 
     return (
         <Card className="bg-card shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
@@ -41,13 +42,13 @@ export function ProjectsLimitCard({
                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden mb-1.5">
                     <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                            projectPercentage >= 100 ? 'bg-secondary' : 'bg-primary'
+                            limite.noLimite ? 'bg-secondary' : 'bg-primary'
                         }`}
-                        style={{ width: `${projectPercentage}%` }}
+                        style={{ width: `${limite.fracao * 100}%` }}
                     />
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                    {projectPercentage >= 100 ? "Limite de projetos atingido" : `${planLimit - activeProjectsCount} espaço(s) livre(s)`}
+                    {limite.noLimite ? "Limite de projetos atingido" : `${limite.livres} espaço(s) livre(s)`}
                 </p>
             </CardContent>
         </Card>

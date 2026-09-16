@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { useAmbientesDoProjeto, useMoveToProject, useProjetosParaMover } from "@/features/library/hooks"
+import { useMoveToProject } from "@/features/library/hooks"
+import { useAmbientesDoProjeto, useProjetosParaMover } from "@/features/projects/hooks"
 import {
     Dialog,
     DialogContent,
