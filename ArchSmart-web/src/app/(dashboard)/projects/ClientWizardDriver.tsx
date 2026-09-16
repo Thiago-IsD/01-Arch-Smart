@@ -12,15 +12,10 @@ export function ClientWizardDriver({ isOpen }: { isOpen: boolean }) {
         }
     }
 
-    const handleSuccess = () => {
-        router.refresh()
-    }
-
     return (
         <ProjectWizard
             isOpen={isOpen}
             onOpenChange={handleOpenChange}
-            onSuccess={handleSuccess}
         />
     )
 }

@@ -8,12 +8,12 @@
       "motivo": "A Tarefa 2 da Secao 8 tapou quatro furos da regua de cores_literais: bg-white/text-white/-black, hex arbitrario fora de bg|text|border, ring-offset-<paleta>-<n>, e invisible/hidden com group-hover. O numero subiu de 518 para 588 porque a regua passou a enxergar defeito que sempre existiu -- nenhuma cor literal nova entrou no codigo. 518 (regua antiga, em staging) e 583 (regua nova, hoje) foram medidos por reguas diferentes e nao sao comparaveis. Hoje em 583: a migracao da Biblioteca baixou cinco."
     }
   },
-  "eslint_erros": 85,
+  "eslint_erros": 83,
   "cores_literais": 553,
   "modulos_sem_doc": [
     "auth_service"
   ],
-  "fetch_fora_de_lib_api": 74,
+  "fetch_fora_de_lib_api": 73,
   "supabase_fora_de_lib_api": 0,
   "contraste_reprovado": [
     "claro:destructive",
