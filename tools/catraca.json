@@ -9,7 +9,7 @@
     }
   },
   "eslint_erros": 75,
-  "cores_literais": 539,
+  "cores_literais": 538,
   "modulos_sem_doc": [
     "auth_service"
   ],

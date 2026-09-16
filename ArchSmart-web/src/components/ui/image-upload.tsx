@@ -64,7 +64,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
                         />
                         <button
                             onClick={onRemove}
-                            className="absolute top-1 right-1 bg-destructive text-white p-1 rounded-full shadow-sm hover:bg-destructive/90 transition"
+                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground p-1 rounded-full shadow-sm hover:bg-destructive/90 transition"
                             type="button"
                             disabled={disabled}
                         >
