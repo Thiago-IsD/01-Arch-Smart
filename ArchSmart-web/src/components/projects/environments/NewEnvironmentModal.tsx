@@ -34,7 +34,9 @@ import { ApiError } from "@/lib/api/errors"
 
 const environmentSchema = z.object({
     name: z.string().min(1, "O nome do ambiente é obrigatório."),
-    type: z.string().optional(),
+    // Fonte unica do padrao: se o campo vier vazio, o schema preenche —
+    // "Interna/Seca" nao mora mais tambem no onSubmit.
+    type: z.string().default("Interna/Seca"),
     // DNA técnico opcional — pode ser preenchido já na criação.
     floor_area: z.coerce.number().min(0).optional(),
     wall_area: z.coerce.number().min(0).optional(),
@@ -70,7 +72,7 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId }: NewEnvi
         try {
             await criar.mutateAsync({
                 name: data.name,
-                type: data.type ?? "Interna/Seca",
+                type: data.type,
                 dna: {
                     floor_area: data.floor_area || 0,
                     wall_area: data.wall_area || 0,

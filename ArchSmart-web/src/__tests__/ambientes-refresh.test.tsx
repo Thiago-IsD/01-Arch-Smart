@@ -94,3 +94,27 @@ describe("mutacoes de ambiente chamam router.refresh apos sucesso", () => {
         expect(refresh).toHaveBeenCalled()
     })
 })
+
+/**
+ * Correcao 2 da Tarefa 7: "Interna/Seca" morava em dois lugares —
+ * `defaultValues.type` do formulario e o `?? "Interna/Seca"` do `onSubmit`.
+ * O schema do formulario (`environmentSchema`, com `z.string().default(...)`)
+ * passou a ser a UNICA fonte do padrao; o `onSubmit` so repassa `data.type`.
+ * Este teste prende o corpo que sai no `fetch`, nao so o toast — e o que
+ * impede a divergencia (schema dizendo uma coisa, `onSubmit` outra) de
+ * voltar.
+ */
+describe("NewEnvironmentModal — o tipo padrao vem do schema, fonte unica", () => {
+    it("submete sem escolher tipo e o corpo enviado traz type: Interna/Seca", async () => {
+        fetchMock.mockImplementation(async () => resposta({ id: "e1", project_id: "p1", name: "Sala" }, 201))
+        const usuario = userEvent.setup()
+        montar(<NewEnvironmentModal isOpen onOpenChange={vi.fn()} projectId="p1" />)
+
+        await usuario.type(screen.getByLabelText("Nome"), "Sala de Estar")
+        await usuario.click(screen.getByRole("button", { name: "Criar" }))
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+        const [, init] = fetchMock.mock.calls[0]
+        expect(JSON.parse(init.body).type).toBe("Interna/Seca")
+    })
+})
