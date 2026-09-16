@@ -217,6 +217,42 @@ class TestTextoSobreFundo(unittest.TestCase):
             usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
         self.assertIn("destructive", usados)
 
+    def test_image_asterisco_nao_abre_comentario_e_engole_o_codigo(self):
+        # Real em quatro arquivos (image-upload.tsx, profile/page.tsx,
+        # EnvironmentAccordion.tsx, BuilderClient.tsx): `accept="image/*"`
+        # pareava com o `*/` de um comentario de bloco de verdade mais
+        # adiante e apagava o codigo do meio em silencio -- falso NEGATIVO,
+        # pior que o falso positivo que este modulo ja corrigiu. O `/*` de
+        # "image/*" e precedido por "e" (letra), nao espaco/`{`, entao nao
+        # pode abrir bloco.
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                'accept="image/*"\n'
+                'const x = <p className="text-destructive">oi</p>\n'
+                "/* comentario real, bem depois */\n",
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(Path(pasta), claro)
+        self.assertIn("destructive", usados)
+
+    def test_comentario_jsx_na_mesma_linha_de_classname_ainda_e_descartado(self):
+        # `{/* ... */}` e o idioma de comentario do JSX e pode aparecer na
+        # MESMA linha de uma className real, nao so sozinho na linha. O `/*`
+        # ali e precedido por `{`, entao continua abrindo bloco -- e se esse
+        # comentario citasse outro token, ele nao podia contar.
+        with tempfile.TemporaryDirectory() as pasta:
+            Path(pasta, "a.tsx").write_text(
+                'const x = <div className="text-destructive">{/* nao use text-warning aqui */}</div>',
+                encoding="utf-8",
+            )
+            claro, _ = contraste.tokens_dos_temas(CSS_DE_HOJE)
+            usados = contraste.tokens_usados_como_texto(
+                Path(pasta), {**claro, "warning": (0, 0, 0)}
+            )
+        self.assertIn("destructive", usados)
+        self.assertNotIn("warning", usados)
+
 
 if __name__ == "__main__":
     unittest.main()
