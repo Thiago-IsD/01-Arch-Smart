@@ -39,10 +39,12 @@ class TestLeituraDoTema(unittest.TestCase):
 
 
 class TestReprovados(unittest.TestCase):
-    def test_lista_os_quatro_pares_reprovados_de_hoje(self):
+    def test_lista_os_tres_pares_reprovados_de_hoje(self):
+        # Eram quatro ate 15/09/2026: destructive no claro saiu com o token
+        # novo (spec de Projetos, decisao 5).
         self.assertEqual(
             contraste.reprovados(),
-            ["claro:destructive", "claro:muted", "claro:secondary", "escuro:secondary"],
+            ["claro:muted", "claro:secondary", "escuro:secondary"],
         )
 
     def test_par_novo_reprovado_aparece(self):
@@ -78,9 +80,11 @@ class TestTokensDeEstado(unittest.TestCase):
             self.assertNotIn(f"escuro:{estado}", fora)
 
     def test_nao_pioram_o_que_ja_existia(self):
+        # Eram quatro ate 15/09/2026: destructive no claro saiu com o token
+        # novo (spec de Projetos, decisao 5).
         self.assertEqual(
             contraste.reprovados(),
-            ["claro:destructive", "claro:muted", "claro:secondary", "escuro:secondary"],
+            ["claro:muted", "claro:secondary", "escuro:secondary"],
         )
 
 

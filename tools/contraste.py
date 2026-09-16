@@ -9,6 +9,7 @@ Quatro pares reprovavam quando esta ferramenta nasceu, em 09/09/2026: secondary
 nos dois temas (3,93:1 -- e o coral da marca), destructive (3,59:1) e muted
 (4,34:1) no claro. Por isso a medida entra como catraca, e nao como portao
 fechado: portao que nasce vermelho e desligado na primeira semana (ADR 0006).
+Tres desde 15/09/2026, quando destructive mudou (spec de Projetos).
 """
 import colorsys
 import re

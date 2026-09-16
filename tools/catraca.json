@@ -9,14 +9,13 @@
     }
   },
   "eslint_erros": 75,
-  "cores_literais": 553,
+  "cores_literais": 539,
   "modulos_sem_doc": [
     "auth_service"
   ],
   "fetch_fora_de_lib_api": 65,
   "supabase_fora_de_lib_api": 0,
   "contraste_reprovado": [
-    "claro:destructive",
     "claro:muted",
     "claro:secondary",
     "escuro:secondary"
@@ -31,9 +30,7 @@
     "ArchSmart-web/src/components/calendar/EventDialog.tsx"
   ],
   "texto_sobre_fundo_reprovado": [
-    "claro:destructive",
     "claro:secondary",
-    "claro:warning",
-    "escuro:destructive"
+    "claro:warning"
   ]
 }
