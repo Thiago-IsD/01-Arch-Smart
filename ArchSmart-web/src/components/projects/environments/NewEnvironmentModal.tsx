@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -29,8 +28,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { getAccessToken } from "@/lib/api/auth"
-import { apiUrl } from "@/lib/api-url"
+import { useCriarAmbiente } from "@/features/projects/hooks"
+import { ApiError } from "@/lib/api/errors"
 
 const environmentSchema = z.object({
     name: z.string().min(1, "O nome do ambiente é obrigatório."),
@@ -47,12 +46,12 @@ interface NewEnvironmentModalProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
     projectId: string
-    onSuccess: (env: any) => void
 }
 
-export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess }: NewEnvironmentModalProps) {
+export function NewEnvironmentModal({ isOpen, onOpenChange, projectId }: NewEnvironmentModalProps) {
     const { toast } = useToast()
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const criar = useCriarAmbiente(projectId)
+    const isSubmitting = criar.isPending
 
     const form = useForm<EnvironmentFormValues>({
         resolver: zodResolver(environmentSchema) as any,
@@ -67,40 +66,21 @@ export function NewEnvironmentModal({ isOpen, onOpenChange, projectId, onSuccess
 
     const onSubmit = async (data: EnvironmentFormValues) => {
         try {
-            setIsSubmitting(true)
-            const token = (await getAccessToken()) || ""
-
-            const body = {
+            await criar.mutateAsync({
                 name: data.name,
-                type: data.type,
+                type: data.type ?? "Interna/Seca",
                 dna: {
                     floor_area: data.floor_area || 0,
                     wall_area: data.wall_area || 0,
                     ceiling_area: data.ceiling_area || 0,
                 },
-            }
-
-            const res = await fetch(apiUrl(`/api/projects/${projectId}/environments`), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(body)
             })
-
-            if (!res.ok) throw new Error("Falha ao criar ambiente")
-
-            const newEnv = await res.json()
             toast({ title: "Ambiente Criado", description: "DNA Técnico gerado com sucesso." })
-            onSuccess(newEnv)
-
             form.reset()
             onOpenChange(false)
-        } catch (error) {
-            toast({ variant: "destructive", title: "Ops!", description: "Não foi possível criar o ambiente." })
-        } finally {
-            setIsSubmitting(false)
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Não foi possível criar o ambiente."
+            toast({ variant: "destructive", title: "Ops!", description: mensagem })
         }
     }
 

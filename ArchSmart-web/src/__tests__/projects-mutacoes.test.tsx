@@ -5,10 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { queryKeys } from "@/lib/query/keys"
 import {
+    useCriarAmbiente,
     useCriarProjeto,
     useEditarProjeto,
+    useExcluirAmbiente,
     useExcluirProjeto,
     useMudarStatusDoProjeto,
+    useSalvarDna,
 } from "@/features/projects/hooks"
 
 vi.mock("@/lib/api/auth", () => ({ getAccessToken: async () => "tok" }))
@@ -121,5 +124,47 @@ describe("mutacoes de projeto", () => {
         })
         await waitFor(() => expect(result.current.isError).toBe(true))
         expect(invalidadas).toEqual([])
+    })
+})
+
+describe("mutacoes de ambiente", () => {
+    it("criar ambiente: POST no projeto; invalida environments(id) e lists — nao dashboard, nao detail", async () => {
+        fetchMock.mockImplementation(async () => respostaOk({ id: "e1", project_id: "p1", name: "Sala" }, 201))
+        const { Wrapper, invalidadas, descartadas } = montar()
+        const { result } = renderHook(() => useCriarAmbiente("p1"), { wrapper: Wrapper })
+
+        await result.current.mutateAsync({ name: "Sala", type: "Interna/Seca", dna: { floor_area: 0, wall_area: 0, ceiling_area: 0 } })
+
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(String(url)).toMatch(/\/api\/projects\/p1\/environments$/)
+        expect(init.method).toBe("POST")
+        expect(invalidadas.sort()).toEqual(ordenado([queryKeys.projects.environments("p1"), queryKeys.projects.lists()]))
+        expect(descartadas).toEqual([])
+    })
+
+    it("excluir ambiente: DELETE no ambiente; mesmo efeito de criar", async () => {
+        fetchMock.mockImplementation(async () => respostaOk(undefined, 204))
+        const { Wrapper, invalidadas } = montar()
+        const { result } = renderHook(() => useExcluirAmbiente("p1"), { wrapper: Wrapper })
+
+        await result.current.mutateAsync("e1")
+
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(String(url)).toMatch(/\/api\/environments\/e1$/)
+        expect(init.method).toBe("DELETE")
+        expect(invalidadas.sort()).toEqual(ordenado([queryKeys.projects.environments("p1"), queryKeys.projects.lists()]))
+    })
+
+    it("salvar DNA: PUT .../dna; invalida SO environments(id) — a contagem da lista nao muda", async () => {
+        const { Wrapper, invalidadas } = montar()
+        const { result } = renderHook(() => useSalvarDna("p1"), { wrapper: Wrapper })
+
+        await result.current.mutateAsync({ envId: "e1", areas: { floor_area: 10, wall_area: 20, ceiling_area: 10 } })
+
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(String(url)).toMatch(/\/api\/environments\/e1\/dna$/)
+        expect(init.method).toBe("PUT")
+        expect(JSON.parse(init.body)).toEqual({ floor_area: 10, wall_area: 20, ceiling_area: 10 })
+        expect(invalidadas).toEqual(ordenado([queryKeys.projects.environments("p1")]))
     })
 })

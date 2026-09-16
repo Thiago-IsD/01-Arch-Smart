@@ -8,10 +8,13 @@ da Tarefa 4 — só a lista.** A Tarefa 5 migrou também o **detalhe**
 (`/projects/[id]`); a seção "O detalhe" abaixo descreve o que mudou nela. **A
 Tarefa 6 migrou as quatro mutações de projeto** (criar, editar, mudar status,
 excluir) para `useMutation` com um mapa explícito de invalidação — ver "As
-mutações de projeto (Tarefa 6)" abaixo. As **duas mutações de ambiente**
-(criar/excluir ambiente, salvar DNA) continuam no padrão antigo — Tarefa 7.
-Não leia este arquivo como "Projetos migrou" — leia como "lista, detalhe e as
-quatro mutações de projeto migraram; ambientes e DNA não".
+mutações de projeto (Tarefa 6)" abaixo. **A Tarefa 7 migrou as três mutações de
+ambiente/DNA** (criar ambiente, excluir ambiente, salvar DNA) pelo mesmo
+mecanismo, e fez o lint de `fetch` virar **erro** (em vez de aviso) em todo o
+território de Projetos — ver "As mutações de ambiente e DNA (Tarefa 7)"
+abaixo. Não leia este arquivo como "Projetos migrou" — leia como "lista,
+detalhe e as sete mutações (quatro de projeto, três de ambiente/DNA)
+migraram".
 
 ## O que `features/projects/` contém hoje
 
@@ -20,8 +23,8 @@ quatro mutações de projeto migraram; ambientes e DNA não".
 | `types.ts` | `Projeto`, `ClienteDoProjeto`, `PaginaDeProjetos`, `Ambiente`, `DnaDoAmbiente` — espelham `ProjectResponse`/`PaginatedProjectResponse`/`EnvironmentResponse` do backend. `PaginaDeProjetos.active_count` é novo (ver "O backend", abaixo); o comentário no tipo já avisa "ativos da conta INTEIRA, contados no servidor — não conte `items`". |
 | `queries.ts` | Três fábricas `queryOptions`: `queryDaListaDeProjetos(cliente, {page, size})`, `queryDoProjeto(cliente, id)` e `queryDosAmbientes(cliente, projectId)`. As duas últimas, trazidas prontas pela Tarefa 3, passaram a ser consumidas pelo **detalhe** na Tarefa 5. |
 | `limite.ts` | `estadoDoLimite(ativos, limite)` — o cálculo de "no limite" e da fração da barra, num lugar só. Limite `<= 0` é tratado como "no limite", sem divisão (evita o `NaN` que `ProjectsLimitCard` do Dashboard tinha antes da Tarefa 3 desta seção existir). |
-| `hooks.ts` | `useListaDeProjetos()` (usa `queryDaListaDeProjetos`), `useProjeto(id)` e `useAmbientes(projectId)` (usados pelo detalhe desde a Tarefa 5), mais dois hooks que **vieram de `features/library/hooks.ts`** na Tarefa 3 — `useProjetosParaMover(ativo)` (usado pelo `MoveToProjectModal` da Biblioteca) e `useAmbientesDoProjeto(projectId)`. Desde a Tarefa 6, também `useCriarProjeto()`, `useEditarProjeto()`, `useMudarStatusDoProjeto()` e `useExcluirProjeto()`. |
-| `api.ts` | Desde a Tarefa 6: as escritas de Projetos — `criarProjeto`, `editarProjeto`, `mudarStatusDoProjeto`, `excluirProjeto` (consumidas pelos quatro hooks acima), mais `criarAmbiente`, `excluirAmbiente`, `salvarDna` e os tipos `CorpoDeAmbiente`/`AreasDoDna`, que a Tarefa 7 consome — o brief da Tarefa 6 mandou criá-los junto, sem consumidor ainda, para o arquivo nascer inteiro. |
+| `hooks.ts` | `useListaDeProjetos()` (usa `queryDaListaDeProjetos`), `useProjeto(id)` e `useAmbientes(projectId)` (usados pelo detalhe desde a Tarefa 5), mais dois hooks que **vieram de `features/library/hooks.ts`** na Tarefa 3 — `useProjetosParaMover(ativo)` (usado pelo `MoveToProjectModal` da Biblioteca) e `useAmbientesDoProjeto(projectId)`. Desde a Tarefa 6, também `useCriarProjeto()`, `useEditarProjeto()`, `useMudarStatusDoProjeto()` e `useExcluirProjeto()`. Desde a Tarefa 7, também `useCriarAmbiente(projectId)`, `useExcluirAmbiente(projectId)` e `useSalvarDna(projectId)`. |
+| `api.ts` | Desde a Tarefa 6: as escritas de Projetos — `criarProjeto`, `editarProjeto`, `mudarStatusDoProjeto`, `excluirProjeto` (consumidas pelos quatro hooks acima), mais `criarAmbiente`, `excluirAmbiente`, `salvarDna` e os tipos `CorpoDeAmbiente`/`AreasDoDna`, que já existiam sem consumidor (o brief da Tarefa 6 mandou criá-los junto, para o arquivo nascer inteiro) e desde a Tarefa 7 são consumidos pelos três hooks de ambiente/DNA. |
 | `invalidacao.ts` | Desde a Tarefa 6: o mapa `efeitos` (`EfeitoNoCache = { invalidar, descartar }`, uma entrada por mutação) e `aplicarEfeito(queryClient, efeito)`. Ver "As mutações de projeto (Tarefa 6)" abaixo. |
 
 Não há `filters.ts` neste domínio — não há filtro de lista própria como o da
@@ -128,15 +131,15 @@ e mostra `ProjetoComErro` se isso também falhar. Os três casos têm teste em
 `EnvironmentsWorkspace` deixou de copiar a lista para `useState`
 (`EnvironmentsWorkspace({ projectId, ambientes })` — a prop `initialEnvironments`
 não existe mais) e passou a ler `ambientes` por prop, vindo do
-`QueryBoundary`. **Os três `handle*` (adicionar/atualizar/excluir) continuam
-existindo, mas agora escrevem direto no cache do React Query
+`QueryBoundary`. Texto original (Tarefa 5), para o histórico: **os três
+`handle*` (adicionar/atualizar/excluir) continuavam existindo, mas escreviam
+direto no cache do React Query
 (`queryClient.setQueryData(queryKeys.projects.environments(projectId), ...)`)
-em vez de `setState`** — marcado `PROVISORIO` no código: os modais
-(`NewEnvironmentModal`, `DNAEditorSheet`, `EnvironmentCard`) ainda fazem
-`fetch` manual e devolvem o resultado por callback (nenhuma das seis mutações
-migrou nesta tarefa), então a atualização de cache à mão é o que mantém a
-tela reagindo sem reload até a Tarefa 7 trocar isso por invalidação e apagar
-os três handlers. Confirmado ao vivo (ver "Passada por agente" abaixo):
+em vez de `setState`** — marcado `PROVISORIO` no código, porque os modais
+(`NewEnvironmentModal`, `DNAEditorSheet`, `EnvironmentCard`) ainda faziam
+`fetch` manual e devolviam o resultado por callback. **A Tarefa 7 apagou os
+três `handle*` e o trecho `PROVISORIO`**: ver "As mutações de ambiente e DNA
+(Tarefa 7)" abaixo. Confirmado ao vivo (ver "Passada por agente" abaixo):
 criar, excluir e completar o DNA de um ambiente atualizam a grade
 imediatamente, sem `router.refresh()` nem reload.
 
@@ -307,6 +310,133 @@ antes. O teste ajustado foi rodado **antes** de tocar `ProjectWizard.tsx` e
 passou (12/12): é isso que prova que o ajuste só trocou o mecanismo, não
 afrouxou o que o teste prende.
 
+## As mutações de ambiente e DNA (Tarefa 7)
+
+As três escritas de **ambiente/DNA** — criar ambiente, excluir ambiente,
+salvar DNA — trocaram `fetch` manual por `useMutation`, no mesmo padrão das
+quatro mutações de projeto da Tarefa 6: `useCriarAmbiente(projectId)`,
+`useExcluirAmbiente(projectId)` e `useSalvarDna(projectId)` em
+`features/projects/hooks.ts`, consumindo `criarAmbiente`/`excluirAmbiente`/
+`salvarDna` de `api.ts` e invalidando pelo mapa `efeitos.mudarAmbientes(projectId)`
+(criar/excluir) e `efeitos.salvarDna(projectId)` (DNA), já existentes desde a
+Tarefa 6. `NewEnvironmentModal`, `EnvironmentCard` e `DNAEditorSheet` perderam
+`onSuccess`/`onDelete` — quem muta agora invalida o cache, não devolve o
+resultado por callback — e `EnvironmentsWorkspace` perdeu os três `handle*`
+`PROVISORIO` da Tarefa 5. As três telas passaram a tratar erro como o resto de
+Projetos desde a Tarefa 6: `erro instanceof ApiError ? erro.message : <frase
+genérica>`, título "Ops!" — antes era um `catch` cego com frase fixa.
+
+| Mutação | `invalidar` | `descartar` |
+|---|---|---|
+| criar ambiente | `projects.environments(id)`, `projects.lists()` | — |
+| excluir ambiente | `projects.environments(id)`, `projects.lists()` | — |
+| salvar DNA | `projects.environments(id)` | — |
+
+`projects.lists()` entra em criar/excluir ambiente porque o card da lista
+mostra `environments_count`; **não** entra em salvar DNA, que não muda a
+contagem. `dashboard.all` não entra em nenhuma das três — o Dashboard não
+mostra ambiente nem contagem de ambiente (mesma regra da Tarefa 6). Nenhuma
+das três chama `router.refresh()` — ver a ressalva abaixo, que qualifica essa
+decisão.
+
+### Achado do Step 7: a premissa "nenhuma tela de servidor lê a lista de ambientes" é falsa
+
+O brief da Tarefa 7 mandava conferir, antes de decidir não chamar
+`router.refresh()` nas mutações de ambiente, que nenhum Server Component fora
+de `features/projects` lê a lista de ambientes — e mandava **parar e
+reportar** se achasse um. Achou dois:
+
+```
+grep -rn "/environments" "src/app/(dashboard)/projects/[id]/budget" "src/app/(dashboard)/projects/[id]/presentation" "src/app/(dashboard)/projects/[id]/print" --include=*.tsx
+```
+
+```
+src/app/(dashboard)/projects/[id]/budget/page.tsx:48:        const res = await fetch(apiUrl(`/api/projects/${id}/environments`), {
+src/app/(dashboard)/projects/[id]/presentation/[presentation_id]/builder/components/EnvironmentAccordion.tsx:55: ...presentations/${presentationId}/environments/${env.id}
+src/app/(dashboard)/projects/[id]/presentation/[presentation_id]/builder/components/EnvironmentAccordion.tsx:98: ...presentations/${presentationId}/environments/${env.id}/images
+src/app/(dashboard)/projects/[id]/print/page.tsx:47:        const res = await fetch(apiUrl(`/api/projects/${id}/environments`), {
+```
+
+`EnvironmentAccordion.tsx` bate em `/api/presentations/.../environments/...`
+— rota de apresentação, não a lista de ambientes do projeto; não conta.
+`budget/page.tsx:42-57` e `print/page.tsx:41-56` **contam**: ambos são Server
+Components (`export default async function`, sem `"use client"`) com uma
+função `getProjectEnvironments(id)` que busca `GET
+/api/projects/{id}/environments` com `cache: 'no-store'`, em paralelo com o
+orçamento e o projeto.
+
+**A premissa do brief estava errada, e eu não decidi sozinho o que fazer com
+isso** — a decisão de tirar `router.refresh()` das mutações de ambiente é do
+Thiago (não de quem executa), e o brief é claro que ela **depende** de a
+premissa ser verdadeira. Não adicionei `router.refresh()` às três mutações
+(seria eu tomando a decisão que o brief reserva para Thiago, na direção
+oposta), nem removi as duas chamadas de servidor (fora do escopo de arquivos
+desta tarefa). O que dá para dizer sem decidir:
+
+- **Não é uma regressão desta tarefa.** O código antigo (antes da Tarefa 7)
+  também nunca chamava `router.refresh()` nos modais de ambiente — o
+  `onSuccess`/callback só atualizava o cache do React Query (Tarefa 5,
+  `PROVISORIO`) ou o `useState` local (antes da Tarefa 5). Orçamento e
+  Impressão já podiam servir uma contagem de ambientes desatualizada se o
+  usuário mudasse ambientes na aba Ambientes e depois abrisse essas abas sem
+  reload — essa condição existia antes desta tarefa e continua igual depois
+  dela.
+- **`cache: 'no-store'` limita o alcance.** Uma navegação para
+  `/projects/{id}/budget` ou `/print` que ainda não tem entrada no Router
+  Cache do Next.js sempre executa o Server Component de novo — busca fresca,
+  sem depender de `router.refresh()`. O risco de dado desatualizado é
+  específico do Router Cache do App Router (uma rota já visitada nesta sessão
+  do navegador, revisitada dentro da janela de cache), não do carregamento
+  normal.
+- **Decisão pendente:** se Orçamento/Impressão devem invalidar seu Router
+  Cache quando um ambiente muda (o que exigiria `router.refresh()` nas três
+  mutações desta tarefa, ou outra forma de invalidar rotas fora da árvore de
+  `/projects/[id]`) é pergunta de produto/UX (o quão frequente é esse
+  caminho, o quão ruim é mostrar uma contagem de ambientes desatualizada em
+  Orçamento por alguns minutos) que este brief não respondeu e que não é
+  minha para responder.
+
+## O lint de `fetch` vira erro no território de Projetos (Tarefa 7)
+
+`eslint.config.mjs`: o bloco que faz `no-restricted-syntax` (a regra que
+proíbe `fetch(` fora de `lib/api/`) valer como **erro** em vez de aviso
+ganhou, além de `library/**`, seis entradas de Projetos —
+`src/components/projects/**/*.{ts,tsx}`,
+`src/app/(dashboard)/projects/page.tsx`,
+`src/app/(dashboard)/projects/ClientWizardDriver.tsx`,
+`src/app/(dashboard)/projects/components/**/*.{ts,tsx}`,
+`src/app/(dashboard)/projects/\[id\]/page.tsx` e
+`src/app/(dashboard)/projects/\[id\]/components/Projeto*.tsx`. Os colchetes de
+`[id]` são escapados porque em glob `[id]` é classe de caractere (casaria um
+único `i` ou `d`, não o literal `[id]`) — e o escape funcionou de primeira
+nesta versão do eslint (`eslint@9`/flat config), sem precisar do plano B
+(`projects/*/page.tsx`) que o brief previa como alternativa:
+
+```
+npx eslint --print-config "src/app/(dashboard)/projects/[id]/page.tsx" | grep -A1 '"no-restricted-syntax"' | head -2
+# "no-restricted-syntax": [2,   -> erro
+
+npx eslint --print-config "src/app/(dashboard)/projects/[id]/budget/page.tsx" | grep -A1 '"no-restricted-syntax"' | head -2
+# "no-restricted-syntax": [1,   -> aviso (budget/ fica de fora, de propósito)
+
+npx eslint --print-config "src/app/(dashboard)/projects/[id]/components/PresentationsTab.tsx" | grep -A1 '"no-restricted-syntax"' | head -2
+# "no-restricted-syntax": [1,   -> aviso (nao e Projeto*.tsx)
+```
+
+`budget/`, `presentation/` e `print/` sob `projects/[id]` continuam em "warn"
+— são outras telas, fora do escopo desta seção. `npx eslint` sobre o
+território inteiro de Projetos dá **zero** violações de `no-restricted-syntax`
+(as três chamadas `fetch` de ambiente/DNA saíram) — os 6 erros que aparecem na
+mesma passada (`@typescript-eslint/no-explicit-any` em
+`EditProjectButton.tsx`/`ProjectWizard.tsx`/`DNAEditorSheet.tsx`/
+`NewEnvironmentModal.tsx`, `react/no-unescaped-entities` em
+`EnvironmentCard.tsx`) são pré-existentes e de outras regras, não desta
+tarefa — confirmado rodando o mesmo eslint contra o código de antes desta
+tarefa (via `git stash`): já existiam lá, em número igual ou maior (esta
+tarefa **removeu** 4 usos de `any` ao tipar `environment`/`onSuccess` como
+`Ambiente`/vazio em vez de `any`, o que também baixou `eslint_erros` de 79
+para 75).
+
 ## O que esta tarefa (Tarefa 4) NÃO mudou — e o que a Tarefa 5 fechou depois
 
 - ~~`/projects/[id]` (o detalhe) continua no padrão antigo~~ — **migrado na
@@ -315,13 +445,14 @@ afrouxou o que o teste prende.
 - ~~**As seis mutações continuam com `fetch` manual**~~ — **as quatro de
   projeto migraram na Tarefa 6** (criar/editar em `ProjectWizard.tsx`, mudar
   status em `ProjectStatusSelect.tsx`, excluir em `DeleteProjectAlert.tsx`);
-  ver "As mutações de projeto (Tarefa 6)" acima. **As duas de ambiente
-  continuam com `fetch` manual**: `NewEnvironmentModal.tsx`,
-  `EnvironmentCard.tsx`, `DNAEditorSheet.tsx` — é a Tarefa 7. A Tarefa 5 não
-  tinha mudado isso: os três `handle*` de `EnvironmentsWorkspace` passaram a
-  escrever no cache do React Query em vez de `useState` (marcado
-  `PROVISORIO` no código — ver "O detalhe" acima), mas os modais continuam
-  fazendo `fetch` e devolvendo o ambiente por callback.
+  ver "As mutações de projeto (Tarefa 6)" acima. **As três de ambiente/DNA
+  migraram na Tarefa 7**: `NewEnvironmentModal.tsx`, `EnvironmentCard.tsx`,
+  `DNAEditorSheet.tsx` — ver "As mutações de ambiente e DNA (Tarefa 7)" acima.
+  A Tarefa 5 não tinha mudado isso: os três `handle*` de
+  `EnvironmentsWorkspace` passaram a escrever no cache do React Query em vez
+  de `useState` (marcado `PROVISORIO` no código), mas os modais continuavam
+  fazendo `fetch` e devolvendo o ambiente por callback — a Tarefa 7 apagou os
+  três `handle*` e trocou por invalidação.
   Medido na Tarefa 4:
 
   ```
@@ -332,10 +463,14 @@ afrouxou o que o teste prende.
   `components/projects`; a lista tinha 1, que a Tarefa 4 removeu.
   `tools/catraca.py`, `fetch_fora_de_lib_api`, baixou de 74 para 73 na
   Tarefa 4, de 73 para **71** na Tarefa 5 — os dois `fetch` sequenciais do
-  `page.tsx` antigo do detalhe saíram — e de 71 para **68** na Tarefa 6, com
-  a saída dos três `fetch` das mutações de projeto; os das mutações de
-  ambiente, dentro de `components/projects/environments/`, continuam e são
-  a Tarefa 7.)
+  `page.tsx` antigo do detalhe saíram —, de 71 para **68** na Tarefa 6, com
+  a saída dos três `fetch` das mutações de projeto, e de 68 para **65** na
+  Tarefa 7, com a saída dos três `fetch` das mutações de ambiente/DNA:
+
+  ```
+  grep -rn "fetch(" ArchSmart-web/src/components/projects "ArchSmart-web/src/app/(dashboard)/projects/page.tsx" "ArchSmart-web/src/app/(dashboard)/projects/[id]/page.tsx"   # sem saida, apos a Tarefa 7
+  ```
+  )
 - ~~**`ClientWizardDriver.tsx` perdeu `onSuccess`/`handleSuccess`**~~ —
   **fechada na Tarefa 6**: criar um projeto pelo wizard agora atualiza a
   lista pela invalidação explícita de `useCriarProjeto()`
@@ -410,6 +545,18 @@ afrouxou o que o teste prende.
   derrubados pelo PID real (`netstat -ano` → PID → `taskkill /PID <pid> /T
   /F`), nunca por nome.
 
+**Medido (Tarefa 7, mutações de ambiente/DNA + lint):**
+- `fetch_fora_de_lib_api`: 65 (era 68) — `python tools/catraca.py`.
+- `eslint_erros`: 75 (era 79) — `python tools/catraca.py --eslint-json ArchSmart-web/eslint.json`; caiu por remover 4 usos de `any` nos componentes tocados (não pelo `no-restricted-syntax`, que não conta para esta medida).
+- `cores_literais`, `hover_sem_focus`, `tabindex_negativo`, `contraste_reprovado`, `arquivos_acima_de_400`, `modulos_sem_doc`, `supabase_fora_de_lib_api`: todos iguais ao baseline — nenhuma regressão.
+- `npm test`: 282 testes, 40 arquivos, zero `failed`.
+- `npm run typecheck`: limpo.
+- `src/__tests__/projects-mutacoes.test.tsx`: 8/8 (5 de projeto, Tarefa 6, mais 3 de ambiente/DNA, Tarefa 7), conjunto exato de chaves por mutação.
+- `npx eslint --print-config` confirma a severidade do glob: `2` (erro) em `projects/[id]/page.tsx`, `1` (aviso) em `projects/[id]/budget/page.tsx` e em `PresentationsTab.tsx` — o escape `\[id\]` funcionou de primeira, sem precisar do plano B.
+- `npx eslint` sobre o território de Projetos: zero violações de `no-restricted-syntax`; os 6 erros restantes são `no-explicit-any`/`no-unescaped-entities` pré-existentes, fora do escopo desta tarefa (ver "O lint de `fetch` vira erro..." acima).
+- Passada por agente em 15/09/2026 (API local + `npm run dev`, sessão da conta de teste E2E), em "Loft Pinheiros #3" (6 ambientes): criar "Ambiente Teste Tarefa 7" apareceu na grade sem reload (`POST .../environments` → `201`); editar o DNA (15/20/10) mudou o badge de "DNA Pendente" para "DNA Completo" na hora (`PUT .../dna` → `200`); excluir sumiu da grade com o toast "Ambiente Excluído" (`DELETE` → `204`); voltar para `/projects` mostrou "Loft Pinheiros #3" de volta em **6 Ambientes** (o `GET /api/projects` refez sozinho, pela invalidação de `projects.lists()`). Zero erro no log do servidor durante a passada. Processos derrubados pelo PID real (`netstat -ano` → PID → `taskkill //PID <pid> //T //F`), nunca por nome.
+- **Achado, não fechado**: `budget/page.tsx` e `print/page.tsx` leem a lista de ambientes no servidor — ver "Achado do Step 7" acima. Não há teste automatizado para isso; é leitura de código + `grep`.
+
 **A medir** (dependem de tarefas seguintes do mesmo plano, ou de olho humano —
 nenhum número foi estimado no lugar):
 - Clique → dados da lista e do detalhe migrados (o instrumento existe,
@@ -432,7 +579,7 @@ existe:
 
 O "depois" desses dois números é entregável da Tarefa 12, não desta.
 
-## A definição de pronto, item a item (lista + detalhe + mutações de projeto; ambientes/DNA ficam de fora)
+## A definição de pronto, item a item (lista + detalhe + as sete mutações)
 
 | Item | Estado | Onde está a prova |
 |---|---|---|
@@ -441,20 +588,27 @@ O "depois" desses dois números é entregável da Tarefa 12, não desta.
 | Prefetch da lista + `/me` fora da hidratação | ✅ | `src/__tests__/projetos-data.test.tsx` |
 | Prefetch do projeto + ambientes em paralelo, `notFound()` no servidor | ✅ | `src/__tests__/projeto-data.test.tsx` |
 | Os quatro estados via `QueryBoundary` (streaming, dados, vazio, erro), nas duas telas | ✅ | testes acima + `src/__tests__/projeto-detalhe.test.tsx` |
-| `EnvironmentsWorkspace` sem cópia de estado (lê `ambientes` por prop) | ✅ | `src/__tests__/projeto-detalhe.test.tsx`; passada por agente (seção acima) |
+| `EnvironmentsWorkspace` sem cópia de estado (lê `ambientes` por prop), sem handlers `PROVISORIO` | ✅ | `src/__tests__/projeto-detalhe.test.tsx`; passada por agente (Tarefa 7) |
 | `ProjectHeader` tipado (`project: Projeto`), sem quebrar Orçamento/Apresentação | ✅ | `npm run typecheck` limpo |
 | Nenhuma cor, URL, id ou limite literal nos arquivos desta tarefa | ✅ | `npx eslint` limpo; sem cor literal nova |
 | As quatro mutações de projeto por `useMutation`, com mapa explícito de invalidação | ✅ | `src/__tests__/projects-mutacoes.test.tsx` (Tarefa 6) |
 | `dashboard.all` invalidado pelas quatro mutações de projeto | ✅ | mesmo teste, conjunto exato por mutação |
 | Teste de caracterização do wizard sem afrouxar comportamento | ✅ | `project-wizard.test.tsx`, 12/12 antes e depois de tocar o componente |
+| As três mutações de ambiente/DNA por `useMutation`, com mapa explícito de invalidação | ✅ | mesmo teste, `describe("mutacoes de ambiente")` (Tarefa 7) |
+| Erro de domínio (`ApiError`) nas três telas de ambiente, sem `catch` cego | ✅ | leitura de código; sem teste dedicado a essa frase |
+| `fetch` vira erro (não aviso) em todo o território de Projetos | ✅ | `npx eslint --print-config`, severidade `2` no glob (Tarefa 7) |
 | Orçamento de performance | ⚠️ não medido — ver "A medir" |
 | axe, teclado, 390/1440px | ⚠️ não medido — dependem de olho humano, na verificação da Tarefa 12 |
 | Consultas por carregamento < 8 (lista) | ✅ | 5, Tarefa 2, tabela acima |
 | Consultas por carregamento < 8 (detalhe) | ⚠️ não remedido nesta tarefa — Tarefa 2 mediu 4+3 antes do detalhe migrar; endpoint não mudou |
 | Doc do módulo | ✅ | este arquivo |
+| Server Component fora de `features/projects` não lê a lista de ambientes | ❌ **falso** — `budget/page.tsx` e `print/page.tsx` leem; achado no Step 7, não corrigido (decisão de Thiago) | "Achado do Step 7" acima |
 
-Este documento cobre lista, detalhe e as quatro mutações de projeto. As duas
-mutações de ambiente/DNA (Tarefa 7) e o restante da definição de pronto que
-depende de navegador/olho humano ainda não migraram nem foram verificados —
-quando migrarem, revise este arquivo em vez de reescrevê-lo, para não ficar
-descrevendo um estado que o código já passou.
+Este documento cobre lista, detalhe e as sete mutações (quatro de projeto,
+Tarefa 6; três de ambiente/DNA, Tarefa 7). O restante da definição de pronto
+que depende de navegador/olho humano ainda não foi verificado, e a pendência
+do Step 7 (Orçamento/Impressão lendo ambientes no servidor, sem
+`router.refresh()` nas mutações de ambiente) segue em aberto para decisão de
+Thiago — quando a próxima tela migrar ou essa decisão for tomada, revise este
+arquivo em vez de reescrevê-lo, para não ficar descrevendo um estado que o
+código já passou.

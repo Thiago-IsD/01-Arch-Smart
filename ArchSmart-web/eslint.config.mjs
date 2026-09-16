@@ -33,15 +33,20 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
   { files: ["src/**/*.{ts,tsx}"], rules: { "no-restricted-syntax": ["warn", ...PROIBICOES] } },
-  // Territorio que a Secao 5 ja migrou: aqui o lint bloqueia de verdade, em
-  // vez de so avisar. O resto do app (~30 telas) fica em "warn" ate a Secao 8
-  // migrar cada uma; subir o numero delas de uma vez so faria o PR nascer
-  // vermelho e o portao ser desligado na primeira semana (ADR 0006).
+  // Territorio ja migrado: Biblioteca (Secoes 5 e 8) e Projetos (Secao 8).
+  // budget/, presentation/ e print/ sob projects/[id] continuam em "warn" —
+  // sao outras telas.
   {
     files: [
       "src/features/**/*.{ts,tsx}",
       "src/lib/**/*.{ts,tsx}",
       "src/app/(dashboard)/library/**/*.{ts,tsx}",
+      "src/components/projects/**/*.{ts,tsx}",
+      "src/app/(dashboard)/projects/page.tsx",
+      "src/app/(dashboard)/projects/ClientWizardDriver.tsx",
+      "src/app/(dashboard)/projects/components/**/*.{ts,tsx}",
+      "src/app/(dashboard)/projects/\\[id\\]/page.tsx",
+      "src/app/(dashboard)/projects/\\[id\\]/components/Projeto*.tsx",
     ],
     rules: { "no-restricted-syntax": ["error", ...PROIBICOES] },
   },

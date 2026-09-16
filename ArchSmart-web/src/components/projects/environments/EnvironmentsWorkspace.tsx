@@ -1,12 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { Ambiente } from "@/features/projects/types"
-import { queryKeys } from "@/lib/query/keys"
 
 import { DNAEditorSheet } from "./DNAEditorSheet"
 import { EnvironmentCard } from "./EnvironmentCard"
@@ -20,21 +18,6 @@ interface EnvironmentsWorkspaceProps {
 export function EnvironmentsWorkspace({ projectId, ambientes }: EnvironmentsWorkspaceProps) {
     const [isNewModalOpen, setIsNewModalOpen] = useState(false)
     const [selectedEnvId, setSelectedEnvId] = useState<string | null>(null)
-    const queryClient = useQueryClient()
-
-    // PROVISORIO ate a Tarefa 7: os modais ainda fazem `fetch` e devolvem o
-    // ambiente por callback. Em vez da copia em useState (que era a fonte da
-    // tela), a mesma atualizacao local vai direto no cache de onde a tela le.
-    // A Tarefa 7 troca isto por invalidacao e apaga os tres handlers.
-    const chave = queryKeys.projects.environments(projectId)
-    const handleEnvironmentAdded = (novo: Ambiente) =>
-        queryClient.setQueryData<Ambiente[]>(chave, (atual = []) => [...atual, novo])
-    const handleEnvironmentUpdated = (atualizado: Ambiente) =>
-        queryClient.setQueryData<Ambiente[]>(chave, (atual = []) =>
-            atual.map((a) => (a.id === atualizado.id ? atualizado : a)),
-        )
-    const handleEnvironmentDeleted = (id: string) =>
-        queryClient.setQueryData<Ambiente[]>(chave, (atual = []) => atual.filter((a) => a.id !== id))
 
     const selectedEnv = ambientes.find((e) => e.id === selectedEnvId)
 
@@ -54,7 +37,6 @@ export function EnvironmentsWorkspace({ projectId, ambientes }: EnvironmentsWork
                             key={env.id}
                             environment={env}
                             onClick={() => setSelectedEnvId(env.id)}
-                            onDelete={(id) => handleEnvironmentDeleted(id)}
                         />
                     ))}
                 </div>
@@ -77,14 +59,12 @@ export function EnvironmentsWorkspace({ projectId, ambientes }: EnvironmentsWork
                 isOpen={isNewModalOpen}
                 onOpenChange={setIsNewModalOpen}
                 projectId={projectId}
-                onSuccess={handleEnvironmentAdded}
             />
 
             <DNAEditorSheet
                 environment={selectedEnv}
                 isOpen={!!selectedEnvId}
                 onOpenChange={(open) => !open && setSelectedEnvId(null)}
-                onSuccess={handleEnvironmentUpdated}
             />
         </div>
     )

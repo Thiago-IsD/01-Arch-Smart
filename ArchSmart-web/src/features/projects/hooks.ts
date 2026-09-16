@@ -5,10 +5,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api/client"
 
 import {
+    criarAmbiente,
     criarProjeto,
     editarProjeto,
+    excluirAmbiente,
     excluirProjeto,
     mudarStatusDoProjeto,
+    salvarDna,
+    type AreasDoDna,
+    type CorpoDeAmbiente,
     type DadosDoProjeto,
 } from "./api"
 import { aplicarEfeito, efeitos } from "./invalidacao"
@@ -85,5 +90,30 @@ export function useExcluirProjeto() {
     return useMutation({
         mutationFn: (id: string) => excluirProjeto(id),
         onSuccess: (_vazio, id) => aplicarEfeito(queryClient, efeitos.excluirProjeto(id)),
+    })
+}
+
+/** Ambientes: sem `router.refresh()` — nenhuma tela de servidor le a lista de ambientes. */
+export function useCriarAmbiente(projectId: string) {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (corpo: CorpoDeAmbiente) => criarAmbiente(projectId, corpo),
+        onSuccess: () => aplicarEfeito(queryClient, efeitos.mudarAmbientes(projectId)),
+    })
+}
+
+export function useExcluirAmbiente(projectId: string) {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (envId: string) => excluirAmbiente(envId),
+        onSuccess: () => aplicarEfeito(queryClient, efeitos.mudarAmbientes(projectId)),
+    })
+}
+
+export function useSalvarDna(projectId: string) {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ envId, areas }: { envId: string; areas: AreasDoDna }) => salvarDna(envId, areas),
+        onSuccess: () => aplicarEfeito(queryClient, efeitos.salvarDna(projectId)),
     })
 }
