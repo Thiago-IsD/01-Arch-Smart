@@ -5,11 +5,13 @@ primeira que muta o que outra tela já migrada mostra (a spec de Projetos,
 [`docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md`](../../superpowers/specs/2026-09-15-secao-8-projetos-design.md),
 chama isso de "núcleo do modelo"). **Este documento descrevia o estado depois
 da Tarefa 4 — só a lista.** A Tarefa 5 migrou também o **detalhe**
-(`/projects/[id]`); a seção "O detalhe" abaixo descreve o que mudou nela. As
-**seis mutações** (criar, editar, mudar status, excluir projeto; criar/excluir
-ambiente; salvar DNA) continuam no padrão antigo — Tarefas 6 e 7. Não leia
-este arquivo como "Projetos migrou" — leia como "lista e detalhe migraram; as
-mutações não".
+(`/projects/[id]`); a seção "O detalhe" abaixo descreve o que mudou nela. **A
+Tarefa 6 migrou as quatro mutações de projeto** (criar, editar, mudar status,
+excluir) para `useMutation` com um mapa explícito de invalidação — ver "As
+mutações de projeto (Tarefa 6)" abaixo. As **duas mutações de ambiente**
+(criar/excluir ambiente, salvar DNA) continuam no padrão antigo — Tarefa 7.
+Não leia este arquivo como "Projetos migrou" — leia como "lista, detalhe e as
+quatro mutações de projeto migraram; ambientes e DNA não".
 
 ## O que `features/projects/` contém hoje
 
@@ -18,10 +20,12 @@ mutações não".
 | `types.ts` | `Projeto`, `ClienteDoProjeto`, `PaginaDeProjetos`, `Ambiente`, `DnaDoAmbiente` — espelham `ProjectResponse`/`PaginatedProjectResponse`/`EnvironmentResponse` do backend. `PaginaDeProjetos.active_count` é novo (ver "O backend", abaixo); o comentário no tipo já avisa "ativos da conta INTEIRA, contados no servidor — não conte `items`". |
 | `queries.ts` | Três fábricas `queryOptions`: `queryDaListaDeProjetos(cliente, {page, size})`, `queryDoProjeto(cliente, id)` e `queryDosAmbientes(cliente, projectId)`. As duas últimas, trazidas prontas pela Tarefa 3, passaram a ser consumidas pelo **detalhe** na Tarefa 5. |
 | `limite.ts` | `estadoDoLimite(ativos, limite)` — o cálculo de "no limite" e da fração da barra, num lugar só. Limite `<= 0` é tratado como "no limite", sem divisão (evita o `NaN` que `ProjectsLimitCard` do Dashboard tinha antes da Tarefa 3 desta seção existir). |
-| `hooks.ts` | `useListaDeProjetos()` (usa `queryDaListaDeProjetos`), `useProjeto(id)` e `useAmbientes(projectId)` (usados pelo detalhe desde a Tarefa 5), mais dois hooks que **vieram de `features/library/hooks.ts`** na Tarefa 3 — `useProjetosParaMover(ativo)` (usado pelo `MoveToProjectModal` da Biblioteca) e `useAmbientesDoProjeto(projectId)`. |
+| `hooks.ts` | `useListaDeProjetos()` (usa `queryDaListaDeProjetos`), `useProjeto(id)` e `useAmbientes(projectId)` (usados pelo detalhe desde a Tarefa 5), mais dois hooks que **vieram de `features/library/hooks.ts`** na Tarefa 3 — `useProjetosParaMover(ativo)` (usado pelo `MoveToProjectModal` da Biblioteca) e `useAmbientesDoProjeto(projectId)`. Desde a Tarefa 6, também `useCriarProjeto()`, `useEditarProjeto()`, `useMudarStatusDoProjeto()` e `useExcluirProjeto()`. |
+| `api.ts` | Desde a Tarefa 6: as escritas de Projetos — `criarProjeto`, `editarProjeto`, `mudarStatusDoProjeto`, `excluirProjeto` (consumidas pelos quatro hooks acima), mais `criarAmbiente`, `excluirAmbiente`, `salvarDna` e os tipos `CorpoDeAmbiente`/`AreasDoDna`, que a Tarefa 7 consome — o brief da Tarefa 6 mandou criá-los junto, sem consumidor ainda, para o arquivo nascer inteiro. |
+| `invalidacao.ts` | Desde a Tarefa 6: o mapa `efeitos` (`EfeitoNoCache = { invalidar, descartar }`, uma entrada por mutação) e `aplicarEfeito(queryClient, efeito)`. Ver "As mutações de projeto (Tarefa 6)" abaixo. |
 
-Não existe `api.ts` nem `filters.ts` neste domínio — as fábricas de `queries.ts`
-bastam, e não há filtro de lista própria como o da Biblioteca.
+Não há `filters.ts` neste domínio — não há filtro de lista própria como o da
+Biblioteca.
 
 ## Como a lista carrega os dados
 
@@ -228,19 +232,96 @@ do escopo de arquivos do brief) — continuam em 4 e 3 consultas
 respectivamente, medido na mesma suíte; se têm N+1 próprio ou não é pergunta
 da Tarefa 5 (o detalhe), não desta.
 
+## As mutações de projeto (Tarefa 6)
+
+As quatro escritas de **projeto** — criar, editar, mudar status, excluir —
+trocaram `fetch` manual por `useMutation`, com um mapa **explícito** de
+invalidação de cache em `features/projects/invalidacao.ts`, no mesmo padrão
+que a Biblioteca já usava (`useMutation` + invalidação no `onSuccess`, sem
+atualização otimista). `ProjectWizard.tsx` (criar/editar),
+`ProjectStatusSelect.tsx` (mudar status) e `DeleteProjectAlert.tsx` (excluir)
+chamam os hooks; nenhum dos três monta mais `Authorization` à mão nem importa
+`getAccessToken`/`apiUrl`.
+
+### O mapa de invalidação
+
+`invalidar` marca a query obsoleta **e** rebusca o que estiver montado na
+tela; `descartar` marca obsoleta **sem** rebuscar (`refetchType: "none"`).
+
+| Mutação | `invalidar` | `descartar` |
+|---|---|---|
+| criar projeto | `projects.lists()`, `dashboard.all` | — |
+| editar projeto | `projects.lists()`, `projects.detail(id)`, `dashboard.all` | — |
+| mudar status | `projects.lists()`, `projects.detail(id)`, `dashboard.all` | — |
+| excluir projeto | `projects.lists()`, `dashboard.all` | `projects.detail(id)`, `projects.environments(id)` |
+
+`dashboard.all` entra nas quatro: o Dashboard mostra projetos recentes e o
+contador de ativos, e foi o esquecimento exato que abriu o teste desta tarefa
+(`src/__tests__/projects-mutacoes.test.tsx`, que afirma o **conjunto exato**
+de chaves por mutação — nem uma a mais, que custaria uma ida a mais à API a
+0,17 s cada, nem uma a menos, que deixaria a tela mentindo). Ambiente não
+entra: o Dashboard não mostra ambiente nem contagem de ambiente.
+
+`excluir` **descarta** em vez de invalidar `projects.detail(id)` e
+`projects.environments(id)`, e a razão é de timing, não de gosto: no instante
+em que o `onSuccess` roda, a query do detalhe ainda está montada (a
+navegação para `/projects` ainda não terminou) — invalidar com rebusca
+imediata daria um 404 contra um projeto que acabou de sumir, e o usuário
+veria o estado de erro piscar durante a própria navegação de saída. Descartar
+marca a query obsoleta sem refazer a requisição; se o usuário voltar pelo
+histórico do navegador, aí sim ela rebusca e mostra o erro — que é o
+comportamento certo nesse caso. (`removeQueries` foi descartado como
+alternativa: numa query com observador ainda montado, o v5 do React Query não
+documenta o comportamento; `refetchType: "none"` documenta.)
+
+`efeitos.mudarAmbientes(projectId)` e `efeitos.salvarDna(projectId)` já estão
+neste arquivo, junto com `criarAmbiente`/`excluirAmbiente`/`salvarDna` em
+`api.ts` — sem consumidor nesta tarefa, para a Tarefa 7 (ambientes e DNA)
+encontrar o arquivo pronto em vez de editá-lo no meio de outra tarefa.
+
+### Por que `router.refresh()` continua nas três telas
+
+`ProjectWizard`, `ProjectStatusSelect` e `DeleteProjectAlert` continuam
+chamando `router.refresh()` depois do `mutateAsync` ter sucesso — não por
+esquecimento, mas porque as páginas de **Orçamento** e **Apresentação**
+(`budget/page.tsx`, `presentation/page.tsx`) renderizam `ProjectHeader` com
+dado buscado no **servidor**, fora do QueryClient. Sem o `refresh()`, mudar o
+status de um projeto na aba Orçamento não atualizaria o cabeçalho dela — a
+invalidação do React Query não alcança um Server Component. Confirmado ao
+vivo em 15/09/2026 (ver "Passada por agente" abaixo): o `PUT` sai, o cabeçalho
+da aba Orçamento reflete o novo status, e a lista/dashboard atualizam pela
+invalidação, sem reload de página inteira. O comentário no código
+(`ProjectWizard.tsx`, `ProjectStatusSelect.tsx`, `DeleteProjectAlert.tsx`) diz
+a mesma coisa: o `refresh()` sai quando Orçamento e Apresentação migrarem para
+`features/projects`.
+
+### O teste de caracterização do wizard
+
+`src/__tests__/project-wizard.test.tsx` foi ajustado em dois pontos, e só
+esses dois: o mock de `fetch` passou a devolver um `Response` de verdade (o
+cliente de `lib/api` lê `res.headers`), e `abrir()` passou a envolver o
+componente num `QueryClientProvider` (o wizard usa `useMutation` agora).
+Nenhuma asserção de comportamento mudou — URL, método, corpo, títulos de
+toast, `onOpenChange(false)`, `refresh()` chamado continuam exatamente como
+antes. O teste ajustado foi rodado **antes** de tocar `ProjectWizard.tsx` e
+passou (12/12): é isso que prova que o ajuste só trocou o mecanismo, não
+afrouxou o que o teste prende.
+
 ## O que esta tarefa (Tarefa 4) NÃO mudou — e o que a Tarefa 5 fechou depois
 
 - ~~`/projects/[id]` (o detalhe) continua no padrão antigo~~ — **migrado na
   Tarefa 5** ("O detalhe", acima): prefetch em paralelo, `QueryBoundary` nas
   duas regiões, `notFound()` dentro do `<Suspense>`.
-- **As seis mutações continuam com `fetch` manual**: `ProjectWizard.tsx`
-  (criar/editar), `ProjectStatusSelect.tsx`, `DeleteProjectAlert.tsx`,
-  `NewEnvironmentModal.tsx`, `EnvironmentCard.tsx`,
-  `DNAEditorSheet.tsx`. Nenhuma virou `useMutation` ainda — é a Tarefa 6 e 7.
-  A Tarefa 5 não mudou isso: os três `handle*` de `EnvironmentsWorkspace`
-  passaram a escrever no cache do React Query em vez de `useState`
-  (marcado `PROVISORIO` no código — ver "O detalhe" acima), mas os modais
-  continuam fazendo `fetch` e devolvendo o ambiente por callback.
+- ~~**As seis mutações continuam com `fetch` manual**~~ — **as quatro de
+  projeto migraram na Tarefa 6** (criar/editar em `ProjectWizard.tsx`, mudar
+  status em `ProjectStatusSelect.tsx`, excluir em `DeleteProjectAlert.tsx`);
+  ver "As mutações de projeto (Tarefa 6)" acima. **As duas de ambiente
+  continuam com `fetch` manual**: `NewEnvironmentModal.tsx`,
+  `EnvironmentCard.tsx`, `DNAEditorSheet.tsx` — é a Tarefa 7. A Tarefa 5 não
+  tinha mudado isso: os três `handle*` de `EnvironmentsWorkspace` passaram a
+  escrever no cache do React Query em vez de `useState` (marcado
+  `PROVISORIO` no código — ver "O detalhe" acima), mas os modais continuam
+  fazendo `fetch` e devolvendo o ambiente por callback.
   Medido na Tarefa 4:
 
   ```
@@ -250,17 +331,21 @@ da Tarefa 5 (o detalhe), não desta.
   (eram 9 no território inteiro antes da Tarefa 4 — lista + detalhe +
   `components/projects`; a lista tinha 1, que a Tarefa 4 removeu.
   `tools/catraca.py`, `fetch_fora_de_lib_api`, baixou de 74 para 73 na
-  Tarefa 4, e de 73 para **71** na Tarefa 5 — os dois `fetch` sequenciais do
-  `page.tsx` antigo do detalhe saíram; os das mutações, dentro de
-  `components/projects/environments/`, continuam.)
-- **`ClientWizardDriver.tsx` perdeu `onSuccess`/`handleSuccess`**: a lista lê
-  do cache agora, e quem a atualizar depois de criar um projeto é a
-  invalidação da Tarefa 6 — que ainda não existe. **Até a Tarefa 6 rodar,
-  criar um projeto pelo wizard não atualiza a lista sozinha** (o
-  `ProjectWizard` continua chamando `router.refresh()` por conta própria, o
-  que reconstrói o Server Component e refaz o prefetch — isso cobre o caso na
-  prática mesmo sem invalidação explícita, mas não é o mecanismo que a spec
-  desenha para as mutações).
+  Tarefa 4, de 73 para **71** na Tarefa 5 — os dois `fetch` sequenciais do
+  `page.tsx` antigo do detalhe saíram — e de 71 para **68** na Tarefa 6, com
+  a saída dos três `fetch` das mutações de projeto; os das mutações de
+  ambiente, dentro de `components/projects/environments/`, continuam e são
+  a Tarefa 7.)
+- ~~**`ClientWizardDriver.tsx` perdeu `onSuccess`/`handleSuccess`**~~ —
+  **fechada na Tarefa 6**: criar um projeto pelo wizard agora atualiza a
+  lista pela invalidação explícita de `useCriarProjeto()`
+  (`projects.lists()` + `dashboard.all`), não só pelo `router.refresh()` que
+  continua ali por outro motivo (ver "As mutações de projeto (Tarefa 6)",
+  acima). Texto original, para o histórico: a lista lê do cache agora, e quem
+  a atualizava depois de criar um projeto era só o `router.refresh()` do
+  próprio `ProjectWizard`, que reconstrói o Server Component e refaz o
+  prefetch — cobria o caso na prática, mas não era o mecanismo que a spec
+  desenha para as mutações.
 - **`QueryBoundary` com query desabilitada, `is_empty` com várias regiões,
   token `destructive`, acessibilidade do shell, LCP/JS "depois", axe/teclado
   por olho humano**: todos são tarefas próprias e posteriores no plano da
@@ -292,6 +377,39 @@ da Tarefa 5 (o detalhe), não desta.
   existir, e nenhuma delas mudou o endpoint; não há teste de contagem
   refazendo essa medição sobre o código de hoje.
 
+**Medido (Tarefa 6, mutações de projeto):**
+- `fetch_fora_de_lib_api`: 68 (era 71) — `python tools/catraca.py`.
+- `eslint_erros`: 79, igual ao baseline.
+- `cores_literais`, `hover_sem_focus`, `tabindex_negativo`,
+  `contraste_reprovado`, `arquivos_acima_de_400`, `modulos_sem_doc`,
+  `supabase_fora_de_lib_api`: todos iguais ao baseline — nenhuma regressão.
+- `npm test`: 276 testes, 38 arquivos, zero `failed`.
+- `npm run typecheck`: limpo.
+- `src/__tests__/projects-mutacoes.test.tsx`: 5/5, afirmando o conjunto exato
+  de chaves invalidadas/descartadas por mutação.
+- `src/__tests__/project-wizard.test.tsx`: 12/12, rodado **antes** de tocar
+  `ProjectWizard.tsx` (prova que o ajuste do mock não afrouxou nenhuma
+  asserção) e de novo depois, isolado, para descartar o flake de timeout já
+  registrado nesta tarefa.
+- Passada por agente em 15/09/2026 (API local + `npm run dev`, sessão da
+  conta de teste E2E): criar um projeto pelo wizard fez o card aparecer em
+  `/projects` sem reload (`POST /api/projects` → `201`, seguido de refetch
+  automático da lista) e o projeto apareceu no Dashboard em
+  "Continuar Trabalhando" e no contador "Projetos Ativos" na navegação
+  seguinte, sem esperar nenhum intervalo; mudar o status no detalhe refletiu
+  no seletor e, na aba Orçamento do mesmo projeto (que lê `ProjectHeader` do
+  servidor), o cabeçalho atualizou depois do `router.refresh()`
+  (`PUT /api/projects/{id}` → `200`); excluir um projeto de teste navegou
+  para `/projects` sem piscar estado de erro (`DELETE` → `204 No Content`,
+  confirmado no log do servidor local — a extensão do navegador rotulou essa
+  mesma requisição e uma de telemetria como `503`, mas é o proxy de
+  RSC/telemetria abortando por navegação, não uma falha real: o servidor
+  respondeu 204 e 204/200 respectivamente nas duas). Dados de teste
+  restaurados ao estado original ao final (status do projeto usado para o
+  teste devolvido a "Em Andamento", projeto de teste excluído). Processos
+  derrubados pelo PID real (`netstat -ano` → PID → `taskkill /PID <pid> /T
+  /F`), nunca por nome.
+
 **A medir** (dependem de tarefas seguintes do mesmo plano, ou de olho humano —
 nenhum número foi estimado no lugar):
 - Clique → dados da lista e do detalhe migrados (o instrumento existe,
@@ -314,7 +432,7 @@ existe:
 
 O "depois" desses dois números é entregável da Tarefa 12, não desta.
 
-## A definição de pronto, item a item (lista + detalhe; mutações ficam de fora)
+## A definição de pronto, item a item (lista + detalhe + mutações de projeto; ambientes/DNA ficam de fora)
 
 | Item | Estado | Onde está a prova |
 |---|---|---|
@@ -326,14 +444,17 @@ O "depois" desses dois números é entregável da Tarefa 12, não desta.
 | `EnvironmentsWorkspace` sem cópia de estado (lê `ambientes` por prop) | ✅ | `src/__tests__/projeto-detalhe.test.tsx`; passada por agente (seção acima) |
 | `ProjectHeader` tipado (`project: Projeto`), sem quebrar Orçamento/Apresentação | ✅ | `npm run typecheck` limpo |
 | Nenhuma cor, URL, id ou limite literal nos arquivos desta tarefa | ✅ | `npx eslint` limpo; sem cor literal nova |
+| As quatro mutações de projeto por `useMutation`, com mapa explícito de invalidação | ✅ | `src/__tests__/projects-mutacoes.test.tsx` (Tarefa 6) |
+| `dashboard.all` invalidado pelas quatro mutações de projeto | ✅ | mesmo teste, conjunto exato por mutação |
+| Teste de caracterização do wizard sem afrouxar comportamento | ✅ | `project-wizard.test.tsx`, 12/12 antes e depois de tocar o componente |
 | Orçamento de performance | ⚠️ não medido — ver "A medir" |
 | axe, teclado, 390/1440px | ⚠️ não medido — dependem de olho humano, na verificação da Tarefa 12 |
 | Consultas por carregamento < 8 (lista) | ✅ | 5, Tarefa 2, tabela acima |
 | Consultas por carregamento < 8 (detalhe) | ⚠️ não remedido nesta tarefa — Tarefa 2 mediu 4+3 antes do detalhe migrar; endpoint não mudou |
 | Doc do módulo | ✅ | este arquivo |
 
-Este documento cobre lista e detalhe. As seis mutações (Tarefas 6 e 7) e o
-restante da definição de pronto que depende de navegador/olho humano ainda
-não migraram nem foram verificados — quando migrarem, revise este arquivo em
-vez de reescrevê-lo, para não ficar descrevendo um estado que o código já
-passou.
+Este documento cobre lista, detalhe e as quatro mutações de projeto. As duas
+mutações de ambiente/DNA (Tarefa 7) e o restante da definição de pronto que
+depende de navegador/olho humano ainda não migraram nem foram verificados —
+quando migrarem, revise este arquivo em vez de reescrevê-lo, para não ficar
+descrevendo um estado que o código já passou.

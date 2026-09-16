@@ -2,12 +2,11 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { getAccessToken } from "@/lib/api/auth"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Trash2 } from "lucide-react"
-import { apiUrl } from "@/lib/api-url"
+import { useExcluirProjeto } from "@/features/projects/hooks"
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -26,35 +25,25 @@ interface DeleteProjectAlertProps {
 
 export function DeleteProjectAlert({ projectId, projectName }: DeleteProjectAlertProps) {
     const [confirmName, setConfirmName] = useState("")
-    const [isDeleting, setIsDeleting] = useState(false)
     const { toast } = useToast()
     const router = useRouter()
     const [isOpen, setIsOpen] = useState(false)
+    const excluir = useExcluirProjeto()
+    const isDeleting = excluir.isPending
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.preventDefault()
-
         if (confirmName !== projectName) return
 
         try {
-            setIsDeleting(true)
-            const token = (await getAccessToken()) || ""
-
-            const res = await fetch(apiUrl(`/api/projects/${projectId}`), {
-                method: "DELETE",
-                headers: { "Authorization": `Bearer ${token}` }
-            })
-
-            if (!res.ok) throw new Error("Erro ao excluir o projeto.")
-
+            await excluir.mutateAsync(projectId)
             toast({ title: "Projeto Excluído", description: "O projeto e todos os seus ambientes foram excluídos com sucesso." })
             setIsOpen(false)
             router.push("/projects")
+            // Ver o comentario em ProjectWizard.
             router.refresh()
-        } catch (error) {
+        } catch {
             toast({ variant: "destructive", title: "Ops!", description: "Não foi possível excluir o projeto." })
-        } finally {
-            setIsDeleting(false)
         }
     }
 

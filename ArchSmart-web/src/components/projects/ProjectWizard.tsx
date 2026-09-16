@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, ArrowRight, ArrowLeft } from "lucide-react"
 
-import { getAccessToken } from "@/lib/api/auth"
-import { apiUrl } from "@/lib/api-url"
+import { ApiError } from "@/lib/api/errors"
+import { useCriarProjeto, useEditarProjeto } from "@/features/projects/hooks"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,9 +36,12 @@ interface ProjectWizardProps {
 
 export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create", initialData }: ProjectWizardProps) {
     const [step, setStep] = useState(1)
-    const [isSubmitting, setIsSubmitting] = useState(false)
     const { toast } = useToast()
     const router = useRouter()
+
+    const criar = useCriarProjeto()
+    const editar = useEditarProjeto()
+    const isSubmitting = criar.isPending || editar.isPending
 
     const form = useForm<WizardFormValues>({
         resolver: zodResolver(wizardSchema),
@@ -123,33 +126,10 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
         if (step !== 3) return
 
         try {
-            setIsSubmitting(true)
-
-            const token = (await getAccessToken()) || ""
-
-            const endpoint = mode === "edit" ? apiUrl(`/api/projects/${initialData.id}`) : apiUrl("/api/projects")
-
-            const res = await fetch(endpoint, {
-                method: mode === "edit" ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data),
-            })
-
-            const responseData = await res.json()
-
-            if (!res.ok) {
-                if (res.status === 403) {
-                    toast({
-                        variant: "destructive",
-                        title: "Limite de Plano",
-                        description: responseData.detail || "Você atingiu o limite de projetos do seu plano.",
-                    })
-                    return
-                }
-                throw new Error(`Erro ao ${mode === 'edit' ? 'editar' : 'criar'} projeto`)
+            if (mode === "edit") {
+                await editar.mutateAsync({ id: String(initialData.id), dados: data })
+            } else {
+                await criar.mutateAsync(data)
             }
 
             toast({
@@ -160,20 +140,19 @@ export function ProjectWizard({ isOpen, onOpenChange, onSuccess, mode = "create"
             form.reset()
             setStep(1)
             onOpenChange(false)
-            if (onSuccess) onSuccess()
+            onSuccess?.()
 
-            // Refresh Server Component
+            // Orcamento e Apresentacoes renderizam ProjectHeader com dado do
+            // SERVIDOR; sem isto, editar ali nao atualiza o cabecalho. Sai
+            // quando as duas telas migrarem (spec de Projetos, "Mutacoes").
             router.refresh()
-
-        } catch (error) {
+        } catch (erro) {
+            const mensagem = erro instanceof ApiError ? erro.message : "Ocorreu um erro ao tentar salvar o projeto."
             toast({
                 variant: "destructive",
-                title: "Ops!",
-                description: "Ocorreu um erro ao tentar salvar o projeto.",
+                title: erro instanceof ApiError && erro.status === 403 ? "Limite de Plano" : "Ops!",
+                description: mensagem,
             })
-            console.error(error)
-        } finally {
-            setIsSubmitting(false)
         }
     }
 

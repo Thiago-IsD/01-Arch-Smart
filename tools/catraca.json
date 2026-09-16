@@ -13,7 +13,7 @@
   "modulos_sem_doc": [
     "auth_service"
   ],
-  "fetch_fora_de_lib_api": 71,
+  "fetch_fora_de_lib_api": 68,
   "supabase_fora_de_lib_api": 0,
   "contraste_reprovado": [
     "claro:destructive",

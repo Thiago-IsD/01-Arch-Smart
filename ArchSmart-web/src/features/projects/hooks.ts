@@ -1,9 +1,17 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { api } from "@/lib/api/client"
 
+import {
+    criarProjeto,
+    editarProjeto,
+    excluirProjeto,
+    mudarStatusDoProjeto,
+    type DadosDoProjeto,
+} from "./api"
+import { aplicarEfeito, efeitos } from "./invalidacao"
 import { queryDaListaDeProjetos, queryDoProjeto, queryDosAmbientes } from "./queries"
 
 export function useListaDeProjetos() {
@@ -39,5 +47,43 @@ export function useAmbientesDoProjeto(projectId: string | undefined) {
     return useQuery({
         ...queryDosAmbientes(api, projectId ?? ""),
         enabled: !!projectId,
+    })
+}
+
+/**
+ * Mutacoes de projeto. Quem chama continua fazendo `router.refresh()` depois do
+ * sucesso — nao por causa desta tela, mas porque Orcamento e Apresentacoes
+ * renderizam `ProjectHeader` com dado do SERVIDOR (nota revisada da spec de
+ * Projetos, "Mutacoes"). O refresh sai quando essas duas telas migrarem.
+ */
+export function useCriarProjeto() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (dados: DadosDoProjeto) => criarProjeto(dados),
+        onSuccess: () => aplicarEfeito(queryClient, efeitos.criarProjeto()),
+    })
+}
+
+export function useEditarProjeto() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, dados }: { id: string; dados: Partial<DadosDoProjeto> }) => editarProjeto(id, dados),
+        onSuccess: (_projeto, { id }) => aplicarEfeito(queryClient, efeitos.editarProjeto(id)),
+    })
+}
+
+export function useMudarStatusDoProjeto() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, status }: { id: string; status: string }) => mudarStatusDoProjeto(id, status),
+        onSuccess: (_projeto, { id }) => aplicarEfeito(queryClient, efeitos.editarProjeto(id)),
+    })
+}
+
+export function useExcluirProjeto() {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (id: string) => excluirProjeto(id),
+        onSuccess: (_vazio, id) => aplicarEfeito(queryClient, efeitos.excluirProjeto(id)),
     })
 }
