@@ -597,12 +597,20 @@ O "depois" desses dois números é entregável da Tarefa 12, não desta.
 | As três mutações de ambiente/DNA por `useMutation`, com mapa explícito de invalidação | ✅ | mesmo teste, `describe("mutacoes de ambiente")` (Tarefa 7) |
 | Erro de domínio (`ApiError`) nas três telas de ambiente, sem `catch` cego | ✅ | leitura de código; sem teste dedicado a essa frase |
 | `fetch` vira erro (não aviso) em todo o território de Projetos | ✅ | `npx eslint --print-config`, severidade `2` no glob (Tarefa 7) |
-| Orçamento de performance | ⚠️ não medido — ver "A medir" |
-| axe, teclado, 390/1440px | ⚠️ não medido — dependem de olho humano, na verificação da Tarefa 12 |
+| ~~Orçamento de performance~~ | ~~⚠️ não medido — ver "A medir"~~ | **SUPERADO pela Tarefa 12 — ver "O que a Tarefa 12 fecha, na definição de pronto", mais abaixo** |
+| ~~axe, teclado, 390/1440px~~ | ~~⚠️ não medido — dependem de olho humano, na verificação da Tarefa 12~~ | **SUPERADO pela Tarefa 12 — idem** |
 | Consultas por carregamento < 8 (lista) | ✅ | 5, Tarefa 2, tabela acima |
-| Consultas por carregamento < 8 (detalhe) | ⚠️ não remedido nesta tarefa — Tarefa 2 mediu 4+3 antes do detalhe migrar; endpoint não mudou |
+| ~~Consultas por carregamento < 8 (detalhe)~~ | ~~⚠️ não remedido nesta tarefa — Tarefa 2 mediu 4+3 antes do detalhe migrar; endpoint não mudou~~ | **SUPERADO pela Tarefa 12 — reconfirmado ao vivo contra staging (4/3, sem regressão), ver a tabela mais abaixo** |
 | Doc do módulo | ✅ | este arquivo |
 | As três mutações de ambiente/DNA chamam `router.refresh()` (achado do Step 7: `budget/page.tsx`/`print/page.tsx` leem ambientes no servidor) | ✅ | `src/__tests__/ambientes-refresh.test.tsx` (Tarefa 7, decisão de 15/09/2026) |
+
+⚠️ **As três linhas riscadas acima são registro histórico do que a Tarefa 4
+via na hora em que este documento foi escrito — não republique "não medido"
+para nenhuma delas.** As três foram medidas na Tarefa 12 (16/09/2026): a
+tabela "O que a Tarefa 12 fecha, na definição de pronto", na seção "Tarefa
+12" mais abaixo, é a versão vigente. O padrão é o mesmo que as Seções 6 e 7
+usam no `CLAUDE.md`: risca o texto superado, não apaga a linha, e aponta para
+onde a informação atual está.
 
 Este documento cobria, até aqui, lista, detalhe e as sete mutações (quatro de
 projeto, Tarefa 6; três de ambiente/DNA, Tarefa 7). O achado do Step 7
@@ -664,6 +672,12 @@ desta mesma migração), em
 
 **Clique → dados**, arranjo local (API local + `npm run dev`, como as outras
 duas telas):
+
+```bash
+cd ArchSmart-api && ./venv/Scripts/python.exe -m uvicorn app.main:app --port 8000   # em background
+cd ArchSmart-web && set -a && . ./.env.e2e.local && . ./.env.local && set +a
+npx playwright test e2e/medicao-projetos.spec.ts --reporter=line --timeout=180000
+```
 
 ```
 AMOSTRAS=919,919,921,933,942

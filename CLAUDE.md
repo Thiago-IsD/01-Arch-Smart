@@ -767,7 +767,10 @@ Os números e os comandos de cada item estão em
 
 8. **Projetos herda dois débitos medidos — um fechado, um recusado por
    escrito.** ~~`/api/projects` tem N+1~~ **fechado na Tarefa 2 da migração de
-   Projetos (commit `a2b4601`)**: 43 consultas numa lista de 20 projetos caíram
+   Projetos (commit `1c6d31a`, que fez as 43 → 5 consultas; o commit `a2b4601`
+   da mesma tarefa é só a correção do docstring de `get_projects`, achada na
+   revisão — não é onde o N+1 foi consertado)**: 43 consultas numa lista de 20
+   projetos caíram
    para **5**, constante entre 1 e 20 (`joinedload` do cliente + contagem de
    ambientes por subconsulta agregada + `active_count` numa consulta própria),
    travado por `tests/api/test_projetos_sem_n_mais_um.py` e reconfirmado ao
@@ -786,10 +789,11 @@ Os números e os comandos de cada item estão em
    `8c61eb8`, `24fd072`).** `tentarPrefetch` agora lê o estado da query no
    `QueryClient` depois do `prefetchQuery` e loga quando ela não resolveu, em
    vez de depender de uma exceção que `prefetchQuery` engolia — com uma guarda
-   extra achada na execução: `fetchStatus === "fetching"` não conta como
+   extra achada na revisão e fechada no fix round seguinte, **commit
+   `913ee9f`**: `fetchStatus === "fetching"` não conta como
    desistência (uma query irmã ainda em voo no mesmo `QueryClient`, caso real
    da Biblioteca com duas chamadas concorrentes, não pode ser confundida com
-   timeout). `ProjectsLimitCard.tsx` passou a usar `estadoDoLimite` de
+   timeout) — provado vermelho sem a guarda antes de fechar. `ProjectsLimitCard.tsx` passou a usar `estadoDoLimite` de
    `features/projects/limite.ts`, que trata limite `<= 0` como "no limite" sem
    dividir — o `NaN` não existe mais nesse card. O texto original: `tentarPrefetch`
    nunca imprimia o aviso de timeout, e `ProjectsLimitCard.tsx:23` dividia por
@@ -949,7 +953,8 @@ em [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
     Não é defeito de nenhuma tela.
 
 11. **A Biblioteca passou a ter UM teto de tempo de prefetch para lista e
-    badge, onde antes eram dois independentes.** Decisão da Tarefa 9: em vez
+    badge, onde antes eram dois independentes.** Decisão da Tarefa 9, fechada
+    no fix round **commit `913ee9f`**: em vez
     de só blindar `tentarPrefetch` contra o falso positivo de query irmã em
     voo, `LibraryData.tsx` passou a fazer as duas chamadas (lista + badge do
     inbox) num `Promise.all` só, como `ProjetoData` já fazia para
