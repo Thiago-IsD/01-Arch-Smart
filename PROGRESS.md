@@ -1067,8 +1067,12 @@ _Última atualização: 2026-09-16_
 > ## Projetos, 16/09/2026 — a terceira tela
 >
 > Branch `secao-8-projetos`, 12 tarefas, 32 commits. **Merge `b04a015` em
-> `develop`**, em 16/09/2026, logo depois da verificação humana; o PR
-> `develop` → `staging` saiu na sequência. Spec em
+> `develop`**, em 16/09/2026, logo depois da verificação humana; o PR #12
+> `develop` → `staging` foi aprovado e mergeado no mesmo dia (merge
+> `ccfe290`). Verificado de fora: `/health` → 200 (0,31 s), `/health/db` →
+> `{"status":"ok","db":"up"}`, `openapi.json` com **58 rotas**, e a impressão
+> digital do código desta seção — `PaginatedProjectResponse` com o campo
+> `active_count` — presente na resposta de `GET /api/projects`. Spec em
 > [`docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md`](docs/superpowers/specs/2026-09-15-secao-8-projetos-design.md),
 > doc do módulo com os números em
 > [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
@@ -1099,13 +1103,23 @@ _Última atualização: 2026-09-16_
 > bytes (era 358129); consultas por carregamento **5** (lista) / **4**
 > (detalhe) / **3** (ambientes), reconfirmadas ao vivo contra staging;
 > `load_ms` de clique **521 ms** (n=8), de commit **206 ms** (n=25).
-> **P95 da API implantada: não medido** — depende do deploy, que fica fora
-> desta nota; comando exato em
+> **P95 da API implantada — medido em 16/09/2026, depois do merge `ccfe290`
+> em `staging`:** `GET /api/projects?page=1&size=20` (5 consultas): P50
+> **1541 ms**, P95 **1986 ms** (n=40); `GET /api/projects/{id}/environments`
+> (3 consultas): P50 **1192 ms**, P95 **1358 ms** (n=40). Volume da conta de
+> teste: 5 projetos, `active_count=2`, projeto medido com 6 ambientes.
+> Controles (mediana de 7 amostras): `/health` **278 ms**, `/health/db`
+> **1048 ms**, `/api/users/me` com token inválido **614 ms**. Contra o
+> modelo de distância (`0,29 + 0,24 + 0,17 × (3 + consultas)`): previsto
+> 1890 ms/1550 ms, medido 1541 ms/1192 ms — a previsão foi pessimista em 23%
+> (lista) e 30% (ambientes). **P95 não atingido nas duas rotas** (1986 ms e
+> 1358 ms contra 400 ms) — estoura por distância (0,17 s × idas ao banco),
+> não pela tela; comando exato em
 > [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
 >
 > **A definição de pronto fechou com estes itens em ⚠️:** orçamento de
-> performance na API implantada (a medir pós-deploy, por distância — mesma
-> causa do Dashboard e da Biblioteca); axe, teclado e 390/1440px foram
+> performance na API implantada — medido em 16/09/2026, **registrado, não
+> atingido**, por distância — mesma causa do Dashboard e da Biblioteca; axe, teclado e 390/1440px foram
 > **medidos por agente, não por olho humano** — a verificação humana global
 > de Thiago cobriu o conjunto, mas não confirmou cada achado da passada por
 > agente item a item. Achado novo, registrado e não corrigido:

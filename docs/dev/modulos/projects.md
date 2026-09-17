@@ -557,16 +557,21 @@ para 75).
 - Passada por agente em 15/09/2026 (API local + `npm run dev`, sessão da conta de teste E2E), em "Loft Pinheiros #3" (6 ambientes): criar "Ambiente Teste Tarefa 7" apareceu na grade sem reload (`POST .../environments` → `201`); editar o DNA (15/20/10) mudou o badge de "DNA Pendente" para "DNA Completo" na hora (`PUT .../dna` → `200`); excluir sumiu da grade com o toast "Ambiente Excluído" (`DELETE` → `204`); voltar para `/projects` mostrou "Loft Pinheiros #3" de volta em **6 Ambientes** (o `GET /api/projects` refez sozinho, pela invalidação de `projects.lists()`). Zero erro no log do servidor durante a passada. Processos derrubados pelo PID real (`netstat -ano` → PID → `taskkill //PID <pid> //T //F`), nunca por nome.
 - **Achado do Step 7, decidido**: `budget/page.tsx` e `print/page.tsx` leem a lista de ambientes no servidor — as três mutações passaram a chamar `router.refresh()` por isso (decisão de Thiago em 15/09/2026). Ver "Achado do Step 7" acima e `src/__tests__/ambientes-refresh.test.tsx` (3/3).
 
-**A medir** (dependem de tarefas seguintes do mesmo plano, ou de olho humano —
-nenhum número foi estimado no lugar):
-- Clique → dados da lista e do detalhe migrados (o instrumento existe,
-  `e2e/medicao-carga.spec.ts`, mas a medição "depois" é da Tarefa 12).
-- P50/P95 de `GET /api/projects` e `GET /api/projects/{id}` na API implantada.
-- `load_ms` do `screen_viewed` de `/projects` e `/projects/[id]` em
-  `product_events`, filtrado por `medido_ate=dados`.
-- axe em navegador, navegação por teclado, 390px/1440px, por agente e por olho
-  humano (decisão 7 da spec: "a última tarefa **para** e entrega a Thiago uma
-  lista de rotas × larguras × temas").
+**A medir** (registro histórico da Tarefa 4 — dependiam de tarefas seguintes
+do mesmo plano, ou de olho humano; nenhum número foi estimado no lugar):
+- ~~Clique → dados da lista e do detalhe migrados~~ — **medido na Tarefa 12**
+  (921 ms, ver "Clique → dados" acima).
+- ~~P50/P95 de `GET /api/projects` e `GET /api/projects/{id}` na API
+  implantada.~~ — **medido em 16/09/2026, depois do PR #12/merge `ccfe290`**:
+  ver "P95 da API implantada" acima (a rota medida no lugar de
+  `GET /api/projects/{id}` foi `GET /api/projects/{id}/environments`, que é a
+  chamada que a tela de fato faz).
+- ~~`load_ms` do `screen_viewed` de `/projects` e `/projects/[id]`~~ —
+  **medido na Tarefa 12** (ver "`load_ms` do `screen_viewed` de `/projects`"
+  acima).
+- ~~axe em navegador, navegação por teclado, 390px/1440px~~ — **medido por
+  agente na Tarefa 12, aprovação humana global em 16/09/2026** (ver "A passada
+  por agente completa" e "Verificação humana" acima).
 
 **Medido antes desta migração** (código antigo, commit `139b16b`, do
 instrumento da Tarefa 1 — `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md`),
@@ -731,27 +736,74 @@ print(cur.fetchall())
 PY
 ```
 
-**P95 da API implantada — não medido nesta tarefa, só depois do deploy.** O
-mesmo procedimento de `docs/dev/modulos/dashboard.md` ("Os números medidos"),
-trocando `lean` por `/api/projects` e `/api/projects/{id}/environments`, com a
-impressão digital do contêiner novo sendo `active_count` na resposta de
-`/api/projects` — sem esse campo, o contêiner ainda não é o desta seção e
-nenhum número vale:
+**P95 da API implantada — medido em 16/09/2026**, depois do PR #12
+(`develop` → `staging`, merge `ccfe290`). A verificação externa de que o
+contêiner serve o código desta seção (58 rotas no `openapi.json`, `/health` →
+200 em 0,31 s, `/health/db` → `{"status":"ok","db":"up"}`) já tinha sido feita
+por Thiago; a impressão digital específica desta tarefa foi reconferida antes
+de medir — `active_count` presente na resposta de `GET /api/projects`:
 
 ```bash
 API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
 curl -s "$API/api/projects?page=1&size=20" -H "$H" | python -c "import json,sys; print('active_count' in json.load(sys.stdin))"
-for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects?page=1&size=20"; done
-for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects/<id>/environments"; done
+# True
 ```
 
-Pelo modelo de distância já medido (`0,29 + 0,24 (se autenticado) + 0,17 ×
-(3 + consultas)`), a expectativa **por distância** para `/api/projects` (5
-consultas) é ≈ `0,29 + 0,24 + 0,17×8` ≈ **1,89 s**, e para `/environments` (3
-consultas) ≈ `0,29 + 0,24 + 0,17×6` ≈ **1,55 s** — as duas acima do orçamento
-de 400 ms, pela mesma razão registrada para a Biblioteca e o Dashboard
-("estoura por distância, não pela tela"). **Isto é previsão, não medição** —
-fica marcado como tal até o número real existir.
+**Volume declarado** — conta do usuário de teste: **5 projetos**,
+`active_count=2`; o projeto usado para medir `/environments` é "Loft
+Pinheiros #3" (`beaf469e-2b4f-4e47-b2e3-0ef6f7a5b7ee`), com **6 ambientes** — o
+mesmo projeto que a passada por agente da Tarefa 5/7 já usava.
+
+Medianas (P50) e P95 de **40 amostras** (45 chamadas, descartadas as 5
+primeiras), controles com mediana de 7 amostras:
+
+| Rota | Consultas | Status | P50 | P95 | Faixa (min–max) |
+|---|---:|---|---:|---:|---|
+| `/health` (controle) | 0 | 200 | **278 ms** | — | 270 – 735 |
+| `/health/db` (controle) | 1 | 200 | **1048 ms** | — | 998 – 1926 |
+| `/api/users/me`, token inválido (controle) | 0 | 401 | **614 ms** | — | 535 – 1325 |
+| **`GET /api/projects?page=1&size=20`** | 5 | 200 | **1541 ms** | **1986 ms** | 1514 – 2014 |
+| **`GET /api/projects/{id}/environments`** | 3 | 200 | **1192 ms** | **1358 ms** | 1160 – 1600 |
+
+Comando (token pelo bloco "Como reproduzir" de
+[`2026-09-13-custo-da-requisicao-autenticada.md`](../medicoes/2026-09-13-custo-da-requisicao-autenticada.md)):
+
+```bash
+API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
+for i in $(seq 7); do
+  curl -s -o /dev/null -w "%{time_total}\n" "$API/health"
+  curl -s -o /dev/null -w "%{time_total}\n" "$API/health/db"
+  curl -s -o /dev/null -w "%{time_total}\n" -H "Authorization: Bearer nao.e.jwt" "$API/api/users/me"
+done
+for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects?page=1&size=20"; done
+for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects/<id>/environments"; done
+# P50/P95: descartar as 5 primeiras de cada serie de 45 antes de calcular
+```
+
+**Contra o modelo** (`0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`,
+com 5 consultas na lista e 3 nos ambientes):
+
+| Rota | Previsto | Medido (P50) | A previsão... |
+|---|---:|---:|---|
+| `/api/projects` (lista) | 1890 ms | **1541 ms** | pessimista em **23%** |
+| `/api/projects/{id}/environments` | 1550 ms | **1192 ms** | pessimista em **30%** |
+
+O modelo continua acertando a direção (as duas rotas estouram o orçamento por
+uma margem grande, dominada pelas idas ao banco) mas superestima mais aqui do
+que acertou para a Biblioteca (pessimista em 11%) e o Dashboard (pessimista em
+8%) — a diferença provável é o número de consultas real ficar um pouco abaixo
+do que o ajuste de mínimos quadrados original previa por consulta marginal (a
+própria medição de 13/09 já registra que o resíduo é negativo e cresce com o
+número de consultas). Não foi isolado nesta tarefa: é leitura do número, não
+uma medição nova de onde o resíduo vem.
+
+> **P95 de `GET /api/projects`: 1986 ms contra 400 ms — não atingido.** P95 de
+> `GET /api/projects/{id}/environments`: 1358 ms contra 400 ms — também não
+> atingido. **Estoura por distância (0,17 s × idas ao banco), não pela
+> tela** — mesma frase e mesma causa já registradas para a Biblioteca e o
+> Dashboard (decisão 1 da spec do Dashboard, carregada adiante). O alvo de
+> consultas por carregamento (< 8) continua atingido nas duas rotas (5 e 3),
+> porque não depende da distância.
 
 ### A passada por agente completa (axe, 390/1440, teclado)
 
@@ -861,7 +913,7 @@ captura de tela.
 | Item | Estado | Onde está a prova |
 |---|---|---|
 | Orçamento de performance (clique → dados) | ✅ no arranjo local — 921 ms < 1,5 s | seção acima |
-| Orçamento de performance (API implantada, P95) | ⚠️ **a medir depois do deploy** — previsão ≈ 1,89 s (lista) / 1,55 s (ambientes), por distância | seção acima |
+| Orçamento de performance (API implantada, P95) | ⚠️ **registrado, não atingido** — 1986 ms (lista) / 1358 ms (ambientes) contra 400 ms, medido em 16/09/2026 após o merge `ccfe290`; estoura por distância (0,17 s × idas ao banco), não pela tela | seção acima |
 | Consultas por carregamento (lista, detalhe, ambientes) | ✅ 5 / 4 / 3, reconfirmadas ao vivo contra staging | seção acima |
 | LCP e JS da rota | ✅ medido (952 ms / 466888 bytes) — sem alvo formal isolado por rota nesta régua | `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md` |
 | axe em navegador | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista repete achados já conhecidos (shell); detalhe tem achados novos (`aria-required-*` nas abas, `heading-order`, verde literal), registrados e não corrigidos | seção acima |
