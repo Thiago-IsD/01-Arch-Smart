@@ -128,6 +128,44 @@ query fica sem estado hidratado, e o `QueryBoundary` do cliente busca de novo
 e mostra `ProjetoComErro` se isso também falhar. Os três casos têm teste em
 `src/__tests__/projeto-data.test.tsx`.
 
+### A UI de não encontrado
+
+Desde 16/09/2026 (branch de limpeza `secao-8-limpeza-projetos`, commits
+`2011353` + `6ea0a36`), quem responde ao `notFound()` acima — e a todo outro
+`notFound()` sob `projects/[id]/` que não tenha o próprio boundary — é
+`ArchSmart-web/src/app/(dashboard)/projects/[id]/not-found.tsx`. Por estar
+dentro do grupo `(dashboard)`, o shell (sidebar e cabeçalho) continua
+renderizado — diferente do 404 embutido do Next, que substituiria o shell
+inteiro.
+
+Ele cobre **6 chamadas de `notFound()` em 5 arquivos**, não só a do detalhe
+(medido, comando no próprio docstring do arquivo):
+
+```
+grep -rn "notFound()" "ArchSmart-web/src/app/(dashboard)/projects/[id]" --include=*.tsx
+```
+
+detalhe (`components/ProjetoData.tsx`), orçamento (`budget/page.tsx`, quando o
+orçamento ainda não existe — o projeto continua vivo), apresentação
+(`presentation/page.tsx`), impressão (`print/page.tsx`) e o construtor de
+apresentação (`presentation/[presentation_id]/builder/page.tsx`, que chama
+duas vezes: sem token de sessão, e sem apresentação). Por isso a copy é
+deliberadamente genérica — "Isto pode não existir, ainda não ter sido criado,
+ou não pertencer a esta conta." — para não mentir em nenhum dos cinco casos; e
+não afirma qual motivo é o real, porque o backend responde 404 tanto para
+"não existe" quanto para "existe, mas não pertence a esta conta"
+(`ScopedRepository.obter`, nunca 403, de propósito). Testid
+`projeto-nao-encontrado`; teste em
+`src/__tests__/projeto-nao-encontrado.test.tsx`.
+
+**O que continua faltando**: um `not-found.tsx` **de raiz**
+(`src/app/not-found.tsx`), para uma URL que não casa com **nenhum** segmento
+da aplicação (`/projetos-typo`, por exemplo). Sem ele, essa rota cai no 404
+padrão do Next — página em inglês, fora do shell do produto. Medido: `find
+ArchSmart-web/src -iname "not-found*"` → só o arquivo de `projects/[id]`
+acima (17/09/2026). Não corrigido, de propósito: é decisão de design (o que
+mostrar, em que idioma, com ou sem shell), fora do escopo desta limpeza.
+
 `EnvironmentsWorkspace` deixou de copiar a lista para `useState`
 (`EnvironmentsWorkspace({ projectId, ambientes })` — a prop `initialEnvironments`
 não existe mais) e passou a ler `ambientes` por prop, vindo do
@@ -149,10 +187,13 @@ páginas de Orçamento e Apresentação (`budget/page.tsx`,
 `res.json()` — que o TypeScript aceita como `any`/implicitamente compatível —
 então `npm run typecheck` continua limpo sem tocar nelas.
 
-Os quatro `data-testid` que o detalhe produz: `projeto-shell-streaming`
+Os **cinco** `data-testid` que o detalhe produz: `projeto-shell-streaming`
 (fallback do `<Suspense>` de `page.tsx`), `projeto-cabecalho` (wrapper do
 `QueryBoundary` do cabeçalho), `projeto-ambientes` (wrapper do `QueryBoundary`
-dos ambientes) e `projeto-error` (o estado de erro, dos dois `QueryBoundary`).
+dos ambientes), `projeto-error` (o estado de erro, dos dois `QueryBoundary`) e,
+desde 16/09/2026 (branch de limpeza `secao-8-limpeza-projetos`, commits
+`2011353` + `6ea0a36`), `projeto-nao-encontrado` (o `not-found.tsx` do
+segmento — ver "A UI de não encontrado", abaixo).
 
 ### Passada por agente (15/09/2026)
 
@@ -197,8 +238,16 @@ portas 8000/3000 → PID → `taskkill /PID <pid> /T /F`), nunca por nome.
    em vez de `items.filter(...)`.
 
 Mais um ajuste de layout, não de comportamento: `p-8` fixo virou
-`p-4 md:p-8`, como no Dashboard — o `p-8` fixo é a causa medida do estouro de
-42px da Biblioteca em 390px (`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`).
+`p-4 md:p-8`, como no Dashboard. ~~O `p-8` fixo é a causa medida do estouro de
+42px da Biblioteca em 390px~~ — **essa atribuição foi desmentida em
+17/09/2026, na branch de limpeza `secao-8-limpeza-projetos` (commit
+`413c8f8`)**: com `min-w-0` na coluna do `AppShell`, `/library` zera o
+estouro **sem** tocar o `p-8`, que continua no arquivo como redundância
+inofensiva. A causa real era a mesma coluna do shell que também estourava em
+`/projects/{id}`; ver
+[`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](../medicoes/2026-09-14-passada-de-navegador.md)
+(nota de correção datada) e
+[`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](../medicoes/2026-09-17-largura-do-shell.md).
 
 ## Os quatro `data-testid` que a tela produz
 
@@ -877,6 +926,21 @@ document.documentElement.scrollWidth - window.innerWidth   // 203
 document.querySelector("header .flex.h-16").getBoundingClientRect().width   // 593
 ```
 
+✅ **Fechado em 16–17/09/2026, na branch de limpeza `secao-8-limpeza-projetos`
+— e a atribuição acima ("é do shell, `Header.tsx`") estava só parcialmente
+certa.** Medido: **151 dos 203px** eram a barra de **ações** de
+`ProjectHeader.tsx` (`ProjectStatusSelect`, "Caderno de Obras",
+`EditProjectButton`, `DeleteProjectAlert`, em `space-x-2` sem quebra de
+linha) — não a fileira de abas, e não o shell —, corrigida no commit
+`564af1b` (`flex-wrap gap-2`), baixando o estouro para 52px. Os 52px
+restantes não fecharam com `min-w-0` isolado em `Header.tsx` (zero efeito,
+medido) — a causa era `AppShell.tsx:89` (a coluna `flex-1 flex flex-col`,
+sem `min-w-0`), impedindo o shell inteiro de encolher. Corrigida no commit
+`413c8f8`, o estouro caiu a **zero** em `/projects`, `/projects/<id>`,
+`/dashboard` e `/library`, nas duas larguras e nos dois temas — a mesma
+correção fechou de brinde o estouro de 42px da Biblioteca. Detalhe completo
+em [`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](../medicoes/2026-09-17-largura-do-shell.md).
+
 **Teclado** — `Tab` a partir do topo, lista e detalhe, sessão real:
 
 - **Lista**: sem parada invisível nas 30 primeiras paradas (sidebar → botões
@@ -918,7 +982,7 @@ captura de tela.
 | LCP e JS da rota | ✅ medido (952 ms / 466888 bytes) — sem alvo formal isolado por rota nesta régua | `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md` |
 | axe em navegador | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista repete achados já conhecidos (shell); detalhe tem achados novos (`aria-required-*` nas abas, `heading-order`, verde literal), registrados e não corrigidos | seção acima |
 | Navegação só por teclado | ✅ **medido por agente, aprovação humana global em 16/09/2026** — sem parada invisível, wizard e diálogo de exclusão abrem/fecham sem mouse | seção acima |
-| 390px e 1440px | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista sem estouro; **detalhe estoura 203px em 390px, achado novo, registrado e não corrigido** | seção acima |
+| 390px e 1440px | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista sem estouro; ~~detalhe estoura 203px em 390px, achado novo, registrado e não corrigido~~ **fechado em 16–17/09/2026, branch `secao-8-limpeza-projetos` — ver ✅ na seção acima** | seção acima |
 | Guardas e2e no `e2e.yml` | ✅ | `.github/workflows/e2e.yml` |
 | Doc do módulo com números e comando | ✅ | este arquivo |
 | Verificação humana (decisão 7 da spec) | ✅ **Concluída em 16/09/2026 — Thiago respondeu "verificado"** | seção "Verificação humana", abaixo |
@@ -928,10 +992,13 @@ global, não item a item.** Thiago respondeu "verificado" para a branch
 inteira, sem apontar nenhum defeito e sem comentar cada achado da passada
 por agente (axe, teclado, 390/1440px) individualmente. Isso é diferente de
 "cada achado foi revisto e confirmado um por um" — e é essa a razão de as
-três linhas virarem ✅ com a ressalva escrita, em vez de silenciosamente. Os
-achados que a passada por agente já tinha listado como não corrigidos
-(estouro de 203px, os `aria-*` do `ProjectHeader`, o `bg-emerald-500/10`
-literal, `page-has-heading-one` e `color-contrast` da lista) continuam não
+três linhas virarem ✅ com a ressalva escrita, em vez de silenciosamente. Dos
+achados que a passada por agente tinha listado como não corrigidos, o
+**estouro de 203px fechou depois, em 16–17/09/2026, na branch de limpeza
+`secao-8-limpeza-projetos`** (ver ✅ na seção "Largura, 390px", acima) — a
+aprovação de 16/09 não o resolveu, mas não é mais um item aberto hoje. Os
+demais (os `aria-*` do `ProjectHeader`, o `bg-emerald-500/10` literal,
+`page-has-heading-one` e `color-contrast` da lista) continuam não
 corrigidos — a aprovação não os resolveu, só confirmou que ninguém os achou
 bloqueantes para o merge.
 
@@ -972,3 +1039,13 @@ revisada, `custom_installments` descartado, e os demais do bloco "O que
 Projetos (Seção 8) deixou em aberto" no `CLAUDE.md`) seguem registrados como
 **conhecidos e aceitos** — a aprovação global não os corrigiu nem os
 reabriu, só liberou o merge com eles cientes e de pé.
+
+> ✅ **Correção datada, 17/09/2026, na branch de limpeza
+> `secao-8-limpeza-projetos`: três dos itens listados no parágrafo acima não
+> "seguem" abertos hoje.** Os dois estouros de 390px fecharam (ver "Largura,
+> 390px" e "`p-8` fixo virou `p-4 md:p-8`", acima); `custom_installments`
+> passou a ser devolvido e a preservar parcelas recebidas (ver "O que
+> Projetos (Seção 8) deixou em aberto", item 4, no `CLAUDE.md`); e passou a
+> existir um `not-found.tsx` em `projects/[id]` — falta só o de raiz (ver "A
+> UI de não encontrado", acima). A copy dos erros de mutação nunca revisada
+> continua aberta, sem mudança.

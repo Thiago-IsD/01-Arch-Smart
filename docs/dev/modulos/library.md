@@ -324,7 +324,7 @@ O que a passada mediu, e deixou aberto, para a Biblioteca especificamente:
   "Normalizado" em todo card, `muted` nas abas inativas, `destructive` no
   badge do Inbox), `page-has-heading-one` (1 — o título é `h2`, sem `h1`), e
   `region` (6, do shell).
-- **Largura em 390px — estoura 42px, nos dois temas**
+- ~~**Largura em 390px — estoura 42px, nos dois temas**
   (`scrollWidth: 432` contra `innerWidth: 390`). A causa foi isolada por
   experimento de DOM, injetando estilo em tempo de execução sem tocar no
   código: **não** é o risco do `LibraryToolbar` suspeitado abaixo — é o
@@ -333,7 +333,19 @@ O que a passada mediu, e deixou aberto, para a Biblioteca especificamente:
   lista de abas (295px). Reduzir a raiz para `p-4` sozinho já leva o
   `scrollWidth` a 400; somado a `flex-wrap` na linha do título, a 390 exato.
   **Não aplicado** — a regra desta tarefa era registrar, e mexer em layout de
-  tela já migrada sem ok de Thiago fica para commit próprio.
+  tela já migrada sem ok de Thiago fica para commit próprio.~~ **Fechado em
+  17/09/2026, na branch de limpeza `secao-8-limpeza-projetos` (commit
+  `413c8f8`) — e a causa apontada aqui estava errada.** Não era o `p-8`: a
+  correção foi `min-w-0` na coluna do `AppShell`
+  (`ArchSmart-web/src/components/layout/AppShell.tsx:89`), que estava
+  impedindo o shell inteiro (não só a Biblioteca) de encolher abaixo do seu
+  conteúdo. Com essa correção, `/library` zera o estouro em 390px **sem**
+  tocar o `p-8`, que continua no arquivo como redundância inofensiva — o
+  experimento de injeção citado acima mediu um sintoma real (reduzir o
+  padding também baixava o `scrollWidth`), mas não isolou a causa raiz, que
+  ficava um nível acima, no shell. Ver a nota de correção datada em
+  [`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](../medicoes/2026-09-14-passada-de-navegador.md)
+  e [`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](../medicoes/2026-09-17-largura-do-shell.md).
 - **Teclado**: alcance e ordem, o anel de foco pintado (`box-shadow` com
   opacidade efetiva 1) em todos os elementos da tela, e `Espaço`/`Escape` no
   menu do card medidos e funcionando. Perceptibilidade do anel e se a ordem
@@ -374,7 +386,8 @@ Os dois riscos que este documento apontava como "só o navegador decide" —
 sobre captura de tela e medição no DOM, não por olho humano):
 
 - **`LibraryToolbar.tsx:167`/`:180`, em 390px, nos dois temas**: não causam o
-  estouro (a causa é o padding da raiz, acima), mas **espremem** — a linha cai
+  estouro (a causa real é o shell, não a raiz da página — ver a nota de
+  correção datada acima), mas **espremem** — a linha cai
   para 320px, a busca para 177px, a ordenação encolhe de 160 para **104px**
   (captura mostra "Mais..." truncado) e o filtro de 40 para **23px** de
   largura, abaixo do alvo de toque de 44px. Com `flex-wrap` na linha, os dois

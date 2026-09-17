@@ -413,3 +413,45 @@ dela vê, e a régua é um regex:
 
 Se você zerar uma medida, não escreva que o problema acabou. Escreva que a
 régua parou de encontrar.
+
+## 8. A largura do shell mudou — conteúdo largo precisa do próprio `overflow-x-auto`
+
+Desde a branch de limpeza `secao-8-limpeza-projetos` (17/09/2026, commit
+`413c8f8`), a coluna principal do `AppShell`
+(`ArchSmart-web/src/components/layout/AppShell.tsx:89`) ganhou `min-w-0`. Antes
+disso, essa coluna nunca encolhia abaixo do `max-content` do que ela continha —
+então um filho largo (tabela, grade, linha de ações sem quebra) empurrava a
+coluna inteira, e o excesso virava rolagem do **documento**, não de um elemento
+interno. Foi assim que dois estouros apareceram (203px em `/projects/<id>`,
+42px na Biblioteca) sem nenhum dos dois ser causado pelo mesmo componente.
+
+Com `min-w-0`, isso muda de figura: **a coluna para de crescer**, e qualquer
+filho mais largo que o disponível passa a ter só duas saídas — encolher (com
+`min-w-0`/`flex-wrap` no próprio filho) ou **rolar por dentro dele mesmo**. A
+segunda saída só existe se o filho **pedir** — com `overflow-x-auto` no
+container mais próximo do conteúdo largo, não confiando que a página inteira
+vá esticar para caber.
+
+**Regra para quem escrever tela nova**: tabela, grade ou qualquer bloco que
+possa ficar mais largo que a coluna precisa do próprio `overflow-x-auto`
+perto dele. Não conte com o `<main>` do shell para isso — desde este commit,
+ele não estica mais.
+
+**Como medir, sem depender de olho**: o instrumento versionado
+`ArchSmart-web/e2e/medicao-largura.spec.ts` (não é guarda de CI — não entra em
+`.github/workflows/e2e.yml`) mede as duas coisas separadamente: o estouro do
+**documento** (`scrollWidth`/`innerWidth`, a métrica antiga) e o estouro
+**dentro do primeiro `<main>`** (`MAIN_DIFF`) — que é exatamente a rolagem
+interna que passou a ser possível depois do `min-w-0`. Um controle a 200px
+confirma que o instrumento não é cego (acusa `MAIN_DIFF=58` nessa largura, em
+`/finance`). Comando:
+
+```
+cd ArchSmart-web
+set -a; . ./.env.e2e.local; set +a
+ROTA=/sua-rota LARGURA=390 TEMA=claro npx playwright test e2e/medicao-largura.spec.ts --reporter=line
+```
+
+Detalhe completo, incluindo o que ele **não** prova (as ~28 rotas não
+amostradas, larguras intermediárias, tema escuro), em
+[`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](medicoes/2026-09-17-largura-do-shell.md).
