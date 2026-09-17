@@ -68,7 +68,7 @@ export function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen
                     {/* Breadcrumb dinâmico + Data */}
                     <div className="flex flex-col min-w-0">
                         <HeaderBreadcrumb />
-                        <span className="text-xs text-muted-foreground mt-0.5">
+                        <span className="hidden sm:block text-xs text-muted-foreground mt-0.5">
                             {mounted
                                 ? new Date().toLocaleDateString("pt-BR", {
                                     weekday: "long",
