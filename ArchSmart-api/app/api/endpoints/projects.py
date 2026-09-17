@@ -96,10 +96,15 @@ def get_project_by_id(
 
     from app.models.all_models import FinancialEntry
     if getattr(project, "payment_method", "STANDARD") == "CUSTOM":
+        # O cronograma e o cronograma inteiro: previstas E recebidas. Filtrar
+        # so por PREDICTED (como era antes) faz um projeto com 1 parcela ja
+        # recebida devolver `payment_installments - 1` linhas aqui, enquanto
+        # `project.payment_installments` continua contando todas — o
+        # ProjectWizard via essa divergencia e reconstruia o cronograma do
+        # zero (achado 1 da revisao, .superpowers/sdd/2026-09-15-secao-8-projetos).
         entries = repo.query(FinancialEntry).filter(
             FinancialEntry.project_id == project.id,
             FinancialEntry.type == "INCOME",
-            FinancialEntry.status == "PREDICTED"
         ).order_by(FinancialEntry.due_date.asc()).all()
 
         custom_insts = [{"amount": e.amount, "due_date": e.due_date, "description": e.description} for e in entries]
