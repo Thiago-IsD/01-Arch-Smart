@@ -1173,6 +1173,102 @@ _Última atualização: 2026-09-16_
 > O que ficou em aberto para a próxima tela está em `CLAUDE.md`, no bloco "O
 > que Projetos (Seção 8) deixou em aberto".
 
+> ## A limpeza pós-Projetos, 17/09/2026 — não é tela nova
+>
+> Branch `secao-8-limpeza-projetos`, **11 commits**
+> (`git log --oneline f120ddb..99319c1`), **merge `10cd3eb` em `develop`**. O
+> PR **#13** `develop` → `staging` foi aprovado e mergeado em 17/09/2026
+> (**merge `d659b87`**), com os três checks verdes e o PR em
+> `MERGEABLE / CLEAN`. **Não marca caixa de tela nenhuma — a Seção 8 continua
+> em 3/10 (Biblioteca, Dashboard, Projetos)**: esta branch fechou pendências
+> que a migração de Projetos tinha deixado registradas, não migrou a próxima
+> tela.
+>
+> **O que entrou**, cada item com o commit e o número medido:
+>
+> 1. **Edição de projeto com recebimento Personalizado consertada** — commits
+>    `c289bd1` (`ProjectResponse` para de descartar `custom_installments` na
+>    serialização) e `a2197d0` (o detalhe passa a trazer o cronograma
+>    **inteiro**, previstas e recebidas, e `sync_project_financials` preserva
+>    as parcelas `REALIZED` intocadas, re-sincronizando só as `PREDICTED` —
+>    casadas por `(amount, due_date)`). Antes desta correção, reenviar o mesmo
+>    cronograma no PUT duplicava a parcela já recebida a cada salvamento.
+>    **O que ficou aberto**: o casamento por `(amount, due_date)` é
+>    heurístico — editar deliberadamente valor ou data da linha já recebida no
+>    wizard cria uma `PREDICTED` extra em vez de casar; travar essa linha na
+>    UI é decisão de produto, de Thiago, não tomada. Ver
+>    `.superpowers/sdd/2026-09-15-secao-8-projetos/limpeza-parcelas-report.md`
+>    e `limpeza-rodada2-parcelas-report.md`.
+> 2. **`not-found.tsx` em `projects/[id]`** — commits `2011353` (arquivo
+>    criado) e `6ea0a36` (copy generalizada para cobrir os 5 casos que passam
+>    por esse boundary). `grep -rn "notFound()" "ArchSmart-web/src/app/(dashboard)/projects/[id]" --include=*.tsx`
+>    dá **6 chamadas em 5 arquivos** (detalhe, orçamento, apresentação,
+>    impressão e o construtor de apresentação, que chama duas vezes), todas
+>    cobertas por este boundary único, dentro do shell, copy genérica em
+>    português. **O que ficou aberto**: falta o `not-found.tsx` **de raiz**
+>    (`src/app/not-found.tsx`) — uma URL que não casa com nenhum segmento
+>    (`/projetos-typo`) ainda cai no 404 padrão do Next, em inglês, fora do
+>    shell. Medido: `find ArchSmart-web/src -iname "not-found*"` só acha o
+>    arquivo de `projects/[id]`.
+> 3. **Estouro horizontal em 390px zerado** — dois commits, dois níveis de
+>    causa. `564af1b` trocou `space-x-2` por `flex-wrap gap-2` na barra de
+>    ações do `ProjectHeader.tsx`, baixando o estouro do detalhe de **203px**
+>    para **52px** (151px eram a própria barra de ações, não o shell).
+>    `413c8f8` fechou o resíduo: `AppShell.tsx:89` (`flex-1 flex flex-col`)
+>    não tinha `min-w-0`, então a coluna do shell nunca encolhia abaixo do seu
+>    conteúdo — `min-w-0` isolado em `Header.tsx` (tentado antes) não tinha
+>    efeito nenhum sozinho, medido. Corrigido nos dois pontos (`AppShell.tsx`
+>    e `Header.tsx`, mais `shrink-0` no botão de menu), o estouro caiu a
+>    **zero** em `/projects`, `/projects/<id>`, `/dashboard` e `/library`, nas
+>    duas larguras (390/1440px) e nos dois temas — a mesma correção fechou de
+>    brinde o estouro de **42px** da Biblioteca (mesma causa raiz; o `p-8` de
+>    `library/page.tsx:14`, apontado antes como causa, continua no arquivo
+>    como redundância inofensiva, não removido). Medição completa,
+>    rota × largura × tema, em
+>    `.superpowers/sdd/2026-09-15-secao-8-projetos/limpeza-header-projeto-report.md`.
+> 4. **Instrumento de largura versionado** — commits `96584b0` (instrumento)
+>    e `90090df` (merge), em
+>    [`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](docs/dev/medicoes/2026-09-17-largura-do-shell.md).
+>    `ArchSmart-web/e2e/medicao-largura.spec.ts` mede **duas** métricas por
+>    rota/largura/tema — `document.documentElement.scrollWidth` **e**
+>    `main.scrollWidth` contra `main.clientWidth` —, porque um zero no
+>    documento não distinguia "cabe" de "rola por dentro de `main`" (que já
+>    era `overflow-auto`). Medido em **8 rotas** (as 4 migradas mais uma
+>    amostra de 4 do padrão antigo — `print`, `budget`, `presentations`,
+>    `finance`), em 390px e 1440px, tema claro: as **16 combinações** deram
+>    `main.scrollWidth == main.clientWidth` — nenhuma rolagem interna
+>    escondida. É **instrumento, não guarda**: não entra em `e2e.yml`.
+> 5. **Seis afirmações da documentação corrigidas** — commit `99319c1`, sem
+>    mudança de código: `CLAUDE.md`, `PROGRESS.md`,
+>    [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md),
+>    [`docs/dev/modulos/library.md`](docs/dev/modulos/library.md) e
+>    [`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](docs/dev/medicoes/2026-09-14-passada-de-navegador.md)
+>    corrigidos com nota datada (registro histórico preservado, não apagado),
+>    mais a regra de que conteúdo largo precisa do próprio `overflow-x-auto`
+>    agora que o shell parou de esticar
+>    ([`docs/dev/componentes.md`](docs/dev/componentes.md), seção 8).
+>
+> **Os portões**, do corpo do commit de merge `10cd3eb`: `npm run typecheck`
+> limpo; `npm test` **45 arquivos / 302 testes**; `pytest -q` (backend)
+> **371 passaram, 1 pulado**; `tools/` **137 testes, OK**; catraca com as nove
+> medidas iguais ao baseline (`eslint_erros` pulada por falta de
+> `--eslint-json`, comportamento documentado, não regressão).
+>
+> **Verificação externa, feita por Thiago depois do deploy**, contra
+> `https://arqsmart-staging.onrender.com`: `/health` → **200** (0,36 s),
+> `/health/db` → `{"status":"ok","db":"up"}`, `openapi.json` com **58 rotas**
+> (nenhuma rota nova) e — a impressão digital de que o contêiner serve este
+> código — **`custom_installments` presente em `ProjectResponse`**.
+>
+> **O que continua aberto**, sem mudança desta branch: todo o resto do bloco
+> "O que Projetos (Seção 8) deixou em aberto" no `CLAUDE.md` — em especial a
+> heurística de casamento `(amount, due_date)` do item 1 acima, o
+> `not-found.tsx` de raiz do item 2 acima, e a copy dos erros de mutação
+> (item 16 daquele bloco), que esta limpeza não tocou. A caixa "Custo da
+> requisição autenticada" e o Art. 8 do evento `archsmart:budget_updated`
+> (`grep -rn "archsmart:" ArchSmart-web/src`) seguem abertos, e são pauta de
+> quem planejar Orçamento — ver `CLAUDE.md`.
+
 > ## O Dashboard, 15/09/2026 — a segunda tela
 >
 > Branch `secao-8-dashboard`, 15 commits, merge `b07aaa0` em `develop` e PR #11
