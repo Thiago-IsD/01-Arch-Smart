@@ -256,6 +256,49 @@ describe("ProjectWizard (caracterizacao — descreve o presente)", () => {
         expect(fetchMock).not.toHaveBeenCalled()
     })
 
+    it("no modo edit com recebimento Personalizado, o cronograma chega preenchido com as parcelas", async () => {
+        // Regressao: a API descartava `custom_installments` na serializacao
+        // (ProjectResponse nao declarava o campo) e o cronograma abria vazio,
+        // com o superRefine do schema reprovando o salvamento por a soma nao
+        // bater com o valor do servico. `ProjectResponse` passou a declarar o
+        // campo e `Projeto` (features/projects/types.ts) o recuperou.
+        const usuario = userEvent.setup()
+        abrir({
+            mode: "edit",
+            initialData: {
+                id: 7,
+                name: "Casa da Praia",
+                service_type: "Consultoria Express",
+                client: { name: "Maria Silva" },
+                service_value: 1000,
+                payment_installments: 2,
+                payment_method: "CUSTOM",
+                custom_installments: [
+                    { amount: 500, due_date: "2026-10-01", description: "Parcela 1" },
+                    { amount: 500, due_date: "2026-11-01", description: "Parcela 2" },
+                ],
+            },
+        })
+        await waitFor(() => expect(screen.getByLabelText("Nome do Projeto")).toHaveValue("Casa da Praia"))
+        await usuario.click(screen.getByRole("button", { name: /Próximo/ }))
+        await usuario.click(await screen.findByRole("button", { name: /Próximo/ }))
+
+        const secao = (await screen.findByText("Cronograma Personalizado")).closest("div") as HTMLElement
+        const datas = secao.querySelectorAll<HTMLInputElement>('input[type="date"]')
+        const valores = secao.querySelectorAll<HTMLInputElement>('input[type="number"]')
+
+        expect(datas).toHaveLength(2)
+        expect(datas[0].value).toBe("2026-10-01")
+        expect(datas[1].value).toBe("2026-11-01")
+        expect(valores).toHaveLength(2)
+        expect(valores[0].value).toBe("500")
+        expect(valores[1].value).toBe("500")
+
+        // E a soma bate com o valor do servico — nao ha erro reprovando o salvamento.
+        const soma = screen.getByText("Soma das Parcelas:")
+        expect(within(soma.parentElement as HTMLElement).getByText(/R\$ 1000\.00 \/ R\$ 1000\.00/)).toBeInTheDocument()
+    })
+
     it("o rodape do passo 3 mostra o total das parcelas contra o valor do servico", async () => {
         const usuario = userEvent.setup()
         const { container } = abrir()

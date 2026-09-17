@@ -53,7 +53,34 @@ def sync_project_financials(
     if getattr(project, "payment_method", "STANDARD") == "CUSTOM" and custom_installments:
         # Se for um Cronograma Personalizado recebido via UI Front-end:
         # Criamos as parcelas exatamente como formatadas no Array (Valor, Data, Desc).
-        for idx, custom_inst in enumerate(custom_installments):
+        #
+        # Decisao (achado 1 da revisao, .superpowers/sdd/2026-09-15-secao-8-projetos):
+        # uma parcela REALIZED e dinheiro que a conta ja recebeu, e o valor
+        # recebido nao pode ser apagado nem recriado silenciosamente. Desde que
+        # GET /api/projects/{id} passou a devolver o cronograma inteiro
+        # (previstas + recebidas), o array que chega aqui pode reincluir a(s)
+        # parcela(s) ja recebida(s) que o front so reexibiu. O caminho seguro
+        # escolhido: preservar as REALIZED como estao (nunca tocadas por este
+        # metodo) e re-sincronizar so as previstas. Como o schema de entrada
+        # (`CustomInstallment`) nao carrega id nem status, casamos por
+        # (amount, due_date) contra as REALIZED existentes — cada realizada so
+        # casa uma vez — e so criamos parcela PREDICTED nova para o que sobrar.
+        realizadas_disponiveis = list(realized_entries)
+        pendentes_a_criar = []
+        for custom_inst in custom_installments:
+            casada = next(
+                (
+                    r for r in realizadas_disponiveis
+                    if r.amount == custom_inst.amount and r.due_date == custom_inst.due_date
+                ),
+                None,
+            )
+            if casada is not None:
+                realizadas_disponiveis.remove(casada)
+                continue
+            pendentes_a_criar.append(custom_inst)
+
+        for idx, custom_inst in enumerate(pendentes_a_criar):
             current_parcel_index = len(realized_entries) + idx + 1
             desc = custom_inst.description if custom_inst.description else f"Parcela {current_parcel_index}/{total_installments} - {project.name}"
 

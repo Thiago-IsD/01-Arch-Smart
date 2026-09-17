@@ -4,9 +4,11 @@ Projetos: o contrato da rota e o isolamento entre contas.
 Os testes de isolamento sao pares: a conta A ve o dela, e recebe 404 no da B.
 404 e nao 403 — um 403 confirmaria que o projeto existe.
 """
+from datetime import date
+
 from sqlalchemy.orm import Session
 
-from app.models.all_models import Plan, Subscription, SubscriptionStatus
+from app.models.all_models import Client, FinancialEntry, Plan, Project, Subscription, SubscriptionStatus
 from tests.conftest import criar_projeto
 
 
@@ -94,3 +96,185 @@ def test_apagar_projeto_alheio_e_404(db: Session, client_a, conta_b):
     from app.models.all_models import Project
 
     assert db.query(Project).filter(Project.id == alheio.id).first() is not None
+
+
+def test_detalhe_com_recebimento_personalizado_devolve_as_parcelas(
+    db: Session, client_a, conta_a
+):
+    """`get_project_by_id` (app/api/endpoints/projects.py:94-108) monta
+    `custom_installments` com `setattr`, mas `ProjectResponse` nao declarava o
+    campo — o Pydantic descartava o resultado na serializacao (pendencia 4 da
+    Secao 8 em CLAUDE.md). O front usa esse campo para preencher o cronograma
+    na edicao; sem ele a tela abre vazia e o `superRefine` do wizard reprova o
+    salvamento porque a soma das parcelas nao bate com o valor do servico."""
+    conta, _ = conta_a
+    cliente = Client(account_id=conta.id, name="Cliente Personalizado")
+    db.add(cliente)
+    db.flush()
+    projeto = Project(
+        account_id=conta.id,
+        client_id=cliente.id,
+        name="Projeto Personalizado",
+        payment_method="CUSTOM",
+        service_value=1000.0,
+    )
+    db.add(projeto)
+    db.flush()
+    db.add(
+        FinancialEntry(
+            account_id=conta.id,
+            project_id=projeto.id,
+            description="Parcela 0",
+            amount=500.0,
+            type="INCOME",
+            status="PREDICTED",
+            due_date=date(2026, 10, 1),
+        )
+    )
+    db.add(
+        FinancialEntry(
+            account_id=conta.id,
+            project_id=projeto.id,
+            description="Parcela 1",
+            amount=500.0,
+            type="INCOME",
+            status="PREDICTED",
+            due_date=date(2026, 11, 1),
+        )
+    )
+    db.flush()
+
+    corpo = client_a.get(f"/api/projects/{projeto.id}").json()
+
+    assert corpo["payment_method"] == "CUSTOM"
+    assert len(corpo["custom_installments"]) == 2
+    valores = {p["amount"] for p in corpo["custom_installments"]}
+    datas = {p["due_date"] for p in corpo["custom_installments"]}
+    assert valores == {500.0}
+    assert datas == {"2026-10-01", "2026-11-01"}
+
+
+def test_detalhe_com_recebimento_padrao_nao_devolve_parcelas(db: Session, client_a, conta_a):
+    """Projeto sem `payment_method == "CUSTOM"` nunca consulta `FinancialEntry`
+    para o cronograma — o campo tem que sair ausente ou nulo, nunca uma lista
+    vazia que o front confundiria com "cronograma zerado"."""
+    conta, _ = conta_a
+    projeto = criar_projeto(db, conta, "Projeto Padrao")
+
+    corpo = client_a.get(f"/api/projects/{projeto.id}").json()
+
+    assert corpo["payment_method"] == "STANDARD"
+    assert corpo.get("custom_installments") is None
+
+
+def _projeto_custom_com_parcela_recebida(db: Session, conta):
+    """3 parcelas de um projeto CUSTOM, a primeira ja REALIZED (recebida)."""
+    cliente = Client(account_id=conta.id, name="Cliente Com Recebida")
+    db.add(cliente)
+    db.flush()
+    projeto = Project(
+        account_id=conta.id,
+        client_id=cliente.id,
+        name="Projeto Com Recebida",
+        payment_method="CUSTOM",
+        payment_installments=3,
+        service_value=900.0,
+    )
+    db.add(projeto)
+    db.flush()
+    db.add(
+        FinancialEntry(
+            account_id=conta.id,
+            project_id=projeto.id,
+            description="Parcela 1/3 - Projeto Com Recebida",
+            amount=300.0,
+            type="INCOME",
+            status="REALIZED",
+            due_date=date(2026, 9, 1),
+        )
+    )
+    db.add(
+        FinancialEntry(
+            account_id=conta.id,
+            project_id=projeto.id,
+            description="Parcela 2/3 - Projeto Com Recebida",
+            amount=300.0,
+            type="INCOME",
+            status="PREDICTED",
+            due_date=date(2026, 10, 1),
+        )
+    )
+    db.add(
+        FinancialEntry(
+            account_id=conta.id,
+            project_id=projeto.id,
+            description="Parcela 3/3 - Projeto Com Recebida",
+            amount=300.0,
+            type="INCOME",
+            status="PREDICTED",
+            due_date=date(2026, 11, 1),
+        )
+    )
+    db.flush()
+    return projeto
+
+
+def test_detalhe_com_parcela_recebida_devolve_o_cronograma_inteiro(
+    db: Session, client_a, conta_a
+):
+    """Achado 1: a consulta do detalhe filtrava so status == "PREDICTED",
+    enquanto `project.payment_installments` conta todas as parcelas. Projeto
+    com 3 parcelas e uma ja recebida devolvia so 2 em `custom_installments`,
+    e o ProjectWizard reconstruia o cronograma para 3 linhas (a terceira sem
+    data), reprovando no superRefine. O detalhe agora devolve as 3."""
+    conta, _ = conta_a
+    projeto = _projeto_custom_com_parcela_recebida(db, conta)
+
+    corpo = client_a.get(f"/api/projects/{projeto.id}").json()
+
+    assert corpo["payment_method"] == "CUSTOM"
+    assert len(corpo["custom_installments"]) == 3
+    datas = {p["due_date"] for p in corpo["custom_installments"]}
+    assert datas == {"2026-09-01", "2026-10-01", "2026-11-01"}
+
+
+def test_editar_projeto_personalizado_com_parcela_recebida_nao_duplica_lancamento(
+    db: Session, client_a, conta_a
+):
+    """Achado 1 (adjacente): salvar (PUT) o cronograma que o detalhe devolveu
+    - recebida incluida - nao pode recriar a parcela ja recebida. Antes desta
+    correcao, `sync_project_financials` criava `len(custom_installments)`
+    entradas PREDICTED novas sem olhar para o que ja foi recebido: o projeto
+    passava a ter as recebidas MAIS as novas (900 -> 1200 em receita)."""
+    conta, _ = conta_a
+    projeto = _projeto_custom_com_parcela_recebida(db, conta)
+
+    detalhe = client_a.get(f"/api/projects/{projeto.id}").json()
+    antes = (
+        db.query(FinancialEntry)
+        .filter(FinancialEntry.project_id == projeto.id, FinancialEntry.type == "INCOME")
+        .count()
+    )
+    assert antes == 3
+
+    r = client_a.put(
+        f"/api/projects/{projeto.id}",
+        json={"custom_installments": detalhe["custom_installments"]},
+    )
+    assert r.status_code == 200, r.text
+
+    db.expunge_all()
+    entradas = (
+        db.query(FinancialEntry)
+        .filter(FinancialEntry.project_id == projeto.id, FinancialEntry.type == "INCOME")
+        .order_by(FinancialEntry.due_date.asc())
+        .all()
+    )
+    assert len(entradas) == 3, [
+        (e.status, e.amount, e.due_date) for e in entradas
+    ]
+    recebida = entradas[0]
+    assert recebida.status == "REALIZED"
+    assert recebida.amount == 300.0
+    assert recebida.due_date == date(2026, 9, 1)
+    assert {e.status for e in entradas[1:]} == {"PREDICTED"}

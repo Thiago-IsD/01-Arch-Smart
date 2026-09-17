@@ -11,6 +11,14 @@ export interface ClienteDoProjeto {
     phone?: string | null
 }
 
+/** Espelha `CustomInstallment` (project_schema.py). `due_date` chega como
+ * string ISO (`YYYY-MM-DD`), serializada pelo Pydantic. */
+export interface ParcelaPersonalizada {
+    amount: number
+    due_date: string
+    description: string
+}
+
 export interface Projeto {
     id: string
     account_id: string
@@ -25,6 +33,9 @@ export interface Projeto {
     created_at: string
     environments_count: number
     client?: ClienteDoProjeto | null
+    /** So vem preenchido quando `payment_method === "CUSTOM"` — o endpoint de
+     * detalhe monta a partir de `FinancialEntry`. */
+    custom_installments?: ParcelaPersonalizada[] | null
 }
 
 export interface PaginaDeProjetos {

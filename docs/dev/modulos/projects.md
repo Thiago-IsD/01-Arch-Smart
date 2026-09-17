@@ -128,6 +128,44 @@ query fica sem estado hidratado, e o `QueryBoundary` do cliente busca de novo
 e mostra `ProjetoComErro` se isso também falhar. Os três casos têm teste em
 `src/__tests__/projeto-data.test.tsx`.
 
+### A UI de não encontrado
+
+Desde 16/09/2026 (branch de limpeza `secao-8-limpeza-projetos`, commits
+`2011353` + `6ea0a36`), quem responde ao `notFound()` acima — e a todo outro
+`notFound()` sob `projects/[id]/` que não tenha o próprio boundary — é
+`ArchSmart-web/src/app/(dashboard)/projects/[id]/not-found.tsx`. Por estar
+dentro do grupo `(dashboard)`, o shell (sidebar e cabeçalho) continua
+renderizado — diferente do 404 embutido do Next, que substituiria o shell
+inteiro.
+
+Ele cobre **6 chamadas de `notFound()` em 5 arquivos**, não só a do detalhe
+(medido, comando no próprio docstring do arquivo):
+
+```
+grep -rn "notFound()" "ArchSmart-web/src/app/(dashboard)/projects/[id]" --include=*.tsx
+```
+
+detalhe (`components/ProjetoData.tsx`), orçamento (`budget/page.tsx`, quando o
+orçamento ainda não existe — o projeto continua vivo), apresentação
+(`presentation/page.tsx`), impressão (`print/page.tsx`) e o construtor de
+apresentação (`presentation/[presentation_id]/builder/page.tsx`, que chama
+duas vezes: sem token de sessão, e sem apresentação). Por isso a copy é
+deliberadamente genérica — "Isto pode não existir, ainda não ter sido criado,
+ou não pertencer a esta conta." — para não mentir em nenhum dos cinco casos; e
+não afirma qual motivo é o real, porque o backend responde 404 tanto para
+"não existe" quanto para "existe, mas não pertence a esta conta"
+(`ScopedRepository.obter`, nunca 403, de propósito). Testid
+`projeto-nao-encontrado`; teste em
+`src/__tests__/projeto-nao-encontrado.test.tsx`.
+
+**O que continua faltando**: um `not-found.tsx` **de raiz**
+(`src/app/not-found.tsx`), para uma URL que não casa com **nenhum** segmento
+da aplicação (`/projetos-typo`, por exemplo). Sem ele, essa rota cai no 404
+padrão do Next — página em inglês, fora do shell do produto. Medido: `find
+ArchSmart-web/src -iname "not-found*"` → só o arquivo de `projects/[id]`
+acima (17/09/2026). Não corrigido, de propósito: é decisão de design (o que
+mostrar, em que idioma, com ou sem shell), fora do escopo desta limpeza.
+
 `EnvironmentsWorkspace` deixou de copiar a lista para `useState`
 (`EnvironmentsWorkspace({ projectId, ambientes })` — a prop `initialEnvironments`
 não existe mais) e passou a ler `ambientes` por prop, vindo do
@@ -149,10 +187,13 @@ páginas de Orçamento e Apresentação (`budget/page.tsx`,
 `res.json()` — que o TypeScript aceita como `any`/implicitamente compatível —
 então `npm run typecheck` continua limpo sem tocar nelas.
 
-Os quatro `data-testid` que o detalhe produz: `projeto-shell-streaming`
+Os **cinco** `data-testid` que o detalhe produz: `projeto-shell-streaming`
 (fallback do `<Suspense>` de `page.tsx`), `projeto-cabecalho` (wrapper do
 `QueryBoundary` do cabeçalho), `projeto-ambientes` (wrapper do `QueryBoundary`
-dos ambientes) e `projeto-error` (o estado de erro, dos dois `QueryBoundary`).
+dos ambientes), `projeto-error` (o estado de erro, dos dois `QueryBoundary`) e,
+desde 16/09/2026 (branch de limpeza `secao-8-limpeza-projetos`, commits
+`2011353` + `6ea0a36`), `projeto-nao-encontrado` (o `not-found.tsx` do
+segmento — ver "A UI de não encontrado", abaixo).
 
 ### Passada por agente (15/09/2026)
 
@@ -197,8 +238,16 @@ portas 8000/3000 → PID → `taskkill /PID <pid> /T /F`), nunca por nome.
    em vez de `items.filter(...)`.
 
 Mais um ajuste de layout, não de comportamento: `p-8` fixo virou
-`p-4 md:p-8`, como no Dashboard — o `p-8` fixo é a causa medida do estouro de
-42px da Biblioteca em 390px (`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`).
+`p-4 md:p-8`, como no Dashboard. ~~O `p-8` fixo é a causa medida do estouro de
+42px da Biblioteca em 390px~~ — **essa atribuição foi desmentida em
+17/09/2026, na branch de limpeza `secao-8-limpeza-projetos` (commit
+`413c8f8`)**: com `min-w-0` na coluna do `AppShell`, `/library` zera o
+estouro **sem** tocar o `p-8`, que continua no arquivo como redundância
+inofensiva. A causa real era a mesma coluna do shell que também estourava em
+`/projects/{id}`; ver
+[`docs/dev/medicoes/2026-09-14-passada-de-navegador.md`](../medicoes/2026-09-14-passada-de-navegador.md)
+(nota de correção datada) e
+[`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](../medicoes/2026-09-17-largura-do-shell.md).
 
 ## Os quatro `data-testid` que a tela produz
 
@@ -557,16 +606,21 @@ para 75).
 - Passada por agente em 15/09/2026 (API local + `npm run dev`, sessão da conta de teste E2E), em "Loft Pinheiros #3" (6 ambientes): criar "Ambiente Teste Tarefa 7" apareceu na grade sem reload (`POST .../environments` → `201`); editar o DNA (15/20/10) mudou o badge de "DNA Pendente" para "DNA Completo" na hora (`PUT .../dna` → `200`); excluir sumiu da grade com o toast "Ambiente Excluído" (`DELETE` → `204`); voltar para `/projects` mostrou "Loft Pinheiros #3" de volta em **6 Ambientes** (o `GET /api/projects` refez sozinho, pela invalidação de `projects.lists()`). Zero erro no log do servidor durante a passada. Processos derrubados pelo PID real (`netstat -ano` → PID → `taskkill //PID <pid> //T //F`), nunca por nome.
 - **Achado do Step 7, decidido**: `budget/page.tsx` e `print/page.tsx` leem a lista de ambientes no servidor — as três mutações passaram a chamar `router.refresh()` por isso (decisão de Thiago em 15/09/2026). Ver "Achado do Step 7" acima e `src/__tests__/ambientes-refresh.test.tsx` (3/3).
 
-**A medir** (dependem de tarefas seguintes do mesmo plano, ou de olho humano —
-nenhum número foi estimado no lugar):
-- Clique → dados da lista e do detalhe migrados (o instrumento existe,
-  `e2e/medicao-carga.spec.ts`, mas a medição "depois" é da Tarefa 12).
-- P50/P95 de `GET /api/projects` e `GET /api/projects/{id}` na API implantada.
-- `load_ms` do `screen_viewed` de `/projects` e `/projects/[id]` em
-  `product_events`, filtrado por `medido_ate=dados`.
-- axe em navegador, navegação por teclado, 390px/1440px, por agente e por olho
-  humano (decisão 7 da spec: "a última tarefa **para** e entrega a Thiago uma
-  lista de rotas × larguras × temas").
+**A medir** (registro histórico da Tarefa 4 — dependiam de tarefas seguintes
+do mesmo plano, ou de olho humano; nenhum número foi estimado no lugar):
+- ~~Clique → dados da lista e do detalhe migrados~~ — **medido na Tarefa 12**
+  (921 ms, ver "Clique → dados" acima).
+- ~~P50/P95 de `GET /api/projects` e `GET /api/projects/{id}` na API
+  implantada.~~ — **medido em 16/09/2026, depois do PR #12/merge `ccfe290`**:
+  ver "P95 da API implantada" acima (a rota medida no lugar de
+  `GET /api/projects/{id}` foi `GET /api/projects/{id}/environments`, que é a
+  chamada que a tela de fato faz).
+- ~~`load_ms` do `screen_viewed` de `/projects` e `/projects/[id]`~~ —
+  **medido na Tarefa 12** (ver "`load_ms` do `screen_viewed` de `/projects`"
+  acima).
+- ~~axe em navegador, navegação por teclado, 390px/1440px~~ — **medido por
+  agente na Tarefa 12, aprovação humana global em 16/09/2026** (ver "A passada
+  por agente completa" e "Verificação humana" acima).
 
 **Medido antes desta migração** (código antigo, commit `139b16b`, do
 instrumento da Tarefa 1 — `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md`),
@@ -731,27 +785,74 @@ print(cur.fetchall())
 PY
 ```
 
-**P95 da API implantada — não medido nesta tarefa, só depois do deploy.** O
-mesmo procedimento de `docs/dev/modulos/dashboard.md` ("Os números medidos"),
-trocando `lean` por `/api/projects` e `/api/projects/{id}/environments`, com a
-impressão digital do contêiner novo sendo `active_count` na resposta de
-`/api/projects` — sem esse campo, o contêiner ainda não é o desta seção e
-nenhum número vale:
+**P95 da API implantada — medido em 16/09/2026**, depois do PR #12
+(`develop` → `staging`, merge `ccfe290`). A verificação externa de que o
+contêiner serve o código desta seção (58 rotas no `openapi.json`, `/health` →
+200 em 0,31 s, `/health/db` → `{"status":"ok","db":"up"}`) já tinha sido feita
+por Thiago; a impressão digital específica desta tarefa foi reconferida antes
+de medir — `active_count` presente na resposta de `GET /api/projects`:
 
 ```bash
 API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
 curl -s "$API/api/projects?page=1&size=20" -H "$H" | python -c "import json,sys; print('active_count' in json.load(sys.stdin))"
-for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects?page=1&size=20"; done
-for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects/<id>/environments"; done
+# True
 ```
 
-Pelo modelo de distância já medido (`0,29 + 0,24 (se autenticado) + 0,17 ×
-(3 + consultas)`), a expectativa **por distância** para `/api/projects` (5
-consultas) é ≈ `0,29 + 0,24 + 0,17×8` ≈ **1,89 s**, e para `/environments` (3
-consultas) ≈ `0,29 + 0,24 + 0,17×6` ≈ **1,55 s** — as duas acima do orçamento
-de 400 ms, pela mesma razão registrada para a Biblioteca e o Dashboard
-("estoura por distância, não pela tela"). **Isto é previsão, não medição** —
-fica marcado como tal até o número real existir.
+**Volume declarado** — conta do usuário de teste: **5 projetos**,
+`active_count=2`; o projeto usado para medir `/environments` é "Loft
+Pinheiros #3" (`beaf469e-2b4f-4e47-b2e3-0ef6f7a5b7ee`), com **6 ambientes** — o
+mesmo projeto que a passada por agente da Tarefa 5/7 já usava.
+
+Medianas (P50) e P95 de **40 amostras** (45 chamadas, descartadas as 5
+primeiras), controles com mediana de 7 amostras:
+
+| Rota | Consultas | Status | P50 | P95 | Faixa (min–max) |
+|---|---:|---|---:|---:|---|
+| `/health` (controle) | 0 | 200 | **278 ms** | — | 270 – 735 |
+| `/health/db` (controle) | 1 | 200 | **1048 ms** | — | 998 – 1926 |
+| `/api/users/me`, token inválido (controle) | 0 | 401 | **614 ms** | — | 535 – 1325 |
+| **`GET /api/projects?page=1&size=20`** | 5 | 200 | **1541 ms** | **1986 ms** | 1514 – 2014 |
+| **`GET /api/projects/{id}/environments`** | 3 | 200 | **1192 ms** | **1358 ms** | 1160 – 1600 |
+
+Comando (token pelo bloco "Como reproduzir" de
+[`2026-09-13-custo-da-requisicao-autenticada.md`](../medicoes/2026-09-13-custo-da-requisicao-autenticada.md)):
+
+```bash
+API=https://arqsmart-staging.onrender.com; H="Authorization: Bearer $TOKEN"
+for i in $(seq 7); do
+  curl -s -o /dev/null -w "%{time_total}\n" "$API/health"
+  curl -s -o /dev/null -w "%{time_total}\n" "$API/health/db"
+  curl -s -o /dev/null -w "%{time_total}\n" -H "Authorization: Bearer nao.e.jwt" "$API/api/users/me"
+done
+for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects?page=1&size=20"; done
+for i in $(seq 45); do curl -s -o /dev/null -w "%{time_total}\n" -H "$H" "$API/api/projects/<id>/environments"; done
+# P50/P95: descartar as 5 primeiras de cada serie de 45 antes de calcular
+```
+
+**Contra o modelo** (`0,29 + 0,24 (se autenticado) + 0,17 × (3 + consultas)`,
+com 5 consultas na lista e 3 nos ambientes):
+
+| Rota | Previsto | Medido (P50) | A previsão... |
+|---|---:|---:|---|
+| `/api/projects` (lista) | 1890 ms | **1541 ms** | pessimista em **23%** |
+| `/api/projects/{id}/environments` | 1550 ms | **1192 ms** | pessimista em **30%** |
+
+O modelo continua acertando a direção (as duas rotas estouram o orçamento por
+uma margem grande, dominada pelas idas ao banco) mas superestima mais aqui do
+que acertou para a Biblioteca (pessimista em 11%) e o Dashboard (pessimista em
+8%) — a diferença provável é o número de consultas real ficar um pouco abaixo
+do que o ajuste de mínimos quadrados original previa por consulta marginal (a
+própria medição de 13/09 já registra que o resíduo é negativo e cresce com o
+número de consultas). Não foi isolado nesta tarefa: é leitura do número, não
+uma medição nova de onde o resíduo vem.
+
+> **P95 de `GET /api/projects`: 1986 ms contra 400 ms — não atingido.** P95 de
+> `GET /api/projects/{id}/environments`: 1358 ms contra 400 ms — também não
+> atingido. **Estoura por distância (0,17 s × idas ao banco), não pela
+> tela** — mesma frase e mesma causa já registradas para a Biblioteca e o
+> Dashboard (decisão 1 da spec do Dashboard, carregada adiante). O alvo de
+> consultas por carregamento (< 8) continua atingido nas duas rotas (5 e 3),
+> porque não depende da distância.
 
 ### A passada por agente completa (axe, 390/1440, teclado)
 
@@ -825,6 +926,21 @@ document.documentElement.scrollWidth - window.innerWidth   // 203
 document.querySelector("header .flex.h-16").getBoundingClientRect().width   // 593
 ```
 
+✅ **Fechado em 16–17/09/2026, na branch de limpeza `secao-8-limpeza-projetos`
+— e a atribuição acima ("é do shell, `Header.tsx`") estava só parcialmente
+certa.** Medido: **151 dos 203px** eram a barra de **ações** de
+`ProjectHeader.tsx` (`ProjectStatusSelect`, "Caderno de Obras",
+`EditProjectButton`, `DeleteProjectAlert`, em `space-x-2` sem quebra de
+linha) — não a fileira de abas, e não o shell —, corrigida no commit
+`564af1b` (`flex-wrap gap-2`), baixando o estouro para 52px. Os 52px
+restantes não fecharam com `min-w-0` isolado em `Header.tsx` (zero efeito,
+medido) — a causa era `AppShell.tsx:89` (a coluna `flex-1 flex flex-col`,
+sem `min-w-0`), impedindo o shell inteiro de encolher. Corrigida no commit
+`413c8f8`, o estouro caiu a **zero** em `/projects`, `/projects/<id>`,
+`/dashboard` e `/library`, nas duas larguras e nos dois temas — a mesma
+correção fechou de brinde o estouro de 42px da Biblioteca. Detalhe completo
+em [`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](../medicoes/2026-09-17-largura-do-shell.md).
+
 **Teclado** — `Tab` a partir do topo, lista e detalhe, sessão real:
 
 - **Lista**: sem parada invisível nas 30 primeiras paradas (sidebar → botões
@@ -861,12 +977,12 @@ captura de tela.
 | Item | Estado | Onde está a prova |
 |---|---|---|
 | Orçamento de performance (clique → dados) | ✅ no arranjo local — 921 ms < 1,5 s | seção acima |
-| Orçamento de performance (API implantada, P95) | ⚠️ **a medir depois do deploy** — previsão ≈ 1,89 s (lista) / 1,55 s (ambientes), por distância | seção acima |
+| Orçamento de performance (API implantada, P95) | ⚠️ **registrado, não atingido** — 1986 ms (lista) / 1358 ms (ambientes) contra 400 ms, medido em 16/09/2026 após o merge `ccfe290`; estoura por distância (0,17 s × idas ao banco), não pela tela | seção acima |
 | Consultas por carregamento (lista, detalhe, ambientes) | ✅ 5 / 4 / 3, reconfirmadas ao vivo contra staging | seção acima |
 | LCP e JS da rota | ✅ medido (952 ms / 466888 bytes) — sem alvo formal isolado por rota nesta régua | `docs/dev/medicoes/2026-09-15-lcp-e-js-da-rota.md` |
 | axe em navegador | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista repete achados já conhecidos (shell); detalhe tem achados novos (`aria-required-*` nas abas, `heading-order`, verde literal), registrados e não corrigidos | seção acima |
 | Navegação só por teclado | ✅ **medido por agente, aprovação humana global em 16/09/2026** — sem parada invisível, wizard e diálogo de exclusão abrem/fecham sem mouse | seção acima |
-| 390px e 1440px | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista sem estouro; **detalhe estoura 203px em 390px, achado novo, registrado e não corrigido** | seção acima |
+| 390px e 1440px | ✅ **medido por agente, aprovação humana global em 16/09/2026** — lista sem estouro; ~~detalhe estoura 203px em 390px, achado novo, registrado e não corrigido~~ **fechado em 16–17/09/2026, branch `secao-8-limpeza-projetos` — ver ✅ na seção acima** | seção acima |
 | Guardas e2e no `e2e.yml` | ✅ | `.github/workflows/e2e.yml` |
 | Doc do módulo com números e comando | ✅ | este arquivo |
 | Verificação humana (decisão 7 da spec) | ✅ **Concluída em 16/09/2026 — Thiago respondeu "verificado"** | seção "Verificação humana", abaixo |
@@ -876,10 +992,13 @@ global, não item a item.** Thiago respondeu "verificado" para a branch
 inteira, sem apontar nenhum defeito e sem comentar cada achado da passada
 por agente (axe, teclado, 390/1440px) individualmente. Isso é diferente de
 "cada achado foi revisto e confirmado um por um" — e é essa a razão de as
-três linhas virarem ✅ com a ressalva escrita, em vez de silenciosamente. Os
-achados que a passada por agente já tinha listado como não corrigidos
-(estouro de 203px, os `aria-*` do `ProjectHeader`, o `bg-emerald-500/10`
-literal, `page-has-heading-one` e `color-contrast` da lista) continuam não
+três linhas virarem ✅ com a ressalva escrita, em vez de silenciosamente. Dos
+achados que a passada por agente tinha listado como não corrigidos, o
+**estouro de 203px fechou depois, em 16–17/09/2026, na branch de limpeza
+`secao-8-limpeza-projetos`** (ver ✅ na seção "Largura, 390px", acima) — a
+aprovação de 16/09 não o resolveu, mas não é mais um item aberto hoje. Os
+demais (os `aria-*` do `ProjectHeader`, o `bg-emerald-500/10` literal,
+`page-has-heading-one` e `color-contrast` da lista) continuam não
 corrigidos — a aprovação não os resolveu, só confirmou que ninguém os achou
 bloqueantes para o merge.
 
@@ -920,3 +1039,13 @@ revisada, `custom_installments` descartado, e os demais do bloco "O que
 Projetos (Seção 8) deixou em aberto" no `CLAUDE.md`) seguem registrados como
 **conhecidos e aceitos** — a aprovação global não os corrigiu nem os
 reabriu, só liberou o merge com eles cientes e de pé.
+
+> ✅ **Correção datada, 17/09/2026, na branch de limpeza
+> `secao-8-limpeza-projetos`: três dos itens listados no parágrafo acima não
+> "seguem" abertos hoje.** Os dois estouros de 390px fecharam (ver "Largura,
+> 390px" e "`p-8` fixo virou `p-4 md:p-8`", acima); `custom_installments`
+> passou a ser devolvido e a preservar parcelas recebidas (ver "O que
+> Projetos (Seção 8) deixou em aberto", item 4, no `CLAUDE.md`); e passou a
+> existir um `not-found.tsx` em `projects/[id]` — falta só o de raiz (ver "A
+> UI de não encontrado", acima). A copy dos erros de mutação nunca revisada
+> continua aberta, sem mudança.
