@@ -55,11 +55,11 @@ export function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen
         <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-16 items-center justify-between px-6 md:px-8">
                 {/* Left Side: Mobile Menu + Breadcrumb */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 min-w-0">
                     {/* Mobile Menu Button */}
                     <button
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        className="lg:hidden h-9 w-9 rounded-lg flex items-center justify-center hover:bg-accent transition-colors"
+                        className="lg:hidden h-9 w-9 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0"
                         aria-label="Menu"
                     >
                         <Menu className="h-5 w-5 text-foreground" />
@@ -68,7 +68,7 @@ export function Header({ notificationsOpen, setNotificationsOpen, mobileMenuOpen
                     {/* Breadcrumb dinâmico + Data */}
                     <div className="flex flex-col min-w-0">
                         <HeaderBreadcrumb />
-                        <span className="text-xs text-muted-foreground mt-0.5">
+                        <span className="hidden sm:block text-xs text-muted-foreground mt-0.5">
                             {mounted
                                 ? new Date().toLocaleDateString("pt-BR", {
                                     weekday: "long",

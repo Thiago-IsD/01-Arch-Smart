@@ -461,6 +461,21 @@ e a lista de abas (295 px) não cabem nisso.
 `src/app/(dashboard)/library/page.tsx:14` **e** `flex-wrap gap-2` na linha do
 título. As duas juntas levaram o `scrollWidth` a 390 no experimento.
 
+> ✅ **Correção datada, 17/09/2026, na branch de limpeza
+> `secao-8-limpeza-projetos`: a causa apontada acima não era a causa —
+> registrado aqui sem reescrever o experimento, que mediu um sintoma real,
+> não a raiz.** O `p-8` da raiz nunca precisou mudar: o commit `413c8f8`
+> aplicou `min-w-0` na coluna do `AppShell`
+> (`ArchSmart-web/src/components/layout/AppShell.tsx:89`), um nível acima do
+> `<main>` de qualquer tela, e isso zerou o estouro de `/library` em 390px
+> **sem** tocar `library/page.tsx`. A causa raiz era a mesma nas duas telas
+> que estouravam (esta e `/projects/<id>`, 203px): a coluna do shell nunca
+> encolhia abaixo do seu conteúdo, então reduzir o padding da raiz (como o
+> experimento `raizP4` fez) só disfarçava o sintoma numa tela por vez — quem
+> corrigiu de fato foi um `min-w-0` upstream. Ver
+> [`docs/dev/modulos/projects.md`](../modulos/projects.md) e
+> [`docs/dev/medicoes/2026-09-17-largura-do-shell.md`](2026-09-17-largura-do-shell.md).
+
 ### Os dois riscos do item 3
 
 - **`LibraryToolbar.tsx:167` e `:180`, em 390, nos dois temas** — _verificado

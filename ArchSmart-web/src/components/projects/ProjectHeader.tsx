@@ -35,7 +35,7 @@ export function ProjectHeader({ project, activeTab = "ambientes" }: ProjectHeade
                         <span>{project.service_type || "Interiores"}</span>
                     </p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center flex-wrap gap-2">
                     <ProjectStatusSelect projectId={project.id} currentStatus={project.status} />
                     <span className="w-px h-6 bg-border mx-2 hidden md:block"></span>
                     <Button variant="outline" size="sm" asChild>

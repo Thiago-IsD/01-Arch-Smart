@@ -160,11 +160,11 @@ def test_o_detalhe_com_recebimento_personalizado_gasta_uma_consulta_a_mais(
     c, corpo, contador = _contar(db, client_a, f"/api/projects/{projeto.id}")
 
     assert corpo["payment_method"] == "CUSTOM"
-    # `custom_installments` nao esta em `corpo`: `ProjectResponse` nao declara
-    # o campo e o Pydantic o descarta (pendencia 4 da Secao 8 em CLAUDE.md) —
-    # a consulta acontece e o resultado e jogado fora. Nao afirmamos o valor
-    # aqui, so que a consulta que o monta foi paga.
-    assert "custom_installments" not in corpo
+    # `custom_installments` agora vem em `corpo` — `ProjectResponse` passou a
+    # declarar o campo (pendencia 4 da Secao 8 em CLAUDE.md, fechada). O valor
+    # em si e coberto por test_projetos.py; aqui a garantia e so a contagem de
+    # consultas abaixo, que continua sendo o assunto deste arquivo.
+    assert len(corpo["custom_installments"]) == 3
     # 1 contexto/entitlements + 1 obter do projeto + 1 ambientes (colecao,
     # so para o len de environments_count) + 1 cliente + 1 FinancialEntry
     # (so entra quando payment_method == "CUSTOM"; projects.py:99-103) = 5.

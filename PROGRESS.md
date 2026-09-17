@@ -1122,21 +1122,49 @@ _Última atualização: 2026-09-16_
 > atingido**, por distância — mesma causa do Dashboard e da Biblioteca; axe, teclado e 390/1440px foram
 > **medidos por agente, não por olho humano** — a verificação humana global
 > de Thiago cobriu o conjunto, mas não confirmou cada achado da passada por
-> agente item a item. Achado novo, registrado e não corrigido:
+> agente item a item. ~~Achado novo, registrado e não corrigido:
 > `/projects/{id}` estoura **203px** em 390px, nos dois temas (causa isolada
 > no `Header` do shell — breadcrumb + data não encolhem com nome de projeto
-> longo —, não em código de Projetos; a lista não estoura).
+> longo —, não em código de Projetos; a lista não estoura).~~
 >
-> **Itens conhecidos que continuam abertos, e que a verificação humana não
-> derrubou nem corrigiu:** o estouro de 203px acima; o estouro de ~42px já
-> conhecido da Biblioteca (`p-8` de `library/page.tsx:14`); a ausência de
-> `not-found.tsx` na árvore da aplicação (rota sem correspondência cai no 404
-> padrão do Next, em inglês, fora do shell); a copy dos erros de mutação
-> nunca revisada; `custom_installments` descartado na serialização de
-> `GET /api/projects/{id}` (efeito no usuário: editar um projeto com
-> recebimento Personalizado traz o cronograma vazio e o salvamento reprova);
-> e os demais itens do bloco "O que Projetos (Seção 8) deixou em aberto" no
-> `CLAUDE.md`.
+> ✅ **Correção datada, 17/09/2026, depois da branch de limpeza
+> `secao-8-limpeza-projetos`: os quatro itens abaixo, listados nesta nota
+> como "conhecidos e continuam abertos", fecharam ou mudaram de forma — e a
+> causa do estouro de 203px, como escrita aqui, estava só parcialmente
+> certa.**
+>
+> - **O estouro de 203px em `/projects/{id}`** não era só do `Header` do
+>   shell: **151px** vinham da própria barra de ações do `ProjectHeader.tsx`
+>   (`space-x-2` sem quebra de linha), corrigidos no commit `564af1b`
+>   (`flex-wrap gap-2`), que baixou o estouro para 52px. O resíduo de 52px
+>   não fechou com `min-w-0` isolado em `Header.tsx` (zero efeito, medido) —
+>   a causa era `AppShell.tsx:89`, sem `min-w-0`, impedindo a coluna inteira
+>   do shell de encolher. Corrigida no commit `413c8f8`, o estouro caiu a
+>   **zero** em `/projects`, `/projects/<id>`, `/dashboard` e `/library`, nas
+>   duas larguras e nos dois temas.
+> - **O estouro de ~42px da Biblioteca**, atribuído a `p-8` de
+>   `library/page.tsx:14`: a mesma correção do `AppShell` (`413c8f8`) zerou
+>   esse estouro também, sem tocar o `p-8` — que continua no arquivo, como
+>   redundância inofensiva, não verificada como contribuindo ou não numa
+>   fração menor. A causa real era a mesma coluna do shell, não o padding da
+>   página.
+> - **A ausência de `not-found.tsx`**: passou a existir um em
+>   `projects/[id]` (commits `2011353` + `6ea0a36`), boundary de 6 chamadas
+>   de `notFound()` em 5 arquivos, com copy genérica. **Continua faltando um
+>   de raiz** — uma URL que não casa com nenhum segmento (`/projetos-typo`)
+>   ainda cai no 404 padrão do Next, em inglês, fora do shell.
+> - **`custom_installments` descartado na serialização**: fechado em dois
+>   commits (`c289bd1` declara o campo no schema; `a2197d0` preserva as
+>   parcelas já recebidas e re-sincroniza só as previstas, em vez de
+>   duplicar). Ficou em aberto: editar a linha da parcela já recebida no
+>   wizard quebra o casamento por `(amount, due_date)` e cria uma prevista a
+>   mais (não duplica dinheiro recebido) — travar essa linha na UI é decisão
+>   de produto, de Thiago, não tomada.
+>
+> A copy dos erros de mutação, e os demais itens do bloco "O que Projetos
+> (Seção 8) deixou em aberto" no `CLAUDE.md` não cobertos acima, continuam
+> abertos como estavam. Números e commits: `CLAUDE.md`, mesmo bloco, e
+> [`docs/dev/modulos/projects.md`](docs/dev/modulos/projects.md).
 >
 > Os portões, medidos em 16/09/2026: comandos e resultados no relatório da
 > Tarefa 12
