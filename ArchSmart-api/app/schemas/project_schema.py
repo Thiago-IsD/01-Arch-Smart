@@ -83,7 +83,11 @@ class ProjectResponse(ProjectBase):
     created_at: datetime
     environments_count: int = 0
     client: Optional[ClientResponse] = None  # Embed client data for the UI Card
-    
+    # So preenchido pelo endpoint via setattr quando payment_method == "CUSTOM"
+    # (app/api/endpoints/projects.py). Sem essa declaracao o Pydantic descarta
+    # o valor na serializacao — pendencia 4 da Secao 8 em CLAUDE.md.
+    custom_installments: Optional[List[CustomInstallment]] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 class PaginatedProjectResponse(BaseModel):
